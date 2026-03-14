@@ -1,0 +1,57 @@
+name: Sift
+options:
+  bundleIdPrefix: com.jessicahirsh
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    PRODUCT_NAME: Sift
+    SWIFT_VERSION: "5.10"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ENABLE_HARDENED_RUNTIME: YES
+    CODE_SIGN_STYLE: Manual
+
+targets:
+  Sift:
+    type: application
+    platform: macOS
+    bundleId: com.jessicahirsh.sift
+    deploymentTarget: "14.0"
+    sources:
+      - Sift
+    settings:
+      base:
+        INFOPLIST_FILE: Sift/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Sift/Resources/Sift.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.jessicahirsh.sift
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_IDENTITY: "Apple Distribution"
+        PROVISIONING_PROFILE_SPECIFIER: ""
+        OTHER_LDFLAGS: "-framework ScriptingBridge"
+    preBuildScripts:
+      - name: SwiftLint
+        script: |
+          if which swiftlint > /dev/null; then
+            swiftlint lint --strict
+          else
+            echo "warning: SwiftLint not installed, download from https://github.com/realm/SwiftLint"
+          fi
+        basedOnDependencyAnalysis: false
+    dependencies:
+      - sdk: ScriptingBridge.framework
+
+  SiftTests:
+    type: bundle.unit-test
+    platform: macOS
+    bundleId: com.jessicahirsh.sift.tests
+    sources:
+      - SiftTests
+    dependencies:
+      - target: Sift
+    settings:
+      base:
+        TEST_HOST: ""
+        PRODUCT_BUNDLE_IDENTIFIER: com.jessicahirsh.sift.tests

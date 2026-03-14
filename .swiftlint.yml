@@ -1,0 +1,28 @@
+included:
+  - Sift
+  - SiftTests
+
+excluded:
+  - Sift/Resources
+
+disabled_rules:
+  - trailing_whitespace
+
+opt_in_rules:
+  - empty_count
+  - explicit_init
+  - first_where
+  - force_unwrapping
+  - implicit_return
+
+line_length:
+  warning: 120
+  error: 160
+
+type_body_length:
+  warning: 300
+  error: 400
+
+file_length:
+  warning: 500
+  error: 700
