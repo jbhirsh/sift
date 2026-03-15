@@ -119,7 +119,7 @@ and run `xcodegen generate`.
 ---
 
 ## CI/CD
-- **CI** (`.github/workflows/ci.yml`): runs on every push to master.
+- **CI** (`.github/workflows/ci.yml`): runs on every push to main.
   Lints + builds + tests.
 - **Deploy** (`.github/workflows/deploy.yml`): runs on `v*` tag push.
   Builds, signs, notarizes, submits to App Store via Fastlane.
@@ -143,4 +143,4 @@ and run `xcodegen generate`.
 - Never use `git add -A` — add files explicitly
 - Never commit Keychain credentials or `.p12`/`.p8` files
 - Never modify tests to make them pass — fix the implementation
-- Never push directly to master without passing tests
+- Never push directly to main without passing tests
