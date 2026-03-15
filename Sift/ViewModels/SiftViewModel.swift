@@ -168,6 +168,15 @@ final class SiftViewModel: ObservableObject {
         if cursor >= tracks.count { phase = .done }
     }
 
+    // MARK: - Stop session
+
+    func stopSession() {
+        stopPositionPolling()
+        Task { try? await musicService.pause() }
+        saveSession()
+        phase = .done
+    }
+
     // MARK: - Decisions
 
     func decide(_ decision: Decision) {

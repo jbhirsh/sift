@@ -105,6 +105,44 @@ final class TestSessionStore: XCTestCase {
     }
 }
 
+// MARK: - TestStopSession
+
+@MainActor
+final class TestStopSession: XCTestCase {
+    func testStopSessionTransitionsToDone() {
+        let vm = SiftViewModel(playlistService: MockPlaylistService())
+        let tracks = [
+            Track(id: "1", name: "A", artist: "X", album: "", duration: 180, playCount: 0, dateAdded: Date()),
+            Track(id: "2", name: "B", artist: "Y", album: "", duration: 200, playCount: 0, dateAdded: Date())
+        ]
+        vm.loadTracks(tracks)
+        vm.decideWithoutPlayback(.keep)
+        XCTAssertEqual(vm.phase, .sifting)
+
+        vm.stopSession()
+
+        XCTAssertEqual(vm.phase, .done)
+    }
+
+    func testStopSessionPreservesDecisionsSoFar() {
+        let vm = SiftViewModel(playlistService: MockPlaylistService())
+        let tracks = [
+            Track(id: "1", name: "A", artist: "X", album: "", duration: 180, playCount: 0, dateAdded: Date()),
+            Track(id: "2", name: "B", artist: "Y", album: "", duration: 200, playCount: 0, dateAdded: Date()),
+            Track(id: "3", name: "C", artist: "Z", album: "", duration: 240, playCount: 0, dateAdded: Date())
+        ]
+        vm.loadTracks(tracks)
+        vm.decideWithoutPlayback(.keep)
+        vm.decideWithoutPlayback(.remove)
+
+        vm.stopSession()
+
+        XCTAssertEqual(vm.kept.count, 1)
+        XCTAssertEqual(vm.removed.count, 1)
+        XCTAssertEqual(vm.remaining, 1)
+    }
+}
+
 // MARK: - TestPlaylistScriptBuilder
 
 final class TestPlaylistScriptBuilder: XCTestCase {

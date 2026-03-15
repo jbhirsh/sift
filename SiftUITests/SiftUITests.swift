@@ -168,4 +168,30 @@ final class SiftUITests: XCTestCase {
         app.buttons["Start Over"].click()
         XCTAssertTrue(app.staticTexts["Mock Song One"].waitForExistence(timeout: 5))
     }
+
+    // MARK: - Stop session
+
+    func testStopButtonExists() {
+        XCTAssertTrue(waitForTrack("Mock Song One"))
+        XCTAssertTrue(app.buttons.matching(identifier: "stop-button").firstMatch.waitForExistence(timeout: 3))
+    }
+
+    func testStopButtonShowsDoneScreen() {
+        XCTAssertTrue(waitForTrack("Mock Song One"))
+        keep()
+        Thread.sleep(forTimeInterval: 0.3)
+        app.buttons.matching(identifier: "stop-button").firstMatch.click()
+        XCTAssertTrue(waitForDoneScreen(), "Done screen not shown after tapping Stop")
+    }
+
+    func testStopPreservesDecisionsInSummary() {
+        XCTAssertTrue(waitForTrack("Mock Song One"))
+        keep()
+        Thread.sleep(forTimeInterval: 0.3)
+        app.buttons.matching(identifier: "stop-button").firstMatch.click()
+        XCTAssertTrue(waitForDoneScreen())
+        let keptCount = app.staticTexts.matching(identifier: "summary-count-kept").firstMatch
+        XCTAssertTrue(keptCount.waitForExistence(timeout: 3))
+        XCTAssertEqual(keptCount.value as? String ?? keptCount.label, "1")
+    }
 }

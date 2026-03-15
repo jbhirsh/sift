@@ -30,7 +30,12 @@ xcodebuild test \
   | xcbeautify
 ```
 
-Tests must be green before any commit. New business logic needs a test.
+Tests must be green before any commit.
+
+**Test coverage requirements:**
+- Every new ViewModel method or service function must have a unit test in `SiftTests/`.
+- Every new UI element or user-facing feature must have a UI test in `SiftUITests/`.
+- Tests are written alongside the implementation, not after the commit.
 
 ---
 

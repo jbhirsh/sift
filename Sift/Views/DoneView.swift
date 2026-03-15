@@ -8,10 +8,12 @@ struct DoneView: View {
         ScrollView {
             VStack(spacing: 32) {
                 VStack(spacing: 8) {
-                    Text("All done.")
+                    Text(vm.remaining == 0 ? "All done." : "Session stopped.")
                         .font(.system(size: 40, weight: .bold, design: .rounded))
                         .accessibilityIdentifier("done-title")
-                    Text("Your library has been sifted.")
+                    Text(vm.remaining == 0
+                         ? "Your library has been sifted."
+                         : "\(vm.remaining) track\(vm.remaining == 1 ? "" : "s") remaining.")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                 }
