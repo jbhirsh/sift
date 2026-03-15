@@ -3,7 +3,6 @@ import XCTest
 /// Captures App Store screenshots using fastlane snapshot.
 /// Run via: fastlane screenshots
 /// Not included in the regular CI test run.
-@MainActor
 final class SiftScreenshots: XCTestCase {
     let app = XCUIApplication()
 
@@ -11,7 +10,8 @@ final class SiftScreenshots: XCTestCase {
         super.setUp()
         continueAfterFailure = false
         app.launchArguments = ["--ui-testing"]
-        Snapshot.setupSnapshot(app)
+        // MainActor.assumeIsolated is safe here — XCTest always calls setUp on the main thread.
+        MainActor.assumeIsolated { Snapshot.setupSnapshot(app) }
         app.launch()
     }
 
@@ -22,14 +22,14 @@ final class SiftScreenshots: XCTestCase {
 
     func test01_SiftingView() {
         XCTAssertTrue(app.staticTexts["Mock Song One"].waitForExistence(timeout: 5))
-        Snapshot.snapshot("01_Sifting")
+        MainActor.assumeIsolated { Snapshot.snapshot("01_Sifting") }
     }
 
     func test02_SiftingWithProgress() {
         XCTAssertTrue(app.staticTexts["Mock Song One"].waitForExistence(timeout: 5))
         app.typeKey(XCUIKeyboardKey.leftArrow, modifierFlags: [])  // keep
         XCTAssertTrue(app.staticTexts["Mock Song Two"].waitForExistence(timeout: 5))
-        Snapshot.snapshot("02_SiftingProgress")
+        MainActor.assumeIsolated { Snapshot.snapshot("02_SiftingProgress") }
     }
 
     func test03_PausedSummary() {
@@ -40,7 +40,7 @@ final class SiftScreenshots: XCTestCase {
         XCTAssertTrue(app.staticTexts["Mock Song Three"].waitForExistence(timeout: 5))
         app.buttons.matching(identifier: "stop-button").firstMatch.click()
         XCTAssertTrue(app.buttons["Resume Session"].waitForExistence(timeout: 5))
-        Snapshot.snapshot("03_PausedSummary")
+        MainActor.assumeIsolated { Snapshot.snapshot("03_PausedSummary") }
     }
 
     func test04_DoneScreen() {
@@ -55,6 +55,6 @@ final class SiftScreenshots: XCTestCase {
                 .matching(NSPredicate(format: "identifier == 'done-title'"))
                 .firstMatch.waitForExistence(timeout: 10)
         )
-        Snapshot.snapshot("04_Done")
+        MainActor.assumeIsolated { Snapshot.snapshot("04_Done") }
     }
 }
