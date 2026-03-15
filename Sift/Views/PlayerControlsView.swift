@@ -77,9 +77,9 @@ struct PlayerControlsView: View {
     }
 
     private func formatTime(_ seconds: Double) -> String {
-        let m = Int(seconds) / 60
-        let s = Int(seconds) % 60
-        return String(format: "%d:%02d", m, s)
+        let minutes = Int(seconds) / 60
+        let secs = Int(seconds) % 60
+        return String(format: "%d:%02d", minutes, secs)
     }
 }
 
@@ -97,7 +97,7 @@ struct SectionButton: View {
                 .padding(.vertical, 4)
                 .background(section.isChorus ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.1),
                             in: Capsule())
-                .foregroundStyle(section.isChorus ? .accent : .secondary)
+                .foregroundStyle(section.isChorus ? Color.accentColor : Color.secondary)
         }
         .buttonStyle(.plain)
     }

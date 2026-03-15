@@ -28,7 +28,7 @@ final class CullViewModel: ObservableObject {
     @Published var playbackPosition: Double = 0
     @Published var isPlaying: Bool = false
     @Published var currentSections: [Section] = []
-    @Published var artwork: NSImage? = nil
+    @Published var artwork: NSImage?
 
     // MARK: - Session resume
     @Published var hasSavedSession: Bool = false
@@ -46,7 +46,7 @@ final class CullViewModel: ObservableObject {
 
     // MARK: - Computed
     var currentTrack: Track? { tracks[safe: cursor] }
-    var nextTrack: Track?    { tracks[safe: cursor + 1] }
+    var nextTrack: Track? { tracks[safe: cursor + 1] }
     var nextNextTrack: Track? { tracks[safe: cursor + 2] }
     var remaining: Int { max(0, tracks.count - cursor) }
     var total: Int { tracks.count }

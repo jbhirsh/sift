@@ -15,6 +15,19 @@ opt_in_rules:
   - force_unwrapping
   - implicit_return
 
+identifier_name:
+  allowed_symbols: ["_"]
+  min_length: 1
+  excluded:
+    - vm
+    - id
+    - dx
+    - dy
+    - m
+    - s
+    - x
+    - y
+
 line_length:
   warning: 120
   error: 160

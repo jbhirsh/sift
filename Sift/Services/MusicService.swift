@@ -1,8 +1,12 @@
+import AppKit
 import Foundation
 import ScriptingBridge
 
 // MARK: - ScriptingBridge protocols for Music.app
 // These mirror the generated Music.h header. We define only what we need.
+
+// In ScriptingBridge, element collections are methods that return SBElementArray.
+// Scalar properties remain as vars.
 
 @objc protocol MusicApplication {
     @objc optional var currentTrack: MusicTrack { get }
@@ -12,18 +16,18 @@ import ScriptingBridge
     @objc optional func pause()
     @objc optional func stop()
     @objc optional func playpause()
-    @objc optional var sources: SBElementArray { get }
+    @objc optional func sources() -> SBElementArray
 }
 
 @objc protocol MusicSource {
-    @objc optional var libraryPlaylists: SBElementArray { get }
-    @objc optional var playlists: SBElementArray { get }
+    @objc optional func libraryPlaylists() -> SBElementArray
+    @objc optional func playlists() -> SBElementArray
     @objc optional var name: String { get }
     @objc optional var kind: MusicESourceKind { get }
 }
 
 @objc protocol MusicLibraryPlaylist {
-    @objc optional var tracks: SBElementArray { get }
+    @objc optional func tracks() -> SBElementArray
     @objc optional var name: String { get }
 }
 
@@ -37,7 +41,7 @@ import ScriptingBridge
     @objc optional var dateAdded: Date { get }
     @objc optional func playOnce(_ flag: Bool)
     @objc optional func delete()
-    @objc optional var artworks: SBElementArray { get }
+    @objc optional func artworks() -> SBElementArray
 }
 
 @objc protocol MusicArtwork {
@@ -45,21 +49,21 @@ import ScriptingBridge
 }
 
 @objc enum MusicEPlayerState: Int {
-    case stopped  = 0x6b505353
-    case playing  = 0x6b505350
-    case paused   = 0x6b505370
+    case stopped   = 0x6b505353
+    case playing   = 0x6b505350
+    case paused    = 0x6b505370
     case rewinding = 0x6b505352
     case advancing = 0x6b505346
 }
 
 @objc enum MusicESourceKind: Int {
-    case library = 0x6b4c6962
-    case iTunesStore = 0x6b495453
-    case iPod = 0x6b69506f
-    case audioCD = 0x6b414344
-    case radioTuner = 0x6b54756e
+    case library       = 0x6b4c6962
+    case iTunesStore   = 0x6b495453
+    case iPod          = 0x6b69506f
+    case audioCD       = 0x6b414344
+    case radioTuner    = 0x6b54756e
     case sharedLibrary = 0x6b536864
-    case unknown = 0x6b556e6b
+    case unknown       = 0x6b556e6b
 }
 
 extension SBApplication: MusicApplication {}
@@ -73,21 +77,25 @@ enum MusicError: Error {
 }
 
 actor MusicService {
-    private var app: (any MusicApplication & SBApplicationProtocol)?
+    private var sbApp: SBApplication?
 
-    private func getApp() throws -> any MusicApplication & SBApplicationProtocol {
-        if let existing = app { return existing }
-        guard let musicApp = SBApplication(bundleIdentifier: "com.apple.Music") as? (any MusicApplication & SBApplicationProtocol) else {
+    private func getApp() throws -> SBApplication {
+        if let existing = sbApp { return existing }
+        guard let app = SBApplication(bundleIdentifier: "com.apple.Music") else {
             throw MusicError.appNotFound
         }
-        app = musicApp
-        return musicApp
+        sbApp = app
+        return app
+    }
+
+    private func musicApp() throws -> any MusicApplication {
+        try getApp() as any MusicApplication
     }
 
     func loadLibrary() async throws -> [Track] {
-        let musicApp = try getApp()
+        let app = try musicApp()
 
-        guard let sources = musicApp.sources?() as? [any MusicSource],
+        guard let sources = app.sources?() as? [any MusicSource],
               let library = sources.first(where: { $0.kind == .library }),
               let playlists = library.libraryPlaylists?() as? [any MusicLibraryPlaylist],
               let libraryPlaylist = playlists.first,
@@ -111,9 +119,9 @@ actor MusicService {
     }
 
     func play(trackID: String, at position: Double = 0) throws {
-        let musicApp = try getApp()
+        let app = try musicApp()
 
-        guard let sources = musicApp.sources?() as? [any MusicSource],
+        guard let sources = app.sources?() as? [any MusicSource],
               let library = sources.first(where: { $0.kind == .library }),
               let playlists = library.libraryPlaylists?() as? [any MusicLibraryPlaylist],
               let libraryPlaylist = playlists.first,
@@ -124,39 +132,34 @@ actor MusicService {
 
         track.playOnce?(false)
         if position > 0 {
-            (musicApp as! SBApplication).setValue(position, forKey: "playerPosition")
+            try getApp().setValue(position, forKey: "playerPosition")
         }
     }
 
     func currentPosition() throws -> Double {
-        let musicApp = try getApp()
-        return musicApp.playerPosition ?? 0
+        try musicApp().playerPosition ?? 0
     }
 
     func seek(to position: Double) throws {
-        let musicApp = try getApp()
-        (musicApp as! SBApplication).setValue(position, forKey: "playerPosition")
+        try getApp().setValue(position, forKey: "playerPosition")
     }
 
     func pause() throws {
-        let musicApp = try getApp()
-        musicApp.pause?()
+        try musicApp().pause?()
     }
 
     func resume() throws {
-        let musicApp = try getApp()
-        musicApp.play?()
+        try musicApp().play?()
     }
 
     func isPlaying() throws -> Bool {
-        let musicApp = try getApp()
-        return musicApp.playerState == .playing
+        try musicApp().playerState == .playing
     }
 
     func artwork(forTrackID trackID: String) throws -> NSImage? {
-        let musicApp = try getApp()
+        let app = try musicApp()
 
-        guard let sources = musicApp.sources?() as? [any MusicSource],
+        guard let sources = app.sources?() as? [any MusicSource],
               let library = sources.first(where: { $0.kind == .library }),
               let playlists = library.libraryPlaylists?() as? [any MusicLibraryPlaylist],
               let libraryPlaylist = playlists.first,
@@ -171,9 +174,9 @@ actor MusicService {
     }
 
     func deleteTrack(id trackID: String) throws {
-        let musicApp = try getApp()
+        let app = try musicApp()
 
-        guard let sources = musicApp.sources?() as? [any MusicSource],
+        guard let sources = app.sources?() as? [any MusicSource],
               let library = sources.first(where: { $0.kind == .library }),
               let playlists = library.libraryPlaylists?() as? [any MusicLibraryPlaylist],
               let libraryPlaylist = playlists.first,

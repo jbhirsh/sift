@@ -7,7 +7,7 @@ struct CullView: View {
         VStack(spacing: 0) {
             // Stats bar
             HStack(spacing: 24) {
-                stat(label: "kept",    value: vm.kept.count,    color: .green)
+                stat(label: "kept", value: vm.kept.count, color: .green)
                 stat(label: "removed", value: vm.removed.count, color: .red)
                 stat(label: "skipped", value: vm.skipped.count, color: .orange)
                 Spacer()
@@ -48,11 +48,11 @@ struct CullView: View {
                 .background(.bar)
         }
         .frame(width: 600, height: 560)
-        .onKeyPress(.leftArrow)  { vm.decide(.keep);   return .handled }
+        .onKeyPress(.leftArrow) { vm.decide(.keep); return .handled }
         .onKeyPress(.rightArrow) { vm.decide(.remove); return .handled }
-        .onKeyPress("a")         { vm.decide(.keep);   return .handled }
-        .onKeyPress("d")         { vm.decide(.remove); return .handled }
-        .onKeyPress(.space)      { vm.togglePlayPause(); return .handled }
+        .onKeyPress("a") { vm.decide(.keep); return .handled }
+        .onKeyPress("d") { vm.decide(.remove); return .handled }
+        .onKeyPress(.space) { vm.togglePlayPause(); return .handled }
     }
 
     private func stat(label: String, value: Int, color: Color) -> some View {

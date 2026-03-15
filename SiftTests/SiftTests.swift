@@ -4,33 +4,36 @@ import XCTest
 final class TestSortOrder: XCTestCase {
     private func makeTracks() -> [Track] {
         [
-            Track(id: "1", name: "A", artist: "X", album: "L", duration: 180, playCount: 5,  dateAdded: Date(timeIntervalSince1970: 1000)),
-            Track(id: "2", name: "B", artist: "Y", album: "L", duration: 200, playCount: 0,  dateAdded: Date(timeIntervalSince1970: 2000)),
-            Track(id: "3", name: "C", artist: "Z", album: "L", duration: 220, playCount: 10, dateAdded: Date(timeIntervalSince1970: 3000)),
+            Track(id: "1", name: "A", artist: "X", album: "L", duration: 180,
+                  playCount: 5, dateAdded: Date(timeIntervalSince1970: 1000)),
+            Track(id: "2", name: "B", artist: "Y", album: "L", duration: 200,
+                  playCount: 0, dateAdded: Date(timeIntervalSince1970: 2000)),
+            Track(id: "3", name: "C", artist: "Z", album: "L", duration: 220,
+                  playCount: 10, dateAdded: Date(timeIntervalSince1970: 3000))
         ]
     }
 
     func testLeastPlayedSort() {
-        let vm = CullViewModel()
-        let sorted = vm.sortedTracks(makeTracks(), by: .leastPlayed)
+        let viewModel = CullViewModel()
+        let sorted = viewModel.sortedTracks(makeTracks(), by: .leastPlayed)
         XCTAssertEqual(sorted.map(\.playCount), [0, 5, 10])
     }
 
     func testMostPlayedSort() {
-        let vm = CullViewModel()
-        let sorted = vm.sortedTracks(makeTracks(), by: .mostPlayed)
+        let viewModel = CullViewModel()
+        let sorted = viewModel.sortedTracks(makeTracks(), by: .mostPlayed)
         XCTAssertEqual(sorted.map(\.playCount), [10, 5, 0])
     }
 
     func testOldestSort() {
-        let vm = CullViewModel()
-        let sorted = vm.sortedTracks(makeTracks(), by: .oldest)
+        let viewModel = CullViewModel()
+        let sorted = viewModel.sortedTracks(makeTracks(), by: .oldest)
         XCTAssertEqual(sorted.map(\.id), ["1", "2", "3"])
     }
 
     func testNewestSort() {
-        let vm = CullViewModel()
-        let sorted = vm.sortedTracks(makeTracks(), by: .newest)
+        let viewModel = CullViewModel()
+        let sorted = viewModel.sortedTracks(makeTracks(), by: .newest)
         XCTAssertEqual(sorted.map(\.id), ["3", "2", "1"])
     }
 }
@@ -52,8 +55,14 @@ final class TestSessionStore: XCTestCase {
     }
 
     func testSaveAndLoad() {
-        let track = Track(id: "abc", name: "Test", artist: "Artist", album: "Album", duration: 180, playCount: 3, dateAdded: Date())
-        let session = SiftSession(tracks: [track], cursor: 0, kept: [], removed: [], skipped: [], sortOrder: .leastPlayed, savedAt: Date())
+        let track = Track(
+            id: "abc", name: "Test", artist: "Artist",
+            album: "Album", duration: 180, playCount: 3, dateAdded: Date()
+        )
+        let session = SiftSession(
+            tracks: [track], cursor: 0, kept: [], removed: [],
+            skipped: [], sortOrder: .leastPlayed, savedAt: Date()
+        )
 
         store.save(session)
         let loaded = store.load()
@@ -64,8 +73,14 @@ final class TestSessionStore: XCTestCase {
     }
 
     func testClearRemovesSession() {
-        let track = Track(id: "abc", name: "Test", artist: "Artist", album: "Album", duration: 180, playCount: 3, dateAdded: Date())
-        let session = SiftSession(tracks: [track], cursor: 0, kept: [], removed: [], skipped: [], sortOrder: .leastPlayed, savedAt: Date())
+        let track = Track(
+            id: "abc", name: "Test", artist: "Artist",
+            album: "Album", duration: 180, playCount: 3, dateAdded: Date()
+        )
+        let session = SiftSession(
+            tracks: [track], cursor: 0, kept: [], removed: [],
+            skipped: [], sortOrder: .leastPlayed, savedAt: Date()
+        )
         store.save(session)
         store.clear()
         XCTAssertFalse(store.exists)
@@ -89,46 +104,49 @@ final class TestSpotifyFallback: XCTestCase {
 
 final class TestDecisionState: XCTestCase {
     @MainActor func testKeepAdvancesCursor() {
-        let vm = CullViewModel()
+        let viewModel = CullViewModel()
         let tracks = [
             Track(id: "1", name: "A", artist: "X", album: "L", duration: 180, playCount: 0, dateAdded: Date()),
-            Track(id: "2", name: "B", artist: "Y", album: "L", duration: 200, playCount: 0, dateAdded: Date()),
+            Track(id: "2", name: "B", artist: "Y", album: "L", duration: 200, playCount: 0, dateAdded: Date())
         ]
-        vm.loadTracks(tracks)
-        XCTAssertEqual(vm.cursor, 0)
-        vm.decideWithoutPlayback(.keep)
-        XCTAssertEqual(vm.cursor, 1)
-        XCTAssertEqual(vm.kept.count, 1)
+        viewModel.loadTracks(tracks)
+        XCTAssertEqual(viewModel.cursor, 0)
+        viewModel.decideWithoutPlayback(.keep)
+        XCTAssertEqual(viewModel.cursor, 1)
+        XCTAssertEqual(viewModel.kept.count, 1)
     }
 
     @MainActor func testRemoveAdvancesCursorAndQueues() {
-        let vm = CullViewModel()
+        let viewModel = CullViewModel()
         let tracks = [
-            Track(id: "1", name: "A", artist: "X", album: "L", duration: 180, playCount: 0, dateAdded: Date()),
+            Track(id: "1", name: "A", artist: "X", album: "L", duration: 180, playCount: 0, dateAdded: Date())
         ]
-        vm.loadTracks(tracks)
-        vm.decideWithoutPlayback(.remove)
-        XCTAssertEqual(vm.removed.count, 1)
-        XCTAssertEqual(vm.phase, .done)
+        viewModel.loadTracks(tracks)
+        viewModel.decideWithoutPlayback(.remove)
+        XCTAssertEqual(viewModel.removed.count, 1)
+        XCTAssertEqual(viewModel.phase, .done)
     }
 
     @MainActor func testSkipAdvancesCursor() {
-        let vm = CullViewModel()
+        let viewModel = CullViewModel()
         let tracks = [
             Track(id: "1", name: "A", artist: "X", album: "L", duration: 180, playCount: 0, dateAdded: Date()),
-            Track(id: "2", name: "B", artist: "Y", album: "L", duration: 200, playCount: 0, dateAdded: Date()),
+            Track(id: "2", name: "B", artist: "Y", album: "L", duration: 200, playCount: 0, dateAdded: Date())
         ]
-        vm.loadTracks(tracks)
-        vm.decideWithoutPlayback(.skip)
-        XCTAssertEqual(vm.skipped.count, 1)
-        XCTAssertEqual(vm.cursor, 1)
+        viewModel.loadTracks(tracks)
+        viewModel.decideWithoutPlayback(.skip)
+        XCTAssertEqual(viewModel.skipped.count, 1)
+        XCTAssertEqual(viewModel.cursor, 1)
     }
 
     @MainActor func testDonePhaseWhenLibraryExhausted() {
-        let vm = CullViewModel()
-        let track = Track(id: "1", name: "A", artist: "X", album: "L", duration: 180, playCount: 0, dateAdded: Date())
-        vm.loadTracks([track])
-        vm.decideWithoutPlayback(.keep)
-        XCTAssertEqual(vm.phase, .done)
+        let viewModel = CullViewModel()
+        let track = Track(
+            id: "1", name: "A", artist: "X", album: "L",
+            duration: 180, playCount: 0, dateAdded: Date()
+        )
+        viewModel.loadTracks([track])
+        viewModel.decideWithoutPlayback(.keep)
+        XCTAssertEqual(viewModel.phase, .done)
     }
 }

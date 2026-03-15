@@ -38,11 +38,15 @@ struct SetupView: View {
                     .controlSize(.large)
                 }
 
-                Button(vm.hasSavedSession ? "Start Fresh" : "Start Sifting") {
-                    vm.startFresh()
+                if vm.hasSavedSession {
+                    Button("Start Fresh") { vm.startFresh() }
+                        .buttonStyle(.bordered)
+                        .controlSize(.large)
+                } else {
+                    Button("Start Sifting") { vm.startFresh() }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
                 }
-                .buttonStyle(vm.hasSavedSession ? .bordered : .borderedProminent)
-                .controlSize(.large)
             }
 
             Spacer()

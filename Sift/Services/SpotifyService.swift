@@ -7,7 +7,12 @@ struct SpotifySection: Codable {
     let tempo: Double
     let key: Int
     let mode: Int
-    let time_signature: Int
+    let timeSignature: Int
+
+    enum CodingKeys: String, CodingKey {
+        case start, duration, loudness, tempo, key, mode
+        case timeSignature = "time_signature"
+    }
 }
 
 struct SpotifyAudioAnalysis: Codable {
@@ -16,7 +21,12 @@ struct SpotifyAudioAnalysis: Codable {
 
 struct SpotifySearchTrack: Codable {
     let id: String
-    let duration_ms: Int
+    let durationMs: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case durationMs = "duration_ms"
+    }
 }
 
 struct SpotifySearchTracks: Codable {
@@ -28,8 +38,13 @@ struct SpotifySearchResponse: Codable {
 }
 
 struct SpotifyTokenResponse: Codable {
-    let access_token: String
-    let expires_in: Int
+    let accessToken: String
+    let expiresIn: Int
+
+    enum CodingKeys: String, CodingKey {
+        case accessToken = "access_token"
+        case expiresIn = "expires_in"
+    }
 }
 
 actor SpotifyService {
@@ -80,7 +95,9 @@ actor SpotifyService {
             return token
         }
 
-        let url = URL(string: "https://accounts.spotify.com/api/token")!
+        guard let url = URL(string: "https://accounts.spotify.com/api/token") else {
+            throw URLError(.badURL)
+        }
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
 
@@ -88,26 +105,28 @@ actor SpotifyService {
         let encoded = Data(credentials.utf8).base64EncodedString()
         request.setValue("Basic \(encoded)", forHTTPHeaderField: "Authorization")
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        request.httpBody = "grant_type=client_credentials".data(using: .utf8)
+        request.httpBody = Data("grant_type=client_credentials".utf8)
 
         let (data, _) = try await URLSession.shared.data(for: request)
         let response = try JSONDecoder().decode(SpotifyTokenResponse.self, from: data)
 
-        cachedToken = response.access_token
-        tokenExpiresAt = Date().addingTimeInterval(Double(response.expires_in) - 30)
-        return response.access_token
+        cachedToken = response.accessToken
+        tokenExpiresAt = Date().addingTimeInterval(Double(response.expiresIn) - 30)
+        return response.accessToken
     }
 
     private func searchTrack(name: String, artist: String, token: String) async throws -> String? {
-        var components = URLComponents(string: "https://api.spotify.com/v1/search")!
-        let query = "\(name) \(artist)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? name
+        guard var components = URLComponents(string: "https://api.spotify.com/v1/search") else {
+            throw URLError(.badURL)
+        }
         components.queryItems = [
             URLQueryItem(name: "q", value: "\(name) \(artist)"),
             URLQueryItem(name: "type", value: "track"),
             URLQueryItem(name: "limit", value: "1")
         ]
 
-        var request = URLRequest(url: components.url!)
+        guard let searchURL = components.url else { throw URLError(.badURL) }
+        var request = URLRequest(url: searchURL)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
         let (data, _) = try await URLSession.shared.data(for: request)
@@ -116,7 +135,9 @@ actor SpotifyService {
     }
 
     private func audioAnalysis(trackID: String, token: String) async throws -> SpotifyAudioAnalysis {
-        let url = URL(string: "https://api.spotify.com/v1/audio-analysis/\(trackID)")!
+        guard let url = URL(string: "https://api.spotify.com/v1/audio-analysis/\(trackID)") else {
+            throw URLError(.badURL)
+        }
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
@@ -130,7 +151,7 @@ actor SpotifyService {
         }
 
         let count = spotifySections.count
-        return spotifySections.enumerated().map { index, s in
+        return spotifySections.enumerated().map { index, section in
             let label: String
             let isChorus: Bool
 
@@ -143,11 +164,11 @@ actor SpotifyService {
             } else {
                 // Heuristic: louder + faster sections are more likely choruses
                 let avgLoudness = spotifySections.map(\.loudness).reduce(0, +) / Double(count)
-                isChorus = s.loudness > avgLoudness
-                label = isChorus ? "chorus" : timestampString(s.start)
+                isChorus = section.loudness > avgLoudness
+                label = isChorus ? "chorus" : timestampString(section.start)
             }
 
-            return Section(start: s.start, label: label, isChorus: isChorus)
+            return Section(start: section.start, label: label, isChorus: isChorus)
         }
     }
 
@@ -156,8 +177,8 @@ actor SpotifyService {
     }
 
     private func timestampString(_ seconds: Double) -> String {
-        let m = Int(seconds) / 60
-        let s = Int(seconds) % 60
-        return String(format: "%d:%02d", m, s)
+        let minutes = Int(seconds) / 60
+        let secs = Int(seconds) % 60
+        return String(format: "%d:%02d", minutes, secs)
     }
 }

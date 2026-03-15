@@ -31,7 +31,7 @@ struct InteractiveCardView: View {
     let track: Track
 
     @GestureState private var dragOffset: CGSize = .zero
-    @State private var swipeDirection: SwipeDirection? = nil
+    @State private var swipeDirection: SwipeDirection?
 
     enum SwipeDirection { case left, right }
 
@@ -122,10 +122,10 @@ struct InteractiveCardView: View {
                     state = value.translation
                 }
                 .onEnded { value in
-                    let dx = value.translation.width
-                    if dx > dragThreshold {
+                    let dragX = value.translation.width
+                    if dragX > dragThreshold {
                         vm.decide(.keep)
-                    } else if dx < -dragThreshold {
+                    } else if dragX < -dragThreshold {
                         vm.decide(.remove)
                     }
                 }
