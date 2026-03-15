@@ -19,7 +19,7 @@ struct SetupView: View {
 
             if accessDenied {
                 Label(
-                    "Music library access denied. Allow it in System Settings → Privacy → Media & Apple Music.",
+                    "Music library access denied. Allow it in Settings → Privacy & Security → Media & Apple Music.",
                     systemImage: "exclamationmark.triangle"
                 )
                     .font(.callout)
@@ -37,7 +37,7 @@ struct SetupView: View {
                         Text(order.displayName).tag(order)
                     }
                 }
-                .pickerStyle(.radioGroup)
+                .pickerStyle(.inline)
             }
             .padding()
             .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
@@ -70,7 +70,6 @@ struct SetupView: View {
             Spacer()
         }
         .padding(40)
-        .frame(width: 480, height: 480)
     }
 
     private func authorize(then action: @escaping () -> Void) async {

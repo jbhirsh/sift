@@ -9,6 +9,5 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .frame(width: 300, height: 120)
     }
 }

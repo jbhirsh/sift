@@ -58,7 +58,7 @@ final class SiftViewModel: ObservableObject {
         ProcessInfo.processInfo.arguments.contains("--ui-testing")
     }
 
-    init(playlistService: any PlaylistService = AppleScriptPlaylistService()) {
+    init(playlistService: any PlaylistService = MusicKitPlaylistService()) {
         self.playlistService = playlistService
         hasSavedSession = sessionStore.exists
         if Self.isUITesting { loadMockTracks() }

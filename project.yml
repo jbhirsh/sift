@@ -2,7 +2,7 @@ name: Sift
 options:
   bundleIdPrefix: com.jessicahirsh
   deploymentTarget:
-    macOS: "14.0"
+    iOS: "17.0"
   xcodeVersion: "16.0"
   createIntermediateGroups: true
 
@@ -10,16 +10,14 @@ settings:
   base:
     PRODUCT_NAME: Sift
     SWIFT_VERSION: "5.10"
-    MACOSX_DEPLOYMENT_TARGET: "14.0"
-    ENABLE_HARDENED_RUNTIME: YES
-    CODE_SIGN_STYLE: Manual
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
 
 targets:
   Sift:
     type: application
-    platform: macOS
+    platform: iOS
     bundleId: com.jessicahirsh.sift
-    deploymentTarget: "14.0"
+    deploymentTarget: "17.0"
     sources:
       - Sift
     settings:
@@ -32,6 +30,7 @@ targets:
         DEVELOPMENT_TEAM: 9PWVKSC697
         CODE_SIGN_STYLE: Automatic
         OTHER_LDFLAGS: ""
+        TARGETED_DEVICE_FAMILY: "1,2"
     preBuildScripts:
       - name: SwiftLint
         script: |
@@ -46,7 +45,7 @@ targets:
 
   SiftTests:
     type: bundle.unit-test
-    platform: macOS
+    platform: iOS
     bundleId: com.jessicahirsh.sift.tests
     sources:
       - SiftTests
@@ -54,17 +53,13 @@ targets:
       - target: Sift
     settings:
       base:
-        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Sift.app/Contents/MacOS/Sift
-        BUNDLE_LOADER: $(TEST_HOST)
         PRODUCT_BUNDLE_IDENTIFIER: com.jessicahirsh.sift.tests
         PRODUCT_MODULE_NAME: SiftTests
         GENERATE_INFOPLIST_FILE: YES
-        CODE_SIGN_STYLE: Manual
-        CODE_SIGN_IDENTITY: "Apple Development"
 
   SiftUITests:
     type: bundle.ui-testing
-    platform: macOS
+    platform: iOS
     bundleId: com.jessicahirsh.sift.uitests
     sources:
       - SiftUITests
@@ -75,9 +70,6 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.jessicahirsh.sift.uitests
         PRODUCT_MODULE_NAME: SiftUITests
         GENERATE_INFOPLIST_FILE: YES
-        CODE_SIGN_STYLE: Manual
-        CODE_SIGN_IDENTITY: "Apple Development"
-        DEVELOPMENT_TEAM: 9PWVKSC697
         BUNDLE_LOADER: ""
         TEST_HOST: ""
 

@@ -23,7 +23,6 @@ final class SiftUITests: XCTestCase {
     }
 
     /// Wait for a stat label to show a specific value using XCTest's native predicate waiter.
-    /// On macOS, SwiftUI Text inside .background(.bar) reports content via `value`, not `label`.
     private func waitForStatLabel(_ identifier: String, label expectedValue: String, timeout: TimeInterval = 5) {
         let stat = app.staticTexts.matching(identifier: identifier).firstMatch
         let predicate = NSPredicate { _, _ in
@@ -41,14 +40,14 @@ final class SiftUITests: XCTestCase {
             .waitForExistence(timeout: timeout)
     }
 
-    /// Keep current track (left arrow shortcut).
-    private func keep() { app.typeKey(XCUIKeyboardKey.leftArrow, modifierFlags: []) }
+    /// Keep current track via Keep button.
+    private func keep() { app.buttons["Keep"].tap() }
 
-    /// Skip current track ('s' keyboard shortcut).
-    private func skip() { app.typeKey("s", modifierFlags: []) }
+    /// Skip current track via Skip button.
+    private func skip() { app.buttons["Skip"].tap() }
 
-    /// Remove current track (right arrow shortcut).
-    private func remove() { app.typeKey(XCUIKeyboardKey.rightArrow, modifierFlags: []) }
+    /// Remove current track via Remove button.
+    private func remove() { app.buttons["Remove"].tap() }
 
     /// Navigate to the done screen by deciding all three mock tracks.
     /// Waits for each card to advance before issuing the next decision.
@@ -59,7 +58,6 @@ final class SiftUITests: XCTestCase {
         skip()
         XCTAssertTrue(waitForTrack("Mock Song Three"))
         remove()
-        app.activate()
     }
 
     // MARK: - Sifting view (mock data loads immediately in --ui-testing mode)
@@ -164,7 +162,7 @@ final class SiftUITests: XCTestCase {
     func testStartOverReturnsToSiftingView() {
         decideAllTracks()
         XCTAssertTrue(waitForDoneScreen())
-        app.buttons["Start Over"].click()
+        app.buttons["Start Over"].tap()
         XCTAssertTrue(app.staticTexts["Mock Song One"].waitForExistence(timeout: 5))
     }
 
@@ -179,7 +177,7 @@ final class SiftUITests: XCTestCase {
         XCTAssertTrue(waitForTrack("Mock Song One"))
         keep()
         XCTAssertTrue(waitForTrack("Mock Song Two"))
-        app.buttons.matching(identifier: "stop-button").firstMatch.click()
+        app.buttons.matching(identifier: "stop-button").firstMatch.tap()
         XCTAssertTrue(
             app.staticTexts.matching(identifier: "done-title").firstMatch.waitForExistence(timeout: 3),
             "Paused summary screen not shown after Save & Pause"
@@ -191,9 +189,9 @@ final class SiftUITests: XCTestCase {
         XCTAssertTrue(waitForTrack("Mock Song One"))
         keep()
         XCTAssertTrue(waitForTrack("Mock Song Two"))
-        app.buttons.matching(identifier: "stop-button").firstMatch.click()
+        app.buttons.matching(identifier: "stop-button").firstMatch.tap()
         XCTAssertTrue(app.buttons["Resume Session"].waitForExistence(timeout: 3))
-        app.buttons["Resume Session"].click()
+        app.buttons["Resume Session"].tap()
         XCTAssertTrue(waitForTrack("Mock Song Two"), "Did not resume at next track after Save & Pause")
     }
 

@@ -1,51 +1,12 @@
-default_platform(:mac)
+default_platform(:ios)
 
-platform :mac do
-  desc "Capture App Store screenshots by running the SiftScreenshots test scheme"
+platform :ios do
+  desc "Capture App Store screenshots via Fastlane Snapshot"
   lane :screenshots do
-    screenshot_dir = "/tmp/SiftScreenshots"
-    output_dir = File.expand_path("../fastlane/screenshots/en-US", __dir__)
-
-    # Clear any previous run
-    FileUtils.rm_rf(screenshot_dir)
-    FileUtils.mkdir_p(screenshot_dir)
-
-    # Run the screenshot tests.
-    # macOS 26+ refuses to load ad-hoc-signed bundles into sandboxed processes,
-    # so we let the build system use the locally-installed developer certificate
-    # (automatic signing). This lane is meant to run on a developer's Mac where
-    # a valid cert is available — not in CI.
-    # BUNDLE_LOADER must be cleared because the pbxproj incorrectly sets it on
-    # SiftUITests (a UI-test target), causing the xctest binary to link against
-    # Sift.app as a host (only correct for unit tests).
-    sh(
-      "xcodebuild test" \
-      " -project ../Sift.xcodeproj" \
-      " -scheme SiftScreenshots" \
-      " -destination 'platform=macOS'" \
-      " BUNDLE_LOADER=''" \
-      " ENABLE_USER_SCRIPT_SANDBOXING=NO" \
-      " CODE_SIGN_STYLE=Manual" \
-      " CODE_SIGN_IDENTITY='Apple Development'" \
-      " DEVELOPMENT_TEAM=76AYYJCJP5" \
-      " 2>&1 | xcbeautify; exit ${PIPESTATUS[0]}"
-    )
-
-    # Collect the PNGs saved by the tests
-    pngs = Dir.glob("#{screenshot_dir}/**/*.png")
-
-    if pngs.empty?
-      UI.error("No screenshots found in #{screenshot_dir} — did the tests run?")
-      next
-    end
-
-    FileUtils.rm_rf(output_dir)
-    FileUtils.mkdir_p(output_dir)
-    pngs.each { |f| FileUtils.cp(f, output_dir) }
-    UI.success("#{pngs.count} screenshots saved to #{output_dir}")
+    capture_screenshots
   end
 
-  desc "Deploy to Mac App Store"
+  desc "Deploy to App Store"
   lane :deploy do
     api_key = app_store_connect_api_key(
       key_id: ENV["ASC_KEY_ID"],
@@ -54,18 +15,17 @@ platform :mac do
       is_key_content_base64: false
     )
 
-    build_mac_app(
+    build_app(
       project: "Sift.xcodeproj",
       scheme: "Sift",
       export_method: "app-store",
       output_directory: "build",
-      output_name: "Sift.pkg",
-      xcargs: "CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER='Sift App Store'"
+      output_name: "Sift.ipa"
     )
 
     upload_to_app_store(
       api_key: api_key,
-      pkg: "build/Sift.pkg",
+      ipa: "build/Sift.ipa",
       skip_metadata: true,
       skip_screenshots: true,
       submit_for_review: false,

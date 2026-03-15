@@ -1,4 +1,5 @@
 import Foundation
+import MusicKit
 
 // MARK: - Protocol
 
@@ -9,68 +10,40 @@ protocol PlaylistService {
 // MARK: - Errors
 
 enum PlaylistError: Error, LocalizedError {
-    case scriptCreationFailed
-    case executionFailed(String)
+    case fetchFailed
+    case noMatchingSongs
 
     var errorDescription: String? {
         switch self {
-        case .scriptCreationFailed:
-            return "Failed to create AppleScript."
-        case .executionFailed(let msg):
-            return "Music automation failed: \(msg)"
+        case .fetchFailed:
+            return "Failed to fetch tracks from your music library."
+        case .noMatchingSongs:
+            return "None of the selected tracks could be found in your library."
         }
     }
 }
 
-// MARK: - Script builder (pure function — unit-testable)
+// MARK: - MusicKit implementation
 
-func buildRemovalPlaylistScript(tracks: [Track], playlistName: String = "Sift — To Remove") -> String {
-    var lines: [String] = [
-        "tell application \"Music\"",
-        "    if not (exists playlist \"\(playlistName)\") then",
-        "        make new playlist with properties {name:\"\(playlistName)\"}",
-        "    end if",
-        "    set targetPlaylist to playlist \"\(playlistName)\""
-    ]
+final class MusicKitPlaylistService: PlaylistService {
+    private let playlistName = "Sift — To Remove"
 
-    for track in tracks {
-        let name   = track.name.replacingOccurrences(of: "\"", with: "\\\"")
-        let artist = track.artist.replacingOccurrences(of: "\"", with: "\\\"")
-        let matchLine = "    set matchingTracks to " +
-            "(every track of library playlist 1 whose name is \"\(name)\" and artist is \"\(artist)\")"
-        lines += [
-            matchLine,
-            "    if length of matchingTracks > 0 then",
-            "        duplicate (item 1 of matchingTracks) to targetPlaylist",
-            "    end if"
-        ]
-    }
-
-    lines.append("end tell")
-    return lines.joined(separator: "\n")
-}
-
-// MARK: - Concrete implementation
-
-final class AppleScriptPlaylistService: PlaylistService {
     func addToRemovalPlaylist(tracks: [Track]) async throws {
         guard !tracks.isEmpty else { return }
-        let script = buildRemovalPlaylistScript(tracks: tracks)
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            DispatchQueue.global(qos: .userInitiated).async {
-                var errorDict: NSDictionary?
-                guard let appleScript = NSAppleScript(source: script) else {
-                    continuation.resume(throwing: PlaylistError.scriptCreationFailed)
-                    return
-                }
-                appleScript.executeAndReturnError(&errorDict)
-                if let errorDict,
-                   let message = errorDict["NSAppleScriptErrorMessage"] as? String {
-                    continuation.resume(throwing: PlaylistError.executionFailed(message))
-                } else {
-                    continuation.resume(returning: ())
-                }
-            }
-        }
+
+        let ids = tracks.map { MusicItemID($0.id) }
+        var request = MusicLibraryRequest<Song>()
+        request.filter(matching: \.id, memberOf: ids)
+        let response = try await request.response()
+        let songs = Array(response.items)
+
+        guard !songs.isEmpty else { throw PlaylistError.noMatchingSongs }
+
+        try await MusicLibrary.shared.createPlaylist(
+            name: playlistName,
+            description: "Tracks marked for removal by Sift",
+            authorDisplayName: nil,
+            items: songs
+        )
     }
 }

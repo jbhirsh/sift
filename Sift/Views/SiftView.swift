@@ -55,11 +55,8 @@ struct SiftView: View {
                 .padding(.vertical, 12)
                 .background(.bar)
         }
-        .frame(width: 600, height: 560)
         .onKeyPress(.leftArrow) { vm.decide(.keep); return .handled }
         .onKeyPress(.rightArrow) { vm.decide(.remove); return .handled }
-        .onKeyPress("a") { vm.decide(.keep); return .handled }
-        .onKeyPress("d") { vm.decide(.remove); return .handled }
         .onKeyPress("s") { vm.decide(.skip); return .handled }
         .onKeyPress(.space) { vm.togglePlayPause(); return .handled }
     }

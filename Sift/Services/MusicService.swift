@@ -10,7 +10,8 @@ enum MusicError: Error, LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notAuthorized:
-            return "Music library access was denied. Allow access in System Settings → Privacy → Media & Apple Music."
+            return "Music library access was denied. " +
+                   "Allow access in Settings → Privacy & Security → Media & Apple Music."
         case .libraryNotFound: return "Could not load your Music library."
         }
     }

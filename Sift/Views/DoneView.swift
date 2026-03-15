@@ -125,7 +125,6 @@ struct DoneView: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .frame(width: 520, height: 560)
     }
 
     private func summaryItem(count: Int, label: String, icon: String, color: Color) -> some View {
@@ -146,8 +145,7 @@ struct DoneView: View {
 
     private func copyRemovedList() {
         let text = vm.removed.map { "\($0.name) — \($0.artist)" }.joined(separator: "\n")
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
+        UIPasteboard.general.string = text
         copied = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copied = false }
     }
