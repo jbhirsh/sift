@@ -14,10 +14,12 @@ struct SiftView: View {
                 Text("\(vm.remaining) left")
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("remaining-count")
             }
             .padding(.horizontal, 24)
             .padding(.vertical, 12)
             .background(.bar)
+            .accessibilityElement(children: .contain)
 
             Divider()
 
@@ -52,6 +54,7 @@ struct SiftView: View {
         .onKeyPress(.rightArrow) { vm.decide(.remove); return .handled }
         .onKeyPress("a") { vm.decide(.keep); return .handled }
         .onKeyPress("d") { vm.decide(.remove); return .handled }
+        .onKeyPress("s") { vm.decide(.skip); return .handled }
         .onKeyPress(.space) { vm.togglePlayPause(); return .handled }
     }
 
@@ -60,9 +63,11 @@ struct SiftView: View {
             Circle()
                 .fill(color)
                 .frame(width: 8, height: 8)
+                .accessibilityHidden(true)
             Text("\(value) \(label)")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+                .accessibilityIdentifier("stat-\(label)")
         }
     }
 }

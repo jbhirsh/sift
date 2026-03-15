@@ -16,6 +16,6 @@ struct ContentView: View {
                 DoneView()
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: vm.phase)
+        .animation(SiftViewModel.isUITesting ? nil : .easeInOut(duration: 0.3), value: vm.phase)
     }
 }

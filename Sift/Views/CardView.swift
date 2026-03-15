@@ -1,3 +1,4 @@
+import MusicKit
 import SwiftUI
 
 // Static background card (next/next-next in stack)
@@ -50,17 +51,18 @@ struct InteractiveCardView: View {
             // Card content
             VStack(spacing: 16) {
                 // Artwork
-                if let artwork = vm.artwork {
-                    Image(nsImage: artwork)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 120, height: 120)
+                if let artwork = vm.currentArtwork {
+                    ArtworkImage(artwork, width: 120, height: 120)
                         .cornerRadius(8)
                 } else {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(.quaternary)
                         .frame(width: 120, height: 120)
-                        .overlay(Image(systemName: "music.note").font(.largeTitle).foregroundStyle(.secondary))
+                        .overlay(
+                            Image(systemName: "music.note")
+                                .font(.largeTitle)
+                                .foregroundStyle(.secondary)
+                        )
                 }
 
                 VStack(spacing: 4) {
@@ -146,6 +148,7 @@ struct DecisionButtonsView: View {
             } label: {
                 Label("Keep", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
+                    .contentShape(Rectangle())
             }
             .keyboardShortcut(.leftArrow, modifiers: [])
 
@@ -154,13 +157,16 @@ struct DecisionButtonsView: View {
             } label: {
                 Label("Skip", systemImage: "arrow.right.circle")
                     .foregroundStyle(.orange)
+                    .contentShape(Rectangle())
             }
+            .keyboardShortcut("s", modifiers: [])
 
             Button {
                 vm.decide(.remove)
             } label: {
                 Label("Remove", systemImage: "xmark.circle.fill")
                     .foregroundStyle(.red)
+                    .contentShape(Rectangle())
             }
             .keyboardShortcut(.rightArrow, modifiers: [])
         }

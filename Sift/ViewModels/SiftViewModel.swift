@@ -1,6 +1,7 @@
+import MusicKit
 import SwiftUI
 
-enum AppPhase {
+enum AppPhase: Equatable {
     case setup
     case loading
     case sifting
@@ -27,19 +28,20 @@ final class SiftViewModel: ObservableObject {
     // MARK: - Playback state
     @Published var playbackPosition: Double = 0
     @Published var isPlaying: Bool = false
-    @Published var currentSections: [Section] = []
-    @Published var artwork: NSImage?
+    @Published var currentArtwork: Artwork?
 
     // MARK: - Session resume
     @Published var hasSavedSession: Bool = false
 
+    // MARK: - Removal playlist
+    @Published var removalPlaylistCreated: Bool = false
+    @Published var removalPlaylistError: String?
+    @Published var isCreatingPlaylist: Bool = false
+
     // MARK: - Services
     private let musicService = MusicService()
     private let sessionStore = SessionStore()
-    private lazy var spotifyService: SpotifyService = {
-        let (id, secret) = CredentialStore.load()
-        return SpotifyService(clientID: id, clientSecret: secret)
-    }()
+    private let playlistService: any PlaylistService
 
     // MARK: - Timers
     private var positionTask: Task<Void, Never>?
@@ -51,15 +53,31 @@ final class SiftViewModel: ObservableObject {
     var remaining: Int { max(0, tracks.count - cursor) }
     var total: Int { tracks.count }
 
-    init() {
+    static var isUITesting: Bool {
+        ProcessInfo.processInfo.arguments.contains("--ui-testing")
+    }
+
+    init(playlistService: any PlaylistService = AppleScriptPlaylistService()) {
+        self.playlistService = playlistService
         hasSavedSession = sessionStore.exists
+        if Self.isUITesting { loadMockTracks() }
+    }
+
+    // MARK: - Authorization
+
+    func requestMusicAuthorization() async -> Bool {
+        await musicService.requestAuthorization()
     }
 
     // MARK: - Load library
 
     func startFresh() {
         sessionStore.clear()
-        Task { await loadLibrary() }
+        if Self.isUITesting {
+            loadMockTracks()
+        } else {
+            Task { await loadLibrary() }
+        }
     }
 
     func resumeSession() {
@@ -67,13 +85,13 @@ final class SiftViewModel: ObservableObject {
             Task { await loadLibrary() }
             return
         }
-        tracks   = session.tracks
-        cursor   = session.cursor
-        kept     = session.kept
-        removed  = session.removed
-        skipped  = session.skipped
+        tracks    = session.tracks
+        cursor    = session.cursor
+        kept      = session.kept
+        removed   = session.removed
+        skipped   = session.skipped
         sortOrder = session.sortOrder
-        phase    = .sifting
+        phase     = .sifting
         Task { await playCurrentTrack() }
     }
 
@@ -87,12 +105,12 @@ final class SiftViewModel: ObservableObject {
             loadMessage = "Sorting \(allTracks.count) tracks…"
             loadProgress = 0.9
 
-            allTracks = sort(allTracks, by: sortOrder)
-            tracks = allTracks
-            cursor = 0
-            kept   = []
-            removed = []
-            skipped = []
+            allTracks = sortedTracks(allTracks, by: sortOrder)
+            tracks    = allTracks
+            cursor    = 0
+            kept      = []
+            removed   = []
+            skipped   = []
 
             loadProgress = 1.0
             phase = .sifting
@@ -102,11 +120,8 @@ final class SiftViewModel: ObservableObject {
         }
     }
 
-    private func sort(_ tracks: [Track], by order: SortOrder) -> [Track] {
-        sortedTracks(tracks, by: order)
-    }
+    // MARK: - Sort
 
-    // Exposed for testing
     func sortedTracks(_ tracks: [Track], by order: SortOrder) -> [Track] {
         switch order {
         case .leastPlayed: return tracks.sorted { $0.playCount < $1.playCount }
@@ -117,17 +132,31 @@ final class SiftViewModel: ObservableObject {
         }
     }
 
-    // Exposed for testing — loads tracks without triggering Music.app
-    func loadTracks(_ tracks: [Track]) {
-        self.tracks = tracks
-        self.cursor = 0
-        self.kept   = []
-        self.removed = []
-        self.skipped = []
-        self.phase  = .sifting
+    // MARK: - Testing hooks
+
+    private func loadMockTracks() {
+        tracks = [
+            Track(id: "mock-1", name: "Mock Song One", artist: "Artist A",
+                  album: "Album One", duration: 240, playCount: 0, dateAdded: Date()),
+            Track(id: "mock-2", name: "Mock Song Two", artist: "Artist B",
+                  album: "Album Two", duration: 180, playCount: 5, dateAdded: Date()),
+            Track(id: "mock-3", name: "Mock Song Three", artist: "Artist C",
+                  album: "Album Three", duration: 300, playCount: 12, dateAdded: Date())
+        ]
+        cursor = 0
+        kept = []; removed = []; skipped = []
+        phase = .sifting
     }
 
-    // Exposed for testing — decides without triggering playback or deletion
+    func loadTracks(_ tracks: [Track]) {
+        self.tracks  = tracks
+        self.cursor  = 0
+        self.kept    = []
+        self.removed = []
+        self.skipped = []
+        self.phase   = .sifting
+    }
+
     func decideWithoutPlayback(_ decision: Decision) {
         guard let track = currentTrack else { return }
         switch decision {
@@ -145,15 +174,9 @@ final class SiftViewModel: ObservableObject {
         guard let track = currentTrack else { return }
 
         switch decision {
-        case .keep:
-            kept.append(track)
-        case .remove:
-            removed.append(track)
-            Task {
-                try? await musicService.deleteTrack(id: track.id)
-            }
-        case .skip:
-            skipped.append(track)
+        case .keep:   kept.append(track)
+        case .remove: removed.append(track)   // collected for manual deletion at the end
+        case .skip:   skipped.append(track)
         }
 
         cursor += 1
@@ -171,23 +194,18 @@ final class SiftViewModel: ObservableObject {
     // MARK: - Playback
 
     func playCurrentTrack() async {
+        guard !Self.isUITesting else { return }
         guard let track = currentTrack else { return }
 
         try? await musicService.play(trackID: track.id, at: 0)
         isPlaying = true
-        artwork = try? await musicService.artwork(forTrackID: track.id)
+        currentArtwork = await musicService.artwork(forTrackID: track.id)
         startPositionPolling()
-
-        currentSections = await spotifyService.sections(
-            name: track.name,
-            artist: track.artist,
-            duration: track.duration
-        )
     }
 
     func seek(to position: Double) {
         Task {
-            try? await musicService.seek(to: position)
+            await musicService.seek(to: position)
             playbackPosition = position
         }
     }
@@ -218,9 +236,8 @@ final class SiftViewModel: ObservableObject {
         stopPositionPolling()
         positionTask = Task {
             while !Task.isCancelled {
-                if let pos = try? await musicService.currentPosition() {
-                    await MainActor.run { self.playbackPosition = pos }
-                }
+                let pos = await musicService.currentPosition()
+                self.playbackPosition = pos
                 try? await Task.sleep(for: .milliseconds(500))
             }
         }
@@ -246,14 +263,23 @@ final class SiftViewModel: ObservableObject {
         sessionStore.save(session)
     }
 
-    // MARK: - Spotify credentials
+    // MARK: - Removal playlist
 
-    func updateSpotifyCredentials(clientID: String, clientSecret: String) {
-        CredentialStore.save(clientID: clientID, clientSecret: clientSecret)
+    func createRemovalPlaylist() {
+        guard !removed.isEmpty else { return }
+        isCreatingPlaylist = true
+        removalPlaylistError = nil
         Task {
-            await spotifyService.updateCredentials(clientID: clientID, clientSecret: clientSecret)
+            do {
+                try await playlistService.addToRemovalPlaylist(tracks: removed)
+                removalPlaylistCreated = true
+            } catch {
+                removalPlaylistError = error.localizedDescription
+            }
+            isCreatingPlaylist = false
         }
     }
+
 }
 
 // MARK: - Safe subscript

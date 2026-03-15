@@ -10,28 +10,35 @@
 		0581F91937853C3319F2A095 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F93552E726B415090946CC2 /* LoadingView.swift */; };
 		0F47C6DA6C8ACE6A2B6DBD79 /* SiftView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0489C2F65DD8AF7333A63092 /* SiftView.swift */; };
 		1D7515C35DAEDF8BB1829E9B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F39BCA547BEAAAE7D021A202 /* ContentView.swift */; };
+		2F82F4306BC4321F37B50185 /* SiftUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0A5CE00657F04FB81293182 /* SiftUITests.swift */; };
 		3137F50331933E1DE88CB902 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 575D387F8CF84E2A12C5ED88 /* Assets.xcassets */; };
-		4146C1836DC8A5CD30412FE6 /* CredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4F12E32A5550D53E3626967 /* CredentialStore.swift */; };
 		448C3DA032C2CCAAD27B27A7 /* SiftSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B72EE2B289923D343CF38822 /* SiftSession.swift */; };
 		510C987AE37A0D1079ABFD29 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB6E9992371811C62121AFAE /* SetupView.swift */; };
 		715B73C2B377CF9E0E580FF6 /* Track.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D98F3AA79762A8C16EE1C72 /* Track.swift */; };
 		72892383736EC323F58E9857 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A6861B0540D05B7AE5F6FEE /* SettingsView.swift */; };
 		78BDE439CA1175A4B8BC31D9 /* SiftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751BE13D563A3C27B82CFE11 /* SiftTests.swift */; };
 		78DCB90ED2CD9391475DBB7E /* SiftViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3894FA24EBFA6A2F2F845BB8 /* SiftViewModel.swift */; };
-		7CEF89000317F771DE68CA06 /* ScriptingBridge.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3CFDA7A1931A09A3784D76DA /* ScriptingBridge.framework */; };
 		897BA9DFAE4BED548923370B /* DoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D36832679468AE86136B876B /* DoneView.swift */; };
 		979B5D178FD2BAC1E7E05498 /* Decision.swift in Sources */ = {isa = PBXBuildFile; fileRef = 549FCA4D5E11AA9133A030B9 /* Decision.swift */; };
 		AFFC87A115E69A1B228C992A /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 143345DC16B5540350C1BA08 /* SessionStore.swift */; };
+		C489B52DC0D72FC7C9AE7122 /* PlaylistService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA2083EEA2845595E27E39B8 /* PlaylistService.swift */; };
 		C5D0CCC946E59E7FCCD52071 /* Section.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F1AC22BAC911C607211A30A /* Section.swift */; };
 		CDED4446CFD217B7E21723E2 /* CardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53E64B97217885164EB357F6 /* CardView.swift */; };
 		D14B656F9FCA90589509111C /* MusicService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD757AD276D78B7AFF12F0DA /* MusicService.swift */; };
+		D199015B68763D7DF701E575 /* MusicKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 697FA8431835F0C4FC53B88D /* MusicKit.framework */; };
 		D3D051AD77DF88E31C5ED4BD /* SiftApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 943DFDC32F6BE99E05E19275 /* SiftApp.swift */; };
-		D9A594CBEE48E60E7E77E3CA /* SpotifyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89340930B5332BBEF5785FAC /* SpotifyService.swift */; };
 		E970BD963D1705090189A3B6 /* PlayerControlsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DCE95690550A6AA1CC5037A6 /* PlayerControlsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		55F6CD0EF3039E8E4F054886 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = DF5A71E18F356690F069FA36 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E76B955C8BCD08241D6FF961;
+			remoteInfo = Sift;
+		};
+		97D6F87A5468B30F0D2AAE07 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = DF5A71E18F356690F069FA36 /* Project object */;
 			proxyType = 1;
@@ -45,13 +52,13 @@
 		143345DC16B5540350C1BA08 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
 		2D98F3AA79762A8C16EE1C72 /* Track.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Track.swift; sourceTree = "<group>"; };
 		3894FA24EBFA6A2F2F845BB8 /* SiftViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiftViewModel.swift; sourceTree = "<group>"; };
-		3CFDA7A1931A09A3784D76DA /* ScriptingBridge.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ScriptingBridge.framework; path = System/Library/Frameworks/ScriptingBridge.framework; sourceTree = SDKROOT; };
 		53E64B97217885164EB357F6 /* CardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardView.swift; sourceTree = "<group>"; };
 		549FCA4D5E11AA9133A030B9 /* Decision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Decision.swift; sourceTree = "<group>"; };
 		575D387F8CF84E2A12C5ED88 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		5C0F501AEE4B2A0B5BDE6D92 /* SiftUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SiftUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		697FA8431835F0C4FC53B88D /* MusicKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MusicKit.framework; path = System/Library/Frameworks/MusicKit.framework; sourceTree = SDKROOT; };
 		751BE13D563A3C27B82CFE11 /* SiftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiftTests.swift; sourceTree = "<group>"; };
 		7F1AC22BAC911C607211A30A /* Section.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Section.swift; sourceTree = "<group>"; };
-		89340930B5332BBEF5785FAC /* SpotifyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotifyService.swift; sourceTree = "<group>"; };
 		8CEFE07E40B5883E33B09911 /* SiftTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SiftTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8F93552E726B415090946CC2 /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
 		943DFDC32F6BE99E05E19275 /* SiftApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiftApp.swift; sourceTree = "<group>"; };
@@ -63,8 +70,9 @@
 		D36832679468AE86136B876B /* DoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DoneView.swift; sourceTree = "<group>"; };
 		DB6E9992371811C62121AFAE /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
 		DCE95690550A6AA1CC5037A6 /* PlayerControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerControlsView.swift; sourceTree = "<group>"; };
-		E4F12E32A5550D53E3626967 /* CredentialStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CredentialStore.swift; sourceTree = "<group>"; };
+		E0A5CE00657F04FB81293182 /* SiftUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiftUITests.swift; sourceTree = "<group>"; };
 		F39BCA547BEAAAE7D021A202 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		FA2083EEA2845595E27E39B8 /* PlaylistService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaylistService.swift; sourceTree = "<group>"; };
 		FD09A31E752A785156FC806B /* Sift.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Sift.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -73,7 +81,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7CEF89000317F771DE68CA06 /* ScriptingBridge.framework in Frameworks */,
+				D199015B68763D7DF701E575 /* MusicKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -85,6 +93,7 @@
 			children = (
 				D0A82EFF95D94FE10F5901DB /* Sift.app */,
 				8CEFE07E40B5883E33B09911 /* SiftTests.xctest */,
+				5C0F501AEE4B2A0B5BDE6D92 /* SiftUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -107,7 +116,7 @@
 		702F78C38CF9134D68395DB7 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				3CFDA7A1931A09A3784D76DA /* ScriptingBridge.framework */,
+				697FA8431835F0C4FC53B88D /* MusicKit.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -123,10 +132,9 @@
 		9109BB7525CC8F7340B220F2 /* Services */ = {
 			isa = PBXGroup;
 			children = (
-				E4F12E32A5550D53E3626967 /* CredentialStore.swift */,
 				BD757AD276D78B7AFF12F0DA /* MusicService.swift */,
+				FA2083EEA2845595E27E39B8 /* PlaylistService.swift */,
 				143345DC16B5540350C1BA08 /* SessionStore.swift */,
-				89340930B5332BBEF5785FAC /* SpotifyService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -165,9 +173,18 @@
 			children = (
 				F98CE90785F999E3B584CF1B /* Sift */,
 				D6CF14E474CF2FA18EFCC921 /* SiftTests */,
+				E313C5385E61D450255A789A /* SiftUITests */,
 				702F78C38CF9134D68395DB7 /* Frameworks */,
 				45CA59FC210B6C618C2FB69C /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		E313C5385E61D450255A789A /* SiftUITests */ = {
+			isa = PBXGroup;
+			children = (
+				E0A5CE00657F04FB81293182 /* SiftUITests.swift */,
+			);
+			path = SiftUITests;
 			sourceTree = "<group>";
 		};
 		EDEDB9167B39F513B59E438A /* ViewModels */ = {
@@ -212,6 +229,24 @@
 			productReference = 8CEFE07E40B5883E33B09911 /* SiftTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		604F278E6411CE6488EE956C /* SiftUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F2DC6F1E8D2C8B4F8967A91F /* Build configuration list for PBXNativeTarget "SiftUITests" */;
+			buildPhases = (
+				1F6586A7AF9DC38E809E1C1E /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				913FF8CDD9AE5ECCD52389F7 /* PBXTargetDependency */,
+			);
+			name = SiftUITests;
+			packageProductDependencies = (
+			);
+			productName = SiftUITests;
+			productReference = 5C0F501AEE4B2A0B5BDE6D92 /* SiftUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		E76B955C8BCD08241D6FF961 /* Sift */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 287BE5D5D56E665411D453C7 /* Build configuration list for PBXNativeTarget "Sift" */;
@@ -244,6 +279,10 @@
 					5F3FF16262E59317491C2595 = {
 						ProvisioningStyle = Manual;
 					};
+					604F278E6411CE6488EE956C = {
+						ProvisioningStyle = Manual;
+						TestTargetID = E76B955C8BCD08241D6FF961;
+					};
 					E76B955C8BCD08241D6FF961 = {
 						DevelopmentTeam = 9PWVKSC697;
 						ProvisioningStyle = Automatic;
@@ -266,6 +305,7 @@
 			targets = (
 				E76B955C8BCD08241D6FF961 /* Sift */,
 				5F3FF16262E59317491C2595 /* SiftTests */,
+				604F278E6411CE6488EE956C /* SiftUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -310,12 +350,12 @@
 			files = (
 				CDED4446CFD217B7E21723E2 /* CardView.swift in Sources */,
 				1D7515C35DAEDF8BB1829E9B /* ContentView.swift in Sources */,
-				4146C1836DC8A5CD30412FE6 /* CredentialStore.swift in Sources */,
 				979B5D178FD2BAC1E7E05498 /* Decision.swift in Sources */,
 				897BA9DFAE4BED548923370B /* DoneView.swift in Sources */,
 				0581F91937853C3319F2A095 /* LoadingView.swift in Sources */,
 				D14B656F9FCA90589509111C /* MusicService.swift in Sources */,
 				E970BD963D1705090189A3B6 /* PlayerControlsView.swift in Sources */,
+				C489B52DC0D72FC7C9AE7122 /* PlaylistService.swift in Sources */,
 				C5D0CCC946E59E7FCCD52071 /* Section.swift in Sources */,
 				AFFC87A115E69A1B228C992A /* SessionStore.swift in Sources */,
 				72892383736EC323F58E9857 /* SettingsView.swift in Sources */,
@@ -324,8 +364,15 @@
 				448C3DA032C2CCAAD27B27A7 /* SiftSession.swift in Sources */,
 				0F47C6DA6C8ACE6A2B6DBD79 /* SiftView.swift in Sources */,
 				78DCB90ED2CD9391475DBB7E /* SiftViewModel.swift in Sources */,
-				D9A594CBEE48E60E7E77E3CA /* SpotifyService.swift in Sources */,
 				715B73C2B377CF9E0E580FF6 /* Track.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1F6586A7AF9DC38E809E1C1E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2F82F4306BC4321F37B50185 /* SiftUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -340,6 +387,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		913FF8CDD9AE5ECCD52389F7 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E76B955C8BCD08241D6FF961 /* Sift */;
+			targetProxy = 97D6F87A5468B30F0D2AAE07 /* PBXContainerItemProxy */;
+		};
 		A65EB8A0F67E21EA155A8E55 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = E76B955C8BCD08241D6FF961 /* Sift */;
@@ -363,7 +415,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				OTHER_LDFLAGS = "-framework ScriptingBridge";
+				OTHER_LDFLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.jessicahirsh.sift;
 				SDKROOT = macosx;
 			};
@@ -374,16 +426,36 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.jessicahirsh.sift.tests;
+				PRODUCT_MODULE_NAME = SiftTests;
 				SDKROOT = macosx;
-				TEST_HOST = "";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Sift.app/Contents/MacOS/Sift";
 			};
 			name = Debug;
+		};
+		7DC55ED1735A9ED22804062B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.jessicahirsh.sift.uitests;
+				PRODUCT_MODULE_NAME = SiftUITests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = Sift;
+			};
+			name = Release;
 		};
 		89A2EA77B80E610BB0F2D29A /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -442,6 +514,24 @@
 				SWIFT_VERSION = 5.10;
 			};
 			name = Release;
+		};
+		8BE718C3B70164FAB40716FB /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.jessicahirsh.sift.uitests;
+				PRODUCT_MODULE_NAME = SiftUITests;
+				SDKROOT = macosx;
+				TEST_TARGET_NAME = Sift;
+			};
+			name = Debug;
 		};
 		DF6C4A37C171C349234402BA /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -513,14 +603,16 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 					"@loader_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.jessicahirsh.sift.tests;
+				PRODUCT_MODULE_NAME = SiftTests;
 				SDKROOT = macosx;
-				TEST_HOST = "";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Sift.app/Contents/MacOS/Sift";
 			};
 			name = Release;
 		};
@@ -539,7 +631,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				OTHER_LDFLAGS = "-framework ScriptingBridge";
+				OTHER_LDFLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = com.jessicahirsh.sift;
 				SDKROOT = macosx;
 			};
@@ -571,6 +663,15 @@
 			buildConfigurations = (
 				541F28A9B75A8EBF3F6B8AD4 /* Debug */,
 				EE12E920B9F289A5FCFDACA4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F2DC6F1E8D2C8B4F8967A91F /* Build configuration list for PBXNativeTarget "SiftUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8BE718C3B70164FAB40716FB /* Debug */,
+				7DC55ED1735A9ED22804062B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

@@ -31,7 +31,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.jessicahirsh.sift
         DEVELOPMENT_TEAM: 9PWVKSC697
         CODE_SIGN_STYLE: Automatic
-        OTHER_LDFLAGS: "-framework ScriptingBridge"
+        OTHER_LDFLAGS: ""
     preBuildScripts:
       - name: SwiftLint
         script: |
@@ -42,7 +42,7 @@ targets:
           fi
         basedOnDependencyAnalysis: false
     dependencies:
-      - sdk: ScriptingBridge.framework
+      - sdk: MusicKit.framework
 
   SiftTests:
     type: bundle.unit-test
@@ -54,5 +54,43 @@ targets:
       - target: Sift
     settings:
       base:
-        TEST_HOST: ""
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Sift.app/Contents/MacOS/Sift
+        BUNDLE_LOADER: $(TEST_HOST)
         PRODUCT_BUNDLE_IDENTIFIER: com.jessicahirsh.sift.tests
+        PRODUCT_MODULE_NAME: SiftTests
+        GENERATE_INFOPLIST_FILE: YES
+
+  SiftUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    bundleId: com.jessicahirsh.sift.uitests
+    sources:
+      - SiftUITests
+    dependencies:
+      - target: Sift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jessicahirsh.sift.uitests
+        PRODUCT_MODULE_NAME: SiftUITests
+        GENERATE_INFOPLIST_FILE: YES
+
+schemes:
+  Sift:
+    build:
+      targets:
+        Sift: [run, archive, profile, analyze]
+        SiftTests: [test]
+        SiftUITests: [test]
+    test:
+      targets:
+        - SiftTests
+        - SiftUITests
+
+  SiftUnitTests:
+    build:
+      targets:
+        Sift: [test]
+        SiftTests: [test]
+    test:
+      targets:
+        - SiftTests
