@@ -24,6 +24,7 @@ jobs:
 
       - name: Build and test
         run: |
+          set -o pipefail
           xcodebuild test \
             -project Sift.xcodeproj \
             -scheme Sift \
