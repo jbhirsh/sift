@@ -20,17 +20,42 @@ xcodegen generate
 ## Test Commands
 **Always run tests before committing.**
 
+Unit tests:
 ```bash
 xcodebuild test \
   -project Sift.xcodeproj \
-  -scheme Sift \
+  -scheme SiftUnitTests \
   -destination 'platform=macOS' \
-  CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- \
   ENABLE_USER_SCRIPT_SANDBOXING=NO \
+  CODE_SIGN_STYLE=Manual \
+  CODE_SIGN_IDENTITY="Apple Development" \
+  DEVELOPMENT_TEAM=76AYYJCJP5 \
   | xcbeautify
 ```
 
-Tests must be green before any commit. Always re-run tests before committing — especially when test files were modified.
+UI/screenshot tests:
+```bash
+xcodebuild test \
+  -project Sift.xcodeproj \
+  -scheme SiftScreenshots \
+  -destination 'platform=macOS' \
+  BUNDLE_LOADER="" \
+  ENABLE_USER_SCRIPT_SANDBOXING=NO \
+  CODE_SIGN_STYLE=Manual \
+  CODE_SIGN_IDENTITY="Apple Development" \
+  DEVELOPMENT_TEAM=76AYYJCJP5 \
+  | xcbeautify
+```
+
+Note: macOS 26 enforces matching Team IDs when loading test bundles. The
+`DEVELOPMENT_TEAM=76AYYJCJP5` and `CODE_SIGN_STYLE=Manual` flags are required
+because Xcode's Automatic signing needs a registered Apple account (which is
+not available in command-line builds). `76AYYJCJP5` is the OU (team) in the
+"Apple Development: Jessica Hirsh (9PWVKSC697)" certificate. `9PWVKSC697` is
+the App Store team used for distribution signing.
+
+Tests must be green before any commit. Always re-run tests before committing —
+especially when test files were modified.
 
 **Test coverage requirements:**
 - Every new ViewModel method or service function must have a unit test in `SiftTests/`.
@@ -45,13 +70,16 @@ xcodebuild build \
   -project Sift.xcodeproj \
   -scheme Sift \
   -destination 'platform=macOS' \
-  CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- \
   ENABLE_USER_SCRIPT_SANDBOXING=NO \
+  CODE_SIGN_STYLE=Manual \
+  CODE_SIGN_IDENTITY="Apple Development" \
+  DEVELOPMENT_TEAM=76AYYJCJP5 \
   | xcbeautify
 ```
 
 Note: Xcode GUI builds (⌘R) use automatic signing with team 9PWVKSC697.
-Command-line builds skip signing — this is intentional for local verification.
+Command-line builds use manual signing with the "Apple Development" cert
+(OU team 76AYYJCJP5) — required because macOS 26 enforces Team ID matching.
 
 ---
 

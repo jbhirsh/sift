@@ -196,4 +196,5 @@ final class SiftUITests: XCTestCase {
         app.buttons["Resume Session"].click()
         XCTAssertTrue(waitForTrack("Mock Song Two"), "Did not resume at next track after Save & Pause")
     }
+
 }

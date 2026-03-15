@@ -59,6 +59,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.jessicahirsh.sift.tests
         PRODUCT_MODULE_NAME: SiftTests
         GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Apple Development"
 
   SiftUITests:
     type: bundle.ui-testing
@@ -73,8 +75,11 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.jessicahirsh.sift.uitests
         PRODUCT_MODULE_NAME: SiftUITests
         GENERATE_INFOPLIST_FILE: YES
-        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Apple Development"
         DEVELOPMENT_TEAM: 9PWVKSC697
+        BUNDLE_LOADER: ""
+        TEST_HOST: ""
 
 schemes:
   Sift:

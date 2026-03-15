@@ -287,7 +287,7 @@
 					};
 					604F278E6411CE6488EE956C = {
 						DevelopmentTeam = 9PWVKSC697;
-						ProvisioningStyle = Automatic;
+						ProvisioningStyle = Manual;
 						TestTargetID = E76B955C8BCD08241D6FF961;
 					};
 					E76B955C8BCD08241D6FF961 = {
@@ -434,6 +434,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -451,8 +453,9 @@
 		7DC55ED1735A9ED22804062B /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
+				BUNDLE_LOADER = "";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = 9PWVKSC697;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -464,6 +467,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.jessicahirsh.sift.uitests;
 				PRODUCT_MODULE_NAME = SiftUITests;
 				SDKROOT = macosx;
+				TEST_HOST = "";
 				TEST_TARGET_NAME = Sift;
 			};
 			name = Release;
@@ -529,8 +533,9 @@
 		8BE718C3B70164FAB40716FB /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
+				BUNDLE_LOADER = "";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				DEVELOPMENT_TEAM = 9PWVKSC697;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -542,6 +547,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.jessicahirsh.sift.uitests;
 				PRODUCT_MODULE_NAME = SiftUITests;
 				SDKROOT = macosx;
+				TEST_HOST = "";
 				TEST_TARGET_NAME = Sift;
 			};
 			name = Debug;
@@ -615,6 +621,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Manual;
 				COMBINE_HIDPI_IMAGES = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (

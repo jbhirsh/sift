@@ -1,18 +1,41 @@
 default_platform(:mac)
 
 platform :mac do
-  desc "Collect App Store screenshots captured by the SiftScreenshots Xcode scheme"
+  desc "Capture App Store screenshots by running the SiftScreenshots test scheme"
   lane :screenshots do
-    cache_dir = File.expand_path("~/Library/Caches/tools.fastlane/screenshots")
+    screenshot_dir = "/tmp/SiftScreenshots"
     output_dir = File.expand_path("../fastlane/screenshots/en-US", __dir__)
-    pngs = Dir.glob("#{cache_dir}/**/*.png")
+
+    # Clear any previous run
+    FileUtils.rm_rf(screenshot_dir)
+    FileUtils.mkdir_p(screenshot_dir)
+
+    # Run the screenshot tests.
+    # macOS 26+ refuses to load ad-hoc-signed bundles into sandboxed processes,
+    # so we let the build system use the locally-installed developer certificate
+    # (automatic signing). This lane is meant to run on a developer's Mac where
+    # a valid cert is available — not in CI.
+    # BUNDLE_LOADER must be cleared because the pbxproj incorrectly sets it on
+    # SiftUITests (a UI-test target), causing the xctest binary to link against
+    # Sift.app as a host (only correct for unit tests).
+    sh(
+      "xcodebuild test" \
+      " -project ../Sift.xcodeproj" \
+      " -scheme SiftScreenshots" \
+      " -destination 'platform=macOS'" \
+      " BUNDLE_LOADER=''" \
+      " ENABLE_USER_SCRIPT_SANDBOXING=NO" \
+      " CODE_SIGN_STYLE=Manual" \
+      " CODE_SIGN_IDENTITY='Apple Development'" \
+      " DEVELOPMENT_TEAM=76AYYJCJP5" \
+      " 2>&1 | xcbeautify; exit ${PIPESTATUS[0]}"
+    )
+
+    # Collect the PNGs saved by the tests
+    pngs = Dir.glob("#{screenshot_dir}/**/*.png")
 
     if pngs.empty?
-      UI.important("No screenshots found in cache.")
-      UI.important("Run the SiftScreenshots scheme from Xcode first:")
-      UI.important("  1. Select the 'SiftScreenshots' scheme in Xcode")
-      UI.important("  2. Product → Test  (⌘U)")
-      UI.important("  3. Then run 'fastlane screenshots' again to collect them")
+      UI.error("No screenshots found in #{screenshot_dir} — did the tests run?")
       next
     end
 
