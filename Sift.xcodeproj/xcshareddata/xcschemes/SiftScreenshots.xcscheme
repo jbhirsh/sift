@@ -8,30 +8,16 @@
       runPostActionsOnFailure = "NO">
       <BuildActionEntries>
          <BuildActionEntry
-            buildForTesting = "NO"
-            buildForRunning = "YES"
-            buildForProfiling = "YES"
-            buildForArchiving = "YES"
-            buildForAnalyzing = "YES">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "E76B955C8BCD08241D6FF961"
-               BuildableName = "Sift.app"
-               BlueprintName = "Sift"
-               ReferencedContainer = "container:Sift.xcodeproj">
-            </BuildableReference>
-         </BuildActionEntry>
-         <BuildActionEntry
             buildForTesting = "YES"
-            buildForRunning = "NO"
+            buildForRunning = "YES"
             buildForProfiling = "NO"
             buildForArchiving = "NO"
             buildForAnalyzing = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "5F3FF16262E59317491C2595"
-               BuildableName = "SiftTests.xctest"
-               BlueprintName = "SiftTests"
+               BlueprintIdentifier = "E76B955C8BCD08241D6FF961"
+               BuildableName = "Sift.app"
+               BlueprintName = "Sift"
                ReferencedContainer = "container:Sift.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -60,27 +46,17 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "5F3FF16262E59317491C2595"
-            BuildableName = "SiftTests.xctest"
-            BlueprintName = "SiftTests"
+            BlueprintIdentifier = "E76B955C8BCD08241D6FF961"
+            BuildableName = "Sift.app"
+            BlueprintName = "Sift"
             ReferencedContainer = "container:Sift.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
          <TestableReference
             skipped = "NO"
-            parallelizable = "NO">
-            <BuildableReference
-               BuildableIdentifier = "primary"
-               BlueprintIdentifier = "5F3FF16262E59317491C2595"
-               BuildableName = "SiftTests.xctest"
-               BlueprintName = "SiftTests"
-               ReferencedContainer = "container:Sift.xcodeproj">
-            </BuildableReference>
-         </TestableReference>
-         <TestableReference
-            skipped = "NO"
-            parallelizable = "NO">
+            parallelizable = "NO"
+            useTestSelectionWhitelist = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "604F278E6411CE6488EE956C"
@@ -88,6 +64,11 @@
                BlueprintName = "SiftUITests"
                ReferencedContainer = "container:Sift.xcodeproj">
             </BuildableReference>
+            <SelectedTests>
+               <Test
+                  Identifier = "SiftScreenshots">
+               </Test>
+            </SelectedTests>
          </TestableReference>
       </Testables>
       <CommandLineArguments>

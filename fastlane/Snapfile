@@ -1,0 +1,6 @@
+scheme("SiftScreenshots")
+output_directory("./fastlane/screenshots")
+clear_previous_screenshots(true)
+
+# macOS doesn't use device simulators — screenshots run on the host Mac
+languages(["en-US"])

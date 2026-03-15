@@ -94,3 +94,15 @@ schemes:
     test:
       targets:
         - SiftTests
+
+  SiftScreenshots:
+    build:
+      targets:
+        Sift: [run, test]
+        SiftUITests: [test]
+    test:
+      targets:
+        - name: SiftUITests
+          skipped: false
+          selectedTests:
+            - SiftScreenshots
