@@ -14,25 +14,25 @@ final class TestSortOrder: XCTestCase {
     }
 
     func testLeastPlayedSort() {
-        let viewModel = CullViewModel()
+        let viewModel = SiftViewModel()
         let sorted = viewModel.sortedTracks(makeTracks(), by: .leastPlayed)
         XCTAssertEqual(sorted.map(\.playCount), [0, 5, 10])
     }
 
     func testMostPlayedSort() {
-        let viewModel = CullViewModel()
+        let viewModel = SiftViewModel()
         let sorted = viewModel.sortedTracks(makeTracks(), by: .mostPlayed)
         XCTAssertEqual(sorted.map(\.playCount), [10, 5, 0])
     }
 
     func testOldestSort() {
-        let viewModel = CullViewModel()
+        let viewModel = SiftViewModel()
         let sorted = viewModel.sortedTracks(makeTracks(), by: .oldest)
         XCTAssertEqual(sorted.map(\.id), ["1", "2", "3"])
     }
 
     func testNewestSort() {
-        let viewModel = CullViewModel()
+        let viewModel = SiftViewModel()
         let sorted = viewModel.sortedTracks(makeTracks(), by: .newest)
         XCTAssertEqual(sorted.map(\.id), ["3", "2", "1"])
     }
@@ -104,7 +104,7 @@ final class TestSpotifyFallback: XCTestCase {
 
 final class TestDecisionState: XCTestCase {
     @MainActor func testKeepAdvancesCursor() {
-        let viewModel = CullViewModel()
+        let viewModel = SiftViewModel()
         let tracks = [
             Track(id: "1", name: "A", artist: "X", album: "L", duration: 180, playCount: 0, dateAdded: Date()),
             Track(id: "2", name: "B", artist: "Y", album: "L", duration: 200, playCount: 0, dateAdded: Date())
@@ -117,7 +117,7 @@ final class TestDecisionState: XCTestCase {
     }
 
     @MainActor func testRemoveAdvancesCursorAndQueues() {
-        let viewModel = CullViewModel()
+        let viewModel = SiftViewModel()
         let tracks = [
             Track(id: "1", name: "A", artist: "X", album: "L", duration: 180, playCount: 0, dateAdded: Date())
         ]
@@ -128,7 +128,7 @@ final class TestDecisionState: XCTestCase {
     }
 
     @MainActor func testSkipAdvancesCursor() {
-        let viewModel = CullViewModel()
+        let viewModel = SiftViewModel()
         let tracks = [
             Track(id: "1", name: "A", artist: "X", album: "L", duration: 180, playCount: 0, dateAdded: Date()),
             Track(id: "2", name: "B", artist: "Y", album: "L", duration: 200, playCount: 0, dateAdded: Date())
@@ -140,7 +140,7 @@ final class TestDecisionState: XCTestCase {
     }
 
     @MainActor func testDonePhaseWhenLibraryExhausted() {
-        let viewModel = CullViewModel()
+        let viewModel = SiftViewModel()
         let track = Track(
             id: "1", name: "A", artist: "X", album: "L",
             duration: 180, playCount: 0, dateAdded: Date()

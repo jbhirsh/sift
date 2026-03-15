@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @EnvironmentObject var viewModel: CullViewModel
+    @EnvironmentObject var viewModel: SiftViewModel
     @State private var clientID: String = ""
     @State private var clientSecret: String = ""
     @State private var saved: Bool = false

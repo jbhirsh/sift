@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct LoadingView: View {
-    @EnvironmentObject var vm: CullViewModel
+    @EnvironmentObject var vm: SiftViewModel
 
     var body: some View {
         VStack(spacing: 24) {

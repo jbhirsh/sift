@@ -1,7 +1,7 @@
 import SwiftUI
 
-struct CullView: View {
-    @EnvironmentObject var vm: CullViewModel
+struct SiftView: View {
+    @EnvironmentObject var vm: SiftViewModel
 
     var body: some View {
         VStack(spacing: 0) {

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct PlayerControlsView: View {
-    @EnvironmentObject var vm: CullViewModel
+    @EnvironmentObject var vm: SiftViewModel
 
     var body: some View {
         VStack(spacing: 8) {
@@ -84,7 +84,7 @@ struct PlayerControlsView: View {
 }
 
 struct SectionButton: View {
-    @EnvironmentObject var vm: CullViewModel
+    @EnvironmentObject var vm: SiftViewModel
     let section: Section
 
     var body: some View {

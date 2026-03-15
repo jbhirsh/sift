@@ -27,7 +27,7 @@ struct CardView: View {
 
 // Interactive front card with drag gesture
 struct InteractiveCardView: View {
-    @EnvironmentObject var vm: CullViewModel
+    @EnvironmentObject var vm: SiftViewModel
     let track: Track
 
     @GestureState private var dragOffset: CGSize = .zero
@@ -137,7 +137,7 @@ struct InteractiveCardView: View {
 // MARK: - Action buttons below card
 
 struct DecisionButtonsView: View {
-    @EnvironmentObject var vm: CullViewModel
+    @EnvironmentObject var vm: SiftViewModel
 
     var body: some View {
         HStack(spacing: 24) {

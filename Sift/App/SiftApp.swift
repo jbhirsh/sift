@@ -2,7 +2,7 @@ import SwiftUI
 
 @main
 struct SiftApp: App {
-    @StateObject private var viewModel = CullViewModel()
+    @StateObject private var viewModel = SiftViewModel()
 
     var body: some Scene {
         WindowGroup {

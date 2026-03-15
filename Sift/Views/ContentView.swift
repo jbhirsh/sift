@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @EnvironmentObject var vm: CullViewModel
+    @EnvironmentObject var vm: SiftViewModel
 
     var body: some View {
         Group {
@@ -10,8 +10,8 @@ struct ContentView: View {
                 SetupView()
             case .loading:
                 LoadingView()
-            case .culling:
-                CullView()
+            case .sifting:
+                SiftView()
             case .done:
                 DoneView()
             }
