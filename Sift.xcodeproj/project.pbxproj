@@ -10,6 +10,7 @@
 		0581F91937853C3319F2A095 /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F93552E726B415090946CC2 /* LoadingView.swift */; };
 		0F47C6DA6C8ACE6A2B6DBD79 /* SiftView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0489C2F65DD8AF7333A63092 /* SiftView.swift */; };
 		1D7515C35DAEDF8BB1829E9B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F39BCA547BEAAAE7D021A202 /* ContentView.swift */; };
+		3137F50331933E1DE88CB902 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 575D387F8CF84E2A12C5ED88 /* Assets.xcassets */; };
 		4146C1836DC8A5CD30412FE6 /* CredentialStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4F12E32A5550D53E3626967 /* CredentialStore.swift */; };
 		448C3DA032C2CCAAD27B27A7 /* SiftSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B72EE2B289923D343CF38822 /* SiftSession.swift */; };
 		510C987AE37A0D1079ABFD29 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB6E9992371811C62121AFAE /* SetupView.swift */; };
@@ -47,6 +48,7 @@
 		3CFDA7A1931A09A3784D76DA /* ScriptingBridge.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ScriptingBridge.framework; path = System/Library/Frameworks/ScriptingBridge.framework; sourceTree = SDKROOT; };
 		53E64B97217885164EB357F6 /* CardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardView.swift; sourceTree = "<group>"; };
 		549FCA4D5E11AA9133A030B9 /* Decision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Decision.swift; sourceTree = "<group>"; };
+		575D387F8CF84E2A12C5ED88 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		751BE13D563A3C27B82CFE11 /* SiftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiftTests.swift; sourceTree = "<group>"; };
 		7F1AC22BAC911C607211A30A /* Section.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Section.swift; sourceTree = "<group>"; };
 		89340930B5332BBEF5785FAC /* SpotifyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpotifyService.swift; sourceTree = "<group>"; };
@@ -143,6 +145,7 @@
 		D1DF56842465BC3837B28415 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				575D387F8CF84E2A12C5ED88 /* Assets.xcassets */,
 				A87AD59760F44CA48C01E407 /* Info.plist */,
 				FD09A31E752A785156FC806B /* Sift.entitlements */,
 			);
@@ -215,6 +218,7 @@
 			buildPhases = (
 				E390B385AD3D9FBD47BCF745 /* SwiftLint */,
 				0195E17015D9C5525CBA2516 /* Sources */,
+				DBCD5A16D67F2DABCCAC79FE /* Resources */,
 				B71A9D2E534F321CC5248C16 /* Frameworks */,
 			);
 			buildRules = (
@@ -265,6 +269,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		DBCD5A16D67F2DABCCAC79FE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3137F50331933E1DE88CB902 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
 		E390B385AD3D9FBD47BCF745 /* SwiftLint */ = {
@@ -337,6 +352,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSET_CATALOG_APP_ICON = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Sift/Resources/Sift.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
@@ -512,6 +528,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSET_CATALOG_APP_ICON = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = Sift/Resources/Sift.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;

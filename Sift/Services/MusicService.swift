@@ -3,9 +3,7 @@ import Foundation
 import ScriptingBridge
 
 // MARK: - ScriptingBridge protocols for Music.app
-// These mirror the generated Music.h header. We define only what we need.
-
-// In ScriptingBridge, element collections are methods that return SBElementArray.
+// Collections are @objc optional func returning SBElementArray (not var).
 // Scalar properties remain as vars.
 
 @objc protocol MusicApplication {
@@ -21,7 +19,6 @@ import ScriptingBridge
 
 @objc protocol MusicSource {
     @objc optional func libraryPlaylists() -> SBElementArray
-    @objc optional func playlists() -> SBElementArray
     @objc optional var name: String { get }
     @objc optional var kind: MusicESourceKind { get }
 }
@@ -68,16 +65,31 @@ import ScriptingBridge
 
 extension SBApplication: MusicApplication {}
 
-// MARK: - MusicService
+// MARK: - Errors
 
-enum MusicError: Error {
+enum MusicError: Error, LocalizedError {
     case appNotFound
     case libraryNotFound
     case trackNotFound(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .appNotFound:       return "Music.app could not be found or launched."
+        case .libraryNotFound:   return "Could not access your Music library."
+        case .trackNotFound(let id): return "Track \(id) not found in library."
+        }
+    }
 }
+
+// MARK: - MusicService
 
 actor MusicService {
     private var sbApp: SBApplication?
+    /// Cached ScriptingBridge track objects keyed by persistentID.
+    /// Populated on loadLibrary() and used for all subsequent operations.
+    private var trackCache: [String: any MusicTrack] = [:]
+
+    // MARK: - Private helpers
 
     private func getApp() throws -> SBApplication {
         if let existing = sbApp { return existing }
@@ -88,25 +100,43 @@ actor MusicService {
         return app
     }
 
-    private func musicApp() throws -> any MusicApplication {
+    private func musicProtocol() throws -> any MusicApplication {
         try getApp() as any MusicApplication
     }
 
-    func loadLibrary() async throws -> [Track] {
-        let app = try musicApp()
+    /// Returns all MusicTrack SBObjects from the first library source.
+    private func allSBTracks() throws -> [any MusicTrack] {
+        let app = try musicProtocol()
 
-        guard let sources = app.sources?() as? [any MusicSource],
-              let library = sources.first(where: { $0.kind == .library }),
-              let playlists = library.libraryPlaylists?() as? [any MusicLibraryPlaylist],
-              let libraryPlaylist = playlists.first,
-              let sbTracks = libraryPlaylist.tracks?() as? [any MusicTrack] else {
+        guard let sourcesArr = app.sources?() else { throw MusicError.libraryNotFound }
+        let sources = sourcesArr.compactMap { $0 as? any MusicSource }
+
+        guard let library = sources.first(where: { $0.kind == .library }),
+              let playlistsArr = library.libraryPlaylists?() else {
             throw MusicError.libraryNotFound
         }
+        let playlists = playlistsArr.compactMap { $0 as? any MusicLibraryPlaylist }
 
-        return sbTracks.compactMap { sbTrack -> Track? in
+        guard let libraryPlaylist = playlists.first,
+              let tracksArr = libraryPlaylist.tracks?() else {
+            throw MusicError.libraryNotFound
+        }
+        return tracksArr.compactMap { $0 as? any MusicTrack }
+    }
+
+    // MARK: - Public API
+
+    func loadLibrary() async throws -> [Track] {
+        let sbTracks = try allSBTracks()
+
+        var result: [Track] = []
+        var cache: [String: any MusicTrack] = [:]
+
+        for sbTrack in sbTracks {
             guard let id = sbTrack.persistentID,
-                  let name = sbTrack.name else { return nil }
-            return Track(
+                  let name = sbTrack.name else { continue }
+            cache[id] = sbTrack
+            result.append(Track(
                 id: id,
                 name: name,
                 artist: sbTrack.artist ?? "",
@@ -114,22 +144,17 @@ actor MusicService {
                 duration: sbTrack.duration ?? 0,
                 playCount: sbTrack.playedCount ?? 0,
                 dateAdded: sbTrack.dateAdded ?? Date.distantPast
-            )
+            ))
         }
+
+        trackCache = cache
+        return result
     }
 
     func play(trackID: String, at position: Double = 0) throws {
-        let app = try musicApp()
-
-        guard let sources = app.sources?() as? [any MusicSource],
-              let library = sources.first(where: { $0.kind == .library }),
-              let playlists = library.libraryPlaylists?() as? [any MusicLibraryPlaylist],
-              let libraryPlaylist = playlists.first,
-              let sbTracks = libraryPlaylist.tracks?() as? [any MusicTrack],
-              let track = sbTracks.first(where: { $0.persistentID == trackID }) else {
+        guard let track = trackCache[trackID] else {
             throw MusicError.trackNotFound(trackID)
         }
-
         track.playOnce?(false)
         if position > 0 {
             try getApp().setValue(position, forKey: "playerPosition")
@@ -137,7 +162,7 @@ actor MusicService {
     }
 
     func currentPosition() throws -> Double {
-        try musicApp().playerPosition ?? 0
+        try musicProtocol().playerPosition ?? 0
     }
 
     func seek(to position: Double) throws {
@@ -145,46 +170,31 @@ actor MusicService {
     }
 
     func pause() throws {
-        try musicApp().pause?()
+        try musicProtocol().pause?()
     }
 
     func resume() throws {
-        try musicApp().play?()
+        try musicProtocol().play?()
     }
 
     func isPlaying() throws -> Bool {
-        try musicApp().playerState == .playing
+        try musicProtocol().playerState == .playing
     }
 
     func artwork(forTrackID trackID: String) throws -> NSImage? {
-        let app = try musicApp()
-
-        guard let sources = app.sources?() as? [any MusicSource],
-              let library = sources.first(where: { $0.kind == .library }),
-              let playlists = library.libraryPlaylists?() as? [any MusicLibraryPlaylist],
-              let libraryPlaylist = playlists.first,
-              let sbTracks = libraryPlaylist.tracks?() as? [any MusicTrack],
-              let track = sbTracks.first(where: { $0.persistentID == trackID }),
-              let artworks = track.artworks?() as? [any MusicArtwork],
-              let artwork = artworks.first else {
+        guard let track = trackCache[trackID],
+              let artworksArr = track.artworks?(),
+              let first = artworksArr.compactMap({ $0 as? any MusicArtwork }).first else {
             return nil
         }
-
-        return artwork.data
+        return first.data
     }
 
     func deleteTrack(id trackID: String) throws {
-        let app = try musicApp()
-
-        guard let sources = app.sources?() as? [any MusicSource],
-              let library = sources.first(where: { $0.kind == .library }),
-              let playlists = library.libraryPlaylists?() as? [any MusicLibraryPlaylist],
-              let libraryPlaylist = playlists.first,
-              let sbTracks = libraryPlaylist.tracks?() as? [any MusicTrack],
-              let track = sbTracks.first(where: { $0.persistentID == trackID }) else {
+        guard let track = trackCache[trackID] else {
             throw MusicError.trackNotFound(trackID)
         }
-
         track.delete?()
+        trackCache.removeValue(forKey: trackID)
     }
 }
