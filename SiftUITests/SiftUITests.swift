@@ -22,18 +22,16 @@ final class SiftUITests: XCTestCase {
         app.staticTexts[name].waitForExistence(timeout: timeout)
     }
 
-    /// Wait for a stat Text (identified by `identifier`) to show `expectedValue`.
+    /// Wait for a stat label to show a specific value using XCTest's native predicate waiter.
     /// On macOS, SwiftUI Text inside .background(.bar) reports content via `value`, not `label`.
-    @discardableResult
-    private func waitForStatLabel(_ identifier: String, label expectedValue: String, timeout: TimeInterval = 5) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            let stat = app.staticTexts.matching(identifier: identifier).firstMatch
-            if stat.exists, let v = stat.value as? String, v == expectedValue { return true }
-            Thread.sleep(forTimeInterval: 0.1)
+    private func waitForStatLabel(_ identifier: String, label expectedValue: String, timeout: TimeInterval = 5) {
+        let stat = app.staticTexts.matching(identifier: identifier).firstMatch
+        let predicate = NSPredicate { _, _ in
+            stat.exists && (stat.value as? String) == expectedValue
         }
-        XCTFail("Stat '\(identifier)' did not show '\(expectedValue)' within \(timeout)s")
-        return false
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: nil)
+        let result = XCTWaiter().wait(for: [expectation], timeout: timeout)
+        XCTAssertEqual(result, .completed, "Stat '\(identifier)' did not show '\(expectedValue)' within \(timeout)s")
     }
 
     private func waitForDoneScreen(timeout: TimeInterval = 10) -> Bool {
@@ -53,12 +51,13 @@ final class SiftUITests: XCTestCase {
     private func remove() { app.typeKey(XCUIKeyboardKey.rightArrow, modifierFlags: []) }
 
     /// Navigate to the done screen by deciding all three mock tracks.
+    /// Waits for each card to advance before issuing the next decision.
     private func decideAllTracks() {
         XCTAssertTrue(waitForTrack("Mock Song One"))
         keep()
-        Thread.sleep(forTimeInterval: 0.3)
+        XCTAssertTrue(waitForTrack("Mock Song Two"))
         skip()
-        Thread.sleep(forTimeInterval: 0.3)
+        XCTAssertTrue(waitForTrack("Mock Song Three"))
         remove()
         app.activate()
     }
@@ -179,7 +178,7 @@ final class SiftUITests: XCTestCase {
     func testStopButtonReturnsToSetupWithResumeOption() {
         XCTAssertTrue(waitForTrack("Mock Song One"))
         keep()
-        Thread.sleep(forTimeInterval: 0.3)
+        XCTAssertTrue(waitForTrack("Mock Song Two"))
         app.buttons.matching(identifier: "stop-button").firstMatch.click()
         XCTAssertTrue(app.buttons["Resume Previous Session"].waitForExistence(timeout: 3),
                       "Resume button not shown after Save & Pause")
@@ -188,7 +187,7 @@ final class SiftUITests: XCTestCase {
     func testResumeAfterStopReturnsToSiftingView() {
         XCTAssertTrue(waitForTrack("Mock Song One"))
         keep()
-        Thread.sleep(forTimeInterval: 0.3)
+        XCTAssertTrue(waitForTrack("Mock Song Two"))
         app.buttons.matching(identifier: "stop-button").firstMatch.click()
         XCTAssertTrue(app.buttons["Resume Previous Session"].waitForExistence(timeout: 3))
         app.buttons["Resume Previous Session"].click()
