@@ -16,7 +16,7 @@ platform :mac do
       export_method: "app-store",
       output_directory: "build",
       output_name: "Sift.pkg",
-      xcargs: "CODE_SIGN_STYLE=Manual"
+      xcargs: "CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER='Sift App Store'"
     )
 
     upload_to_app_store(

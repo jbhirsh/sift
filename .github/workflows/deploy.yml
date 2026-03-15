@@ -37,7 +37,7 @@ jobs:
 
       - name: Install provisioning profile
         run: |
-          PROFILE_PATH="$HOME/Library/MobileDevice/Provisioning Profiles/sift.provisionprofile"
+          PROFILE_PATH="$HOME/Library/MobileDevice/Provisioning Profiles/sift.provisioningprofile"
           mkdir -p "$(dirname "$PROFILE_PATH")"
           echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > "$PROFILE_PATH"
 
