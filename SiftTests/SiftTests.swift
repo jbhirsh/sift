@@ -8,7 +8,7 @@ final class MockPlaylistService: PlaylistService {
     var shouldThrow = false
 
     func addToRemovalPlaylist(tracks: [Track]) async throws {
-        if shouldThrow { throw PlaylistError.executionFailed("mock error") }
+        if shouldThrow { throw PlaylistError.noMatchingSongs }
         addedTracks = tracks
     }
 }
@@ -160,56 +160,19 @@ final class TestStopSession: XCTestCase {
     }
 }
 
-// MARK: - TestPlaylistScriptBuilder
+// MARK: - TestPlaylistError
 
-final class TestPlaylistScriptBuilder: XCTestCase {
-    func testScriptContainsPlaylistName() {
-        let script = buildRemovalPlaylistScript(tracks: [], playlistName: "My Playlist")
-        XCTAssertTrue(script.contains("My Playlist"))
+final class TestPlaylistError: XCTestCase {
+    func testFetchFailedHasDescription() {
+        let error = PlaylistError.fetchFailed
+        XCTAssertNotNil(error.errorDescription)
+        XCTAssertFalse((error.errorDescription ?? "").isEmpty)
     }
 
-    func testScriptCreatesPlaylistIfNotExists() {
-        let script = buildRemovalPlaylistScript(tracks: [])
-        XCTAssertTrue(script.contains("if not (exists playlist"))
-        XCTAssertTrue(script.contains("make new playlist"))
-    }
-
-    func testScriptContainsTrackNameAndArtist() {
-        let track = Track(id: "1", name: "Bohemian Rhapsody", artist: "Queen",
-                          album: "A Night at the Opera", duration: 354, playCount: 10, dateAdded: Date())
-        let script = buildRemovalPlaylistScript(tracks: [track])
-        XCTAssertTrue(script.contains("Bohemian Rhapsody"))
-        XCTAssertTrue(script.contains("Queen"))
-    }
-
-    func testScriptEscapesDoubleQuotesInTrackName() {
-        let track = Track(id: "1", name: "Say \"Hello\"", artist: "Test",
-                          album: "", duration: 180, playCount: 0, dateAdded: Date())
-        let script = buildRemovalPlaylistScript(tracks: [track])
-        XCTAssertTrue(script.contains("Say \\\"Hello\\\""))
-    }
-
-    func testScriptEscapesDoubleQuotesInArtistName() {
-        let track = Track(id: "1", name: "Song", artist: "The \"Band\"",
-                          album: "", duration: 180, playCount: 0, dateAdded: Date())
-        let script = buildRemovalPlaylistScript(tracks: [track])
-        XCTAssertTrue(script.contains("The \\\"Band\\\""))
-    }
-
-    func testScriptContainsDuplicateCommandForEachTrack() {
-        let tracks = [
-            Track(id: "1", name: "A", artist: "X", album: "", duration: 180, playCount: 0, dateAdded: Date()),
-            Track(id: "2", name: "B", artist: "Y", album: "", duration: 200, playCount: 0, dateAdded: Date())
-        ]
-        let script = buildRemovalPlaylistScript(tracks: tracks)
-        let duplicateCount = script.components(separatedBy: "duplicate").count - 1
-        XCTAssertEqual(duplicateCount, 2)
-    }
-
-    func testEmptyTracksProducesValidScript() {
-        let script = buildRemovalPlaylistScript(tracks: [])
-        XCTAssertTrue(script.hasPrefix("tell application \"Music\""))
-        XCTAssertTrue(script.hasSuffix("end tell"))
+    func testNoMatchingSongsHasDescription() {
+        let error = PlaylistError.noMatchingSongs
+        XCTAssertNotNil(error.errorDescription)
+        XCTAssertFalse((error.errorDescription ?? "").isEmpty)
     }
 }
 

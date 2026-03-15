@@ -3,6 +3,7 @@ import XCTest
 /// Captures App Store screenshots.
 /// Run via: fastlane screenshots
 /// Not included in the regular CI test run.
+@MainActor
 final class SiftScreenshots: XCTestCase {
     let app = XCUIApplication()
 

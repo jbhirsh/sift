@@ -1,14 +1,14 @@
 # Sift — Claude Project Instructions
 
 ## What This Project Is
-A native SwiftUI macOS app for rapidly reviewing an Apple Music library.
-Users swipe/keyboard through their tracks: keep, remove, or skip.
-Targets the Mac App Store. Uses ScriptingBridge to control Music.app.
+A native SwiftUI iOS app for rapidly reviewing an Apple Music library.
+Users swipe/tap through their tracks: keep, remove, or skip.
+Targets the iOS App Store. Uses MusicKit for library access and playback.
 
 ---
 
 ## Running the App
-Open `Sift.xcodeproj` in Xcode and hit ⌘R.
+Open `Sift.xcodeproj` in Xcode and hit ⌘R (target an iPhone/iPad simulator or device).
 
 To regenerate the Xcode project after editing `project.yml`:
 ```bash
@@ -25,34 +25,23 @@ Unit tests:
 xcodebuild test \
   -project Sift.xcodeproj \
   -scheme SiftUnitTests \
-  -destination 'platform=macOS' \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- \
   ENABLE_USER_SCRIPT_SANDBOXING=NO \
-  CODE_SIGN_STYLE=Manual \
-  CODE_SIGN_IDENTITY="Apple Development" \
-  DEVELOPMENT_TEAM=76AYYJCJP5 \
   | xcbeautify
 ```
 
-UI/screenshot tests:
+UI tests:
 ```bash
 xcodebuild test \
   -project Sift.xcodeproj \
-  -scheme SiftScreenshots \
-  -destination 'platform=macOS' \
-  BUNDLE_LOADER="" \
+  -scheme Sift \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -only-testing:SiftUITests/SiftUITests \
+  CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- \
   ENABLE_USER_SCRIPT_SANDBOXING=NO \
-  CODE_SIGN_STYLE=Manual \
-  CODE_SIGN_IDENTITY="Apple Development" \
-  DEVELOPMENT_TEAM=76AYYJCJP5 \
   | xcbeautify
 ```
-
-Note: macOS 26 enforces matching Team IDs when loading test bundles. The
-`DEVELOPMENT_TEAM=76AYYJCJP5` and `CODE_SIGN_STYLE=Manual` flags are required
-because Xcode's Automatic signing needs a registered Apple account (which is
-not available in command-line builds). `76AYYJCJP5` is the OU (team) in the
-"Apple Development: Jessica Hirsh (9PWVKSC697)" certificate. `9PWVKSC697` is
-the App Store team used for distribution signing.
 
 Tests must be green before any commit. Always re-run tests before committing —
 especially when test files were modified.
@@ -68,18 +57,15 @@ especially when test files were modified.
 ```bash
 xcodebuild build \
   -project Sift.xcodeproj \
-  -scheme Sift \
-  -destination 'platform=macOS' \
+  -target Sift \
+  -sdk iphonesimulator \
+  CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- \
+  CODE_SIGNING_ALLOWED=NO \
   ENABLE_USER_SCRIPT_SANDBOXING=NO \
-  CODE_SIGN_STYLE=Manual \
-  CODE_SIGN_IDENTITY="Apple Development" \
-  DEVELOPMENT_TEAM=76AYYJCJP5 \
   | xcbeautify
 ```
 
 Note: Xcode GUI builds (⌘R) use automatic signing with team 9PWVKSC697.
-Command-line builds use manual signing with the "Apple Development" cert
-(OU team 76AYYJCJP5) — required because macOS 26 enforces Team ID matching.
 
 ---
 
@@ -106,8 +92,6 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 - **Swift**: stdlib + Apple frameworks only. No SPM dependencies.
 - **SwiftLint**: runs as a build phase. Fix all violations before committing.
 - **Tests**: XCTest only. Test classes named `Test<FeatureName>`.
-- **Credentials**: Spotify credentials stored in Keychain via `CredentialStore`.
-  Never hardcode or commit credentials.
 
 ---
 
@@ -116,14 +100,15 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 Sift/
   App/              SiftApp.swift
   Models/           Track, Section, Decision, SiftSession, SortOrder
-  Services/         MusicService (ScriptingBridge), SpotifyService,
-                    SessionStore, CredentialStore
+  Services/         MusicService (MusicKit), PlaylistService (MusicKit),
+                    SessionStore
   ViewModels/       SiftViewModel (@MainActor ObservableObject)
   Views/            SetupView, LoadingView, SiftView, CardView,
                     PlayerControlsView, DoneView, SettingsView
   Resources/        Info.plist, Sift.entitlements, Assets.xcassets
-SiftTests/          XCTest suite
-fastlane/           Fastfile, Appfile
+SiftTests/          XCTest unit test suite
+SiftUITests/        XCTest UI test suite + SnapshotHelper
+fastlane/           Fastfile, Snapfile, Appfile
 project.yml         xcodegen spec — source of truth for Xcode project
 ```
 
@@ -134,15 +119,14 @@ and run `xcodegen generate`.
 ---
 
 ## Key Architecture Notes
-- `MusicService` is a Swift `actor`. All Music.app calls are synchronous
-  ScriptingBridge calls, but cross-actor calls are `await`-ed.
-- `MusicService` caches ScriptingBridge track objects in `trackCache`
-  after `loadLibrary()`. This avoids re-traversing the library on every
-  play/seek/delete call.
+- `MusicService` is a Swift `actor`. All MusicKit calls are `await`-ed.
+- `MusicService` caches `Song` objects in `songCache` after `loadLibrary()`.
+  This avoids re-fetching the library on every play/artwork call.
+- `MusicKitPlaylistService` creates a "Sift — To Remove" playlist using
+  `MusicLibrary.shared.createPlaylist`. Requires iOS 16+.
 - `SiftViewModel` is `@MainActor` and owns all published state.
 - Session is persisted to `~/Library/Application Support/Sift/session.json`
   after every decision.
-- Spotify credentials live in the macOS Keychain via `CredentialStore`.
 
 ---
 
@@ -150,7 +134,7 @@ and run `xcodegen generate`.
 - **CI** (`.github/workflows/ci.yml`): runs on every push to main.
   Lints + builds + tests.
 - **Deploy** (`.github/workflows/deploy.yml`): runs on `v*` tag push.
-  Builds, signs, notarizes, submits to App Store via Fastlane.
+  Builds, signs, submits to App Store via Fastlane.
 - Deploy requires GitHub environment `app-store` with signing secrets.
 
 ---
@@ -160,8 +144,7 @@ and run `xcodegen generate`.
 - **Display name**: Sift — Music Library Cleaner
 - **SKU**: SIFT-001
 - **Team ID**: 9PWVKSC697
-- `com.apple.security.scripting-targets` for Music.app is a restricted
-  entitlement — approval from Apple required before App Store submission.
+- **Platform**: iOS 17.0+ (iPhone and iPad)
 
 ---
 

@@ -23,10 +23,11 @@ final class SiftUITests: XCTestCase {
     }
 
     /// Wait for a stat label to show a specific value using XCTest's native predicate waiter.
+    /// On iOS, SwiftUI Text reports content via `label`; on macOS it uses `value`.
     private func waitForStatLabel(_ identifier: String, label expectedValue: String, timeout: TimeInterval = 5) {
         let stat = app.staticTexts.matching(identifier: identifier).firstMatch
         let predicate = NSPredicate { _, _ in
-            stat.exists && (stat.value as? String) == expectedValue
+            stat.exists && stat.label == expectedValue
         }
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: nil)
         let result = XCTWaiter().wait(for: [expectation], timeout: timeout)
