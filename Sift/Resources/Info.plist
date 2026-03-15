@@ -13,7 +13,7 @@
     <key>CFBundleName</key>
     <string>Sift</string>
     <key>CFBundleDisplayName</key>
-    <string>Sift</string>
+    <string>Sift — Music Library Cleaner</string>
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleShortVersionString</key>
