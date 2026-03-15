@@ -15,7 +15,7 @@ struct SiftView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("remaining-count")
-                Button("Stop") {
+                Button("Save & Pause") {
                     vm.stopSession()
                 }
                 .buttonStyle(.bordered)

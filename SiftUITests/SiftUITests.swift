@@ -176,22 +176,22 @@ final class SiftUITests: XCTestCase {
         XCTAssertTrue(app.buttons.matching(identifier: "stop-button").firstMatch.waitForExistence(timeout: 3))
     }
 
-    func testStopButtonShowsDoneScreen() {
+    func testStopButtonReturnsToSetupWithResumeOption() {
         XCTAssertTrue(waitForTrack("Mock Song One"))
         keep()
         Thread.sleep(forTimeInterval: 0.3)
         app.buttons.matching(identifier: "stop-button").firstMatch.click()
-        XCTAssertTrue(waitForDoneScreen(), "Done screen not shown after tapping Stop")
+        XCTAssertTrue(app.buttons["Resume Previous Session"].waitForExistence(timeout: 3),
+                      "Resume button not shown after Save & Pause")
     }
 
-    func testStopPreservesDecisionsInSummary() {
+    func testResumeAfterStopReturnsToSiftingView() {
         XCTAssertTrue(waitForTrack("Mock Song One"))
         keep()
         Thread.sleep(forTimeInterval: 0.3)
         app.buttons.matching(identifier: "stop-button").firstMatch.click()
-        XCTAssertTrue(waitForDoneScreen())
-        let keptCount = app.staticTexts.matching(identifier: "summary-count-kept").firstMatch
-        XCTAssertTrue(keptCount.waitForExistence(timeout: 3))
-        XCTAssertEqual(keptCount.value as? String ?? keptCount.label, "1")
+        XCTAssertTrue(app.buttons["Resume Previous Session"].waitForExistence(timeout: 3))
+        app.buttons["Resume Previous Session"].click()
+        XCTAssertTrue(waitForTrack("Mock Song Two"), "Did not resume at next track after Save & Pause")
     }
 }

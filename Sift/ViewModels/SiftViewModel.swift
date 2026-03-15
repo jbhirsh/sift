@@ -174,7 +174,8 @@ final class SiftViewModel: ObservableObject {
         stopPositionPolling()
         Task { try? await musicService.pause() }
         saveSession()
-        phase = .done
+        hasSavedSession = true
+        phase = .setup
     }
 
     // MARK: - Decisions
