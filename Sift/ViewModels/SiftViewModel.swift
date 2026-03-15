@@ -5,6 +5,7 @@ enum AppPhase: Equatable {
     case setup
     case loading
     case sifting
+    case paused
     case done
 }
 
@@ -174,8 +175,12 @@ final class SiftViewModel: ObservableObject {
         stopPositionPolling()
         Task { try? await musicService.pause() }
         saveSession()
-        hasSavedSession = true
-        phase = .setup
+        phase = .paused
+    }
+
+    func resumeFromPause() {
+        phase = .sifting
+        Task { await playCurrentTrack() }
     }
 
     // MARK: - Decisions

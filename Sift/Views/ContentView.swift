@@ -12,7 +12,7 @@ struct ContentView: View {
                 LoadingView()
             case .sifting:
                 SiftView()
-            case .done:
+            case .paused, .done:
                 DoneView()
             }
         }

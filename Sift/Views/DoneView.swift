@@ -8,10 +8,10 @@ struct DoneView: View {
         ScrollView {
             VStack(spacing: 32) {
                 VStack(spacing: 8) {
-                    Text("All done.")
+                    Text(vm.phase == .paused ? "Session paused." : "All done.")
                         .font(.system(size: 40, weight: .bold, design: .rounded))
                         .accessibilityIdentifier("done-title")
-                    Text("Your library has been sifted.")
+                    Text(vm.phase == .paused ? "Here's where you left off." : "Your library has been sifted.")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                 }
@@ -102,12 +102,26 @@ struct DoneView: View {
                     .padding(.horizontal, 24)
                 }
 
-                Button("Start Over") {
-                    vm.startFresh()
+                if vm.phase == .paused {
+                    Button("Resume Session") {
+                        vm.resumeFromPause()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    Button("Start Fresh") {
+                        vm.startFresh()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .padding(.bottom, 40)
+                } else {
+                    Button("Start Over") {
+                        vm.startFresh()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .padding(.bottom, 40)
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .padding(.bottom, 40)
             }
             .frame(maxWidth: .infinity)
         }

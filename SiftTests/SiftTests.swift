@@ -109,7 +109,7 @@ final class TestSessionStore: XCTestCase {
 
 @MainActor
 final class TestStopSession: XCTestCase {
-    func testStopSessionTransitionsToSetup() {
+    func testStopSessionTransitionsToPaused() {
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         let tracks = [
             Track(id: "1", name: "A", artist: "X", album: "", duration: 180, playCount: 0, dateAdded: Date()),
@@ -121,8 +121,24 @@ final class TestStopSession: XCTestCase {
 
         vm.stopSession()
 
-        XCTAssertEqual(vm.phase, .setup)
-        XCTAssertTrue(vm.hasSavedSession)
+        XCTAssertEqual(vm.phase, .paused)
+    }
+
+    func testResumeFromPauseTransitionsToSifting() {
+        let vm = SiftViewModel(playlistService: MockPlaylistService())
+        let tracks = [
+            Track(id: "1", name: "A", artist: "X", album: "", duration: 180, playCount: 0, dateAdded: Date()),
+            Track(id: "2", name: "B", artist: "Y", album: "", duration: 200, playCount: 0, dateAdded: Date())
+        ]
+        vm.loadTracks(tracks)
+        vm.decideWithoutPlayback(.keep)
+        vm.stopSession()
+        XCTAssertEqual(vm.phase, .paused)
+
+        vm.resumeFromPause()
+
+        XCTAssertEqual(vm.phase, .sifting)
+        XCTAssertEqual(vm.cursor, 1)
     }
 
     func testStopSessionPreservesDecisionsSoFar() {

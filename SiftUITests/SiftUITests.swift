@@ -175,13 +175,16 @@ final class SiftUITests: XCTestCase {
         XCTAssertTrue(app.buttons.matching(identifier: "stop-button").firstMatch.waitForExistence(timeout: 3))
     }
 
-    func testStopButtonReturnsToSetupWithResumeOption() {
+    func testStopButtonShowsPausedSummary() {
         XCTAssertTrue(waitForTrack("Mock Song One"))
         keep()
         XCTAssertTrue(waitForTrack("Mock Song Two"))
         app.buttons.matching(identifier: "stop-button").firstMatch.click()
-        XCTAssertTrue(app.buttons["Resume Previous Session"].waitForExistence(timeout: 3),
-                      "Resume button not shown after Save & Pause")
+        XCTAssertTrue(
+            app.staticTexts.matching(identifier: "done-title").firstMatch.waitForExistence(timeout: 3),
+            "Paused summary screen not shown after Save & Pause"
+        )
+        XCTAssertTrue(app.buttons["Resume Session"].waitForExistence(timeout: 3))
     }
 
     func testResumeAfterStopReturnsToSiftingView() {
@@ -189,8 +192,8 @@ final class SiftUITests: XCTestCase {
         keep()
         XCTAssertTrue(waitForTrack("Mock Song Two"))
         app.buttons.matching(identifier: "stop-button").firstMatch.click()
-        XCTAssertTrue(app.buttons["Resume Previous Session"].waitForExistence(timeout: 3))
-        app.buttons["Resume Previous Session"].click()
+        XCTAssertTrue(app.buttons["Resume Session"].waitForExistence(timeout: 3))
+        app.buttons["Resume Session"].click()
         XCTAssertTrue(waitForTrack("Mock Song Two"), "Did not resume at next track after Save & Pause")
     }
 }
