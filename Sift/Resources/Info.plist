@@ -26,9 +26,11 @@
     <string>Copyright © 2026 Jessica Hirsh. All rights reserved.</string>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
-    <key>NSAppleEventsUsageDescription</key>
-    <string>Sift controls Music.app to play, seek, and manage your library.</string>
+    <key>NSAppleMusicUsageDescription</key>
+    <string>Sift needs access to your Music library to load your songs and play them while you review.</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.music</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Sift uses Apple Events to create a playlist in Music for tracks you want to remove.</string>
 </dict>
 </plist>

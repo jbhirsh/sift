@@ -1,6 +1,19 @@
 import XCTest
 @testable import Sift
 
+// MARK: - Mock playlist service for unit tests
+
+final class MockPlaylistService: PlaylistService {
+    var addedTracks: [Track] = []
+    var shouldThrow = false
+
+    func addToRemovalPlaylist(tracks: [Track]) async throws {
+        if shouldThrow { throw PlaylistError.executionFailed("mock error") }
+        addedTracks = tracks
+    }
+}
+
+@MainActor
 final class TestSortOrder: XCTestCase {
     private func makeTracks() -> [Track] {
         [
@@ -92,13 +105,106 @@ final class TestSessionStore: XCTestCase {
     }
 }
 
-final class TestSpotifyFallback: XCTestCase {
-    func testFallbackSectionsReturnChorus() async {
-        let service = SpotifyService(clientID: "", clientSecret: "")
-        let sections = await service.sections(name: "Song", artist: "Artist", duration: 200)
-        XCTAssertEqual(sections.count, 1)
-        XCTAssertTrue(sections[0].isChorus)
-        XCTAssertEqual(sections[0].start, 200 * 0.33, accuracy: 0.01)
+// MARK: - TestPlaylistScriptBuilder
+
+final class TestPlaylistScriptBuilder: XCTestCase {
+    func testScriptContainsPlaylistName() {
+        let script = buildRemovalPlaylistScript(tracks: [], playlistName: "My Playlist")
+        XCTAssertTrue(script.contains("My Playlist"))
+    }
+
+    func testScriptCreatesPlaylistIfNotExists() {
+        let script = buildRemovalPlaylistScript(tracks: [])
+        XCTAssertTrue(script.contains("if not (exists playlist"))
+        XCTAssertTrue(script.contains("make new playlist"))
+    }
+
+    func testScriptContainsTrackNameAndArtist() {
+        let track = Track(id: "1", name: "Bohemian Rhapsody", artist: "Queen",
+                          album: "A Night at the Opera", duration: 354, playCount: 10, dateAdded: Date())
+        let script = buildRemovalPlaylistScript(tracks: [track])
+        XCTAssertTrue(script.contains("Bohemian Rhapsody"))
+        XCTAssertTrue(script.contains("Queen"))
+    }
+
+    func testScriptEscapesDoubleQuotesInTrackName() {
+        let track = Track(id: "1", name: "Say \"Hello\"", artist: "Test",
+                          album: "", duration: 180, playCount: 0, dateAdded: Date())
+        let script = buildRemovalPlaylistScript(tracks: [track])
+        XCTAssertTrue(script.contains("Say \\\"Hello\\\""))
+    }
+
+    func testScriptEscapesDoubleQuotesInArtistName() {
+        let track = Track(id: "1", name: "Song", artist: "The \"Band\"",
+                          album: "", duration: 180, playCount: 0, dateAdded: Date())
+        let script = buildRemovalPlaylistScript(tracks: [track])
+        XCTAssertTrue(script.contains("The \\\"Band\\\""))
+    }
+
+    func testScriptContainsDuplicateCommandForEachTrack() {
+        let tracks = [
+            Track(id: "1", name: "A", artist: "X", album: "", duration: 180, playCount: 0, dateAdded: Date()),
+            Track(id: "2", name: "B", artist: "Y", album: "", duration: 200, playCount: 0, dateAdded: Date())
+        ]
+        let script = buildRemovalPlaylistScript(tracks: tracks)
+        let duplicateCount = script.components(separatedBy: "duplicate").count - 1
+        XCTAssertEqual(duplicateCount, 2)
+    }
+
+    func testEmptyTracksProducesValidScript() {
+        let script = buildRemovalPlaylistScript(tracks: [])
+        XCTAssertTrue(script.hasPrefix("tell application \"Music\""))
+        XCTAssertTrue(script.hasSuffix("end tell"))
+    }
+}
+
+// MARK: - TestRemovalPlaylistViewModel
+
+final class TestRemovalPlaylistViewModel: XCTestCase {
+    @MainActor func testCreateRemovalPlaylistPassesRemovedTracks() async {
+        let mock = MockPlaylistService()
+        let vm = SiftViewModel(playlistService: mock)
+        let tracks = [
+            Track(id: "1", name: "A", artist: "X", album: "", duration: 180, playCount: 0, dateAdded: Date()),
+            Track(id: "2", name: "B", artist: "Y", album: "", duration: 200, playCount: 0, dateAdded: Date())
+        ]
+        vm.loadTracks(tracks)
+        vm.decideWithoutPlayback(.remove)
+        vm.decideWithoutPlayback(.remove)
+
+        vm.createRemovalPlaylist()
+        // Wait for async task
+        try? await Task.sleep(for: .milliseconds(100))
+
+        XCTAssertEqual(mock.addedTracks.count, 2)
+        XCTAssertTrue(vm.removalPlaylistCreated)
+        XCTAssertNil(vm.removalPlaylistError)
+    }
+
+    @MainActor func testCreateRemovalPlaylistSetsErrorOnFailure() async {
+        let mock = MockPlaylistService()
+        mock.shouldThrow = true
+        let vm = SiftViewModel(playlistService: mock)
+        let track = Track(id: "1", name: "A", artist: "X", album: "", duration: 180, playCount: 0, dateAdded: Date())
+        vm.loadTracks([track])
+        vm.decideWithoutPlayback(.remove)
+
+        vm.createRemovalPlaylist()
+        try? await Task.sleep(for: .milliseconds(100))
+
+        XCTAssertFalse(vm.removalPlaylistCreated)
+        XCTAssertNotNil(vm.removalPlaylistError)
+    }
+
+    @MainActor func testCreateRemovalPlaylistDoesNothingWhenNoRemovedTracks() async {
+        let mock = MockPlaylistService()
+        let vm = SiftViewModel(playlistService: mock)
+
+        vm.createRemovalPlaylist()
+        try? await Task.sleep(for: .milliseconds(100))
+
+        XCTAssertEqual(mock.addedTracks.count, 0)
+        XCTAssertFalse(vm.removalPlaylistCreated)
     }
 }
 

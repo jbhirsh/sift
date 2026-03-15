@@ -211,12 +211,12 @@ final class SiftViewModel: ObservableObject {
     }
 
     func skipBackward() {
-        seek(to: max(0, playbackPosition - 20))
+        seek(to: max(0, playbackPosition - 15))
     }
 
     func skipForward() {
         guard let track = currentTrack else { return }
-        seek(to: min(track.duration, playbackPosition + 20))
+        seek(to: min(track.duration, playbackPosition + 15))
     }
 
     func togglePlayPause() {

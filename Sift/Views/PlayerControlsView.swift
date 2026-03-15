@@ -34,7 +34,7 @@ struct PlayerControlsView: View {
                 Button {
                     vm.skipBackward()
                 } label: {
-                    Image(systemName: "gobackward.20")
+                    Image(systemName: "gobackward.15")
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
@@ -52,21 +52,10 @@ struct PlayerControlsView: View {
                 Button {
                     vm.skipForward()
                 } label: {
-                    Image(systemName: "goforward.20")
+                    Image(systemName: "goforward.15")
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-
-                Spacer()
-
-                // Spotify section buttons
-                if !vm.currentSections.isEmpty {
-                    HStack(spacing: 6) {
-                        ForEach(vm.currentSections) { section in
-                            SectionButton(section: section)
-                        }
-                    }
-                }
 
                 Spacer()
 
@@ -80,25 +69,5 @@ struct PlayerControlsView: View {
         let minutes = Int(seconds) / 60
         let secs = Int(seconds) % 60
         return String(format: "%d:%02d", minutes, secs)
-    }
-}
-
-struct SectionButton: View {
-    @EnvironmentObject var vm: SiftViewModel
-    let section: Section
-
-    var body: some View {
-        Button {
-            vm.seek(to: section.start)
-        } label: {
-            Text(section.label)
-                .font(.caption.bold())
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(section.isChorus ? Color.accentColor.opacity(0.15) : Color.secondary.opacity(0.1),
-                            in: Capsule())
-                .foregroundStyle(section.isChorus ? Color.accentColor : Color.secondary)
-        }
-        .buttonStyle(.plain)
     }
 }

@@ -55,11 +55,11 @@
 		53E64B97217885164EB357F6 /* CardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardView.swift; sourceTree = "<group>"; };
 		549FCA4D5E11AA9133A030B9 /* Decision.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Decision.swift; sourceTree = "<group>"; };
 		575D387F8CF84E2A12C5ED88 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		5C0F501AEE4B2A0B5BDE6D92 /* SiftUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SiftUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5C0F501AEE4B2A0B5BDE6D92 /* SiftUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = SiftUITests.xctest; path = Sift.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		697FA8431835F0C4FC53B88D /* MusicKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MusicKit.framework; path = System/Library/Frameworks/MusicKit.framework; sourceTree = SDKROOT; };
 		751BE13D563A3C27B82CFE11 /* SiftTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiftTests.swift; sourceTree = "<group>"; };
 		7F1AC22BAC911C607211A30A /* Section.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Section.swift; sourceTree = "<group>"; };
-		8CEFE07E40B5883E33B09911 /* SiftTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SiftTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8CEFE07E40B5883E33B09911 /* SiftTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; name = SiftTests.xctest; path = Sift.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		8F93552E726B415090946CC2 /* LoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadingView.swift; sourceTree = "<group>"; };
 		943DFDC32F6BE99E05E19275 /* SiftApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiftApp.swift; sourceTree = "<group>"; };
 		9A6861B0540D05B7AE5F6FEE /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -284,7 +284,6 @@
 						TestTargetID = E76B955C8BCD08241D6FF961;
 					};
 					E76B955C8BCD08241D6FF961 = {
-						DevelopmentTeam = 9PWVKSC697;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -408,7 +407,7 @@
 				CODE_SIGN_ENTITLEMENTS = Sift/Resources/Sift.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = 9PWVKSC697;
+				DEVELOPMENT_TEAM = 76AYYJCJP5;
 				INFOPLIST_FILE = Sift/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -624,7 +623,7 @@
 				CODE_SIGN_ENTITLEMENTS = Sift/Resources/Sift.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				DEVELOPMENT_TEAM = 9PWVKSC697;
+				DEVELOPMENT_TEAM = 76AYYJCJP5;
 				INFOPLIST_FILE = Sift/Resources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

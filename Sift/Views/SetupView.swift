@@ -2,6 +2,8 @@ import SwiftUI
 
 struct SetupView: View {
     @EnvironmentObject var vm: SiftViewModel
+    @State private var isRequestingAccess = false
+    @State private var accessDenied = false
 
     var body: some View {
         VStack(spacing: 32) {
@@ -13,6 +15,17 @@ struct SetupView: View {
                 Text("Clean up your music library.")
                     .font(.title3)
                     .foregroundStyle(.secondary)
+            }
+
+            if accessDenied {
+                Label(
+                    "Music library access denied. Allow it in System Settings → Privacy → Media & Apple Music.",
+                    systemImage: "exclamationmark.triangle"
+                )
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
             }
 
             VStack(alignment: .leading, spacing: 12) {
@@ -32,26 +45,43 @@ struct SetupView: View {
             VStack(spacing: 12) {
                 if vm.hasSavedSession {
                     Button("Resume Previous Session") {
-                        vm.resumeSession()
+                        Task { await authorize { vm.resumeSession() } }
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                 }
 
                 if vm.hasSavedSession {
-                    Button("Start Fresh") { vm.startFresh() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.large)
+                    Button("Start Fresh") {
+                        Task { await authorize { vm.startFresh() } }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
                 } else {
-                    Button("Start Sifting") { vm.startFresh() }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
+                    Button("Start Sifting") {
+                        Task { await authorize { vm.startFresh() } }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
                 }
             }
+            .disabled(isRequestingAccess)
 
             Spacer()
         }
         .padding(40)
         .frame(width: 480, height: 480)
+    }
+
+    private func authorize(then action: @escaping () -> Void) async {
+        isRequestingAccess = true
+        let granted = await vm.requestMusicAuthorization()
+        isRequestingAccess = false
+        if granted {
+            accessDenied = false
+            action()
+        } else {
+            accessDenied = true
+        }
     }
 }
