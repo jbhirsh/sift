@@ -30,7 +30,7 @@ xcodebuild test \
   | xcbeautify
 ```
 
-Tests must be green before any commit.
+Tests must be green before any commit. Always re-run tests before committing — especially when test files were modified.
 
 **Test coverage requirements:**
 - Every new ViewModel method or service function must have a unit test in `SiftTests/`.
