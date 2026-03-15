@@ -1,14 +1,25 @@
 default_platform(:mac)
 
 platform :mac do
-  desc "Capture App Store screenshots"
+  desc "Collect App Store screenshots captured by the SiftScreenshots Xcode scheme"
   lane :screenshots do
-    capture_screenshots(
-      scheme: "SiftScreenshots",
-      output_directory: "./fastlane/screenshots",
-      clear_previous_screenshots: true,
-      xcargs: "CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- CODE_SIGN_ENTITLEMENTS= ENABLE_USER_SCRIPT_SANDBOXING=NO"
-    )
+    cache_dir = File.expand_path("~/Library/Caches/tools.fastlane/screenshots")
+    output_dir = File.expand_path("../fastlane/screenshots/en-US", __dir__)
+    pngs = Dir.glob("#{cache_dir}/**/*.png")
+
+    if pngs.empty?
+      UI.important("No screenshots found in cache.")
+      UI.important("Run the SiftScreenshots scheme from Xcode first:")
+      UI.important("  1. Select the 'SiftScreenshots' scheme in Xcode")
+      UI.important("  2. Product → Test  (⌘U)")
+      UI.important("  3. Then run 'fastlane screenshots' again to collect them")
+      next
+    end
+
+    FileUtils.rm_rf(output_dir)
+    FileUtils.mkdir_p(output_dir)
+    pngs.each { |f| FileUtils.cp(f, output_dir) }
+    UI.success("#{pngs.count} screenshots saved to #{output_dir}")
   end
 
   desc "Deploy to Mac App Store"

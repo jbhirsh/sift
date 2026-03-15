@@ -73,6 +73,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.jessicahirsh.sift.uitests
         PRODUCT_MODULE_NAME: SiftUITests
         GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: 9PWVKSC697
 
 schemes:
   Sift:

@@ -16,6 +16,7 @@
 		510C987AE37A0D1079ABFD29 /* SetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB6E9992371811C62121AFAE /* SetupView.swift */; };
 		715B73C2B377CF9E0E580FF6 /* Track.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D98F3AA79762A8C16EE1C72 /* Track.swift */; };
 		72892383736EC323F58E9857 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A6861B0540D05B7AE5F6FEE /* SettingsView.swift */; };
+		73B1A21714BFDCAB8F213155 /* SiftScreenshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = D77C97AA719F37E20176A47C /* SiftScreenshots.swift */; };
 		78BDE439CA1175A4B8BC31D9 /* SiftTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 751BE13D563A3C27B82CFE11 /* SiftTests.swift */; };
 		78DCB90ED2CD9391475DBB7E /* SiftViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3894FA24EBFA6A2F2F845BB8 /* SiftViewModel.swift */; };
 		897BA9DFAE4BED548923370B /* DoneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D36832679468AE86136B876B /* DoneView.swift */; };
@@ -69,6 +70,7 @@
 		BD757AD276D78B7AFF12F0DA /* MusicService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicService.swift; sourceTree = "<group>"; };
 		D0A82EFF95D94FE10F5901DB /* Sift.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Sift.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D36832679468AE86136B876B /* DoneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DoneView.swift; sourceTree = "<group>"; };
+		D77C97AA719F37E20176A47C /* SiftScreenshots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiftScreenshots.swift; sourceTree = "<group>"; };
 		DB6E9992371811C62121AFAE /* SetupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupView.swift; sourceTree = "<group>"; };
 		DCE95690550A6AA1CC5037A6 /* PlayerControlsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerControlsView.swift; sourceTree = "<group>"; };
 		E0A5CE00657F04FB81293182 /* SiftUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SiftUITests.swift; sourceTree = "<group>"; };
@@ -184,6 +186,7 @@
 		E313C5385E61D450255A789A /* SiftUITests */ = {
 			isa = PBXGroup;
 			children = (
+				D77C97AA719F37E20176A47C /* SiftScreenshots.swift */,
 				E0A5CE00657F04FB81293182 /* SiftUITests.swift */,
 				FDB4793D9CB55CA856DA4FDB /* SnapshotHelper.swift */,
 			);
@@ -283,7 +286,8 @@
 						ProvisioningStyle = Manual;
 					};
 					604F278E6411CE6488EE956C = {
-						ProvisioningStyle = Manual;
+						DevelopmentTeam = 9PWVKSC697;
+						ProvisioningStyle = Automatic;
 						TestTargetID = E76B955C8BCD08241D6FF961;
 					};
 					E76B955C8BCD08241D6FF961 = {
@@ -375,6 +379,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				73B1A21714BFDCAB8F213155 /* SiftScreenshots.swift in Sources */,
 				2F82F4306BC4321F37B50185 /* SiftUITests.swift in Sources */,
 				D7B7C3E2BF5ABA99B6CDCB22 /* SnapshotHelper.swift in Sources */,
 			);
@@ -447,7 +452,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 9PWVKSC697;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -523,7 +530,9 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+				DEVELOPMENT_TEAM = 9PWVKSC697;
 				GENERATE_INFOPLIST_FILE = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
