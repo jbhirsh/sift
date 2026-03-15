@@ -74,6 +74,7 @@ struct SetupView: View {
     }
 
     private func authorize(then action: @escaping () -> Void) async {
+        guard !SiftViewModel.isUITesting else { action(); return }
         isRequestingAccess = true
         let granted = await vm.requestMusicAuthorization()
         isRequestingAccess = false
