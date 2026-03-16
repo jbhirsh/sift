@@ -55,7 +55,7 @@ final class SiftScreenshots: XCTestCase {
         XCTAssertTrue(
             app.descendants(matching: .any)
                 .matching(NSPredicate(format: "identifier == 'done-title'"))
-                .firstMatch.waitForExistence(timeout: 10)
+                .firstMatch.waitForExistence(timeout: 30)
         )
         snapshot("04_Done")
     }

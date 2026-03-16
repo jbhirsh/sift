@@ -3,9 +3,9 @@ output_directory("./fastlane/screenshots")
 clear_previous_screenshots(true)
 
 devices([
-  "iPhone 16 Pro",
-  "iPhone 16 Pro Max",
-  "iPad Pro 13-inch (M4)"
+  "iPhone 17 Pro",
+  "iPhone 17 Pro Max",
+  "iPad Pro 13-inch (M5)"
 ])
 
 languages(["en-US"])
