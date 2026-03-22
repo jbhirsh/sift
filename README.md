@@ -16,7 +16,7 @@ An iOS app for rapidly culling your Apple Music library. Tap through tracks and 
 ## Setup
 
 ```bash
-xcodegen generate   # regenerate Sift.xcodeproj from project.yml
+make generate   # regenerate Sift.xcodeproj from project.yml
 open Sift.xcodeproj
 ```
 
@@ -29,29 +29,10 @@ Build and run with **⌘R** targeting an iPhone simulator or device.
 
 ## Running Tests
 
-### Unit tests
-
 ```bash
-xcodebuild test \
-  -project Sift.xcodeproj \
-  -scheme SiftUnitTests \
-  -destination 'platform=iOS Simulator,arch=arm64,name=iPhone 17' \
-  CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- \
-  ENABLE_USER_SCRIPT_SANDBOXING=NO \
-  | xcbeautify
-```
-
-### UI tests
-
-```bash
-xcodebuild test \
-  -project Sift.xcodeproj \
-  -scheme Sift \
-  -destination 'platform=iOS Simulator,arch=arm64,name=iPhone 17' \
-  -only-testing:SiftUITests/SiftUITests \
-  CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- \
-  ENABLE_USER_SCRIPT_SANDBOXING=NO \
-  | xcbeautify
+make test        # unit tests only
+make test-ui     # UI tests only
+make test-all    # unit then UI
 ```
 
 When launched with the `--ui-testing` argument, the app skips Music authorization and loads mock tracks directly — no Apple Music account or network access needed.
