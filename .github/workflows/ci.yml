@@ -22,14 +22,28 @@ jobs:
       - name: Lint
         run: swiftlint lint --strict
 
-      - name: Build and test
+      - name: Unit tests
         run: |
           set -o pipefail
           xcodebuild test \
             -project Sift.xcodeproj \
             -scheme SiftUnitTests \
             -destination 'platform=iOS Simulator,name=iPhone 16' \
-            -resultBundlePath TestResults.xcresult \
+            -resultBundlePath UnitTestResults.xcresult \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=- \
+            ENABLE_USER_SCRIPT_SANDBOXING=NO \
+            | xcpretty
+
+      - name: Integration tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Sift.xcodeproj \
+            -scheme Sift \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            -only-testing:SiftUITests/SiftUITests \
+            -resultBundlePath IntegTestResults.xcresult \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=- \
             ENABLE_USER_SCRIPT_SANDBOXING=NO \
@@ -40,4 +54,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: test-results
-          path: TestResults.xcresult
+          path: |
+            UnitTestResults.xcresult
+            IntegTestResults.xcresult
