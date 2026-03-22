@@ -25,7 +25,7 @@ Unit tests:
 xcodebuild test \
   -project Sift.xcodeproj \
   -scheme SiftUnitTests \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,arch=arm64,name=iPhone 17' \
   CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- \
   ENABLE_USER_SCRIPT_SANDBOXING=NO \
   | xcbeautify
@@ -36,7 +36,7 @@ UI tests:
 xcodebuild test \
   -project Sift.xcodeproj \
   -scheme Sift \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -destination 'platform=iOS Simulator,arch=arm64,name=iPhone 17' \
   -only-testing:SiftUITests/SiftUITests \
   CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- \
   ENABLE_USER_SCRIPT_SANDBOXING=NO \
@@ -76,10 +76,11 @@ Every commit message must:
 - End with the Co-Authored-By trailer
 
 ```
-Fix SBElementArray casting in MusicService
+Fix artwork fetch crashing on missing cache entry
 
-compactMap each element instead of casting the whole array, since
-NSArray→[Protocol] bridging doesn't work in Swift.
+Guard against nil songCache lookups in MusicService.artwork(for:)
+instead of force-unwrapping, which caused crashes on first launch
+before loadLibrary() completes.
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ```
@@ -131,8 +132,9 @@ and run `xcodegen generate`.
 ---
 
 ## CI/CD
-- **CI** (`.github/workflows/ci.yml`): runs on every push to main.
-  Lints + builds + tests.
+- **CI** (`.github/workflows/ci.yml`): runs on every PR and push to main.
+  Lints, then runs unit tests (`SiftUnitTests` scheme), then UI tests (`Sift` scheme).
+  All changes reach main via PR — never by pushing directly.
 - **Deploy** (`.github/workflows/deploy.yml`): runs on `v*` tag push.
   Builds, signs, submits to App Store via Fastlane.
 - Deploy requires GitHub environment `app-store` with signing secrets.
@@ -154,4 +156,5 @@ and run `xcodegen generate`.
 - Never use `git add -A` — add files explicitly
 - Never commit Keychain credentials or `.p12`/`.p8` files
 - Never modify tests to make them pass — fix the implementation
-- Never push directly to main without passing tests
+- Never push directly to main — always create a branch and open a PR
+- Never push a commit without first running tests locally to confirm they pass
