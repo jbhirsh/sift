@@ -27,12 +27,11 @@ jobs:
           set -o pipefail
           xcodebuild test \
             -project Sift.xcodeproj \
-            -scheme Sift \
-            -destination 'platform=macOS' \
+            -scheme SiftUnitTests \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
             -resultBundlePath TestResults.xcresult \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=- \
-            CODE_SIGN_ENTITLEMENTS= \
             ENABLE_USER_SCRIPT_SANDBOXING=NO \
             | xcpretty
 
