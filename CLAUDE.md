@@ -12,7 +12,7 @@ Open `Sift.xcodeproj` in Xcode and hit ⌘R (target an iPhone/iPad simulator or 
 
 To regenerate the Xcode project after editing `project.yml`:
 ```bash
-xcodegen generate
+make generate
 ```
 
 ---
@@ -20,27 +20,10 @@ xcodegen generate
 ## Test Commands
 **Always run tests before committing.**
 
-Unit tests:
 ```bash
-xcodebuild test \
-  -project Sift.xcodeproj \
-  -scheme SiftUnitTests \
-  -destination 'platform=iOS Simulator,arch=arm64,name=iPhone 17' \
-  CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- \
-  ENABLE_USER_SCRIPT_SANDBOXING=NO \
-  | xcbeautify
-```
-
-UI tests:
-```bash
-xcodebuild test \
-  -project Sift.xcodeproj \
-  -scheme Sift \
-  -destination 'platform=iOS Simulator,arch=arm64,name=iPhone 17' \
-  -only-testing:SiftUITests/SiftUITests \
-  CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- \
-  ENABLE_USER_SCRIPT_SANDBOXING=NO \
-  | xcbeautify
+make test        # unit tests
+make test-ui     # UI tests
+make test-all    # unit then UI
 ```
 
 Tests must be green before any commit. Always re-run tests before committing —
@@ -54,18 +37,7 @@ especially when test files were modified.
 ---
 
 ## Build (command line)
-```bash
-xcodebuild build \
-  -project Sift.xcodeproj \
-  -target Sift \
-  -sdk iphonesimulator \
-  CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- \
-  CODE_SIGNING_ALLOWED=NO \
-  ENABLE_USER_SCRIPT_SANDBOXING=NO \
-  | xcbeautify
-```
-
-Note: Xcode GUI builds (⌘R) use automatic signing with team 9PWVKSC697.
+Use `make test` to build and test in one step. For a standalone build, use Xcode (⌘B or ⌘R) with automatic signing (team 9PWVKSC697).
 
 ---
 
