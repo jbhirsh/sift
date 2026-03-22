@@ -1,0 +1,5 @@
+#!/bin/bash
+# Pre-commit hook: enforce unit test line coverage threshold.
+# Install: git config core.hooksPath .githooks
+
+exec "$(git rev-parse --show-toplevel)/scripts/check_coverage.sh"

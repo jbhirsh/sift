@@ -93,6 +93,10 @@ schemes:
     test:
       targets:
         - SiftTests
+      coverage:
+        enabled: true
+        targets:
+          - Sift
 
   SiftScreenshots:
     build:
