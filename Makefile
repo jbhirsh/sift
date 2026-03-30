@@ -1,6 +1,6 @@
 SCHEME_UNIT = SiftUnitTests
 SCHEME_ALL  = Sift
-DEST        = platform=iOS Simulator,arch=arm64,name=iPhone 17
+DEST        = platform=iOS Simulator,name=iPhone 17
 SIGN_FLAGS  = CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- \
               ENABLE_USER_SCRIPT_SANDBOXING=NO
 
