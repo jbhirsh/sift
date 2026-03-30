@@ -1,47 +1,37 @@
 import XCTest
 import SwiftUI
-import UIKit
 @testable import Sift
 
 // MARK: - TestContentView
 
 @MainActor
 final class TestContentView: XCTestCase {
-    func testRendersSetupPhase() throws {
+    override func tearDown() {
+        SessionStore().clear()
+        super.tearDown()
+    }
+
+    func testRendersSetupPhase() {
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         // default phase is .setup
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: ContentView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 
-    func testRendersLoadingPhase() throws {
+    func testRendersLoadingPhase() {
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.phase = .loading
         vm.loadProgress = 0.5
         vm.loadMessage = "Loading library…"
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: ContentView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 
-    func testRendersSiftingPhase() throws {
+    func testRendersSiftingPhase() {
         // loadTracks sets phase to .sifting
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
@@ -53,19 +43,12 @@ final class TestContentView: XCTestCase {
                   dateAdded: Date(timeIntervalSince1970: 1_540_000_000))
         ])
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: ContentView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 
-    func testRendersDonePhase() throws {
+    func testRendersDonePhase() {
         // Deciding on the only track exhausts the library — phase becomes .done
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
@@ -75,19 +58,12 @@ final class TestContentView: XCTestCase {
         ])
         vm.decideWithoutPlayback(.keep)
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: ContentView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 
-    func testRendersPausedPhase() throws {
+    func testRendersPausedPhase() {
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
             Track(id: "allTimelow-jon-bellion", name: "All Time Low", artist: "Jon Bellion",
@@ -100,15 +76,8 @@ final class TestContentView: XCTestCase {
         vm.decideWithoutPlayback(.keep)     // All Time Low — keep
         vm.stopSession()                    // phase becomes .paused
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: ContentView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 }

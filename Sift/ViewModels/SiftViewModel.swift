@@ -25,6 +25,7 @@ final class SiftViewModel: ObservableObject {
     // MARK: - Loading state
     @Published var loadProgress: Double = 0
     @Published var loadMessage: String = "Connecting to Music…"
+    @Published var loadError: String?
 
     // MARK: - Playback state
     @Published var playbackPosition: Double = 0
@@ -100,6 +101,7 @@ final class SiftViewModel: ObservableObject {
         phase = .loading
         loadMessage = "Loading library…"
         loadProgress = 0
+        loadError = nil
 
         do {
             var allTracks = try await musicService.loadLibrary()
@@ -116,9 +118,22 @@ final class SiftViewModel: ObservableObject {
             loadProgress = 1.0
             phase = .sifting
             await playCurrentTrack()
+        } catch let musicErr as MusicError {
+            loadError = musicErr.localizedDescription
+            phase = .setup
         } catch {
-            loadMessage = "Error: \(error.localizedDescription)"
+            loadError = friendlyLoadError(error)
+            phase = .setup
         }
+    }
+
+    private func friendlyLoadError(_ error: Error) -> String {
+        let raw = error.localizedDescription.lowercased()
+        if raw.contains("unknown") || raw.contains("not available") {
+            return "Could not connect to your Music library. " +
+                   "Make sure the Music app is installed on this device, then try again."
+        }
+        return "Could not load your Music library. \(error.localizedDescription)"
     }
 
     // MARK: - Sort
@@ -199,7 +214,7 @@ final class SiftViewModel: ObservableObject {
         if cursor >= tracks.count {
             phase = .done
             stopPositionPolling()
-            saveSession()
+            sessionStore.clear()    // completed — nothing to resume on next launch
         } else {
             saveSession()
             Task { await playCurrentTrack() }
