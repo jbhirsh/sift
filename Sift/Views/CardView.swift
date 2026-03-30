@@ -1,40 +1,13 @@
 import MusicKit
 import SwiftUI
 
-// Static background card (next/next-next in stack)
-struct CardView: View {
-    let track: Track
-    let offset: Int
+// MARK: - Interactive front card with artwork hero
 
-    var body: some View {
-        RoundedRectangle(cornerRadius: 20)
-            .fill(.background)
-            .shadow(radius: 8, y: 4)
-            .overlay(
-                VStack(spacing: 6) {
-                    Text(track.name)
-                        .font(.headline)
-                        .lineLimit(1)
-                    Text(track.artist)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                .padding()
-            )
-            .frame(width: 340, height: 200)
-    }
-}
-
-// Interactive front card with drag gesture
 struct InteractiveCardView: View {
     @EnvironmentObject var vm: SiftViewModel
     let track: Track
 
     @GestureState private var dragOffset: CGSize = .zero
-    @State private var swipeDirection: SwipeDirection?
-
-    enum SwipeDirection { case left, right }
 
     private var dragThreshold: Double { 80 }
 
@@ -44,51 +17,75 @@ struct InteractiveCardView: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 20)
-                .fill(.background)
-                .shadow(radius: 12, y: 6)
+            // Main card
+            VStack(spacing: 0) {
+                // Artwork hero
+                ZStack(alignment: .bottomLeading) {
+                    if let artwork = vm.currentArtwork {
+                        ArtworkImage(artwork, width: 400, height: 400)
+                            .aspectRatio(contentMode: .fill)
+                            .clipped()
+                    } else {
+                        Rectangle()
+                            .fill(Color(.quaternarySystemFill))
+                            .overlay(
+                                Image(systemName: "music.note")
+                                    .font(.system(size: 48))
+                                    .foregroundStyle(.secondary)
+                            )
+                    }
 
-            // Card content
-            VStack(spacing: 16) {
-                // Artwork
-                if let artwork = vm.currentArtwork {
-                    ArtworkImage(artwork, width: 120, height: 120)
-                        .cornerRadius(8)
-                } else {
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(.quaternary)
-                        .frame(width: 120, height: 120)
-                        .overlay(
-                            Image(systemName: "music.note")
-                                .font(.largeTitle)
-                                .foregroundStyle(.secondary)
-                        )
-                }
+                    // Gradient overlay with track info
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.5)],
+                        startPoint: .center,
+                        endPoint: .bottom
+                    )
 
-                VStack(spacing: 4) {
-                    Text(track.name)
-                        .font(.title3.bold())
-                        .lineLimit(2)
-                        .multilineTextAlignment(.center)
-                    Text(track.artist)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    Text(track.album)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(track.name)
+                            .font(.title2.bold())
+                            .foregroundStyle(.primary)
+                            .lineLimit(2)
+                        Text(track.artist)
+                            .font(.callout.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    .padding(20)
+                    .environment(\.colorScheme, .dark)
                 }
+                .frame(maxWidth: .infinity)
+                .aspectRatio(3.0 / 4.0, contentMode: .fit)
+                .clipped()
 
-                HStack(spacing: 4) {
-                    Image(systemName: "play.fill")
-                        .font(.caption2)
-                    Text("\(track.playCount) plays")
-                        .font(.caption)
+                // Card footer
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("ALBUM")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.secondary)
+                            .tracking(1)
+                        Text(track.album)
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Image(systemName: "play.fill")
+                            .font(.caption2)
+                        Text("\(track.playCount) plays")
+                            .font(.caption)
+                    }
+                    .foregroundStyle(.tertiary)
                 }
-                .foregroundStyle(.tertiary)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
             }
-            .padding(24)
+            .background(Color(.systemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .shadow(color: .black.opacity(0.08), radius: 20, y: 8)
 
             // Swipe overlays
             if dragOffset.width > 0 {
@@ -115,7 +112,6 @@ struct InteractiveCardView: View {
                     .padding(16)
             }
         }
-        .frame(width: 340, height: 340)
         .offset(x: dragOffset.width, y: dragOffset.height * 0.2)
         .rotationEffect(.degrees(dragOffset.width / 20))
         .gesture(
@@ -133,44 +129,5 @@ struct InteractiveCardView: View {
                 }
         )
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragOffset)
-    }
-}
-
-// MARK: - Action buttons below card
-
-struct DecisionButtonsView: View {
-    @EnvironmentObject var vm: SiftViewModel
-
-    var body: some View {
-        HStack(spacing: 24) {
-            Button {
-                vm.decide(.keep)
-            } label: {
-                Label("Keep", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                    .contentShape(Rectangle())
-            }
-            .keyboardShortcut(.leftArrow, modifiers: [])
-
-            Button {
-                vm.decide(.skip)
-            } label: {
-                Label("Skip", systemImage: "arrow.right.circle")
-                    .foregroundStyle(.orange)
-                    .contentShape(Rectangle())
-            }
-            .keyboardShortcut("s", modifiers: [])
-
-            Button {
-                vm.decide(.remove)
-            } label: {
-                Label("Remove", systemImage: "xmark.circle.fill")
-                    .foregroundStyle(.red)
-                    .contentShape(Rectangle())
-            }
-            .keyboardShortcut(.rightArrow, modifiers: [])
-        }
-        .buttonStyle(.plain)
-        .font(.callout)
     }
 }
