@@ -17,7 +17,13 @@ struct SetupView: View {
                     .foregroundStyle(.secondary)
             }
 
-            if accessDenied {
+            if let error = vm.loadError {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.callout)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            } else if accessDenied {
                 Label(
                     "Music library access denied. Allow it in Settings → Privacy & Security → Media & Apple Music.",
                     systemImage: "exclamationmark.triangle"

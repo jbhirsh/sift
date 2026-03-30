@@ -261,6 +261,11 @@ final class TestViewModelAdditional: XCTestCase {
 
 @MainActor
 final class TestStopSession: XCTestCase {
+    override func tearDown() {
+        SessionStore().clear()
+        super.tearDown()
+    }
+
     func testStopSessionTransitionsToPaused() {
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
@@ -389,6 +394,11 @@ final class TestRemovalPlaylistViewModel: XCTestCase {
 
 @MainActor
 final class TestSessionResume: XCTestCase {
+    override func tearDown() {
+        SessionStore().clear()
+        super.tearDown()
+    }
+
     func testResumeSessionRestoresStateFromSavedSession() {
         // Save a session via stopSession, then restore via resumeSession on a new VM instance
         let vm1 = SiftViewModel(playlistService: MockPlaylistService())
@@ -409,7 +419,6 @@ final class TestSessionResume: XCTestCase {
         XCTAssertEqual(vm2.phase, .sifting)
         XCTAssertEqual(vm2.cursor, 1)
         XCTAssertEqual(vm2.currentTrack?.name, "Sweet But Psycho")
-        SessionStore().clear()              // cleanup: remove the session from disk
     }
 
     func testStartFreshClearsExistingSession() {

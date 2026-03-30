@@ -1,13 +1,17 @@
 import XCTest
 import SwiftUI
-import UIKit
 @testable import Sift
 
 // MARK: - TestDoneView
 
 @MainActor
 final class TestDoneView: XCTestCase {
-    func testRendersDonePhaseWithAllTracksKept() throws {
+    override func tearDown() {
+        SessionStore().clear()
+        super.tearDown()
+    }
+
+    func testRendersDonePhaseWithAllTracksKept() {
         // removed is empty — hides the removed tracks section entirely
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
@@ -21,19 +25,12 @@ final class TestDoneView: XCTestCase {
         vm.decideWithoutPlayback(.keep)     // All Time Low — keep
         vm.decideWithoutPlayback(.keep)     // Sweet But Psycho — keep
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: DoneView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 
-    func testRendersDonePhaseWithRemovedTracks() throws {
+    func testRendersDonePhaseWithRemovedTracks() {
         // Two removed tracks — exercises the ForEach with alternating row backgrounds
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
@@ -51,19 +48,12 @@ final class TestDoneView: XCTestCase {
         vm.decideWithoutPlayback(.remove)   // Sweet But Psycho — remove
         vm.decideWithoutPlayback(.remove)   // U Can't Touch This — remove
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: DoneView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 
-    func testRendersWithRemovalPlaylistCreated() throws {
+    func testRendersWithRemovalPlaylistCreated() {
         // removalPlaylistCreated true — shows "Moved to Playlist" label instead of button
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
@@ -74,19 +64,12 @@ final class TestDoneView: XCTestCase {
         vm.decideWithoutPlayback(.remove)   // U Can't Touch This — remove
         vm.removalPlaylistCreated = true
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: DoneView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 
-    func testRendersWhileCreatingPlaylist() throws {
+    func testRendersWhileCreatingPlaylist() {
         // isCreatingPlaylist true — shows ProgressView spinner inside the move button
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
@@ -97,19 +80,12 @@ final class TestDoneView: XCTestCase {
         vm.decideWithoutPlayback(.remove)   // Sweet But Psycho — remove
         vm.isCreatingPlaylist = true
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: DoneView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 
-    func testRendersWithPlaylistError() throws {
+    func testRendersWithPlaylistError() {
         // removalPlaylistError set — shows red error text below the track list
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
@@ -120,19 +96,12 @@ final class TestDoneView: XCTestCase {
         vm.decideWithoutPlayback(.remove)   // All Time Low — remove
         vm.removalPlaylistError = "None of the selected tracks could be found in your library."
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: DoneView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 
-    func testRendersPausedPhaseWithResumeAndStartFreshButtons() throws {
+    func testRendersPausedPhaseWithResumeAndStartFreshButtons() {
         // phase .paused — shows "Session paused." title and Resume + Start Fresh buttons
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
@@ -146,19 +115,12 @@ final class TestDoneView: XCTestCase {
         vm.decideWithoutPlayback(.keep)     // All Time Low — keep
         vm.stopSession()                    // pauses with Sweet But Psycho remaining
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: DoneView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 
-    func testRendersSummaryCountsAfterMixedDecisions() throws {
+    func testRendersSummaryCountsAfterMixedDecisions() {
         // Summary shows 1 kept / 1 to remove / 1 skipped
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
@@ -176,15 +138,8 @@ final class TestDoneView: XCTestCase {
         vm.decideWithoutPlayback(.remove)   // Sweet But Psycho — remove
         vm.decideWithoutPlayback(.skip)     // U Can't Touch This — skip
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: DoneView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 }
