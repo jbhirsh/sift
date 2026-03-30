@@ -1,13 +1,12 @@
 import XCTest
 import SwiftUI
-import UIKit
 @testable import Sift
 
 // MARK: - TestSiftView
 
 @MainActor
 final class TestSiftView: XCTestCase {
-    func testRendersFullCardStackWithThreeTracks() throws {
+    func testRendersFullCardStackWithThreeTracks() {
         // All three card layers visible: current, next, next-next
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
@@ -22,19 +21,12 @@ final class TestSiftView: XCTestCase {
                   dateAdded: Date(timeIntervalSince1970: 648_000_000))
         ])
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: SiftView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 
-    func testRendersWithTwoTracksNoNextNextCard() throws {
+    func testRendersWithTwoTracksNoNextNextCard() {
         // nextNextTrack is nil — third card layer hidden
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
@@ -46,19 +38,12 @@ final class TestSiftView: XCTestCase {
                   dateAdded: Date(timeIntervalSince1970: 1_540_000_000))
         ])
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: SiftView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 
-    func testRendersWithOneTrackOnlyCurrentCard() throws {
+    func testRendersWithOneTrackOnlyCurrentCard() {
         // nextTrack and nextNextTrack both nil
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
@@ -67,19 +52,12 @@ final class TestSiftView: XCTestCase {
                   dateAdded: Date(timeIntervalSince1970: 648_000_000))
         ])
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: SiftView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 
-    func testRendersStatBarWithDecisions() throws {
+    func testRendersStatBarWithDecisions() {
         // Stats bar shows 1 kept / 1 removed with U Can't Touch This remaining
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
@@ -96,15 +74,8 @@ final class TestSiftView: XCTestCase {
         vm.decideWithoutPlayback(.keep)     // All Time Low — keep
         vm.decideWithoutPlayback(.remove)   // Sweet But Psycho — remove
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: SiftView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 }

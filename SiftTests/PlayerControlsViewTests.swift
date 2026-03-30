@@ -1,13 +1,12 @@
 import XCTest
 import SwiftUI
-import UIKit
 @testable import Sift
 
 // MARK: - TestPlayerControlsView
 
 @MainActor
 final class TestPlayerControlsView: XCTestCase {
-    func testRendersSeekBarWhenCurrentTrackExists() throws {
+    func testRendersSeekBarWhenCurrentTrackExists() {
         // Exercises formatTime for both elapsed and duration labels
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
@@ -18,36 +17,22 @@ final class TestPlayerControlsView: XCTestCase {
         vm.playbackPosition = 45.0
         vm.isPlaying = true
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: PlayerControlsView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 
-    func testRendersWithoutSeekBarWhenNoCurrentTrack() throws {
+    func testRendersWithoutSeekBarWhenNoCurrentTrack() {
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([])   // currentTrack is nil — seek bar hidden
         vm.isPlaying = false
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: PlayerControlsView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 
-    func testRendersPlayIconWhenNotPlaying() throws {
+    func testRendersPlayIconWhenNotPlaying() {
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
             Track(id: "sweet-but-psycho-ava-max", name: "Sweet But Psycho", artist: "Ava Max",
@@ -56,15 +41,8 @@ final class TestPlayerControlsView: XCTestCase {
         ])
         vm.isPlaying = false    // shows play.fill icon
 
-        let scene = try XCTUnwrap(
-            UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
-        )
-        let window = UIWindow(windowScene: scene)
         let controller = UIHostingController(rootView: PlayerControlsView().environmentObject(vm))
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
         controller.view.layoutIfNeeded()
         XCTAssertNotNil(controller.view)
-        window.isHidden = true
     }
 }
