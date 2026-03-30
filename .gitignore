@@ -15,6 +15,12 @@ fastlane/Preview.html
 fastlane/screenshots
 fastlane/test_output
 
+# Claude Code
+.claude/
+
+# Fastlane generated docs
+fastlane/README.md
+
 # macOS
 .DS_Store
 *.swp
