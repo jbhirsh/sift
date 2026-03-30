@@ -4,14 +4,14 @@ struct PlayerControlsView: View {
     @EnvironmentObject var vm: SiftViewModel
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 4) {
             // Seek bar
             if let track = vm.currentTrack {
                 HStack(spacing: 8) {
                     Text(formatTime(vm.playbackPosition))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .frame(width: 36, alignment: .trailing)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 32, alignment: .trailing)
 
                     Slider(
                         value: Binding(
@@ -20,47 +20,36 @@ struct PlayerControlsView: View {
                         ),
                         in: 0...max(track.duration, 1)
                     )
+                    .tint(.secondary)
 
                     Text(formatTime(track.duration))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                        .frame(width: 36, alignment: .leading)
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 32, alignment: .leading)
                 }
             }
 
-            // Controls row
-            HStack(spacing: 16) {
-                // Skip backward
-                Button {
-                    vm.skipBackward()
-                } label: {
+            // Playback controls
+            HStack(spacing: 24) {
+                Button { vm.skipBackward() } label: {
                     Image(systemName: "gobackward.15")
+                        .font(.callout)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
 
-                // Play/pause
-                Button {
-                    vm.togglePlayPause()
-                } label: {
+                Button { vm.togglePlayPause() } label: {
                     Image(systemName: vm.isPlaying ? "pause.fill" : "play.fill")
-                        .font(.title3)
+                        .font(.body)
                 }
                 .buttonStyle(.plain)
 
-                // Skip forward
-                Button {
-                    vm.skipForward()
-                } label: {
+                Button { vm.skipForward() } label: {
                     Image(systemName: "goforward.15")
+                        .font(.callout)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-
-                Spacer()
-
-                // Decision buttons
-                DecisionButtonsView()
             }
         }
     }
