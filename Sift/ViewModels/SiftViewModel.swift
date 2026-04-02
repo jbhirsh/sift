@@ -8,6 +8,13 @@ enum AppPhase: Equatable {
     case done
 }
 
+enum ConnectionStatus: Equatable {
+    case unknown
+    case checking
+    case connected
+    case disconnected
+}
+
 @MainActor
 final class SiftViewModel: ObservableObject {
     // MARK: - Phase
@@ -40,6 +47,9 @@ final class SiftViewModel: ObservableObject {
     @Published var removalPlaylistCreated: Bool = false
     @Published var removalPlaylistError: String?
     @Published var isCreatingPlaylist: Bool = false
+
+    // MARK: - Connection status
+    @Published var connectionStatus: ConnectionStatus = .unknown
 
     // MARK: - Services
     private var musicService: any MusicServiceProtocol
@@ -105,6 +115,14 @@ final class SiftViewModel: ObservableObject {
 
     func requestMusicAuthorization() async -> Bool {
         await musicService.requestAuthorization()
+    }
+
+    // MARK: - Connection check
+
+    func checkConnection() async {
+        connectionStatus = .checking
+        let authorized = await musicService.isAuthorized
+        connectionStatus = authorized ? .connected : .disconnected
     }
 
     // MARK: - Load library

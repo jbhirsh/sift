@@ -16,7 +16,11 @@ final class TestContentView: XCTestCase {
         // default phase is .setup
 
         let controller = UIHostingController(rootView: ContentView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 
@@ -27,7 +31,11 @@ final class TestContentView: XCTestCase {
         vm.loadMessage = "Loading library…"
 
         let controller = UIHostingController(rootView: ContentView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 
@@ -44,7 +52,11 @@ final class TestContentView: XCTestCase {
         ])
 
         let controller = UIHostingController(rootView: ContentView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 
@@ -59,7 +71,11 @@ final class TestContentView: XCTestCase {
         vm.decideWithoutPlayback(.keep)
 
         let controller = UIHostingController(rootView: ContentView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 
@@ -77,7 +93,12 @@ final class TestContentView: XCTestCase {
         vm.stopSession()                    // phase becomes .paused
 
         let controller = UIHostingController(rootView: ContentView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
+
 }

@@ -196,4 +196,75 @@ final class SiftUITests: XCTestCase {
         XCTAssertTrue(waitForTrack("Mock Song Two"), "Did not resume at next track after Save & Pause")
     }
 
+    // MARK: - Settings page
+
+    func testSettingsButtonExistsDuringSifting() {
+        XCTAssertTrue(waitForTrack("Mock Song One"))
+        XCTAssertTrue(
+            app.buttons.matching(identifier: "settings-button").firstMatch
+                .waitForExistence(timeout: 3),
+            "Settings gear button should be visible during sifting"
+        )
+    }
+
+    func testSettingsButtonOpensSettingsSheet() {
+        XCTAssertTrue(waitForTrack("Mock Song One"))
+        app.buttons.matching(identifier: "settings-button").firstMatch.tap()
+        XCTAssertTrue(
+            app.staticTexts["Settings"].waitForExistence(timeout: 3),
+            "Settings sheet should appear after tapping gear button"
+        )
+    }
+
+    func testSettingsSheetShowsProviderName() {
+        XCTAssertTrue(waitForTrack("Mock Song One"))
+        app.buttons.matching(identifier: "settings-button").firstMatch.tap()
+        XCTAssertTrue(
+            app.staticTexts["Apple Music"].waitForExistence(timeout: 3),
+            "Settings sheet should display the active provider name"
+        )
+    }
+
+    func testSettingsSheetShowsCheckConnectionButton() {
+        XCTAssertTrue(waitForTrack("Mock Song One"))
+        app.buttons.matching(identifier: "settings-button").firstMatch.tap()
+        XCTAssertTrue(
+            app.buttons.matching(identifier: "check-connection-button").firstMatch
+                .waitForExistence(timeout: 3),
+            "Settings sheet should have a Check Connection button"
+        )
+    }
+
+    func testSettingsSheetShowsConnectionStatus() {
+        XCTAssertTrue(waitForTrack("Mock Song One"))
+        app.buttons.matching(identifier: "settings-button").firstMatch.tap()
+        XCTAssertTrue(
+            app.staticTexts.matching(identifier: "connection-status-label").firstMatch
+                .waitForExistence(timeout: 3),
+            "Settings sheet should display a connection status label"
+        )
+    }
+
+    func testSettingsButtonExistsOnDoneScreen() {
+        decideAllTracks()
+        XCTAssertTrue(waitForDoneScreen())
+        XCTAssertTrue(
+            app.buttons.matching(identifier: "settings-button").firstMatch
+                .waitForExistence(timeout: 3),
+            "Settings gear button should be visible on the done screen"
+        )
+    }
+
+    func testSettingsButtonExistsOnPausedScreen() {
+        XCTAssertTrue(waitForTrack("Mock Song One"))
+        keep()
+        XCTAssertTrue(waitForTrack("Mock Song Two"))
+        app.buttons.matching(identifier: "stop-button").firstMatch.tap()
+        XCTAssertTrue(
+            app.buttons.matching(identifier: "settings-button").firstMatch
+                .waitForExistence(timeout: 3),
+            "Settings gear button should be visible on the paused screen"
+        )
+    }
+
 }
