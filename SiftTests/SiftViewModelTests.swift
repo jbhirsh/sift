@@ -657,3 +657,32 @@ final class TestFriendlyLoadError: XCTestCase {
         XCTAssertTrue(vm.loadError?.contains("Network timeout") == true)
     }
 }
+
+// MARK: - TestConnectionCheck
+
+@MainActor
+final class TestConnectionCheck: XCTestCase {
+    func testCheckConnectionSetsConnectedWhenAuthorized() async {
+        let mock = MockMusicService()
+        let vm = SiftViewModel(musicService: mock, playlistService: MockPlaylistService())
+
+        await vm.checkConnection()
+
+        XCTAssertEqual(vm.connectionStatus, .connected)
+    }
+
+    func testCheckConnectionSetsDisconnectedWhenNotAuthorized() async {
+        let mock = MockMusicService()
+        await mock.setAuthorized(false)
+        let vm = SiftViewModel(musicService: mock, playlistService: MockPlaylistService())
+
+        await vm.checkConnection()
+
+        XCTAssertEqual(vm.connectionStatus, .disconnected)
+    }
+
+    func testCheckConnectionDefaultsToUnknown() {
+        let vm = SiftViewModel(playlistService: MockPlaylistService())
+        XCTAssertEqual(vm.connectionStatus, .unknown)
+    }
+}
