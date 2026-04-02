@@ -26,6 +26,23 @@
     <string>Copyright © 2026 Jessica Hirsh. All rights reserved.</string>
     <key>NSAppleMusicUsageDescription</key>
     <string>Sift needs access to your Music library to load your songs and play them while you review.</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.jessicahirsh.sift.spotify</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>sift-music</string>
+            </array>
+        </dict>
+    </array>
+    <key>SpotifyClientID</key>
+    <string>016e974fdcad481e9977a4fc59e2df5c</string>
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+        <string>spotify</string>
+    </array>
     <key>UILaunchScreen</key>
     <dict/>
     <key>UISupportedInterfaceOrientations</key>

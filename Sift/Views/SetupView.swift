@@ -25,7 +25,7 @@ struct SetupView: View {
                     .padding(.horizontal)
             } else if accessDenied {
                 Label(
-                    "Music library access denied. Allow it in Settings → Privacy & Security → Media & Apple Music.",
+                    accessDeniedMessage,
                     systemImage: "exclamationmark.triangle"
                 )
                     .font(.callout)
@@ -33,6 +33,25 @@ struct SetupView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
             }
+
+            // Music provider picker
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Music service")
+                    .font(.headline)
+
+                Picker("Music service", selection: Binding(
+                    get: { vm.provider },
+                    set: { vm.selectProvider($0) }
+                )) {
+                    ForEach(MusicProvider.allCases, id: \.self) { provider in
+                        Label(provider.displayName, systemImage: provider.iconName)
+                            .tag(provider)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+            .padding()
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
 
             VStack(alignment: .leading, spacing: 12) {
                 Text("Sort by")
@@ -76,6 +95,15 @@ struct SetupView: View {
             Spacer()
         }
         .padding(40)
+    }
+
+    private var accessDeniedMessage: String {
+        switch vm.provider {
+        case .appleMusic:
+            return "Music library access denied. Allow it in Settings → Privacy & Security → Media & Apple Music."
+        case .spotify:
+            return "Spotify login was cancelled or denied. Please try again."
+        }
     }
 
     private func authorize(then action: @escaping () -> Void) async {

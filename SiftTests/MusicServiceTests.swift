@@ -22,7 +22,7 @@ final class TestMusicErrors: XCTestCase {
 final class TestMusicService: XCTestCase {
     func testIsPlayingReturnsBool() async {
         // ApplicationMusicPlayer.shared is always accessible; returns false when idle
-        let service = MusicService()
+        let service = AppleMusicService()
         let playing = await service.isPlaying()
         XCTAssertFalse(playing)     // no track loaded — player is idle
     }

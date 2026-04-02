@@ -1,4 +1,3 @@
-import MusicKit
 import SwiftUI
 
 enum AppPhase: Equatable {
@@ -13,6 +12,9 @@ enum AppPhase: Equatable {
 final class SiftViewModel: ObservableObject {
     // MARK: - Phase
     @Published var phase: AppPhase = .setup
+
+    // MARK: - Provider
+    @Published var provider: MusicProvider = .appleMusic
 
     // MARK: - Library state
     @Published var tracks: [Track] = []
@@ -30,7 +32,6 @@ final class SiftViewModel: ObservableObject {
     // MARK: - Playback state
     @Published var playbackPosition: Double = 0
     @Published var isPlaying: Bool = false
-    @Published var currentArtwork: Artwork?
 
     // MARK: - Session resume
     @Published var hasSavedSession: Bool = false
@@ -41,9 +42,9 @@ final class SiftViewModel: ObservableObject {
     @Published var isCreatingPlaylist: Bool = false
 
     // MARK: - Services
-    private let musicService = MusicService()
+    private var musicService: any MusicServiceProtocol
     private let sessionStore = SessionStore()
-    private let playlistService: any PlaylistService
+    private var playlistService: any PlaylistService
 
     // MARK: - Timers
     private var positionTask: Task<Void, Never>?
@@ -59,10 +60,45 @@ final class SiftViewModel: ObservableObject {
         ProcessInfo.processInfo.arguments.contains("--ui-testing")
     }
 
-    init(playlistService: any PlaylistService = MusicKitPlaylistService()) {
+    init(
+        musicService: (any MusicServiceProtocol)? = nil,
+        playlistService: any PlaylistService = MusicKitPlaylistService(),
+        provider: MusicProvider = .appleMusic
+    ) {
+        self.provider = provider
+        self.musicService = musicService ?? Self.createMusicService(for: provider)
         self.playlistService = playlistService
         hasSavedSession = sessionStore.exists
         if Self.isUITesting { loadMockTracks() }
+    }
+
+    // MARK: - Provider switching
+
+    func selectProvider(_ newProvider: MusicProvider) {
+        guard newProvider != provider else { return }
+        provider = newProvider
+        musicService = Self.createMusicService(for: newProvider)
+        playlistService = Self.createPlaylistService(for: newProvider)
+    }
+
+    private static func createMusicService(for provider: MusicProvider) -> any MusicServiceProtocol {
+        switch provider {
+        case .appleMusic:
+            #if targetEnvironment(simulator)
+            return SimulatorMusicService()
+            #else
+            return AppleMusicService()
+            #endif
+        case .spotify:
+            return SpotifyService()
+        }
+    }
+
+    private static func createPlaylistService(for provider: MusicProvider) -> any PlaylistService {
+        switch provider {
+        case .appleMusic: return MusicKitPlaylistService()
+        case .spotify:    return SpotifyPlaylistService()
+        }
     }
 
     // MARK: - Authorization
@@ -93,6 +129,11 @@ final class SiftViewModel: ObservableObject {
         removed   = session.removed
         skipped   = session.skipped
         sortOrder = session.sortOrder
+        if let savedProvider = session.provider {
+            provider = savedProvider
+            musicService = Self.createMusicService(for: savedProvider)
+            playlistService = Self.createPlaylistService(for: savedProvider)
+        }
         phase     = .sifting
         Task { await playCurrentTrack() }
     }
@@ -120,6 +161,12 @@ final class SiftViewModel: ObservableObject {
             await playCurrentTrack()
         } catch let musicErr as MusicError {
             loadError = musicErr.localizedDescription
+            phase = .setup
+        } catch let spotifyErr as SpotifyError {
+            loadError = spotifyErr.localizedDescription
+            phase = .setup
+        } catch let authErr as SpotifyAuthError {
+            loadError = authErr.localizedDescription
             phase = .setup
         } catch {
             loadError = friendlyLoadError(error)
@@ -229,7 +276,6 @@ final class SiftViewModel: ObservableObject {
 
         try? await musicService.play(trackID: track.id, at: 0)
         isPlaying = true
-        currentArtwork = await musicService.artwork(forTrackID: track.id)
         startPositionPolling()
     }
 
@@ -266,6 +312,9 @@ final class SiftViewModel: ObservableObject {
         stopPositionPolling()
         positionTask = Task {
             while !Task.isCancelled {
+                if let spotify = musicService as? SpotifyService {
+                    await spotify.refreshPlaybackState()
+                }
                 let pos = await musicService.currentPosition()
                 self.playbackPosition = pos
                 try? await Task.sleep(for: .milliseconds(500))
@@ -288,7 +337,8 @@ final class SiftViewModel: ObservableObject {
             removed: removed,
             skipped: skipped,
             sortOrder: sortOrder,
-            savedAt: Date()
+            savedAt: Date(),
+            provider: provider
         )
         sessionStore.save(session)
     }

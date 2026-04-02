@@ -22,7 +22,11 @@ final class TestSiftView: XCTestCase {
         ])
 
         let controller = UIHostingController(rootView: SiftView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 
@@ -39,7 +43,11 @@ final class TestSiftView: XCTestCase {
         ])
 
         let controller = UIHostingController(rootView: SiftView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 
@@ -53,7 +61,11 @@ final class TestSiftView: XCTestCase {
         ])
 
         let controller = UIHostingController(rootView: SiftView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 
@@ -75,7 +87,11 @@ final class TestSiftView: XCTestCase {
         vm.decideWithoutPlayback(.remove)   // Sweet But Psycho — remove
 
         let controller = UIHostingController(rootView: SiftView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 }

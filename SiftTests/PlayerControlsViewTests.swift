@@ -18,7 +18,11 @@ final class TestPlayerControlsView: XCTestCase {
         vm.isPlaying = true
 
         let controller = UIHostingController(rootView: PlayerControlsView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 
@@ -28,7 +32,11 @@ final class TestPlayerControlsView: XCTestCase {
         vm.isPlaying = false
 
         let controller = UIHostingController(rootView: PlayerControlsView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 
@@ -42,7 +50,11 @@ final class TestPlayerControlsView: XCTestCase {
         vm.isPlaying = false    // shows play.fill icon
 
         let controller = UIHostingController(rootView: PlayerControlsView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 }

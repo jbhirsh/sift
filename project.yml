@@ -1,4 +1,10 @@
 name: Sift
+
+packages:
+  SpotifyiOS:
+    url: https://github.com/spotify/ios-sdk
+    from: "2.1.6"
+
 options:
   bundleIdPrefix: com.jessicahirsh
   deploymentTarget:
@@ -42,6 +48,7 @@ targets:
         basedOnDependencyAnalysis: false
     dependencies:
       - sdk: MusicKit.framework
+      - package: SpotifyiOS
 
   SiftTests:
     type: bundle.unit-test

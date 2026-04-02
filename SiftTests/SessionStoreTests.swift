@@ -74,4 +74,32 @@ final class TestSessionStore: XCTestCase {
         ))
         XCTAssertTrue(store.exists)
     }
+
+    func testSessionPreservesProvider() {
+        let session = SiftSession(
+            tracks: [Track(id: "t1", name: "Song", artist: "Artist",
+                           album: "Album", duration: 180, playCount: 0,
+                           dateAdded: Date(timeIntervalSince1970: 1_600_000_000))],
+            cursor: 0, kept: [], removed: [], skipped: [],
+            sortOrder: .leastPlayed, savedAt: Date(),
+            provider: .spotify
+        )
+        store.save(session)
+        let loaded = store.load()
+        XCTAssertEqual(loaded?.provider, .spotify)
+    }
+
+    func testSessionWithNilProviderDecodesGracefully() {
+        // Sessions saved before provider was added should decode with nil provider
+        let session = SiftSession(
+            tracks: [Track(id: "t1", name: "Song", artist: "Artist",
+                           album: "Album", duration: 180, playCount: 0,
+                           dateAdded: Date(timeIntervalSince1970: 1_600_000_000))],
+            cursor: 0, kept: [], removed: [], skipped: [],
+            sortOrder: .leastPlayed, savedAt: Date()
+        )
+        store.save(session)
+        let loaded = store.load()
+        XCTAssertNil(loaded?.provider)
+    }
 }

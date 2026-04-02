@@ -13,7 +13,11 @@ final class TestLoadingView: XCTestCase {
         vm.loadMessage = "Connecting to Music…"
 
         let controller = UIHostingController(rootView: LoadingView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 
@@ -24,7 +28,11 @@ final class TestLoadingView: XCTestCase {
         vm.loadMessage = "Sorting 312 tracks…"
 
         let controller = UIHostingController(rootView: LoadingView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 }
