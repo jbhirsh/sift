@@ -62,7 +62,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 ---
 
 ## Code Style
-- **Swift**: stdlib + Apple frameworks only. No SPM dependencies.
+- **Swift**: stdlib + Apple frameworks preferred. SPM dependencies allowed when they provide meaningful value.
 - **SwiftLint**: runs as a build phase. Fix all violations before committing.
 - **Tests**: XCTest only. Test classes named `Test<FeatureName>`.
 
@@ -123,7 +123,7 @@ and run `xcodegen generate`.
 ---
 
 ## Things to Never Do
-- Never add SPM or CocoaPods dependencies
+- Prefer SPM over CocoaPods for new dependencies
 - Never edit `Sift.xcodeproj` directly for structural changes
 - Never use `git add -A` — add files explicitly
 - Never commit Keychain credentials or `.p12`/`.p8` files

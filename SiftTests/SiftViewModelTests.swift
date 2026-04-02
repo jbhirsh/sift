@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import XCTest
 @testable import Sift
 
@@ -390,6 +391,50 @@ final class TestRemovalPlaylistViewModel: XCTestCase {
     }
 }
 
+// MARK: - TestProviderSelection
+
+@MainActor
+final class TestProviderSelection: XCTestCase {
+    func testDefaultProviderIsAppleMusic() {
+        let vm = SiftViewModel(playlistService: MockPlaylistService())
+        XCTAssertEqual(vm.provider, .appleMusic)
+    }
+
+    func testSelectProviderChangesProvider() {
+        let vm = SiftViewModel(playlistService: MockPlaylistService())
+        vm.selectProvider(.spotify)
+        XCTAssertEqual(vm.provider, .spotify)
+    }
+
+    func testSelectSameProviderIsNoOp() {
+        let vm = SiftViewModel(playlistService: MockPlaylistService())
+        vm.selectProvider(.appleMusic)
+        XCTAssertEqual(vm.provider, .appleMusic)
+    }
+
+    func testInitWithSpotifyProvider() {
+        let vm = SiftViewModel(
+            playlistService: MockPlaylistService(),
+            provider: .spotify
+        )
+        XCTAssertEqual(vm.provider, .spotify)
+    }
+
+    func testInitWithMusicServiceProtocol() {
+        let mock = MockMusicService()
+        let vm = SiftViewModel(
+            musicService: mock,
+            playlistService: MockPlaylistService()
+        )
+        vm.loadTracks([
+            Track(id: "t1", name: "Test", artist: "Artist",
+                  album: "Album", duration: 180, playCount: 0,
+                  dateAdded: Date())
+        ])
+        XCTAssertEqual(vm.currentTrack?.name, "Test")
+    }
+}
+
 // MARK: - TestSessionResume
 
 @MainActor
@@ -434,5 +479,181 @@ final class TestSessionResume: XCTestCase {
         vm.startFresh()                     // synchronously clears session, then fires loadLibrary Task
 
         XCTAssertFalse(SessionStore().exists)
+    }
+}
+
+// MARK: - TestLoadLibraryWithMockService
+
+@MainActor
+final class TestLoadLibraryWithMockService: XCTestCase {
+    override func tearDown() {
+        SessionStore().clear()
+        super.tearDown()
+    }
+
+    func testLoadLibraryPopulatesTracksAndTransitionsToSifting() async {
+        let mock = MockMusicService()
+        await mock.setTracksToReturn([
+            Track(id: "t1", name: "Alpha", artist: "Artist A",
+                  album: "Album A", duration: 200, playCount: 10,
+                  dateAdded: Date(timeIntervalSince1970: 1_600_000_000)),
+            Track(id: "t2", name: "Beta", artist: "Artist B",
+                  album: "Album B", duration: 180, playCount: 5,
+                  dateAdded: Date(timeIntervalSince1970: 1_610_000_000))
+        ])
+        let vm = SiftViewModel(musicService: mock, playlistService: MockPlaylistService())
+        vm.startFresh()
+        try? await Task.sleep(for: .milliseconds(200))
+
+        XCTAssertEqual(vm.phase, .sifting)
+        XCTAssertEqual(vm.tracks.count, 2)
+        // Default sort is leastPlayed — track with playCount 5 should come first
+        XCTAssertEqual(vm.currentTrack?.name, "Beta")
+    }
+
+    func testLoadLibraryHandlesMusicError() async {
+        let mock = MockMusicService()
+        await mock.setShouldThrow(true)
+        let vm = SiftViewModel(musicService: mock, playlistService: MockPlaylistService())
+        vm.startFresh()
+        try? await Task.sleep(for: .milliseconds(200))
+
+        XCTAssertEqual(vm.phase, .setup)
+        XCTAssertNotNil(vm.loadError)
+    }
+
+    func testResumeSessionRestoresProvider() {
+        // Save a session with Spotify provider, verify it restores
+        let vm1 = SiftViewModel(playlistService: MockPlaylistService(), provider: .spotify)
+        vm1.loadTracks([
+            Track(id: "s1", name: "Spotify Song", artist: "Spot Artist",
+                  album: "Spot Album", duration: 200, playCount: 0,
+                  dateAdded: Date(timeIntervalSince1970: 1_700_000_000))
+        ])
+        vm1.stopSession()
+
+        let vm2 = SiftViewModel(playlistService: MockPlaylistService())
+        vm2.resumeSession()
+
+        XCTAssertEqual(vm2.provider, .spotify)
+        XCTAssertEqual(vm2.phase, .sifting)
+        XCTAssertEqual(vm2.currentTrack?.name, "Spotify Song")
+    }
+}
+
+// MARK: - TestSortOrders
+
+@MainActor
+final class TestSortOrders: XCTestCase {
+    func testSortByLeastPlayed() {
+        let vm = SiftViewModel(playlistService: MockPlaylistService())
+        let tracks = [
+            Track(id: "a", name: "A", artist: "X", album: "Y", duration: 100,
+                  playCount: 50, dateAdded: Date(timeIntervalSince1970: 1_000_000)),
+            Track(id: "b", name: "B", artist: "X", album: "Y", duration: 100,
+                  playCount: 5, dateAdded: Date(timeIntervalSince1970: 2_000_000)),
+            Track(id: "c", name: "C", artist: "X", album: "Y", duration: 100,
+                  playCount: 25, dateAdded: Date(timeIntervalSince1970: 3_000_000))
+        ]
+        let sorted = vm.sortedTracks(tracks, by: .leastPlayed)
+        XCTAssertEqual(sorted.map(\.name), ["B", "C", "A"])
+    }
+
+    func testSortByMostPlayed() {
+        let vm = SiftViewModel(playlistService: MockPlaylistService())
+        let tracks = [
+            Track(id: "a", name: "A", artist: "X", album: "Y", duration: 100,
+                  playCount: 50, dateAdded: Date(timeIntervalSince1970: 1_000_000)),
+            Track(id: "b", name: "B", artist: "X", album: "Y", duration: 100,
+                  playCount: 5, dateAdded: Date(timeIntervalSince1970: 2_000_000)),
+            Track(id: "c", name: "C", artist: "X", album: "Y", duration: 100,
+                  playCount: 25, dateAdded: Date(timeIntervalSince1970: 3_000_000))
+        ]
+        let sorted = vm.sortedTracks(tracks, by: .mostPlayed)
+        XCTAssertEqual(sorted.map(\.name), ["A", "C", "B"])
+    }
+
+    func testSortByOldest() {
+        let vm = SiftViewModel(playlistService: MockPlaylistService())
+        let tracks = [
+            Track(id: "a", name: "A", artist: "X", album: "Y", duration: 100,
+                  playCount: 0, dateAdded: Date(timeIntervalSince1970: 3_000_000)),
+            Track(id: "b", name: "B", artist: "X", album: "Y", duration: 100,
+                  playCount: 0, dateAdded: Date(timeIntervalSince1970: 1_000_000)),
+            Track(id: "c", name: "C", artist: "X", album: "Y", duration: 100,
+                  playCount: 0, dateAdded: Date(timeIntervalSince1970: 2_000_000))
+        ]
+        let sorted = vm.sortedTracks(tracks, by: .oldest)
+        XCTAssertEqual(sorted.map(\.name), ["B", "C", "A"])
+    }
+
+    func testSortByNewest() {
+        let vm = SiftViewModel(playlistService: MockPlaylistService())
+        let tracks = [
+            Track(id: "a", name: "A", artist: "X", album: "Y", duration: 100,
+                  playCount: 0, dateAdded: Date(timeIntervalSince1970: 3_000_000)),
+            Track(id: "b", name: "B", artist: "X", album: "Y", duration: 100,
+                  playCount: 0, dateAdded: Date(timeIntervalSince1970: 1_000_000)),
+            Track(id: "c", name: "C", artist: "X", album: "Y", duration: 100,
+                  playCount: 0, dateAdded: Date(timeIntervalSince1970: 2_000_000))
+        ]
+        let sorted = vm.sortedTracks(tracks, by: .newest)
+        XCTAssertEqual(sorted.map(\.name), ["A", "C", "B"])
+    }
+
+    func testSortByRandomReturnsAllTracks() {
+        let vm = SiftViewModel(playlistService: MockPlaylistService())
+        let tracks = [
+            Track(id: "a", name: "A", artist: "X", album: "Y", duration: 100,
+                  playCount: 0, dateAdded: Date()),
+            Track(id: "b", name: "B", artist: "X", album: "Y", duration: 100,
+                  playCount: 0, dateAdded: Date()),
+            Track(id: "c", name: "C", artist: "X", album: "Y", duration: 100,
+                  playCount: 0, dateAdded: Date())
+        ]
+        let sorted = vm.sortedTracks(tracks, by: .random)
+        XCTAssertEqual(sorted.count, 3)
+        XCTAssertEqual(Set(sorted.map(\.id)), Set(["a", "b", "c"]))
+    }
+}
+
+// MARK: - TestFriendlyLoadError
+
+@MainActor
+final class TestFriendlyLoadError: XCTestCase {
+    func testLoadLibraryWithUnknownErrorShowsFriendlyMessage() async {
+        let mock = MockMusicService()
+        await mock.setCustomError(NSError(domain: "test", code: -1,
+                                           userInfo: [NSLocalizedDescriptionKey: "Unknown error occurred"]))
+        let vm = SiftViewModel(musicService: mock, playlistService: MockPlaylistService())
+        vm.startFresh()
+        try? await Task.sleep(for: .milliseconds(200))
+
+        XCTAssertEqual(vm.phase, .setup)
+        XCTAssertTrue(vm.loadError?.contains("Could not connect to your Music library") == true)
+    }
+
+    func testLoadLibraryWithNotAvailableErrorShowsFriendlyMessage() async {
+        let mock = MockMusicService()
+        await mock.setCustomError(NSError(domain: "test", code: -1,
+                                           userInfo: [NSLocalizedDescriptionKey: "Service not available"]))
+        let vm = SiftViewModel(musicService: mock, playlistService: MockPlaylistService())
+        vm.startFresh()
+        try? await Task.sleep(for: .milliseconds(200))
+
+        XCTAssertEqual(vm.phase, .setup)
+        XCTAssertTrue(vm.loadError?.contains("Could not connect to your Music library") == true)
+    }
+
+    func testLoadLibraryWithGenericErrorShowsOriginalDescription() async {
+        let mock = MockMusicService()
+        await mock.setCustomError(NSError(domain: "test", code: -1,
+                                           userInfo: [NSLocalizedDescriptionKey: "Network timeout"]))
+        let vm = SiftViewModel(musicService: mock, playlistService: MockPlaylistService())
+        vm.startFresh()
+        try? await Task.sleep(for: .milliseconds(200))
+
+        XCTAssertEqual(vm.phase, .setup)
+        XCTAssertTrue(vm.loadError?.contains("Network timeout") == true)
     }
 }

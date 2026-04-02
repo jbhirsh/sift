@@ -26,6 +26,7 @@ struct SiftSession: Codable {
     var skipped: [Track]
     var sortOrder: SortOrder
     var savedAt: Date
+    var provider: MusicProvider?
 
     var remaining: Int { max(0, tracks.count - cursor) }
     var total: Int { tracks.count }

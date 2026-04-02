@@ -17,11 +17,11 @@ enum MusicError: Error, LocalizedError {
     }
 }
 
-// MARK: - MusicService
+// MARK: - AppleMusicService
 
-actor MusicService {
+actor AppleMusicService: MusicServiceProtocol {
     /// Cached Song objects keyed by their MusicItemID raw value.
-    /// Populated by loadLibrary() and used for play/artwork lookups.
+    /// Populated by loadLibrary() and used for play lookups.
     private var songCache: [String: Song] = [:]
 
     // MARK: - Authorization
@@ -65,7 +65,8 @@ actor MusicService {
                 album: song.albumTitle ?? "",
                 duration: song.duration ?? 0,
                 playCount: song.playCount ?? 0,
-                dateAdded: song.libraryAddedDate ?? Date.distantPast
+                dateAdded: song.libraryAddedDate ?? Date.distantPast,
+                artworkURL: song.artwork?.url(width: 600, height: 600)
             )
         }
         songCache = cache
@@ -103,11 +104,4 @@ actor MusicService {
     func isPlaying() -> Bool {
         ApplicationMusicPlayer.shared.state.playbackStatus == .playing
     }
-
-    // MARK: - Artwork
-
-    func artwork(forTrackID trackID: String) -> Artwork? {
-        songCache[trackID]?.artwork
-    }
-
 }

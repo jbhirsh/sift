@@ -26,7 +26,11 @@ final class TestDoneView: XCTestCase {
         vm.decideWithoutPlayback(.keep)     // Sweet But Psycho — keep
 
         let controller = UIHostingController(rootView: DoneView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 
@@ -49,7 +53,11 @@ final class TestDoneView: XCTestCase {
         vm.decideWithoutPlayback(.remove)   // U Can't Touch This — remove
 
         let controller = UIHostingController(rootView: DoneView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 
@@ -65,7 +73,11 @@ final class TestDoneView: XCTestCase {
         vm.removalPlaylistCreated = true
 
         let controller = UIHostingController(rootView: DoneView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 
@@ -81,7 +93,11 @@ final class TestDoneView: XCTestCase {
         vm.isCreatingPlaylist = true
 
         let controller = UIHostingController(rootView: DoneView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 
@@ -97,7 +113,11 @@ final class TestDoneView: XCTestCase {
         vm.removalPlaylistError = "None of the selected tracks could be found in your library."
 
         let controller = UIHostingController(rootView: DoneView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 
@@ -116,7 +136,11 @@ final class TestDoneView: XCTestCase {
         vm.stopSession()                    // pauses with Sweet But Psycho remaining
 
         let controller = UIHostingController(rootView: DoneView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 
@@ -139,7 +163,11 @@ final class TestDoneView: XCTestCase {
         vm.decideWithoutPlayback(.skip)     // U Can't Touch This — skip
 
         let controller = UIHostingController(rootView: DoneView().environmentObject(vm))
-        controller.view.layoutIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: controller.view.frame)
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        RunLoop.current.run(until: Date())
         XCTAssertNotNil(controller.view)
     }
 }

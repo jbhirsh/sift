@@ -1,4 +1,3 @@
-import MusicKit
 import SwiftUI
 
 // MARK: - Interactive front card with artwork hero
@@ -21,10 +20,19 @@ struct InteractiveCardView: View {
             VStack(spacing: 0) {
                 // Artwork hero
                 ZStack(alignment: .bottomLeading) {
-                    if let artwork = vm.currentArtwork {
-                        ArtworkImage(artwork, width: 400, height: 400)
-                            .aspectRatio(contentMode: .fill)
-                            .clipped()
+                    if let url = track.artworkURL {
+                        AsyncImage(url: url) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Rectangle()
+                                .fill(Color(.quaternarySystemFill))
+                                .overlay(
+                                    ProgressView()
+                                )
+                        }
+                        .clipped()
                     } else {
                         Rectangle()
                             .fill(Color(.quaternarySystemFill))
