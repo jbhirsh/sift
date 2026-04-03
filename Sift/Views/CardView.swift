@@ -5,13 +5,18 @@ import SwiftUI
 struct InteractiveCardView: View {
     @EnvironmentObject var vm: SiftViewModel
     let track: Track
+    var programmaticOffset: CGFloat = 0
 
     @GestureState private var dragOffset: CGSize = .zero
 
     private var dragThreshold: Double { 80 }
 
+    private var effectiveOffset: CGFloat {
+        dragOffset.width + programmaticOffset
+    }
+
     private var overlayOpacity: Double {
-        min(abs(dragOffset.width) / dragThreshold, 1.0)
+        min(abs(effectiveOffset) / dragThreshold, 1.0)
     }
 
     var body: some View {
@@ -100,7 +105,7 @@ struct InteractiveCardView: View {
             .shadow(color: .black.opacity(0.08), radius: 20, y: 8)
 
             // Swipe overlays
-            if dragOffset.width > 0 {
+            if effectiveOffset > 0 {
                 RoundedRectangle(cornerRadius: 20)
                     .fill(.green.opacity(0.15 * overlayOpacity))
                     .overlay(
@@ -111,7 +116,7 @@ struct InteractiveCardView: View {
                         alignment: .topLeading
                     )
                     .padding(16)
-            } else if dragOffset.width < 0 {
+            } else if effectiveOffset < 0 {
                 RoundedRectangle(cornerRadius: 20)
                     .fill(.red.opacity(0.15 * overlayOpacity))
                     .overlay(
@@ -124,8 +129,8 @@ struct InteractiveCardView: View {
                     .padding(16)
             }
         }
-        .offset(x: dragOffset.width, y: dragOffset.height * 0.2)
-        .rotationEffect(.degrees(dragOffset.width / 20))
+        .offset(x: effectiveOffset, y: dragOffset.height * 0.2)
+        .rotationEffect(.degrees(effectiveOffset / 20))
         .gesture(
             DragGesture(minimumDistance: 10)
                 .updating($dragOffset) { value, state, _ in
@@ -141,5 +146,6 @@ struct InteractiveCardView: View {
                 }
         )
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: dragOffset)
+        .animation(.easeIn(duration: 0.3), value: programmaticOffset)
     }
 }

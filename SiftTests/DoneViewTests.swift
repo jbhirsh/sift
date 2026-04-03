@@ -11,17 +11,6 @@ final class TestDoneView: XCTestCase {
         super.tearDown()
     }
 
-    private func render(vm: SiftViewModel) -> UIView {
-        let controller = UIHostingController(rootView: DoneView().environmentObject(vm))
-        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
-        let window = UIWindow(frame: controller.view.frame)
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
-        controller.view.layoutIfNeeded()
-        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.05))
-        return controller.view
-    }
-
     // MARK: - Title text
 
     func testTitleShowsAllDoneWhenDonePhase() {
@@ -32,7 +21,7 @@ final class TestDoneView: XCTestCase {
                   dateAdded: Date(timeIntervalSince1970: 1_470_000_000))
         ])
         vm.decideWithoutPlayback(.keep)
-        let view = render(vm: vm)
+        let view = renderInWindow(DoneView().environmentObject(vm))
         XCTAssertTrue(findAccessibilityElement(label: "All done.", in: view),
                       "Should display 'All done.' title text")
     }
@@ -49,7 +38,7 @@ final class TestDoneView: XCTestCase {
         ])
         vm.decideWithoutPlayback(.keep)
         vm.stopSession()
-        let view = render(vm: vm)
+        let view = renderInWindow(DoneView().environmentObject(vm))
         XCTAssertTrue(findAccessibilityElement(label: "Session paused.", in: view),
                       "Should display 'Session paused.' title text")
     }
@@ -72,7 +61,7 @@ final class TestDoneView: XCTestCase {
         vm.decideWithoutPlayback(.keep)
         vm.decideWithoutPlayback(.remove)
         vm.decideWithoutPlayback(.skip)
-        let view = render(vm: vm)
+        let view = renderInWindow(DoneView().environmentObject(vm))
         XCTAssertTrue(findAccessibilityElement(label: "kept", in: view),
                       "Kept summary label should be present")
         XCTAssertTrue(findAccessibilityElement(label: "to remove", in: view),
@@ -91,7 +80,7 @@ final class TestDoneView: XCTestCase {
                   dateAdded: Date(timeIntervalSince1970: 1_470_000_000))
         ])
         vm.decideWithoutPlayback(.keep)
-        let view = render(vm: vm)
+        let view = renderInWindow(DoneView().environmentObject(vm))
         XCTAssertTrue(findAccessibilityElement(label: "Start Over", in: view),
                       "Start Over button should be visible when done")
         XCTAssertTrue(accessibilityElementAbsent(label: "Resume Session", in: view),
@@ -110,7 +99,7 @@ final class TestDoneView: XCTestCase {
         ])
         vm.decideWithoutPlayback(.keep)
         vm.stopSession()
-        let view = render(vm: vm)
+        let view = renderInWindow(DoneView().environmentObject(vm))
         XCTAssertTrue(findAccessibilityElement(label: "Resume Session", in: view),
                       "Resume Session should be visible when paused")
         XCTAssertTrue(findAccessibilityElement(label: "Start Fresh", in: view),
@@ -127,7 +116,7 @@ final class TestDoneView: XCTestCase {
                   dateAdded: Date(timeIntervalSince1970: 1_470_000_000))
         ])
         vm.decideWithoutPlayback(.remove)
-        let view = render(vm: vm)
+        let view = renderInWindow(DoneView().environmentObject(vm))
         XCTAssertTrue(findAccessibilityElement(label: "Move to Playlist", in: view),
                       "Move to Playlist button should be visible when tracks are removed")
     }
@@ -141,7 +130,7 @@ final class TestDoneView: XCTestCase {
         ])
         vm.decideWithoutPlayback(.remove)
         vm.removalPlaylistCreated = true
-        let view = render(vm: vm)
+        let view = renderInWindow(DoneView().environmentObject(vm))
         XCTAssertTrue(findAccessibilityElement(label: "Moved to Playlist", in: view),
                       "Moved to Playlist label should appear after playlist creation")
     }

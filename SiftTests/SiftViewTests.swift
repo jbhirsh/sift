@@ -6,17 +6,6 @@ import SwiftUI
 
 @MainActor
 final class TestSiftView: XCTestCase {
-    private func render(vm: SiftViewModel) -> UIView {
-        let controller = UIHostingController(rootView: SiftView().environmentObject(vm))
-        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
-        let window = UIWindow(frame: controller.view.frame)
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
-        controller.view.layoutIfNeeded()
-        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.05))
-        return controller.view
-    }
-
     /// Checks whether the given accessibility element's label contains `text`.
     private func elementLabelContains(_ text: String, in object: Any) -> Bool {
         let lbl = (object as AnyObject).accessibilityLabel ?? nil
@@ -70,7 +59,7 @@ final class TestSiftView: XCTestCase {
                   album: "The Definition", duration: 213, playCount: 47,
                   dateAdded: Date(timeIntervalSince1970: 1_470_000_000))
         ])
-        let view = render(vm: vm)
+        let view = renderInWindow(SiftView().environmentObject(vm))
         XCTAssertTrue(deepFind(label: "Sift", in: view),
                       "Header should show 'Sift' title")
     }
@@ -85,7 +74,7 @@ final class TestSiftView: XCTestCase {
                   album: "Heaven & Hell", duration: 196, playCount: 23,
                   dateAdded: Date(timeIntervalSince1970: 1_540_000_000))
         ])
-        let view = render(vm: vm)
+        let view = renderInWindow(SiftView().environmentObject(vm))
         XCTAssertTrue(deepFind(label: "left", in: view),
                       "Remaining count label should be present")
     }
@@ -97,7 +86,7 @@ final class TestSiftView: XCTestCase {
                   album: "The Definition", duration: 213, playCount: 47,
                   dateAdded: Date(timeIntervalSince1970: 1_470_000_000))
         ])
-        let view = render(vm: vm)
+        let view = renderInWindow(SiftView().environmentObject(vm))
         XCTAssertTrue(findAccessibilityElement(label: "0 kept", in: view),
                       "Kept stat should be present")
         XCTAssertTrue(findAccessibilityElement(label: "0 removed", in: view),
@@ -113,7 +102,7 @@ final class TestSiftView: XCTestCase {
                   album: "The Definition", duration: 213, playCount: 47,
                   dateAdded: Date(timeIntervalSince1970: 1_470_000_000))
         ])
-        let view = render(vm: vm)
+        let view = renderInWindow(SiftView().environmentObject(vm))
         // SF Symbol "chevron.left" inside .contain container
         XCTAssertTrue(deepFind(label: "Back", in: view),
                       "Stop button should be present")
@@ -129,7 +118,7 @@ final class TestSiftView: XCTestCase {
                   album: "Heaven & Hell", duration: 196, playCount: 23,
                   dateAdded: Date(timeIntervalSince1970: 1_540_000_000))
         ])
-        let view = render(vm: vm)
+        let view = renderInWindow(SiftView().environmentObject(vm))
         XCTAssertTrue(findAccessibilityElement(label: "Keep", in: view),
                       "Keep button should be present")
         XCTAssertTrue(findAccessibilityElement(label: "Skip", in: view),
