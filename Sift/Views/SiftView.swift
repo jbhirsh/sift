@@ -2,6 +2,8 @@ import SwiftUI
 
 struct SiftView: View {
     @EnvironmentObject var vm: SiftViewModel
+    @State private var swipeOffset: CGFloat = 0
+    @State private var isAnimating = false
 
     private var progress: Double {
         guard vm.total > 0 else { return 0 }
@@ -83,7 +85,7 @@ struct SiftView: View {
                         .opacity(0.6)
                 }
                 if let track = vm.currentTrack {
-                    InteractiveCardView(track: track)
+                    InteractiveCardView(track: track, programmaticOffset: swipeOffset)
                 }
             }
             .padding(.horizontal, 24)
@@ -100,7 +102,7 @@ struct SiftView: View {
                     icon: "xmark",
                     label: "Remove",
                     color: .red
-                ) { vm.decide(.remove) }
+                ) { animateDecision(.remove) }
 
                 actionButton(
                     icon: "arrow.right",
@@ -112,14 +114,30 @@ struct SiftView: View {
                     icon: "checkmark",
                     label: "Keep",
                     color: .green
-                ) { vm.decide(.keep) }
+                ) { animateDecision(.keep) }
             }
+            .disabled(isAnimating)
             .padding(.bottom, 32)
         }
-        .onKeyPress(.leftArrow) { vm.decide(.keep); return .handled }
-        .onKeyPress(.rightArrow) { vm.decide(.remove); return .handled }
+        .onKeyPress(.leftArrow) { animateDecision(.keep); return .handled }
+        .onKeyPress(.rightArrow) { animateDecision(.remove); return .handled }
         .onKeyPress("s") { vm.decide(.skip); return .handled }
         .onKeyPress(.space) { vm.togglePlayPause(); return .handled }
+    }
+
+    // MARK: - Animation
+
+    private func animateDecision(_ decision: Decision) {
+        guard !isAnimating else { return }
+        isAnimating = true
+        let direction: CGFloat = decision == .keep ? 500 : -500
+        withAnimation(.easeIn(duration: 0.3)) {
+            swipeOffset = direction
+        } completion: {
+            vm.decide(decision)
+            swipeOffset = 0
+            isAnimating = false
+        }
     }
 
     // MARK: - Subviews

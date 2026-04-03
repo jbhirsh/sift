@@ -52,17 +52,11 @@ struct SetupView: View {
                 }
                 .pickerStyle(.segmented)
             }
-            .padding()
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
-            )
 
-            VStack(alignment: .leading, spacing: 12) {
+            HStack {
                 Text("Sort by")
                     .font(.headline)
-
+                Spacer()
                 Picker("Sort order", selection: $vm.sortOrder) {
                     ForEach(SortOrder.allCases, id: \.self) { order in
                         Text(order.displayName).tag(order)
@@ -108,8 +102,8 @@ struct SetupView: View {
         .background(
             LinearGradient(
                 colors: [
-                    Color.blue.opacity(0.15),
-                    Color.purple.opacity(0.1),
+                    Color.blue.opacity(0.2),
+                    Color.purple.opacity(0.15),
                     Color.clear
                 ],
                 startPoint: .topLeading,
