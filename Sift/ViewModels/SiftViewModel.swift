@@ -127,12 +127,14 @@ final class SiftViewModel: ObservableObject {
 
     // MARK: - Load library
 
-    func startFresh() {
+    @discardableResult
+    func startFresh() -> Task<Void, Never> {
         sessionStore.clear()
         if Self.isUITesting {
             loadMockTracks()
+            return Task {}
         } else {
-            Task { await loadLibrary() }
+            return Task { await loadLibrary() }
         }
     }
 
@@ -363,11 +365,12 @@ final class SiftViewModel: ObservableObject {
 
     // MARK: - Removal playlist
 
-    func createRemovalPlaylist() {
-        guard !removed.isEmpty else { return }
+    @discardableResult
+    func createRemovalPlaylist() -> Task<Void, Never>? {
+        guard !removed.isEmpty else { return nil }
         isCreatingPlaylist = true
         removalPlaylistError = nil
-        Task {
+        return Task {
             do {
                 try await playlistService.addToRemovalPlaylist(tracks: removed)
                 removalPlaylistCreated = true

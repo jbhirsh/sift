@@ -347,8 +347,7 @@ final class TestRemovalPlaylistViewModel: XCTestCase {
         vm.decideWithoutPlayback(.remove)   // All Time Low — remove
         vm.decideWithoutPlayback(.remove)   // Sweet But Psycho — remove
 
-        vm.createRemovalPlaylist()
-        try? await Task.sleep(for: .milliseconds(100))
+        await vm.createRemovalPlaylist()?.value
 
         XCTAssertEqual(mock.addedTracks.map(\.name), ["All Time Low", "Sweet But Psycho"])
         XCTAssertTrue(vm.removalPlaylistCreated)
@@ -366,13 +365,7 @@ final class TestRemovalPlaylistViewModel: XCTestCase {
         ])
         vm.decideWithoutPlayback(.remove)   // U Can't Touch This — remove
 
-        vm.createRemovalPlaylist()
-        // Allow the unstructured Task inside createRemovalPlaylist
-        // enough time to complete the async error path.
-        for _ in 0..<20 {
-            try? await Task.sleep(for: .milliseconds(100))
-            if vm.removalPlaylistError != nil { break }
-        }
+        await vm.createRemovalPlaylist()?.value
 
         XCTAssertFalse(vm.removalPlaylistCreated)
         XCTAssertNotNil(vm.removalPlaylistError)
@@ -388,8 +381,7 @@ final class TestRemovalPlaylistViewModel: XCTestCase {
         ])
         vm.decideWithoutPlayback(.keep)     // All Time Low — keep (not removed)
 
-        vm.createRemovalPlaylist()
-        try? await Task.sleep(for: .milliseconds(100))
+        await vm.createRemovalPlaylist()?.value
 
         XCTAssertEqual(mock.addedTracks.count, 0)
         XCTAssertFalse(vm.removalPlaylistCreated)
@@ -507,8 +499,7 @@ final class TestLoadLibraryWithMockService: XCTestCase {
                   dateAdded: Date(timeIntervalSince1970: 1_610_000_000))
         ])
         let vm = SiftViewModel(musicService: mock, playlistService: MockPlaylistService())
-        vm.startFresh()
-        try? await Task.sleep(for: .milliseconds(200))
+        await vm.startFresh().value
 
         XCTAssertEqual(vm.phase, .sifting)
         XCTAssertEqual(vm.tracks.count, 2)
@@ -520,8 +511,7 @@ final class TestLoadLibraryWithMockService: XCTestCase {
         let mock = MockMusicService()
         await mock.setShouldThrow(true)
         let vm = SiftViewModel(musicService: mock, playlistService: MockPlaylistService())
-        vm.startFresh()
-        try? await Task.sleep(for: .milliseconds(200))
+        await vm.startFresh().value
 
         XCTAssertEqual(vm.phase, .setup)
         XCTAssertNotNil(vm.loadError)
@@ -631,8 +621,7 @@ final class TestFriendlyLoadError: XCTestCase {
         await mock.setCustomError(NSError(domain: "test", code: -1,
                                            userInfo: [NSLocalizedDescriptionKey: "Unknown error occurred"]))
         let vm = SiftViewModel(musicService: mock, playlistService: MockPlaylistService())
-        vm.startFresh()
-        try? await Task.sleep(for: .milliseconds(200))
+        await vm.startFresh().value
 
         XCTAssertEqual(vm.phase, .setup)
         XCTAssertTrue(vm.loadError?.contains("Could not connect to your Music library") == true)
@@ -643,8 +632,7 @@ final class TestFriendlyLoadError: XCTestCase {
         await mock.setCustomError(NSError(domain: "test", code: -1,
                                            userInfo: [NSLocalizedDescriptionKey: "Service not available"]))
         let vm = SiftViewModel(musicService: mock, playlistService: MockPlaylistService())
-        vm.startFresh()
-        try? await Task.sleep(for: .milliseconds(200))
+        await vm.startFresh().value
 
         XCTAssertEqual(vm.phase, .setup)
         XCTAssertTrue(vm.loadError?.contains("Could not connect to your Music library") == true)
@@ -655,8 +643,7 @@ final class TestFriendlyLoadError: XCTestCase {
         await mock.setCustomError(NSError(domain: "test", code: -1,
                                            userInfo: [NSLocalizedDescriptionKey: "Network timeout"]))
         let vm = SiftViewModel(musicService: mock, playlistService: MockPlaylistService())
-        vm.startFresh()
-        try? await Task.sleep(for: .milliseconds(200))
+        await vm.startFresh().value
 
         XCTAssertEqual(vm.phase, .setup)
         XCTAssertTrue(vm.loadError?.contains("Network timeout") == true)
