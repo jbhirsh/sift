@@ -53,7 +53,11 @@ struct SetupView: View {
                 .pickerStyle(.segmented)
             }
             .padding()
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+            )
 
             VStack(alignment: .leading, spacing: 12) {
                 Text("Sort by")
@@ -64,10 +68,14 @@ struct SetupView: View {
                         Text(order.displayName).tag(order)
                     }
                 }
-                .pickerStyle(.inline)
+                .pickerStyle(.menu)
             }
             .padding()
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
+            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+            )
 
             VStack(spacing: 12) {
                 if vm.hasSavedSession {
@@ -97,6 +105,18 @@ struct SetupView: View {
             Spacer()
         }
         .padding(40)
+        .background(
+            LinearGradient(
+                colors: [
+                    Color.blue.opacity(0.15),
+                    Color.purple.opacity(0.1),
+                    Color.clear
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+        )
     }
 
     private var accessDeniedMessage: String {
