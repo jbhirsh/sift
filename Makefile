@@ -8,22 +8,28 @@ SIGN_FLAGS  = CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- \
 generate:
 	xcodegen generate
 
-# Unit tests — no signing required, always runnable from the terminal
+# Unit tests — override DEST for different simulators:
+#   make test DEST="platform=iOS Simulator,name=iPhone 16 Pro"
 test:
+	rm -rf UnitTestResults.xcresult
 	xcodebuild test \
 	  -project Sift.xcodeproj \
 	  -scheme $(SCHEME_UNIT) \
 	  -destination "$(DEST)" \
+	  -resultBundlePath UnitTestResults.xcresult \
+	  -enableCodeCoverage YES \
 	  $(SIGN_FLAGS) \
 	  | xcbeautify
 
 # UI tests — full interaction flow on the simulator
 test-ui:
+	rm -rf IntegTestResults.xcresult
 	xcodebuild test \
 	  -project Sift.xcodeproj \
 	  -scheme $(SCHEME_ALL) \
 	  -only-testing:SiftUITests/SiftUITests \
 	  -destination "$(DEST)" \
+	  -resultBundlePath IntegTestResults.xcresult \
 	  $(SIGN_FLAGS) \
 	  | xcbeautify
 
