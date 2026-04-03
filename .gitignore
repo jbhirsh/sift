@@ -9,6 +9,7 @@ build/
 *.pkg
 *.dSYM.zip
 *.dSYM
+*.xcresult
 
 # Fastlane
 fastlane/report.xml
