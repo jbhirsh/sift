@@ -12,6 +12,7 @@ struct SetupView: View {
             VStack(spacing: 8) {
                 Text("sift.")
                     .font(.system(size: 48, weight: .bold, design: .rounded))
+                    .accessibilityIdentifier("setup-brand")
                 Text("Clean up your music library.")
                     .font(.title3)
                     .foregroundStyle(.secondary)
@@ -23,6 +24,7 @@ struct SetupView: View {
                     .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
+                    .accessibilityIdentifier("setup-error")
             } else if accessDenied {
                 Label(
                     accessDeniedMessage,

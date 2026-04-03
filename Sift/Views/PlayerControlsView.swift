@@ -12,6 +12,7 @@ struct PlayerControlsView: View {
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.tertiary)
                         .frame(width: 32, alignment: .trailing)
+                        .accessibilityIdentifier("elapsed-time")
 
                     Slider(
                         value: Binding(
@@ -26,6 +27,7 @@ struct PlayerControlsView: View {
                         .font(.caption2.monospacedDigit())
                         .foregroundStyle(.tertiary)
                         .frame(width: 32, alignment: .leading)
+                        .accessibilityIdentifier("duration-time")
                 }
             }
 
@@ -43,6 +45,7 @@ struct PlayerControlsView: View {
                         .font(.body)
                 }
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("play-pause-button")
 
                 Button { vm.skipForward() } label: {
                     Image(systemName: "goforward.15")
