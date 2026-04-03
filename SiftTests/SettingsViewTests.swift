@@ -6,57 +6,104 @@ import SwiftUI
 
 @MainActor
 final class TestSettingsView: XCTestCase {
-    func testBodyRendersWithoutCrashing() {
-        let vm = SiftViewModel(playlistService: MockPlaylistService())
-        let controller = UIHostingController(
+    private func render(vm: SiftViewModel) -> UIView {
+        let host = UIHostingController(
             rootView: SettingsView().environmentObject(vm)
         )
-        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
-        let window = UIWindow(frame: controller.view.frame)
-        window.rootViewController = controller
+        host.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
+        let window = UIWindow(frame: host.view.frame)
+        window.rootViewController = host
         window.makeKeyAndVisible()
-        RunLoop.current.run(until: Date())
-        XCTAssertNotNil(controller.view)
-    }
-
-    func testRendersWithSpotifyProvider() {
-        let vm = SiftViewModel(playlistService: MockPlaylistService(), provider: .spotify)
-        let controller = UIHostingController(
-            rootView: SettingsView().environmentObject(vm)
+        host.view.layoutIfNeeded()
+        RunLoop.current.run(
+            until: Date(timeIntervalSinceNow: 0.05)
         )
-        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
-        let window = UIWindow(frame: controller.view.frame)
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
-        RunLoop.current.run(until: Date())
-        XCTAssertNotNil(controller.view)
+        return host.view
     }
 
-    func testRendersWithConnectedStatus() {
-        let vm = SiftViewModel(playlistService: MockPlaylistService())
+    // MARK: - Provider name
+
+    func testDisplaysAppleMusicProviderName() {
+        let vm = SiftViewModel(
+            playlistService: MockPlaylistService()
+        )
+        let view = render(vm: vm)
+        XCTAssertTrue(
+            findAccessibilityElement(label: "Apple Music", in: view),
+            "Should display Apple Music provider name"
+        )
+    }
+
+    func testDisplaysSpotifyProviderName() {
+        let vm = SiftViewModel(
+            playlistService: MockPlaylistService(),
+            provider: .spotify
+        )
+        let view = render(vm: vm)
+        XCTAssertTrue(
+            findAccessibilityElement(label: "Spotify", in: view),
+            "Should display Spotify provider name"
+        )
+    }
+
+    // MARK: - Connection status text
+
+    func testConnectionStatusShowsConnectedWhenConnected() {
+        let vm = SiftViewModel(
+            playlistService: MockPlaylistService()
+        )
         vm.connectionStatus = .connected
-        let controller = UIHostingController(
-            rootView: SettingsView().environmentObject(vm)
+        let view = render(vm: vm)
+        XCTAssertTrue(
+            findAccessibilityElement(label: "Connected", in: view),
+            "Should show 'Connected' when status is connected"
         )
-        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
-        let window = UIWindow(frame: controller.view.frame)
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
-        RunLoop.current.run(until: Date())
-        XCTAssertNotNil(controller.view)
     }
 
-    func testRendersWithDisconnectedStatus() {
-        let vm = SiftViewModel(playlistService: MockPlaylistService())
-        vm.connectionStatus = .disconnected
-        let controller = UIHostingController(
-            rootView: SettingsView().environmentObject(vm)
+    func testConnectionStatusShowsNotConnectedWhenDisconnected() {
+        let vm = SiftViewModel(
+            playlistService: MockPlaylistService()
         )
-        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
-        let window = UIWindow(frame: controller.view.frame)
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
-        RunLoop.current.run(until: Date())
-        XCTAssertNotNil(controller.view)
+        vm.connectionStatus = .disconnected
+        let view = render(vm: vm)
+        XCTAssertTrue(
+            findAccessibilityElement(
+                label: "Not connected",
+                in: view
+            ),
+            "Should show 'Not connected' when disconnected"
+        )
+    }
+
+    // MARK: - Check Connection button
+
+    func testCheckConnectionButtonExists() {
+        let vm = SiftViewModel(
+            playlistService: MockPlaylistService()
+        )
+        let view = render(vm: vm)
+        XCTAssertTrue(
+            findAccessibilityElement(
+                label: "Check Connection",
+                in: view
+            ),
+            "Check Connection button should exist"
+        )
+    }
+
+    // MARK: - Version text
+
+    func testVersionTextVisible() {
+        let vm = SiftViewModel(
+            playlistService: MockPlaylistService()
+        )
+        let view = render(vm: vm)
+        XCTAssertTrue(
+            findAccessibilityElement(
+                label: "Version 1.0.0",
+                in: view
+            ),
+            "Version text should be visible"
+        )
     }
 }

@@ -55,10 +55,12 @@ struct InteractiveCardView: View {
                             .font(.title2.bold())
                             .foregroundStyle(.primary)
                             .lineLimit(2)
+                            .accessibilityIdentifier("card-track-name")
                         Text(track.artist)
                             .font(.callout.weight(.medium))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
+                            .accessibilityIdentifier("card-artist-name")
                     }
                     .padding(20)
                     .environment(\.colorScheme, .dark)
@@ -78,6 +80,7 @@ struct InteractiveCardView: View {
                             .font(.caption.weight(.medium))
                             .foregroundStyle(.primary)
                             .lineLimit(1)
+                            .accessibilityIdentifier("card-album-name")
                     }
                     Spacer()
                     HStack(spacing: 4) {
@@ -85,6 +88,7 @@ struct InteractiveCardView: View {
                             .font(.caption2)
                         Text("\(track.playCount) plays")
                             .font(.caption)
+                            .accessibilityIdentifier("card-play-count")
                     }
                     .foregroundStyle(.tertiary)
                 }

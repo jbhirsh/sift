@@ -9,6 +9,7 @@ struct LoadingView: View {
 
             Text("sift.")
                 .font(.system(size: 36, weight: .bold, design: .rounded))
+                .accessibilityIdentifier("loading-brand")
 
             VStack(spacing: 12) {
                 ProgressView(value: vm.loadProgress)
@@ -19,6 +20,7 @@ struct LoadingView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .animation(.default, value: vm.loadMessage)
+                    .accessibilityIdentifier("loading-message")
             }
 
             Spacer()

@@ -367,7 +367,12 @@ final class TestRemovalPlaylistViewModel: XCTestCase {
         vm.decideWithoutPlayback(.remove)   // U Can't Touch This — remove
 
         vm.createRemovalPlaylist()
-        try? await Task.sleep(for: .milliseconds(100))
+        // Allow the unstructured Task inside createRemovalPlaylist
+        // enough time to complete the async error path.
+        for _ in 0..<20 {
+            try? await Task.sleep(for: .milliseconds(100))
+            if vm.removalPlaylistError != nil { break }
+        }
 
         XCTAssertFalse(vm.removalPlaylistCreated)
         XCTAssertNotNil(vm.removalPlaylistError)

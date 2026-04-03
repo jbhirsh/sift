@@ -11,94 +11,73 @@ final class TestContentView: XCTestCase {
         super.tearDown()
     }
 
-    func testRendersSetupPhase() {
-        let vm = SiftViewModel(playlistService: MockPlaylistService())
-        // default phase is .setup
-
+    private func render(vm: SiftViewModel) -> UIView {
         let controller = UIHostingController(rootView: ContentView().environmentObject(vm))
         controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
         let window = UIWindow(frame: controller.view.frame)
         window.rootViewController = controller
         window.makeKeyAndVisible()
-        RunLoop.current.run(until: Date())
-        XCTAssertNotNil(controller.view)
+        controller.view.layoutIfNeeded()
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.05))
+        return controller.view
     }
 
-    func testRendersLoadingPhase() {
+    // MARK: - Settings button visibility per phase
+
+    func testSettingsButtonHiddenDuringSetup() {
+        let vm = SiftViewModel(playlistService: MockPlaylistService())
+        let view = render(vm: vm)
+        XCTAssertTrue(accessibilityElementAbsent(label: "gearshape", in: view),
+                      "Settings button should NOT be visible during setup phase")
+    }
+
+    func testSettingsButtonVisibleDuringLoading() {
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.phase = .loading
-        vm.loadProgress = 0.5
-        vm.loadMessage = "Loading library…"
-
-        let controller = UIHostingController(rootView: ContentView().environmentObject(vm))
-        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
-        let window = UIWindow(frame: controller.view.frame)
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
-        RunLoop.current.run(until: Date())
-        XCTAssertNotNil(controller.view)
+        let view = render(vm: vm)
+        XCTAssertTrue(findAccessibilityElement(label: "gearshape", in: view),
+                      "Settings button should be visible during loading phase")
     }
 
-    func testRendersSiftingPhase() {
-        // loadTracks sets phase to .sifting
+    func testSettingsButtonVisibleDuringSifting() {
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
-            Track(id: "allTimelow-jon-bellion", name: "All Time Low", artist: "Jon Bellion",
-                  album: "The Definition", duration: 213, playCount: 47,
-                  dateAdded: Date(timeIntervalSince1970: 1_470_000_000)),
-            Track(id: "sweet-but-psycho-ava-max", name: "Sweet But Psycho", artist: "Ava Max",
-                  album: "Heaven & Hell", duration: 196, playCount: 23,
-                  dateAdded: Date(timeIntervalSince1970: 1_540_000_000))
+            Track(id: "t1", name: "Song", artist: "Artist",
+                  album: "Album", duration: 200, playCount: 5,
+                  dateAdded: Date(timeIntervalSince1970: 1_500_000_000))
         ])
-
-        let controller = UIHostingController(rootView: ContentView().environmentObject(vm))
-        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
-        let window = UIWindow(frame: controller.view.frame)
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
-        RunLoop.current.run(until: Date())
-        XCTAssertNotNil(controller.view)
+        let view = render(vm: vm)
+        XCTAssertTrue(findAccessibilityElement(label: "gearshape", in: view),
+                      "Settings button should be visible during sifting phase")
     }
 
-    func testRendersDonePhase() {
-        // Deciding on the only track exhausts the library — phase becomes .done
+    func testSettingsButtonVisibleWhenDone() {
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
-            Track(id: "allTimelow-jon-bellion", name: "All Time Low", artist: "Jon Bellion",
-                  album: "The Definition", duration: 213, playCount: 47,
-                  dateAdded: Date(timeIntervalSince1970: 1_470_000_000))
+            Track(id: "t1", name: "Song", artist: "Artist",
+                  album: "Album", duration: 200, playCount: 5,
+                  dateAdded: Date(timeIntervalSince1970: 1_500_000_000))
         ])
         vm.decideWithoutPlayback(.keep)
-
-        let controller = UIHostingController(rootView: ContentView().environmentObject(vm))
-        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
-        let window = UIWindow(frame: controller.view.frame)
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
-        RunLoop.current.run(until: Date())
-        XCTAssertNotNil(controller.view)
+        let view = render(vm: vm)
+        XCTAssertTrue(findAccessibilityElement(label: "gearshape", in: view),
+                      "Settings button should be visible on done screen")
     }
 
-    func testRendersPausedPhase() {
+    func testSettingsButtonVisibleWhenPaused() {
         let vm = SiftViewModel(playlistService: MockPlaylistService())
         vm.loadTracks([
-            Track(id: "allTimelow-jon-bellion", name: "All Time Low", artist: "Jon Bellion",
-                  album: "The Definition", duration: 213, playCount: 47,
-                  dateAdded: Date(timeIntervalSince1970: 1_470_000_000)),
-            Track(id: "sweet-but-psycho-ava-max", name: "Sweet But Psycho", artist: "Ava Max",
-                  album: "Heaven & Hell", duration: 196, playCount: 23,
-                  dateAdded: Date(timeIntervalSince1970: 1_540_000_000))
+            Track(id: "t1", name: "Song", artist: "Artist",
+                  album: "Album", duration: 200, playCount: 5,
+                  dateAdded: Date(timeIntervalSince1970: 1_500_000_000)),
+            Track(id: "t2", name: "Song2", artist: "Artist",
+                  album: "Album", duration: 200, playCount: 5,
+                  dateAdded: Date(timeIntervalSince1970: 1_500_000_000))
         ])
-        vm.decideWithoutPlayback(.keep)     // All Time Low — keep
-        vm.stopSession()                    // phase becomes .paused
-
-        let controller = UIHostingController(rootView: ContentView().environmentObject(vm))
-        controller.view.frame = CGRect(x: 0, y: 0, width: 393, height: 852)
-        let window = UIWindow(frame: controller.view.frame)
-        window.rootViewController = controller
-        window.makeKeyAndVisible()
-        RunLoop.current.run(until: Date())
-        XCTAssertNotNil(controller.view)
+        vm.decideWithoutPlayback(.keep)
+        vm.stopSession()
+        let view = render(vm: vm)
+        XCTAssertTrue(findAccessibilityElement(label: "gearshape", in: view),
+                      "Settings button should be visible on paused screen")
     }
-
 }
