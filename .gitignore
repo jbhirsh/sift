@@ -1,4 +1,5 @@
 # Node / React Native
+!package-lock.json
 node_modules/
 .expo/
 ios/

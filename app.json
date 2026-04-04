@@ -21,6 +21,7 @@
       }
     },
     "plugins": [
+      "expo-dev-client",
       "expo-audio",
       "expo-image",
       "expo-secure-store",
