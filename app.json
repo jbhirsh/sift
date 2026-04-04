@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "Sift",
+    "slug": "sift-i1bgkl6kqg81gghgshzcr",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jessicahirsh.sift",
+      "infoPlist": {
+        "NSAppleMusicUsageDescription": "Sift needs access to your Music library to help you review and organize your tracks.",
+        "UISupportsDocumentBrowser": false
+      }
+    },
+    "plugins": [
+      "expo-audio",
+      "expo-image",
+      "expo-secure-store",
+      "expo-web-browser"
+    ],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "73ef36df-9686-4e09-b562-8012148bc937"
+      }
+    },
+    "owner": "jbhirshs-organization",
+    "android": {
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ],
+      "package": "com.jessicahirsh.sift"
+    }
+  }
+}

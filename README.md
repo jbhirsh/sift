@@ -1,62 +1,58 @@
 # Sift
 
-An iOS app for rapidly culling your Apple Music library. Tap through tracks and decide: **Keep**, **Skip**, or **Remove**. When you're done, all tracks marked for removal are collected into a "Sift — To Remove" playlist for easy cleanup.
+A React Native (Expo) app for rapidly culling your music library. Swipe through tracks and decide: **Keep**, **Skip**, or **Remove**. Supports Apple Music and Spotify.
 
 ---
 
 ## Requirements
 
-- iOS 17.0+ (iPhone or iPad)
-- Xcode 26+
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
-- [SwiftLint](https://github.com/realm/SwiftLint): `brew install swiftlint`
+- Node.js 22+
+- [Expo CLI](https://docs.expo.dev/get-started/set-up-your-environment/): `npm install -g expo-cli`
+- iOS: Xcode 26+ (for native builds)
 
 ---
 
 ## Setup
 
 ```bash
-make generate   # regenerate Sift.xcodeproj from project.yml
-open Sift.xcodeproj
+npm install
+npx expo run:ios       # first build (compiles native modules)
+npx expo start         # subsequent launches
 ```
-
-After opening in Xcode, enable automatic signing:
-- Select the **Sift** target → Signing & Capabilities → check "Automatically manage signing"
-
-Build and run with **⌘R** targeting an iPhone simulator or device.
 
 ---
 
 ## Running Tests
 
 ```bash
-make test        # unit tests only
-make test-ui     # UI tests only
-make test-all    # unit then UI
+make test              # unit tests (Jest)
+make lint              # ESLint
+make typecheck         # TypeScript type checking
+make check             # all three
 ```
-
-When launched with the `--ui-testing` argument, the app skips Music authorization and loads mock tracks directly — no Apple Music account or network access needed.
 
 ---
 
 ## Architecture
 
 ```
-Sift/
-  App/            — SiftApp entry point
-  Views/          — SwiftUI views (ContentView, SiftView, DoneView, …)
-  ViewModels/     — SiftViewModel (main state machine, @MainActor)
-  Services/       — MusicService (actor), PlaylistService, SessionStore
-  Models/         — Track, Section, Decision, SiftSession, SortOrder
-  Resources/      — Info.plist, entitlements, assets
-SiftTests/        — XCTest unit tests
-SiftUITests/      — XCUITest UI tests
-project.yml       — XcodeGen project definition (source of truth)
+src/
+  App.tsx               Phase router + settings modal
+  components/           Reusable UI (GlassCard, InteractiveCard, PlayerControls, …)
+  screens/              SetupScreen, LoadingScreen, SiftScreen, DoneScreen, SettingsScreen
+  context/              SiftContext (useReducer state management)
+  services/             Music provider implementations, SessionStore
+  hooks/                Custom hooks (useKeyboardShortcuts, useMusicProvider)
+  theme/                Design tokens, ThemeContext
+  types/                TypeScript type definitions
+  utils/                Helpers (formatTime, sorting, mockData)
+modules/
+  expo-musickit/        Custom Expo native module for MusicKit
+__tests__/              Jest unit + E2E tests
 ```
 
 ---
 
 ## CI/CD
 
-CI runs on every PR and push to main: lint → unit tests → UI tests.
-Deploys to the App Store via Fastlane on `v*` tag push.
+CI runs lint, typecheck, and unit tests on every PR. All changes reach main via PR.
