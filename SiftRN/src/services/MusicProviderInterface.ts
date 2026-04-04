@@ -1,0 +1,37 @@
+import { Track } from '../types';
+
+/**
+ * Abstract interface for music provider services.
+ *
+ * Both Apple Music (via native MusicKit module) and Spotify (via Web API)
+ * implement this interface so the UI layer doesn't need to know which
+ * provider is active.
+ */
+export interface MusicProviderService {
+  /** Request authorization from the user. Returns true if granted. */
+  requestAuthorization(): Promise<boolean>;
+
+  /** Check whether the provider is currently authorized. */
+  isAuthorized(): Promise<boolean>;
+
+  /** Load the user's full music library. */
+  loadLibrary(): Promise<Track[]>;
+
+  /** Start playback of a track, optionally from a position in seconds. */
+  play(trackID: string, position?: number): Promise<void>;
+
+  /** Pause playback. */
+  pause(): Promise<void>;
+
+  /** Resume playback after a pause. */
+  resume(): Promise<void>;
+
+  /** Seek to a position in seconds within the current track. */
+  seek(position: number): void;
+
+  /** Get the current playback position and playing state. */
+  getPlaybackState(): { position: number; isPlaying: boolean };
+
+  /** Create a playlist with the given name containing the specified tracks. */
+  createPlaylist(name: string, trackIDs: string[]): Promise<void>;
+}

@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Sift",
+    "slug": "sift",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jessicahirsh.sift",
+      "infoPlist": {
+        "NSAppleMusicUsageDescription": "Sift needs access to your Music library to help you review and organize your tracks.",
+        "UISupportsDocumentBrowser": false
+      }
+    },
+    "plugins": [
+      "expo-av"
+    ],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
