@@ -1,39 +1,31 @@
-SCHEME_UNIT = SiftUnitTests
-SCHEME_ALL  = Sift
-DEST        = platform=iOS Simulator,name=iPhone 17
-SIGN_FLAGS  = CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- \
-              ENABLE_USER_SCRIPT_SANDBOXING=NO
-
-# Regenerate Sift.xcodeproj from project.yml
-generate:
-	xcodegen generate
-
-# Unit tests — override DEST for different simulators:
-#   make test DEST="platform=iOS Simulator,name=iPhone 16 Pro"
+# Run unit tests
 test:
-	rm -rf UnitTestResults.xcresult
-	xcodebuild test \
-	  -project Sift.xcodeproj \
-	  -scheme $(SCHEME_UNIT) \
-	  -destination "$(DEST)" \
-	  -resultBundlePath UnitTestResults.xcresult \
-	  -enableCodeCoverage YES \
-	  $(SIGN_FLAGS) \
-	  | xcbeautify
+	npx jest
 
-# UI tests — full interaction flow on the simulator
-test-ui:
-	rm -rf IntegTestResults.xcresult
-	xcodebuild test \
-	  -project Sift.xcodeproj \
-	  -scheme $(SCHEME_ALL) \
-	  -only-testing:SiftUITests/SiftUITests \
-	  -destination "$(DEST)" \
-	  -resultBundlePath IntegTestResults.xcresult \
-	  $(SIGN_FLAGS) \
-	  | xcbeautify
+# Run unit tests in watch mode
+test-watch:
+	npx jest --watch
 
-# All tests: unit then UI
-test-all: test test-ui
+# Run E2E tests (placeholder — will use Maestro later)
+test-e2e:
+	@echo "E2E tests not yet configured (Maestro)"
 
-.PHONY: generate test test-ui test-all
+# All tests
+test-all: test test-e2e
+
+# Lint
+lint:
+	npx eslint src/ __tests__/
+
+# Type check
+typecheck:
+	npx tsc --noEmit
+
+# Build iOS dev client
+build-ios:
+	npx expo run:ios
+
+# Check everything (lint + types + tests)
+check: lint typecheck test
+
+.PHONY: test test-watch test-e2e test-all lint typecheck build-ios check
