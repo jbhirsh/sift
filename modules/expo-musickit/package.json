@@ -1,0 +1,9 @@
+{
+  "name": "expo-musickit",
+  "version": "0.1.0",
+  "main": "src/index.ts",
+  "keywords": ["react-native", "expo"],
+  "peerDependencies": {
+    "expo": "*"
+  }
+}
