@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react-native';
 import * as AuthSession from 'expo-auth-session';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
@@ -111,6 +112,7 @@ export async function refreshTokenIfNeeded(): Promise<void> {
   });
 
   if (!response.ok) {
+    Sentry.addBreadcrumb({ category: 'spotify-auth', message: `Token refresh failed: ${response.status}`, level: 'warning' });
     // Refresh failed — force re-auth on next action
     await logout();
     return;
@@ -181,7 +183,8 @@ export async function authorize(): Promise<boolean> {
     const data = await response.json();
     await storeTokens(data);
     return true;
-  } catch {
+  } catch (err) {
+    Sentry.captureException(err, { tags: { flow: 'spotify-authorize' } });
     return false;
   }
 }

@@ -66,7 +66,8 @@ export function useMusicProvider() {
         status: granted ? 'connected' : 'disconnected',
       });
       return granted;
-    } catch {
+    } catch (err) {
+      Sentry.captureException(err, { tags: { flow: 'authorize' } });
       dispatch({ type: 'SET_CONNECTION_STATUS', status: 'disconnected' });
       return false;
     }
@@ -99,8 +100,8 @@ export function useMusicProvider() {
         await providerRef.current.play(trackID, position);
         dispatch({ type: 'SET_IS_PLAYING', isPlaying: true });
         dispatch({ type: 'SET_PLAYBACK_POSITION', position: position ?? 0 });
-      } catch {
-        // Playback failure is non-fatal; UI stays in current state
+      } catch (err) {
+        Sentry.addBreadcrumb({ category: 'playback', message: `Play failed: ${err}`, level: 'warning' });
       }
     },
     [dispatch]
@@ -110,8 +111,8 @@ export function useMusicProvider() {
     try {
       await providerRef.current.pause();
       dispatch({ type: 'SET_IS_PLAYING', isPlaying: false });
-    } catch {
-      // Non-fatal
+    } catch (err) {
+      Sentry.addBreadcrumb({ category: 'playback', message: `Pause failed: ${err}`, level: 'warning' });
     }
   }, [dispatch]);
 
@@ -119,8 +120,8 @@ export function useMusicProvider() {
     try {
       await providerRef.current.resume();
       dispatch({ type: 'SET_IS_PLAYING', isPlaying: true });
-    } catch {
-      // Non-fatal
+    } catch (err) {
+      Sentry.addBreadcrumb({ category: 'playback', message: `Resume failed: ${err}`, level: 'warning' });
     }
   }, [dispatch]);
 
@@ -164,6 +165,7 @@ export function useMusicProvider() {
         await providerRef.current.createPlaylist(name, trackIDs);
         dispatch({ type: 'SET_PLAYLIST_CREATED', created: true });
       } catch (err) {
+        Sentry.captureException(err, { tags: { flow: 'create-playlist' } });
         const message = err instanceof Error ? err.message : 'Failed to create playlist';
         dispatch({ type: 'SET_PLAYLIST_ERROR', error: message });
       } finally {
