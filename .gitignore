@@ -40,3 +40,5 @@ fastlane/README.md
 *.p8
 *.mobileprovision
 *.provisionprofile
+
+.env.local

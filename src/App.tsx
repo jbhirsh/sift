@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 import { SymbolView } from 'expo-symbols';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +18,17 @@ import LoadingScreen from './screens/LoadingScreen';
 import SiftScreen from './screens/SiftScreen';
 import DoneScreen from './screens/DoneScreen';
 import SettingsScreen from './screens/SettingsScreen';
+
+Sentry.init({
+  dsn: 'https://34686f32423b6ac06bd69e774107cab0@o4511157588918272.ingest.us.sentry.io/4511164573548544',
+  sendDefaultPii: true,
+  tracesSampleRate: 1.0,
+  enableLogs: true,
+  profilesSampleRate: 1.0,
+  replaysOnErrorSampleRate: 1.0,
+  replaysSessionSampleRate: 0.1,
+  integrations: [Sentry.mobileReplayIntegration()],
+});
 
 function PhaseRouter() {
   const { state } = useSift();
@@ -72,7 +84,7 @@ function PhaseRouter() {
   );
 }
 
-export default function App() {
+function App() {
   return (
     <GestureHandlerRootView style={styles.container}>
       <SafeAreaProvider>
@@ -85,6 +97,8 @@ export default function App() {
     </GestureHandlerRootView>
   );
 }
+
+export default Sentry.wrap(App);
 
 const styles = StyleSheet.create({
   container: {
