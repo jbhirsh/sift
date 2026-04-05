@@ -12,7 +12,8 @@
     "test:coverage": "jest --coverage",
     "lint": "eslint src/ __tests__/",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck && npm run test"
+    "check": "npm run lint && npm run typecheck && npm run test",
+    "eas-build-post-install": "echo '=== DEBUG: modules dir ===' && ls -la modules/ && ls -la modules/expo-musickit/ && ls -la modules/expo-musickit/ios/ && echo '=== DEBUG: node_modules/expo-musickit ===' && ls -la node_modules/expo-musickit/ 2>&1 && ls -la node_modules/expo-musickit/ios/ 2>&1 && echo '=== DEBUG: autolinking ===' && npx expo-modules-autolinking resolve --platform ios --json 2>&1 | node -e \"process.stdin.on('data',d=>{try{const m=JSON.parse(d).modules;console.log(m.map(x=>x.packageName).filter(n=>n.includes('music')))}catch(e){console.log('parse error',e.message)}})\""
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
