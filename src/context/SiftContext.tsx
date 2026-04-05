@@ -9,7 +9,6 @@ import {
   ConnectionStatus,
   SiftSession,
 } from '../types';
-import { MOCK_TRACKS } from '../utils/mockData';
 import { saveSession, loadSession, clearSession, hasSession } from '../services/SessionStore';
 
 // ── State ──────────────────────────────────────────────
@@ -304,8 +303,7 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     Sentry.addBreadcrumb({ category: 'user-action', message: 'Started fresh session', level: 'info' });
     clearSession().then(() => {
       dispatch({ type: 'SET_HAS_SAVED_SESSION', has: false });
-      // For now, load mock data. Will be replaced with real MusicKit calls.
-      dispatch({ type: 'LOAD_TRACKS', tracks: MOCK_TRACKS });
+      dispatch({ type: 'START_FRESH' });
     });
   }, [dispatch]);
 

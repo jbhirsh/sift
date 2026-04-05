@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,22 @@ import {
 } from 'react-native';
 import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
+import { useMusicProvider } from '../hooks/useMusicProvider';
 import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
 
 export default function LoadingScreen() {
   const { state } = useSift();
   const { colors } = useTheme();
+  const { loadLibrary } = useMusicProvider();
+  const loadedRef = useRef(false);
+
+  useEffect(() => {
+    if (!loadedRef.current) {
+      loadedRef.current = true;
+      loadLibrary();
+    }
+  }, [loadLibrary]);
 
   return (
     <View style={styles.container}>

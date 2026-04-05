@@ -27,7 +27,10 @@ Sentry.init({
   profilesSampleRate: 1.0,
   replaysOnErrorSampleRate: 1.0,
   replaysSessionSampleRate: 0.1,
-  integrations: [Sentry.mobileReplayIntegration()],
+  integrations: [
+    Sentry.reactNativeTracingIntegration(),
+    Sentry.mobileReplayIntegration(),
+  ],
 });
 
 function PhaseRouter() {
