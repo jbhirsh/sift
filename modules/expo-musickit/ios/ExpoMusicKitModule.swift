@@ -5,6 +5,8 @@ public class ExpoMusicKitModule: Module {
   /// Cached Song objects keyed by MusicItemID raw value.
   /// Populated by loadLibrary/loadFullLibrary and used for playback lookups.
   private var songCache: [String: Song] = [:]
+  /// Resolved artwork file paths keyed by track ID.
+  private var artworkCache: [String: String] = [:]
 
   private let dateFormatter: ISO8601DateFormatter = {
     let formatter = ISO8601DateFormatter()
@@ -172,6 +174,44 @@ public class ExpoMusicKitModule: Module {
         items: songs
       )
     }
+
+    // MARK: - Artwork Resolution
+
+    AsyncFunction("resolveArtworkURL") { (trackID: String, width: Int, height: Int) -> String? in
+      // Return cached result immediately
+      if let cached = self.artworkCache[trackID] {
+        return cached
+      }
+
+      guard let song = self.songCache[trackID] else {
+        return nil
+      }
+
+      guard let artwork = song.artwork,
+            let url = artwork.url(width: width, height: height) else {
+        return nil
+      }
+
+      // HTTP URLs can be used directly by React Native
+      if url.scheme == "https" || url.scheme == "http" {
+        let urlString = url.absoluteString
+        self.artworkCache[trackID] = urlString
+        return urlString
+      }
+
+      // For musicKit:// and other non-HTTP schemes, load natively and save to cache dir
+      do {
+        let data = try Data(contentsOf: url)
+        let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
+        let fileURL = cacheDir.appendingPathComponent("artwork-\(trackID).jpg")
+        try data.write(to: fileURL)
+        let filePath = fileURL.absoluteString
+        self.artworkCache[trackID] = filePath
+        return filePath
+      } catch {
+        return nil
+      }
+    }
   }
 
   // MARK: - Helpers
@@ -192,7 +232,8 @@ public class ExpoMusicKitModule: Module {
       dict["dateAdded"] = ""
     }
 
-    if let artwork = song.artwork, let url = artwork.url(width: 600, height: 600) {
+    if let artwork = song.artwork, let url = artwork.url(width: 600, height: 600),
+       url.scheme == "https" || url.scheme == "http" {
       dict["artworkURL"] = url.absoluteString
     } else {
       dict["artworkURL"] = NSNull()

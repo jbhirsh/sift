@@ -43,4 +43,8 @@ export async function createPlaylist(name: string, trackIDs: string[]): Promise<
   return ExpoMusicKit.createPlaylist(name, trackIDs);
 }
 
+export async function resolveArtworkURL(trackID: string, width: number, height: number): Promise<string | null> {
+  return ExpoMusicKit.resolveArtworkURL(trackID, width, height);
+}
+
 export type { MusicKitTrack, PlaybackState };

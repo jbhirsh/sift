@@ -2,9 +2,9 @@ import React from 'react';
 import {
   View,
   Text,
-  Image,
   StyleSheet,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
@@ -20,6 +20,7 @@ import { SymbolView } from 'expo-symbols';
 import { Track, Decision } from '../types';
 import { RADIUS } from '../theme';
 import { useTheme } from '../theme/ThemeContext';
+import { useResolvedArtwork } from '../hooks/useResolvedArtwork';
 
 const DRAG_THRESHOLD = 80;
 
@@ -35,6 +36,7 @@ export default function InteractiveCard({
   programmaticOffset,
 }: InteractiveCardProps) {
   const { colors, isDark } = useTheme();
+  const resolvedArtworkURL = useResolvedArtwork(track.id, track.artworkURL);
   const dragX = useSharedValue(0);
   const dragY = useSharedValue(0);
 
@@ -97,11 +99,12 @@ export default function InteractiveCard({
         <View style={styles.card}>
           {/* Artwork fills entire card */}
           <View style={styles.artworkContainer}>
-            {track.artworkURL ? (
+            {resolvedArtworkURL ? (
               <Image
-                source={{ uri: track.artworkURL }}
+                source={resolvedArtworkURL}
                 style={styles.artwork}
-                resizeMode="cover"
+                contentFit="cover"
+                transition={200}
               />
             ) : (
               <LinearGradient
