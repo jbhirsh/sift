@@ -2,6 +2,7 @@
   "expo": {
     "name": "Sift",
     "slug": "sift-i1bgkl6kqg81gghgshzcr",
+    "scheme": "sift",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -17,7 +18,8 @@
       "bundleIdentifier": "com.jessicahirsh.sift",
       "infoPlist": {
         "NSAppleMusicUsageDescription": "Sift needs access to your Music library to help you review and organize your tracks.",
-        "UISupportsDocumentBrowser": false
+        "UISupportsDocumentBrowser": false,
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "plugins": [
