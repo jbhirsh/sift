@@ -1,6 +1,7 @@
 {
   "platforms": ["ios"],
   "ios": {
-    "modules": ["ExpoMusicKitModule"]
+    "modules": ["ExpoMusicKitModule"],
+    "podspecPath": "./ios/ExpoMusicKit.podspec"
   }
 }
