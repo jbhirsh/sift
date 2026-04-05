@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { Alert, Linking } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { useSift } from '../context/SiftContext';
 import { createMusicProvider, MusicProviderService } from '../services';
@@ -78,6 +79,24 @@ export function useMusicProvider() {
     dispatch({ type: 'SET_PHASE', phase: 'loading' });
 
     try {
+      // Check authorization before loading
+      const isAuth = await providerRef.current.isAuthorized();
+      if (!isAuth) {
+        const granted = await providerRef.current.requestAuthorization();
+        if (!granted) {
+          dispatch({ type: 'SET_LOAD_ERROR', error: 'Music library access is required to use Sift.' });
+          Alert.alert(
+            'Music Access Required',
+            'Sift needs access to your music library. Please enable it in Settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() },
+            ],
+          );
+          return;
+        }
+      }
+
       dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0.3, message: 'Fetching tracks\u2026' });
       const tracks = await providerRef.current.loadLibrary();
       Sentry.addBreadcrumb({
