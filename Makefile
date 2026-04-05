@@ -25,7 +25,11 @@ typecheck:
 build-ios:
 	npx expo run:ios
 
-# Check everything (lint + types + tests)
-check: lint typecheck test
+# Expo doctor
+doctor:
+	npx expo-doctor@latest
 
-.PHONY: test test-watch test-e2e test-all lint typecheck build-ios check
+# Check everything (lint + types + tests + expo doctor)
+check: lint typecheck test doctor
+
+.PHONY: test test-watch test-e2e test-all lint typecheck build-ios check doctor
