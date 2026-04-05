@@ -25,7 +25,6 @@
     "expo-blur": "^55.0.12",
     "expo-crypto": "~55.0.12",
     "expo-dev-client": "~55.0.22",
-    "expo-musickit": "file:modules/expo-musickit",
     "expo-font": "~55.0.6",
     "expo-image": "~55.0.8",
     "expo-linear-gradient": "^55.0.11",
