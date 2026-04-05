@@ -12,8 +12,7 @@
     "test:coverage": "jest --coverage",
     "lint": "eslint src/ __tests__/",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck && npm run test",
-    "eas-build-post-install": "echo '=== DEBUG: modules dir ===' && ls -la modules/ && ls -la modules/expo-musickit/ && ls -la modules/expo-musickit/ios/ && echo '=== DEBUG: node_modules/expo-musickit ===' && ls -la node_modules/expo-musickit/ 2>&1 && ls -la node_modules/expo-musickit/ios/ 2>&1 && echo '=== DEBUG: autolinking ===' && npx expo-modules-autolinking resolve --platform ios --json 2>&1 | node -e \"process.stdin.on('data',d=>{try{const m=JSON.parse(d).modules;console.log(m.map(x=>x.packageName).filter(n=>n.includes('music')))}catch(e){console.log('parse error',e.message)}})\""
+    "check": "npm run lint && npm run typecheck && npm run test"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
@@ -24,12 +23,13 @@
     "expo-audio": "~55.0.11",
     "expo-auth-session": "~55.0.12",
     "expo-blur": "^55.0.12",
+    "expo-build-properties": "^55.0.11",
     "expo-crypto": "~55.0.12",
     "expo-dev-client": "~55.0.22",
-    "expo-musickit": "file:modules/expo-musickit",
     "expo-font": "~55.0.6",
     "expo-image": "~55.0.8",
     "expo-linear-gradient": "^55.0.11",
+    "expo-musickit": "file:modules/expo-musickit",
     "expo-secure-store": "~55.0.11",
     "expo-status-bar": "~55.0.5",
     "expo-symbols": "~55.0.7",
