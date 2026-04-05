@@ -12,10 +12,7 @@
     "test:coverage": "jest --coverage",
     "lint": "eslint src/ __tests__/",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck && npm run test",
-    "eas-build-on-error": "sentry-eas-build-on-error",
-    "eas-build-on-success": "sentry-eas-build-on-success",
-    "eas-build-on-complete": "sentry-eas-build-on-complete"
+    "check": "npm run lint && npm run typecheck && npm run test"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
