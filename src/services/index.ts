@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react-native';
 import type { MusicProviderService } from './MusicProviderInterface';
 import type { MusicProvider } from '../types';
 import { MockMusicProvider } from './MockMusicProvider';
@@ -8,8 +9,8 @@ import { SpotifyProvider } from './SpotifyProvider';
  * provider type.
  *
  * Returns SpotifyProvider for 'spotify' (preview playback via expo-audio).
- * Apple Music still uses MockMusicProvider until the native MusicKit module
- * is linked via EAS Build.
+ * For Apple Music, attempts to load the native MusicKit module and falls
+ * back to MockMusicProvider if the native module is unavailable (e.g. Expo Go).
  */
 export function createMusicProvider(provider: MusicProvider): MusicProviderService {
   switch (provider) {
@@ -17,8 +18,26 @@ export function createMusicProvider(provider: MusicProvider): MusicProviderServi
       return new SpotifyProvider();
     case 'apple-music':
     default:
-      // MockMusicProvider until native module is linked
-      return new MockMusicProvider();
+      try {
+        // AppleMusicProvider loads the native MusicKit module and throws
+        // if it's unavailable (Expo Go, Android, web).
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { AppleMusicProvider } = require('./AppleMusicProvider');
+        const instance = new AppleMusicProvider();
+        Sentry.addBreadcrumb({
+          category: 'music-provider',
+          message: 'Loaded native AppleMusicProvider',
+          level: 'info',
+        });
+        return instance;
+      } catch (err) {
+        Sentry.addBreadcrumb({
+          category: 'music-provider',
+          message: `Native AppleMusicProvider unavailable, using mock: ${err}`,
+          level: 'warning',
+        });
+        return new MockMusicProvider();
+      }
   }
 }
 

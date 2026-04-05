@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
+import * as Sentry from '@sentry/react-native';
 import { useSift } from '../context/SiftContext';
 import { createMusicProvider, MusicProviderService } from '../services';
 
@@ -78,9 +79,15 @@ export function useMusicProvider() {
     try {
       dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0.3, message: 'Fetching tracks\u2026' });
       const tracks = await providerRef.current.loadLibrary();
+      Sentry.addBreadcrumb({
+        category: 'music-provider',
+        message: `Loaded ${tracks.length} tracks from library`,
+        level: 'info',
+      });
       dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0.9, message: 'Sorting tracks\u2026' });
       dispatch({ type: 'LOAD_TRACKS', tracks });
     } catch (err) {
+      Sentry.captureException(err, { tags: { flow: 'load-library' } });
       const message = err instanceof Error ? err.message : 'Failed to load library';
       dispatch({ type: 'SET_LOAD_ERROR', error: message });
     }

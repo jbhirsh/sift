@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 import { SymbolView } from 'expo-symbols';
 import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
@@ -188,6 +189,15 @@ export default function SetupScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {/* TODO: Remove after verifying Sentry */}
+        <TouchableOpacity
+          style={[styles.primaryButton, { backgroundColor: '#FF3B30', marginTop: 12 }]}
+          onPress={() => Sentry.captureException(new Error('Sentry test error'))}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.primaryButtonText}>Test Sentry</Text>
+        </TouchableOpacity>
 
         <View style={{ flex: 1 }} />
       </View>
