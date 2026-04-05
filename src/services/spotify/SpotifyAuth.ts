@@ -13,7 +13,7 @@ WebBrowser.maybeCompleteAuthSession();
 
 const CLIENT_ID = '016e974fdcad481e9977a4fc59e2df5c';
 const REDIRECT_URI = AuthSession.makeRedirectUri({
-  scheme: 'sift-music',
+  scheme: 'sift',
   path: 'spotify-callback',
 });
 const SCOPES = 'user-library-read playlist-modify-public playlist-modify-private';
