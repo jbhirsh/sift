@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useReducer, useMemo, useCallback, useEffect, ReactNode } from 'react';
+import * as Sentry from '@sentry/react-native';
 import {
   Track,
   Decision,
@@ -226,6 +227,20 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     });
   }, []);
 
+  // Keep Sentry context in sync with app state
+  useEffect(() => {
+    Sentry.setTag('provider', state.provider);
+    Sentry.setTag('phase', state.phase);
+    Sentry.setContext('sift_session', {
+      trackCount: state.tracks.length,
+      cursor: state.cursor,
+      kept: state.kept.length,
+      removed: state.removed.length,
+      skipped: state.skipped.length,
+      sortOrder: state.sortOrder,
+    });
+  }, [state.phase, state.provider, state.cursor, state.tracks.length, state.kept.length, state.removed.length, state.skipped.length, state.sortOrder]);
+
   // Auto-save session after every decision (when sifting state changes)
   useEffect(() => {
     if (state.phase !== 'sifting' && state.phase !== 'paused' && state.phase !== 'done') return;
@@ -252,12 +267,19 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
 
   const decide = useCallback(
     (decision: Decision) => {
+      const track = state.tracks[state.cursor];
+      Sentry.addBreadcrumb({
+        category: 'user-action',
+        message: `Decision: ${decision} on "${track?.name ?? 'unknown'}"`,
+        level: 'info',
+      });
       dispatch({ type: 'DECIDE', decision });
     },
-    [dispatch]
+    [dispatch, state.tracks, state.cursor]
   );
 
   const stopSession = useCallback(() => {
+    Sentry.addBreadcrumb({ category: 'user-action', message: 'Session stopped', level: 'info' });
     const session: SiftSession = {
       tracks: state.tracks,
       cursor: state.cursor,
@@ -274,10 +296,12 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
   }, [dispatch, state.tracks, state.cursor, state.kept, state.removed, state.skipped, state.sortOrder, state.provider]);
 
   const resumeFromPause = useCallback(() => {
+    Sentry.addBreadcrumb({ category: 'user-action', message: 'Session resumed from pause', level: 'info' });
     dispatch({ type: 'SET_PHASE', phase: 'sifting' });
   }, [dispatch]);
 
   const startFresh = useCallback(() => {
+    Sentry.addBreadcrumb({ category: 'user-action', message: 'Started fresh session', level: 'info' });
     clearSession().then(() => {
       dispatch({ type: 'SET_HAS_SAVED_SESSION', has: false });
       // For now, load mock data. Will be replaced with real MusicKit calls.
@@ -286,6 +310,7 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
   }, [dispatch]);
 
   const resumeSession = useCallback(() => {
+    Sentry.addBreadcrumb({ category: 'user-action', message: 'Resumed saved session', level: 'info' });
     loadSession().then((session) => {
       if (session) {
         dispatch({
