@@ -22,9 +22,9 @@ import SettingsScreen from './screens/SettingsScreen';
 Sentry.init({
   dsn: 'https://34686f32423b6ac06bd69e774107cab0@o4511157588918272.ingest.us.sentry.io/4511164573548544',
   sendDefaultPii: true,
-  tracesSampleRate: 1.0,
+  tracesSampleRate: 0.2,
   enableLogs: true,
-  profilesSampleRate: 1.0,
+  profilesSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
   replaysSessionSampleRate: 0.1,
   integrations: [
