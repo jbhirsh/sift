@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AuthRequest } from 'expo-auth-session';
 import {
   isAuthenticated,
   getAccessToken,
@@ -211,10 +212,10 @@ describe('refreshTokenIfNeeded', () => {
 });
 
 describe('authorize', () => {
-  const { AuthRequest } = require('expo-auth-session');
+  const MockAuthRequest = jest.mocked(AuthRequest);
 
   test('returns false when user cancels', async () => {
-    AuthRequest.mockImplementation(() => ({
+    MockAuthRequest.mockImplementation(() => ({
       promptAsync: jest.fn().mockResolvedValue({ type: 'cancel' }),
     }));
 
@@ -223,7 +224,7 @@ describe('authorize', () => {
   });
 
   test('returns true on successful authorization', async () => {
-    AuthRequest.mockImplementation(() => ({
+    MockAuthRequest.mockImplementation(() => ({
       promptAsync: jest.fn().mockResolvedValue({
         type: 'success',
         params: { code: 'auth-code' },
@@ -246,7 +247,7 @@ describe('authorize', () => {
   });
 
   test('returns false when token exchange fails', async () => {
-    AuthRequest.mockImplementation(() => ({
+    MockAuthRequest.mockImplementation(() => ({
       promptAsync: jest.fn().mockResolvedValue({
         type: 'success',
         params: { code: 'auth-code' },
@@ -260,7 +261,7 @@ describe('authorize', () => {
   });
 
   test('returns false on exception', async () => {
-    AuthRequest.mockImplementation(() => ({
+    MockAuthRequest.mockImplementation(() => ({
       promptAsync: jest.fn().mockRejectedValue(new Error('network error')),
     }));
 

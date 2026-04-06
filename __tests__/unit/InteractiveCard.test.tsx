@@ -12,45 +12,40 @@ jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 jest.mock('expo-symbols', () => ({ SymbolView: 'SymbolView' }));
 jest.mock('expo-image', () => ({ Image: 'Image' }));
 
-jest.mock('react-native-reanimated', () => {
-  const View = require('react-native').View;
-  return {
-    __esModule: true,
-    default: {
-      View,
-      createAnimatedComponent: (comp: unknown) => comp,
-    },
-    useSharedValue: (val: number) => ({ value: val }),
-    useAnimatedStyle: (fn: () => unknown) => fn(),
-    withSpring: (val: number) => val,
-    interpolate: (val: number, inputRange: number[], outputRange: number[]) => {
-      const ratio = (val - inputRange[0]) / (inputRange[1] - inputRange[0]);
-      return outputRange[0] + ratio * (outputRange[1] - outputRange[0]);
-    },
-    runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
-  };
-});
+jest.mock('react-native-reanimated', () => ({
+  __esModule: true,
+  default: {
+    View: 'View',
+    createAnimatedComponent: (comp: unknown) => comp,
+  },
+  useSharedValue: (val: number) => ({ value: val }),
+  useAnimatedStyle: (fn: () => unknown) => fn(),
+  withSpring: (val: number) => val,
+  interpolate: (val: number, inputRange: number[], outputRange: number[]) => {
+    const ratio = (val - inputRange[0]) / (inputRange[1] - inputRange[0]);
+    return outputRange[0] + ratio * (outputRange[1] - outputRange[0]);
+  },
+  runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
+}));
 
-jest.mock('react-native-gesture-handler', () => {
-  const View = require('react-native').View;
-  return {
-    GestureDetector: ({ children }: { children: React.ReactNode }) => children,
-    Gesture: {
-      Pan: () => ({
-        minDistance: () => ({
-          onUpdate: () => ({
-            onEnd: () => ({}),
-          }),
+jest.mock('react-native-gesture-handler', () => ({
+  GestureDetector: ({ children }: { children: React.ReactNode }) => children,
+  Gesture: {
+    Pan: () => ({
+      minDistance: () => ({
+        onUpdate: () => ({
+          onEnd: () => ({}),
         }),
       }),
-    },
-  };
-});
+    }),
+  },
+}));
 
 jest.mock('../../src/hooks/useResolvedArtwork', () => ({
   useResolvedArtwork: jest.fn().mockReturnValue('https://example.com/art.jpg'),
 }));
 
+import { useResolvedArtwork } from '../../src/hooks/useResolvedArtwork';
 import InteractiveCard from '../../src/components/InteractiveCard';
 import { ThemeProvider } from '../../src/theme/ThemeContext';
 
@@ -90,8 +85,7 @@ describe('InteractiveCard', () => {
   });
 
   test('renders placeholder when no artwork URL', () => {
-    const { useResolvedArtwork } = require('../../src/hooks/useResolvedArtwork');
-    useResolvedArtwork.mockReturnValueOnce(null);
+    jest.mocked(useResolvedArtwork).mockReturnValueOnce(null);
     const trackNoArt = { ...mockTrack, artworkURL: undefined };
     const { toJSON } = renderCard(trackNoArt);
     expect(toJSON()).toBeTruthy();

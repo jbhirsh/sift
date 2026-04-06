@@ -13,29 +13,24 @@ jest.mock('expo-symbols', () => ({ SymbolView: 'SymbolView' }));
 jest.mock('expo-image', () => ({ Image: 'Image' }));
 jest.mock('expo-status-bar', () => ({ StatusBar: 'StatusBar' }));
 
-jest.mock('react-native-reanimated', () => {
-  const View = require('react-native').View;
-  return {
-    __esModule: true,
-    default: {
-      View,
-      createAnimatedComponent: (comp: unknown) => comp,
-    },
-    useSharedValue: (val: number) => ({ value: val }),
-    useAnimatedStyle: (fn: () => unknown) => fn(),
-    withTiming: (val: number) => val,
-    withSpring: (val: number) => val,
-    Easing: { in: (e: unknown) => e, ease: {} },
-    interpolate: () => 0,
-    runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
-  };
-});
+jest.mock('react-native-reanimated', () => ({
+  __esModule: true,
+  default: {
+    View: 'View',
+    createAnimatedComponent: (comp: unknown) => comp,
+  },
+  useSharedValue: (val: number) => ({ value: val }),
+  useAnimatedStyle: (fn: () => unknown) => fn(),
+  withTiming: (val: number) => val,
+  withSpring: (val: number) => val,
+  Easing: { in: (e: unknown) => e, ease: {} },
+  interpolate: () => 0,
+  runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
+}));
 
-jest.mock('react-native-gesture-handler', () => {
-  const View = require('react-native').View;
-  return {
-    GestureHandlerRootView: View,
-    GestureDetector: ({ children }: { children: React.ReactNode }) => children,
+jest.mock('react-native-gesture-handler', () => ({
+  GestureHandlerRootView: ({ children }: { children: React.ReactNode }) => children,
+  GestureDetector: ({ children }: { children: React.ReactNode }) => children,
     Gesture: {
       Pan: () => ({
         minDistance: () => ({ onUpdate: () => ({ onEnd: () => ({}) }) }),
@@ -44,8 +39,7 @@ jest.mock('react-native-gesture-handler', () => {
       Tap: () => ({ onEnd: () => ({}) }),
       Race: () => ({}),
     },
-  };
-});
+}));
 
 jest.mock('@sentry/react-native', () => ({
   init: jest.fn(),
@@ -84,6 +78,9 @@ jest.mock('../../src/hooks/useResolvedArtwork', () => ({
 }));
 
 import App from '../../src/App';
+import { SiftProvider } from '../../src/context/SiftContext';
+import { ThemeProvider } from '../../src/theme/ThemeContext';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
 const mockFrame = { x: 0, y: 0, width: 390, height: 844 };
@@ -115,14 +112,6 @@ describe('App', () => {
   });
 
   test('shows settings button when not in setup phase', async () => {
-    // We need to use SiftProvider with initialTracks to get into sifting phase
-    const { SiftProvider } = require('../../src/context/SiftContext');
-    const { ThemeProvider } = require('../../src/theme/ThemeContext');
-    const { GestureHandlerRootView } = require('react-native-gesture-handler');
-
-    // Import PhaseRouter indirectly by using the internal structure
-    // Since App wraps everything, we test by providing initialTracks
-    // We'll render a custom setup instead
     const { getByTestId } = render(
       <SafeAreaProvider initialMetrics={{ insets: mockInsets, frame: mockFrame }}>
         <GestureHandlerRootView style={{ flex: 1 }}>

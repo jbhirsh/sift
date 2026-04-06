@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text } from 'react-native';
-import { render, fireEvent } from '@testing-library/react-native';
+import { fireEvent } from '@testing-library/react-native';
 
 jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
   __esModule: true,
@@ -12,26 +12,23 @@ jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 jest.mock('expo-symbols', () => ({ SymbolView: 'SymbolView' }));
 jest.mock('expo-image', () => ({ Image: 'Image' }));
 
-jest.mock('react-native-reanimated', () => {
-  const View = require('react-native').View;
-  return {
-    __esModule: true,
-    default: {
-      View,
-      createAnimatedComponent: (comp: unknown) => comp,
-    },
-    useSharedValue: (val: number) => ({ value: val }),
-    useAnimatedStyle: (fn: () => unknown) => fn(),
-    withTiming: (val: number) => val,
-    withSpring: (val: number) => val,
-    Easing: { in: (e: unknown) => e, ease: {} },
-    interpolate: (val: number, inputRange: number[], outputRange: number[]) => {
-      const ratio = (val - inputRange[0]) / (inputRange[1] - inputRange[0]);
-      return outputRange[0] + ratio * (outputRange[1] - outputRange[0]);
-    },
-    runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
-  };
-});
+jest.mock('react-native-reanimated', () => ({
+  __esModule: true,
+  default: {
+    View: 'View',
+    createAnimatedComponent: (comp: unknown) => comp,
+  },
+  useSharedValue: (val: number) => ({ value: val }),
+  useAnimatedStyle: (fn: () => unknown) => fn(),
+  withTiming: (val: number) => val,
+  withSpring: (val: number) => val,
+  Easing: { in: (e: unknown) => e, ease: {} },
+  interpolate: (val: number, inputRange: number[], outputRange: number[]) => {
+    const ratio = (val - inputRange[0]) / (inputRange[1] - inputRange[0]);
+    return outputRange[0] + ratio * (outputRange[1] - outputRange[0]);
+  },
+  runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
+}));
 
 jest.mock('react-native-gesture-handler', () => ({
   GestureDetector: ({ children }: { children: React.ReactNode }) => children,

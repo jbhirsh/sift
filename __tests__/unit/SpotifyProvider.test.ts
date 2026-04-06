@@ -1,17 +1,15 @@
-jest.mock('expo-audio', () => {
-  const mockPlayer = {
-    play: jest.fn(),
-    pause: jest.fn(),
-    seekTo: jest.fn(),
-    remove: jest.fn(),
-    addListener: jest.fn(),
-    currentTime: 15,
-  };
-  return {
-    createAudioPlayer: jest.fn(() => mockPlayer),
-    __mockPlayer: mockPlayer,
-  };
-});
+const mockPlayer = {
+  play: jest.fn(),
+  pause: jest.fn(),
+  seekTo: jest.fn(),
+  remove: jest.fn(),
+  addListener: jest.fn(),
+  currentTime: 15,
+};
+
+jest.mock('expo-audio', () => ({
+  createAudioPlayer: jest.fn(() => mockPlayer),
+}));
 
 jest.mock('../../src/services/spotify/SpotifyAuth', () => ({
   authorize: jest.fn().mockResolvedValue(true),
@@ -39,7 +37,7 @@ jest.mock('../../src/services/spotify/SpotifyAPI', () => ({
 import { SpotifyProvider } from '../../src/services/SpotifyProvider';
 import * as SpotifyAuth from '../../src/services/spotify/SpotifyAuth';
 import * as SpotifyAPI from '../../src/services/spotify/SpotifyAPI';
-const { createAudioPlayer, __mockPlayer: mockPlayer } = require('expo-audio');
+import { createAudioPlayer } from 'expo-audio';
 
 describe('SpotifyProvider', () => {
   let provider: SpotifyProvider;
