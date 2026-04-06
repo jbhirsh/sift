@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useMemo, useCallback, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useMemo, useCallback, useEffect, useRef, ReactNode } from 'react';
 import * as Sentry from '@sentry/react-native';
 import {
   Track,
@@ -218,6 +218,7 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     : initialState;
 
   const [state, dispatch] = useReducer(siftReducer, init);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Check for saved session on mount
   useEffect(() => {
@@ -240,7 +241,7 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     });
   }, [state.phase, state.provider, state.cursor, state.tracks.length, state.kept.length, state.removed.length, state.skipped.length, state.sortOrder]);
 
-  // Auto-save session after every decision (when sifting state changes)
+  // Auto-save session after every decision (debounced to avoid rapid-fire writes during fast swiping)
   useEffect(() => {
     if (state.phase !== 'sifting' && state.phase !== 'paused' && state.phase !== 'done') return;
     if (state.tracks.length === 0) return;
@@ -255,7 +256,15 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
       savedAt: new Date().toISOString(),
       provider: state.provider,
     };
-    saveSession(session);
+
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      saveSession(session);
+    }, 500);
+
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
   }, [state.cursor, state.kept, state.removed, state.skipped, state.tracks, state.phase, state.sortOrder, state.provider]);
 
   const currentTrack = state.tracks[state.cursor];
