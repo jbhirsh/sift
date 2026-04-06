@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,13 +15,29 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
+import { useMusicProvider } from '../hooks/useMusicProvider';
 import GlassCard from './GlassCard';
 import { formatTime } from '../utils/formatTime';
 import { RADIUS } from '../theme';
 
 export default function PlayerControls() {
-  const { state, currentTrack, togglePlayPause, seek, skipBackward, skipForward } = useSift();
+  const { state, currentTrack } = useSift();
   const { colors } = useTheme();
+  const { play, pause, togglePlayPause, seek, skipBackward, skipForward } = useMusicProvider();
+
+  // Auto-play current track on mount and when cursor advances
+  const prevTrackIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (currentTrack && currentTrack.id !== prevTrackIdRef.current) {
+      prevTrackIdRef.current = currentTrack.id;
+      play(currentTrack.id);
+    }
+  }, [currentTrack, play]);
+
+  // Pause music when PlayerControls unmounts (session paused/done)
+  useEffect(() => {
+    return () => { pause(); };
+  }, [pause]);
 
   const duration = currentTrack?.duration ?? 0;
   const maxDuration = Math.max(duration, 1);
@@ -33,6 +49,14 @@ export default function PlayerControls() {
     },
     [sliderWidth],
   );
+
+  const handlePlayPause = useCallback(() => {
+    if (!state.isPlaying && currentTrack && state.playbackPosition === 0) {
+      play(currentTrack.id);
+    } else {
+      togglePlayPause();
+    }
+  }, [state.isPlaying, state.playbackPosition, currentTrack, play, togglePlayPause]);
 
   const seekTo = useCallback(
     (value: number) => {
@@ -100,7 +124,7 @@ export default function PlayerControls() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={togglePlayPause}
+            onPress={handlePlayPause}
             style={styles.playButton}
             testID="play-pause-button"
           >
