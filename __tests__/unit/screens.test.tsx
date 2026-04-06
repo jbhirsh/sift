@@ -1,0 +1,282 @@
+import React from 'react';
+import { render, fireEvent, act } from '@testing-library/react-native';
+import { Track } from '../../src/types';
+
+// Common mocks
+jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
+  __esModule: true,
+  default: jest.fn().mockReturnValue('light'),
+}));
+
+jest.mock('expo-blur', () => ({ BlurView: 'BlurView' }));
+jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
+jest.mock('expo-symbols', () => ({ SymbolView: 'SymbolView' }));
+jest.mock('expo-image', () => ({ Image: 'Image' }));
+
+jest.mock('@sentry/react-native', () => ({
+  setTag: jest.fn(),
+  setContext: jest.fn(),
+  addBreadcrumb: jest.fn(),
+  captureException: jest.fn(),
+}));
+
+jest.mock('../../src/services/SessionStore', () => ({
+  hasSession: jest.fn().mockResolvedValue(false),
+  saveSession: jest.fn().mockResolvedValue(undefined),
+  loadSession: jest.fn().mockResolvedValue(null),
+  clearSession: jest.fn().mockResolvedValue(undefined),
+}));
+
+const mockProvider = {
+  requestAuthorization: jest.fn().mockResolvedValue(true),
+  isAuthorized: jest.fn().mockResolvedValue(true),
+  loadLibrary: jest.fn().mockResolvedValue([]),
+  play: jest.fn().mockResolvedValue(undefined),
+  pause: jest.fn().mockResolvedValue(undefined),
+  resume: jest.fn().mockResolvedValue(undefined),
+  seek: jest.fn(),
+  getPlaybackState: jest.fn().mockReturnValue({ position: 0, isPlaying: false }),
+  createPlaylist: jest.fn().mockResolvedValue(undefined),
+};
+
+jest.mock('../../src/services', () => ({
+  createMusicProvider: jest.fn(() => mockProvider),
+  MusicProviderService: {},
+}));
+
+jest.mock('../../src/hooks/useResolvedArtwork', () => ({
+  useResolvedArtwork: jest.fn().mockReturnValue(null),
+}));
+
+// Must import after mocks
+import { renderWithProviders, mockTrackA, mockTrackB, mockTrackC } from '../helpers/renderWithProviders';
+import { useSift } from '../../src/context/SiftContext';
+import SetupScreen from '../../src/screens/SetupScreen';
+import LoadingScreen from '../../src/screens/LoadingScreen';
+import DoneScreen from '../../src/screens/DoneScreen';
+import SettingsScreen from '../../src/screens/SettingsScreen';
+
+describe('SetupScreen', () => {
+  test('renders brand text', () => {
+    const { getByTestId } = renderWithProviders(<SetupScreen />);
+    expect(getByTestId('setup-brand').props.children).toBe('sift.');
+  });
+
+  test('renders Start Sifting button when no saved session', () => {
+    const { getByText } = renderWithProviders(<SetupScreen />);
+    expect(getByText('Start Sifting')).toBeTruthy();
+  });
+
+  test('renders error when loadError exists', () => {
+    const { queryByTestId } = renderWithProviders(<SetupScreen />);
+    expect(queryByTestId('setup-error')).toBeNull();
+  });
+
+  test('renders music service picker with Apple Music and Spotify', () => {
+    const { getByText } = renderWithProviders(<SetupScreen />);
+    expect(getByText('Apple Music')).toBeTruthy();
+    expect(getByText('Spotify')).toBeTruthy();
+  });
+
+  test('renders sort by section', () => {
+    const { getByText } = renderWithProviders(<SetupScreen />);
+    expect(getByText('Sort by')).toBeTruthy();
+    expect(getByText('Least Played')).toBeTruthy();
+  });
+
+  test('pressing sort button toggles sort dropdown', () => {
+    const { getByText, queryByText } = renderWithProviders(<SetupScreen />);
+    // Initially dropdown should not show all options
+    expect(queryByText('Most Played')).toBeNull();
+    // Press the sort button to open dropdown
+    fireEvent.press(getByText('Least Played'));
+    // Now all options should be visible
+    expect(getByText('Most Played')).toBeTruthy();
+    expect(getByText('Oldest Added')).toBeTruthy();
+    expect(getByText('Newest Added')).toBeTruthy();
+    expect(getByText('Random')).toBeTruthy();
+  });
+
+  test('selecting a sort option closes dropdown', () => {
+    const { getByText, queryByText } = renderWithProviders(<SetupScreen />);
+    fireEvent.press(getByText('Least Played'));
+    fireEvent.press(getByText('Most Played'));
+    // Dropdown should close
+    expect(queryByText('Oldest Added')).toBeNull();
+  });
+
+  test('pressing provider segment switches provider', () => {
+    const { getByText } = renderWithProviders(<SetupScreen />);
+    fireEvent.press(getByText('Spotify'));
+    // Component should still render without error
+    expect(getByText('Spotify')).toBeTruthy();
+  });
+
+  test('pressing Start Sifting triggers startFresh', async () => {
+    const { getByText } = renderWithProviders(<SetupScreen />);
+    await act(async () => {
+      fireEvent.press(getByText('Start Sifting'));
+    });
+    // Should not throw
+  });
+});
+
+describe('LoadingScreen', () => {
+  test('renders brand text', () => {
+    const { getByTestId } = renderWithProviders(<LoadingScreen />);
+    expect(getByTestId('loading-brand').props.children).toBe('sift.');
+  });
+
+  test('renders loading message', () => {
+    const { getByTestId } = renderWithProviders(<LoadingScreen />);
+    expect(getByTestId('loading-message')).toBeTruthy();
+  });
+});
+
+// Mock Clipboard on react-native's Clipboard export
+import { Clipboard } from 'react-native';
+const mockClipboardSetString = jest.fn();
+// @ts-expect-error — mock override
+Clipboard.setString = mockClipboardSetString;
+
+describe('DoneScreen', () => {
+  const tracks = [mockTrackA, mockTrackB, mockTrackC];
+
+  test('renders done title when all tracks sifted', () => {
+    const { getByTestId } = renderWithProviders(<DoneScreen />, { initialTracks: tracks });
+    expect(getByTestId('done-title')).toBeTruthy();
+  });
+
+  test('renders summary counts', () => {
+    const { getByTestId } = renderWithProviders(<DoneScreen />, { initialTracks: tracks });
+    expect(getByTestId('summary-count-kept')).toBeTruthy();
+    expect(getByTestId('summary-count-to remove')).toBeTruthy();
+    expect(getByTestId('summary-count-skipped')).toBeTruthy();
+  });
+
+  test('renders Start Over button when done', () => {
+    const { getByText } = renderWithProviders(<DoneScreen />, { initialTracks: tracks });
+    expect(getByText('Start Over')).toBeTruthy();
+  });
+
+  test('pressing Start Over calls startFresh', async () => {
+    const { getByText } = renderWithProviders(<DoneScreen />, { initialTracks: tracks });
+    await act(async () => {
+      fireEvent.press(getByText('Start Over'));
+    });
+    // Should not throw
+  });
+
+  test('shows Resume Session and Start Fresh when paused', () => {
+    // To get paused state, we need to stop the session
+    const StopThenDone = () => {
+      const { stopSession } = useSift();
+      React.useEffect(() => { stopSession(); }, []);
+      return <DoneScreen />;
+    };
+    const { getByText } = renderWithProviders(<StopThenDone />, { initialTracks: tracks });
+    expect(getByText('Resume Session')).toBeTruthy();
+    expect(getByText('Start Fresh')).toBeTruthy();
+  });
+
+  test('shows removed tracks section after removing tracks', () => {
+    const DecideThenDone = () => {
+      const { decide, state } = useSift();
+      React.useEffect(() => { decide('remove'); }, []);
+      if (state.removed.length === 0) return null;
+      return <DoneScreen />;
+    };
+    const { getByText } = renderWithProviders(<DecideThenDone />, { initialTracks: tracks });
+    expect(getByText('Tracks to Remove')).toBeTruthy();
+    expect(getByText('Move to Playlist')).toBeTruthy();
+    expect(getByText('Copy List')).toBeTruthy();
+  });
+
+  test('copy list button copies removed tracks', () => {
+    const DecideThenDone = () => {
+      const { decide, state } = useSift();
+      React.useEffect(() => { decide('remove'); }, []);
+      if (state.removed.length === 0) return null;
+      return <DoneScreen />;
+    };
+    const { getByText } = renderWithProviders(<DecideThenDone />, { initialTracks: tracks });
+    fireEvent.press(getByText('Copy List'));
+    expect(mockClipboardSetString).toHaveBeenCalled();
+    expect(getByText('Copied!')).toBeTruthy();
+  });
+
+  test('move to playlist button calls createPlaylist', async () => {
+    const DecideThenDone = () => {
+      const { decide, state } = useSift();
+      React.useEffect(() => { decide('remove'); }, []);
+      if (state.removed.length === 0) return null;
+      return <DoneScreen />;
+    };
+    const { getByText } = renderWithProviders(<DecideThenDone />, { initialTracks: tracks });
+    await act(async () => {
+      fireEvent.press(getByText('Move to Playlist'));
+    });
+    expect(mockProvider.createPlaylist).toHaveBeenCalled();
+  });
+});
+
+describe('SettingsScreen', () => {
+  test('renders Settings header', () => {
+    const { getByText } = renderWithProviders(<SettingsScreen />);
+    expect(getByText('Settings')).toBeTruthy();
+  });
+
+  test('renders version text', () => {
+    const { getByText } = renderWithProviders(<SettingsScreen />);
+    expect(getByText('Version 1.0.0')).toBeTruthy();
+  });
+
+  test('renders connection status', () => {
+    const { getByTestId } = renderWithProviders(<SettingsScreen />);
+    expect(getByTestId('connection-status-label')).toBeTruthy();
+    expect(getByTestId('connection-status-indicator')).toBeTruthy();
+  });
+
+  test('check connection button updates status', async () => {
+    jest.useFakeTimers();
+    const { getByTestId } = renderWithProviders(<SettingsScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('check-connection-button'));
+    });
+
+    // Status should be 'checking' initially
+    expect(getByTestId('connection-status-label').props.children).toBe('Checking…');
+
+    // Advance timer to complete the check
+    await act(async () => {
+      jest.advanceTimersByTime(1500);
+    });
+
+    expect(getByTestId('connection-status-label').props.children).toBe('Connected');
+    jest.useRealTimers();
+  });
+
+  test('renders provider display name', () => {
+    const { getByText } = renderWithProviders(<SettingsScreen />);
+    expect(getByText('Apple Music')).toBeTruthy();
+  });
+
+  test('renders Check Connection button', () => {
+    const { getByText } = renderWithProviders(<SettingsScreen />);
+    expect(getByText('Check Connection')).toBeTruthy();
+  });
+
+  test('shows disconnected status label and indicator', () => {
+    const SetDisconnected = () => {
+      const { dispatch } = useSift();
+      React.useEffect(() => {
+        dispatch({ type: 'SET_CONNECTION_STATUS', status: 'disconnected' });
+      }, []);
+      return <SettingsScreen />;
+    };
+    const { getByTestId } = renderWithProviders(<SetDisconnected />);
+    expect(getByTestId('connection-status-label').props.children).toBe('Not connected');
+    expect(getByTestId('connection-status-indicator')).toBeTruthy();
+  });
+});

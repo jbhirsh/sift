@@ -2,6 +2,10 @@
 test:
 	npx jest
 
+# Run unit tests with coverage report (80% threshold enforced)
+test-coverage:
+	npx jest --coverage
+
 # Run unit tests in watch mode
 test-watch:
 	npx jest --watch
@@ -32,4 +36,4 @@ doctor:
 # Check everything (lint + types + tests + expo doctor)
 check: lint typecheck test doctor
 
-.PHONY: test test-watch test-e2e test-all lint typecheck build-ios check doctor
+.PHONY: test test-coverage test-watch test-e2e test-all lint typecheck build-ios check doctor

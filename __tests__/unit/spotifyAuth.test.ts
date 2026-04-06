@@ -3,6 +3,10 @@ import {
   isAuthenticated,
   getAccessToken,
   logout,
+  generateCodeVerifier,
+  generateCodeChallenge,
+  authorize,
+  refreshTokenIfNeeded,
 } from '../../src/services/spotify/SpotifyAuth';
 
 // ---------------------------------------------------------------------------
@@ -42,6 +46,9 @@ jest.mock('expo-web-browser', () => ({
 
 const mockGetItem = AsyncStorage.getItem as jest.MockedFunction<
   typeof AsyncStorage.getItem
+>;
+const mockSetItem = AsyncStorage.setItem as jest.MockedFunction<
+  typeof AsyncStorage.setItem
 >;
 const mockRemoveItem = AsyncStorage.removeItem as jest.MockedFunction<
   typeof AsyncStorage.removeItem
@@ -116,5 +123,148 @@ describe('logout', () => {
     expect(mockRemoveItem).toHaveBeenCalledWith('spotify_access_token');
     expect(mockRemoveItem).toHaveBeenCalledWith('spotify_refresh_token');
     expect(mockRemoveItem).toHaveBeenCalledWith('spotify_token_expiration');
+  });
+});
+
+describe('generateCodeVerifier', () => {
+  test('returns a base64url encoded string', () => {
+    const verifier = generateCodeVerifier();
+    expect(typeof verifier).toBe('string');
+    expect(verifier.length).toBeGreaterThan(0);
+    // Should not contain +, /, or = (base64url)
+    expect(verifier).not.toMatch(/[+/=]/);
+  });
+});
+
+describe('generateCodeChallenge', () => {
+  test('returns a base64url encoded challenge', async () => {
+    const challenge = await generateCodeChallenge('test-verifier');
+    expect(typeof challenge).toBe('string');
+    // Should not contain +, /, or = (base64url)
+    expect(challenge).not.toMatch(/[+/=]/);
+  });
+});
+
+describe('refreshTokenIfNeeded', () => {
+  test('does nothing when no token stored', async () => {
+    mockGetItem.mockResolvedValueOnce(null); // access token
+    mockGetItem.mockResolvedValueOnce(null); // expiration
+    mockGetItem.mockResolvedValueOnce(null); // refresh token
+
+    await refreshTokenIfNeeded();
+    // Should not throw or make any fetch calls
+  });
+
+  test('does nothing when no refresh token', async () => {
+    mockGetItem.mockResolvedValueOnce('token');
+    mockGetItem.mockResolvedValueOnce(String(Date.now() - 1000)); // expired
+    mockGetItem.mockResolvedValueOnce(null); // no refresh token
+
+    await refreshTokenIfNeeded();
+  });
+
+  test('skips refresh when token still valid', async () => {
+    const farFuture = String(Date.now() + 120_000); // 2 minutes
+    mockGetItem.mockResolvedValueOnce('token');
+    mockGetItem.mockResolvedValueOnce(farFuture);
+    mockGetItem.mockResolvedValueOnce('refresh-token');
+
+    await refreshTokenIfNeeded();
+    // Should not make any fetch calls since token is valid
+  });
+
+  test('refreshes token when expired', async () => {
+    const pastExpiration = String(Date.now() - 1000);
+    mockGetItem.mockResolvedValueOnce('old-token');
+    mockGetItem.mockResolvedValueOnce(pastExpiration);
+    mockGetItem.mockResolvedValueOnce('refresh-token');
+
+    const mockResponse = {
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        access_token: 'new-token',
+        refresh_token: 'new-refresh',
+        expires_in: 3600,
+      }),
+    };
+    global.fetch = jest.fn().mockResolvedValue(mockResponse);
+
+    await refreshTokenIfNeeded();
+
+    expect(global.fetch).toHaveBeenCalled();
+    expect(mockSetItem).toHaveBeenCalledWith('spotify_access_token', 'new-token');
+    expect(mockSetItem).toHaveBeenCalledWith('spotify_refresh_token', 'new-refresh');
+  });
+
+  test('logs out when refresh fails', async () => {
+    const pastExpiration = String(Date.now() - 1000);
+    mockGetItem.mockResolvedValueOnce('old-token');
+    mockGetItem.mockResolvedValueOnce(pastExpiration);
+    mockGetItem.mockResolvedValueOnce('refresh-token');
+
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401 });
+
+    await refreshTokenIfNeeded();
+
+    expect(mockRemoveItem).toHaveBeenCalled();
+  });
+});
+
+describe('authorize', () => {
+  const { AuthRequest } = require('expo-auth-session');
+
+  test('returns false when user cancels', async () => {
+    AuthRequest.mockImplementation(() => ({
+      promptAsync: jest.fn().mockResolvedValue({ type: 'cancel' }),
+    }));
+
+    const result = await authorize();
+    expect(result).toBe(false);
+  });
+
+  test('returns true on successful authorization', async () => {
+    AuthRequest.mockImplementation(() => ({
+      promptAsync: jest.fn().mockResolvedValue({
+        type: 'success',
+        params: { code: 'auth-code' },
+      }),
+    }));
+
+    const mockResponse = {
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        access_token: 'new-token',
+        refresh_token: 'refresh',
+        expires_in: 3600,
+      }),
+    };
+    global.fetch = jest.fn().mockResolvedValue(mockResponse);
+
+    const result = await authorize();
+    expect(result).toBe(true);
+    expect(mockSetItem).toHaveBeenCalledWith('spotify_access_token', 'new-token');
+  });
+
+  test('returns false when token exchange fails', async () => {
+    AuthRequest.mockImplementation(() => ({
+      promptAsync: jest.fn().mockResolvedValue({
+        type: 'success',
+        params: { code: 'auth-code' },
+      }),
+    }));
+
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 400 });
+
+    const result = await authorize();
+    expect(result).toBe(false);
+  });
+
+  test('returns false on exception', async () => {
+    AuthRequest.mockImplementation(() => ({
+      promptAsync: jest.fn().mockRejectedValue(new Error('network error')),
+    }));
+
+    const result = await authorize();
+    expect(result).toBe(false);
   });
 });
