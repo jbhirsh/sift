@@ -3,11 +3,12 @@ import {
   View,
   Text,
   TouchableOpacity,
-  ScrollView,
+  FlatList,
   StyleSheet,
   Platform,
   Clipboard,
 } from 'react-native';
+import type { Track } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import type { SFSymbol } from 'sf-symbols-typescript';
@@ -42,182 +43,192 @@ export default function DoneScreen() {
     }, 1000);
   }, [dispatch]);
 
-  return (
-    <View style={styles.root}>
-      <GlassBackground phase="done" />
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={[styles.contentContainer, { paddingTop: insets.top }]}
+  const renderTrackRow = useCallback(
+    ({ item: track, index }: { item: Track; index: number }) => (
+      <View
+        style={[
+          styles.trackRow,
+          index % 2 !== 0 && { backgroundColor: colors.quaternary },
+        ]}
       >
-        {/* Title section */}
-        <View style={styles.titleSection}>
+        <View style={{ flex: 1 }}>
           <Text
-            testID="done-title"
-            style={[styles.titleText, { color: colors.text }]}
+            style={[styles.trackName, { color: colors.text }]}
+            numberOfLines={1}
           >
-            {isPaused ? 'Session paused.' : 'All done.'}
+            {track.name}
           </Text>
-          <Text style={[styles.subtitleText, { color: colors.textSecondary }]}>
-            {isPaused
-              ? "Here's where you left off."
-              : 'Your library has been sifted.'}
+          <Text
+            style={[styles.trackArtist, { color: colors.textSecondary }]}
+            numberOfLines={1}
+          >
+            {track.artist}
           </Text>
         </View>
+      </View>
+    ),
+    [colors.quaternary, colors.text, colors.textSecondary],
+  );
 
-        {/* Summary stats in glass card */}
-        <View style={styles.summaryWrapper}>
-          <GlassCard intensity="regular" radius={RADIUS.lg}>
-            <View style={styles.summaryContainer}>
-              <SummaryItem
-                count={state.kept.length}
-                label="kept"
-                symbolName="checkmark.circle.fill"
-                color="#34C759"
-                textColor={colors.text}
-                secondaryText={colors.textSecondary}
-              />
-              <SummaryItem
-                count={state.removed.length}
-                label="to remove"
-                symbolName="xmark.circle.fill"
-                color="#FF3B30"
-                textColor={colors.text}
-                secondaryText={colors.textSecondary}
-              />
-              <SummaryItem
-                count={state.skipped.length}
-                label="skipped"
-                symbolName="arrow.right.circle"
-                color="#FF9500"
-                textColor={colors.text}
-                secondaryText={colors.textSecondary}
-              />
+  const keyExtractor = useCallback((track: Track) => track.id, []);
+
+  const listHeader = (
+    <>
+      {/* Title section */}
+      <View style={styles.titleSection}>
+        <Text
+          testID="done-title"
+          style={[styles.titleText, { color: colors.text }]}
+        >
+          {isPaused ? 'Session paused.' : 'All done.'}
+        </Text>
+        <Text style={[styles.subtitleText, { color: colors.textSecondary }]}>
+          {isPaused
+            ? "Here's where you left off."
+            : 'Your library has been sifted.'}
+        </Text>
+      </View>
+
+      {/* Summary stats in glass card */}
+      <View style={styles.summaryWrapper}>
+        <GlassCard intensity="regular" radius={RADIUS.lg}>
+          <View style={styles.summaryContainer}>
+            <SummaryItem
+              count={state.kept.length}
+              label="kept"
+              symbolName="checkmark.circle.fill"
+              color="#34C759"
+              textColor={colors.text}
+              secondaryText={colors.textSecondary}
+            />
+            <SummaryItem
+              count={state.removed.length}
+              label="to remove"
+              symbolName="xmark.circle.fill"
+              color="#FF3B30"
+              textColor={colors.text}
+              secondaryText={colors.textSecondary}
+            />
+            <SummaryItem
+              count={state.skipped.length}
+              label="skipped"
+              symbolName="arrow.right.circle"
+              color="#FF9500"
+              textColor={colors.text}
+              secondaryText={colors.textSecondary}
+            />
+          </View>
+        </GlassCard>
+      </View>
+
+      {/* Removed tracks header */}
+      {state.removed.length > 0 && (
+        <View style={styles.removedSection}>
+          <View style={styles.removedHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.removedTitle, { color: colors.text }]}>
+                Tracks to Remove
+              </Text>
+              <Text style={[styles.removedSubtitle, { color: colors.textSecondary }]}>
+                Move these to a playlist in Music, then delete them there.
+              </Text>
             </View>
-          </GlassCard>
-        </View>
-
-        {/* Removed tracks section */}
-        {state.removed.length > 0 && (
-          <View style={styles.removedSection}>
-            <View style={styles.removedHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.removedTitle, { color: colors.text }]}>
-                  Tracks to Remove
-                </Text>
-                <Text style={[styles.removedSubtitle, { color: colors.textSecondary }]}>
-                  Move these to a playlist in Music, then delete them there.
-                </Text>
-              </View>
-              <View style={styles.removedActions}>
-                {state.removalPlaylistCreated ? (
-                  <View style={styles.movedLabel}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <SymbolView name="checkmark.circle.fill" size={14} tintColor="#34C759" />
-                      <Text style={styles.movedLabelText}>
-                        Moved to Playlist
-                      </Text>
-                    </View>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={[
-                      styles.smallPrimaryButton,
-                      state.isCreatingPlaylist && { opacity: 0.5 },
-                    ]}
-                    onPress={handleMoveToPlaylist}
-                    disabled={state.isCreatingPlaylist}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.smallPrimaryButtonText}>
-                      {state.isCreatingPlaylist
-                        ? 'Moving...'
-                        : 'Move to Playlist'}
+            <View style={styles.removedActions}>
+              {state.removalPlaylistCreated ? (
+                <View style={styles.movedLabel}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <SymbolView name="checkmark.circle.fill" size={14} tintColor="#34C759" />
+                    <Text style={styles.movedLabelText}>
+                      Moved to Playlist
                     </Text>
-                  </TouchableOpacity>
-                )}
+                  </View>
+                </View>
+              ) : (
                 <TouchableOpacity
-                  style={[styles.smallSecondaryButton, { borderColor: colors.accent }]}
-                  onPress={copyRemovedList}
+                  style={[
+                    styles.smallPrimaryButton,
+                    state.isCreatingPlaylist && { opacity: 0.5 },
+                  ]}
+                  onPress={handleMoveToPlaylist}
+                  disabled={state.isCreatingPlaylist}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.smallSecondaryButtonText, { color: colors.accent }]}>
-                    {copied ? 'Copied!' : 'Copy List'}
+                  <Text style={styles.smallPrimaryButtonText}>
+                    {state.isCreatingPlaylist
+                      ? 'Moving...'
+                      : 'Move to Playlist'}
                   </Text>
                 </TouchableOpacity>
-              </View>
-            </View>
-
-            {state.removalPlaylistError && (
-              <Text style={styles.playlistError}>
-                {state.removalPlaylistError}
-              </Text>
-            )}
-
-            <GlassCard intensity="thin" radius={RADIUS.sm}>
-              <View style={styles.trackList}>
-                {state.removed.map((track, index) => (
-                  <View
-                    key={track.id}
-                    style={[
-                      styles.trackRow,
-                      index % 2 !== 0 && { backgroundColor: colors.quaternary },
-                    ]}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={[styles.trackName, { color: colors.text }]}
-                        numberOfLines={1}
-                      >
-                        {track.name}
-                      </Text>
-                      <Text
-                        style={[styles.trackArtist, { color: colors.textSecondary }]}
-                        numberOfLines={1}
-                      >
-                        {track.artist}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </GlassCard>
-          </View>
-        )}
-
-        {/* Action buttons */}
-        <View style={styles.buttonSection}>
-          {isPaused ? (
-            <>
+              )}
               <TouchableOpacity
-                style={styles.primaryButton}
-                onPress={resumeFromPause}
+                style={[styles.smallSecondaryButton, { borderColor: colors.accent }]}
+                onPress={copyRemovedList}
                 activeOpacity={0.8}
               >
-                <Text style={styles.primaryButtonText}>Resume Session</Text>
+                <Text style={[styles.smallSecondaryButtonText, { color: colors.accent }]}>
+                  {copied ? 'Copied!' : 'Copy List'}
+                </Text>
               </TouchableOpacity>
-              <GlassCard intensity="regular" radius={RADIUS.md} style={{ width: '100%' }}>
-                <TouchableOpacity
-                  style={styles.glassButtonInner}
-                  onPress={startFresh}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.glassButtonText, { color: colors.accent }]}>
-                    Start Fresh
-                  </Text>
-                </TouchableOpacity>
-              </GlassCard>
-            </>
-          ) : (
+            </View>
+          </View>
+
+          {state.removalPlaylistError && (
+            <Text style={styles.playlistError}>
+              {state.removalPlaylistError}
+            </Text>
+          )}
+        </View>
+      )}
+    </>
+  );
+
+  const listFooter = (
+    <View style={styles.buttonSection}>
+      {isPaused ? (
+        <>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={resumeFromPause}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.primaryButtonText}>Resume Session</Text>
+          </TouchableOpacity>
+          <GlassCard intensity="regular" radius={RADIUS.md} style={{ width: '100%' }}>
             <TouchableOpacity
-              style={styles.primaryButton}
+              style={styles.glassButtonInner}
               onPress={startFresh}
               activeOpacity={0.8}
             >
-              <Text style={styles.primaryButtonText}>Start Over</Text>
+              <Text style={[styles.glassButtonText, { color: colors.accent }]}>
+                Start Fresh
+              </Text>
             </TouchableOpacity>
-          )}
-        </View>
-      </ScrollView>
+          </GlassCard>
+        </>
+      ) : (
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={startFresh}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.primaryButtonText}>Start Over</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  return (
+    <View style={styles.root}>
+      <GlassBackground phase="done" />
+      <FlatList
+        data={state.removed}
+        renderItem={renderTrackRow}
+        keyExtractor={keyExtractor}
+        style={styles.container}
+        contentContainerStyle={[styles.contentContainer, { paddingTop: insets.top }]}
+        ListHeaderComponent={listHeader}
+        ListFooterComponent={listFooter}
+      />
     </View>
   );
 }
@@ -314,7 +325,7 @@ const styles = StyleSheet.create({
   removedSection: {
     width: '100%',
     paddingHorizontal: SPACING['2xl'],
-    marginBottom: 32,
+    marginBottom: 12,
   },
   removedHeader: {
     marginBottom: 12,
@@ -368,13 +379,10 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     marginBottom: 8,
   },
-  trackList: {
-    overflow: 'hidden',
-  },
   trackRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: SPACING['2xl'],
     paddingVertical: 8,
   },
   trackName: {
@@ -389,6 +397,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     paddingHorizontal: 40,
+    marginTop: 20,
   },
   primaryButton: {
     backgroundColor: '#007AFF',
