@@ -134,6 +134,105 @@ describe('siftReducer', () => {
     expect(next2.isPlaying).toBe(false);
   });
 
+  test('DECIDE does nothing when cursor is past tracks array', () => {
+    const state = makeState({ tracks: [trackA], cursor: 5 });
+    const next = siftReducer(state, { type: 'DECIDE', decision: 'keep' });
+    expect(next).toBe(state);
+  });
+
+  test('SET_LOAD_PROGRESS only updates loadMessage if provided', () => {
+    const state = makeState({ loadProgress: 0, loadMessage: 'Initial' });
+    const next = siftReducer(state, { type: 'SET_LOAD_PROGRESS', progress: 0.5 });
+    expect(next.loadProgress).toBe(0.5);
+    expect(next.loadMessage).toBe('Initial');
+  });
+
+  test('SET_LOAD_PROGRESS updates loadMessage when provided', () => {
+    const state = makeState({ loadProgress: 0, loadMessage: 'Initial' });
+    const next = siftReducer(state, { type: 'SET_LOAD_PROGRESS', progress: 0.5, message: 'Updated' });
+    expect(next.loadProgress).toBe(0.5);
+    expect(next.loadMessage).toBe('Updated');
+  });
+
+  test('SET_LOAD_ERROR sets error and phase to setup', () => {
+    const state = makeState({ phase: 'loading' });
+    const next = siftReducer(state, { type: 'SET_LOAD_ERROR', error: 'Something failed' });
+    expect(next.loadError).toBe('Something failed');
+    expect(next.phase).toBe('setup');
+  });
+
+  test('SET_PLAYBACK_POSITION updates playbackPosition', () => {
+    const state = makeState({ playbackPosition: 0 });
+    const next = siftReducer(state, { type: 'SET_PLAYBACK_POSITION', position: 42 });
+    expect(next.playbackPosition).toBe(42);
+  });
+
+  test('SET_IS_PLAYING updates isPlaying', () => {
+    const state = makeState({ isPlaying: false });
+    const next = siftReducer(state, { type: 'SET_IS_PLAYING', isPlaying: true });
+    expect(next.isPlaying).toBe(true);
+  });
+
+  test('SET_CONNECTION_STATUS updates connectionStatus', () => {
+    const state = makeState({ connectionStatus: 'unknown' });
+    const next = siftReducer(state, { type: 'SET_CONNECTION_STATUS', status: 'connected' });
+    expect(next.connectionStatus).toBe('connected');
+  });
+
+  test('SET_PLAYLIST_CREATED updates removalPlaylistCreated', () => {
+    const state = makeState({ removalPlaylistCreated: false });
+    const next = siftReducer(state, { type: 'SET_PLAYLIST_CREATED', created: true });
+    expect(next.removalPlaylistCreated).toBe(true);
+  });
+
+  test('SET_PLAYLIST_ERROR updates removalPlaylistError', () => {
+    const state = makeState({ removalPlaylistError: null });
+    const next = siftReducer(state, { type: 'SET_PLAYLIST_ERROR', error: 'Error msg' });
+    expect(next.removalPlaylistError).toBe('Error msg');
+  });
+
+  test('SET_CREATING_PLAYLIST updates isCreatingPlaylist', () => {
+    const state = makeState({ isCreatingPlaylist: false });
+    const next = siftReducer(state, { type: 'SET_CREATING_PLAYLIST', creating: true });
+    expect(next.isCreatingPlaylist).toBe(true);
+  });
+
+  test('SET_HAS_SAVED_SESSION updates hasSavedSession', () => {
+    const state = makeState({ hasSavedSession: false });
+    const next = siftReducer(state, { type: 'SET_HAS_SAVED_SESSION', has: true });
+    expect(next.hasSavedSession).toBe(true);
+  });
+
+  test('RESUME_SESSION merges session state', () => {
+    const state = makeState();
+    const session = {
+      ...state,
+      tracks: [trackA, trackB],
+      cursor: 1,
+      kept: [trackA],
+      provider: 'spotify' as const,
+      phase: 'sifting' as const,
+    };
+    const next = siftReducer(state, { type: 'RESUME_SESSION', session });
+    expect(next.tracks).toEqual([trackA, trackB]);
+    expect(next.cursor).toBe(1);
+    expect(next.phase).toBe('sifting');
+  });
+
+  test('RESUME_SESSION defaults to sifting when no phase', () => {
+    const state = makeState();
+    const session = { ...state, tracks: [trackA] };
+    delete (session as Partial<typeof session>).phase;
+    const next = siftReducer(state, { type: 'RESUME_SESSION', session: session as typeof session });
+    expect(next.phase).toBe('sifting');
+  });
+
+  test('unknown action returns same state', () => {
+    const state = makeState();
+    const next = siftReducer(state, { type: 'UNKNOWN' } as never);
+    expect(next).toBe(state);
+  });
+
   test('START_FRESH resets state and sets phase to loading', () => {
     const state = makeState({
       phase: 'done',
