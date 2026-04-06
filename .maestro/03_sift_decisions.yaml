@@ -1,0 +1,49 @@
+appId: com.jessicahirsh.sift
+name: "Sift Decisions - Keep, Remove, Skip"
+---
+
+# Test that tapping each decision button advances to the next track
+- launchApp:
+    clearState: true
+
+- tapOn: "Start Sifting"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 10000
+
+# Keep the first track
+- tapOn: "Keep"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 3000
+
+# Remove the second track
+- tapOn: "Remove"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 3000
+
+# Skip the third track
+- tapOn: "Skip"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 3000
+
+# Verify stats updated — text format is "N label"
+- assertVisible:
+    id: "stat-kept"
+    text: "1 kept"
+- assertVisible:
+    id: "stat-removed"
+    text: "1 removed"
+- assertVisible:
+    id: "stat-skipped"
+    text: "1 skipped"

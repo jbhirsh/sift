@@ -10,9 +10,16 @@ test-coverage:
 test-watch:
 	npx jest --watch
 
-# Run E2E tests (placeholder — will use Maestro later)
+# Build standalone simulator app for E2E testing (no dev server needed)
+build-e2e:
+	eas build --profile e2e-simulator --platform ios --local --output build/Sift-e2e.tar.gz
+	mkdir -p build/e2e
+	tar -xzf build/Sift-e2e.tar.gz -C build/e2e
+
+# Run E2E tests (requires build-e2e first)
 test-e2e:
-	@echo "E2E tests not yet configured (Maestro)"
+	xcrun simctl install booted build/e2e/*.app
+	maestro test .maestro/
 
 # All tests
 test-all: test test-e2e
@@ -36,4 +43,4 @@ doctor:
 # Check everything (lint + types + tests + expo doctor)
 check: lint typecheck test doctor
 
-.PHONY: test test-coverage test-watch test-e2e test-all lint typecheck build-ios check doctor
+.PHONY: test test-coverage test-watch build-e2e test-e2e test-all lint typecheck build-ios check doctor

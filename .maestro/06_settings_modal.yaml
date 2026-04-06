@@ -1,0 +1,42 @@
+appId: com.jessicahirsh.sift
+name: "Settings Modal"
+---
+
+# Test opening and interacting with the settings modal
+- launchApp:
+    clearState: true
+
+- tapOn: "Start Sifting"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 10000
+
+# Open settings modal
+- tapOn:
+    id: "settings-button"
+
+# Wait for the modal content to appear
+- extendedWaitUntil:
+    visible:
+      id: "check-connection-button"
+    timeout: 5000
+
+# Verify connection status elements
+- assertVisible:
+    id: "connection-status-label"
+
+# Tap check connection
+- tapOn:
+    id: "check-connection-button"
+
+# Wait for connection check to complete — mock provider always returns connected
+- extendedWaitUntil:
+    visible: "Connected"
+    timeout: 5000
+
+# Close the modal by swiping down
+- swipe:
+    start: "50%,30%"
+    end: "50%,90%"

@@ -42,3 +42,9 @@ fastlane/README.md
 *.provisionprofile
 
 .env.local
+
+# Maestro
+.maestro/tests/
+
+# E2E build artifacts
+build/
