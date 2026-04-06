@@ -85,7 +85,7 @@ describe('InteractiveCard', () => {
   });
 
   test('renders placeholder when no artwork URL', () => {
-    jest.mocked(useResolvedArtwork).mockReturnValueOnce(null);
+    jest.mocked(useResolvedArtwork).mockReturnValueOnce(undefined);
     const trackNoArt = { ...mockTrack, artworkURL: undefined };
     const { toJSON } = renderCard(trackNoArt);
     expect(toJSON()).toBeTruthy();
