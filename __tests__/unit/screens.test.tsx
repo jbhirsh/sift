@@ -1,6 +1,5 @@
 import React from 'react';
-import { render, fireEvent, act } from '@testing-library/react-native';
-import { Track } from '../../src/types';
+import { fireEvent, act } from '@testing-library/react-native';
 
 // Common mocks
 jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
@@ -171,7 +170,7 @@ describe('DoneScreen', () => {
     // To get paused state, we need to stop the session
     const StopThenDone = () => {
       const { stopSession } = useSift();
-      React.useEffect(() => { stopSession(); }, []);
+      React.useEffect(() => { stopSession(); }, [stopSession]);
       return <DoneScreen />;
     };
     const { getByText } = renderWithProviders(<StopThenDone />, { initialTracks: tracks });
@@ -182,7 +181,7 @@ describe('DoneScreen', () => {
   test('shows removed tracks section after removing tracks', () => {
     const DecideThenDone = () => {
       const { decide, state } = useSift();
-      React.useEffect(() => { decide('remove'); }, []);
+      React.useEffect(() => { decide('remove'); }, [decide]);
       if (state.removed.length === 0) return null;
       return <DoneScreen />;
     };
@@ -195,7 +194,7 @@ describe('DoneScreen', () => {
   test('copy list button copies removed tracks', () => {
     const DecideThenDone = () => {
       const { decide, state } = useSift();
-      React.useEffect(() => { decide('remove'); }, []);
+      React.useEffect(() => { decide('remove'); }, [decide]);
       if (state.removed.length === 0) return null;
       return <DoneScreen />;
     };
@@ -208,7 +207,7 @@ describe('DoneScreen', () => {
   test('move to playlist button calls createPlaylist', async () => {
     const DecideThenDone = () => {
       const { decide, state } = useSift();
-      React.useEffect(() => { decide('remove'); }, []);
+      React.useEffect(() => { decide('remove'); }, [decide]);
       if (state.removed.length === 0) return null;
       return <DoneScreen />;
     };
@@ -272,7 +271,7 @@ describe('SettingsScreen', () => {
       const { dispatch } = useSift();
       React.useEffect(() => {
         dispatch({ type: 'SET_CONNECTION_STATUS', status: 'disconnected' });
-      }, []);
+      }, [dispatch]);
       return <SettingsScreen />;
     };
     const { getByTestId } = renderWithProviders(<SetDisconnected />);

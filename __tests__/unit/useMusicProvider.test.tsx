@@ -1,6 +1,6 @@
 import React from 'react';
-import { Text, TouchableOpacity } from 'react-native';
-import { render, fireEvent, act, waitFor } from '@testing-library/react-native';
+import { TouchableOpacity } from 'react-native';
+import { render, fireEvent, act } from '@testing-library/react-native';
 import { SiftProvider } from '../../src/context/SiftContext';
 import { useMusicProvider } from '../../src/hooks/useMusicProvider';
 import { Track } from '../../src/types';
@@ -54,8 +54,7 @@ function TestConsumer() {
   return (
     <>
       <TouchableOpacity testID="authorize" onPress={async () => {
-        const result = await provider.authorize();
-        // Store result for verification
+        await provider.authorize();
       }} />
       <TouchableOpacity testID="play" onPress={() => provider.play('1')} />
       <TouchableOpacity testID="play-pos" onPress={() => provider.play('1', 30)} />

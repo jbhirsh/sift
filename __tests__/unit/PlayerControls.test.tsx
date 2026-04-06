@@ -10,31 +10,25 @@ jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
 jest.mock('expo-blur', () => ({ BlurView: 'BlurView' }));
 jest.mock('expo-symbols', () => ({ SymbolView: 'SymbolView' }));
 
-jest.mock('react-native-reanimated', () => {
-  const View = require('react-native').View;
-  return {
-    __esModule: true,
-    default: {
-      View,
-      createAnimatedComponent: (comp: unknown) => comp,
-    },
-    useSharedValue: (val: number) => ({ value: val }),
-    useAnimatedStyle: (fn: () => unknown) => fn(),
-    runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
-  };
-});
+jest.mock('react-native-reanimated', () => ({
+  __esModule: true,
+  default: {
+    View: 'View',
+    createAnimatedComponent: (comp: unknown) => comp,
+  },
+  useSharedValue: (val: number) => ({ value: val }),
+  useAnimatedStyle: (fn: () => unknown) => fn(),
+  runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
+}));
 
-jest.mock('react-native-gesture-handler', () => {
-  const View = require('react-native').View;
-  return {
-    GestureDetector: ({ children }: { children: React.ReactNode }) => children,
-    Gesture: {
-      Tap: () => ({ onEnd: () => ({}) }),
-      Pan: () => ({ onUpdate: () => ({}) }),
-      Race: () => ({}),
-    },
-  };
-});
+jest.mock('react-native-gesture-handler', () => ({
+  GestureDetector: ({ children }: { children: React.ReactNode }) => children,
+  Gesture: {
+    Tap: () => ({ onEnd: () => ({}) }),
+    Pan: () => ({ onUpdate: () => ({}) }),
+    Race: () => ({}),
+  },
+}));
 
 const mockPlay = jest.fn().mockResolvedValue(undefined);
 const mockPause = jest.fn().mockResolvedValue(undefined);
