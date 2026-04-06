@@ -167,12 +167,7 @@ public class ExpoMusicKitModule: Module {
         throw MusicKitError.noTracksFound
       }
 
-      try await MusicLibrary.shared.createPlaylist(
-        name: name,
-        description: "Created by Sift",
-        authorDisplayName: "Sift",
-        items: songs
-      )
+      _ = try await MusicLibrary.shared.createPlaylist(name: name, items: songs)
     }
 
     // MARK: - Artwork Resolution

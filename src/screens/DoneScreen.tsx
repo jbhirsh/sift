@@ -13,14 +13,16 @@ import { SymbolView } from 'expo-symbols';
 import type { SFSymbol } from 'sf-symbols-typescript';
 import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
+import { useMusicProvider } from '../hooks/useMusicProvider';
 import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
 import { RADIUS, SPACING } from '../theme';
 
 export default function DoneScreen() {
-  const { state, dispatch, resumeFromPause, startFresh } = useSift();
+  const { state, resumeFromPause, startFresh } = useSift();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
+  const { createPlaylist } = useMusicProvider();
   const [copied, setCopied] = useState(false);
 
   const isPaused = state.phase === 'paused';
@@ -34,13 +36,11 @@ export default function DoneScreen() {
     setTimeout(() => setCopied(false), 2000);
   }, [state.removed]);
 
-  const handleMoveToPlaylist = useCallback(() => {
-    dispatch({ type: 'SET_CREATING_PLAYLIST', creating: true });
-    setTimeout(() => {
-      dispatch({ type: 'SET_CREATING_PLAYLIST', creating: false });
-      dispatch({ type: 'SET_PLAYLIST_CREATED', created: true });
-    }, 1000);
-  }, [dispatch]);
+  const handleMoveToPlaylist = useCallback(async () => {
+    const trackIDs = state.removed.map((t) => t.id);
+    const name = `Sift — Removed ${new Date().toLocaleDateString()}`;
+    await createPlaylist(name, trackIDs);
+  }, [state.removed, createPlaylist]);
 
   return (
     <View style={styles.root}>
