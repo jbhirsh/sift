@@ -1,5 +1,4 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AuthRequest } from 'expo-auth-session';
 import {
   isAuthenticated,
   getAccessToken,
@@ -188,11 +187,11 @@ describe('refreshTokenIfNeeded', () => {
         expires_in: 3600,
       }),
     };
-    global.fetch = jest.fn().mockResolvedValue(mockResponse);
+    globalThis.fetch = jest.fn().mockResolvedValue(mockResponse);
 
     await refreshTokenIfNeeded();
 
-    expect(global.fetch).toHaveBeenCalled();
+    expect(globalThis.fetch).toHaveBeenCalled();
     expect(mockSetItem).toHaveBeenCalledWith('spotify_access_token', 'new-token');
     expect(mockSetItem).toHaveBeenCalledWith('spotify_refresh_token', 'new-refresh');
   });
@@ -203,7 +202,7 @@ describe('refreshTokenIfNeeded', () => {
     mockGetItem.mockResolvedValueOnce(pastExpiration);
     mockGetItem.mockResolvedValueOnce('refresh-token');
 
-    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401 });
+    globalThis.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401 });
 
     await refreshTokenIfNeeded();
 
@@ -212,7 +211,7 @@ describe('refreshTokenIfNeeded', () => {
 });
 
 describe('authorize', () => {
-  const MockAuthRequest = jest.mocked(AuthRequest);
+  const MockAuthRequest = jest.requireMock<{ AuthRequest: jest.Mock }>('expo-auth-session').AuthRequest;
 
   test('returns false when user cancels', async () => {
     MockAuthRequest.mockImplementation(() => ({
@@ -239,7 +238,7 @@ describe('authorize', () => {
         expires_in: 3600,
       }),
     };
-    global.fetch = jest.fn().mockResolvedValue(mockResponse);
+    globalThis.fetch = jest.fn().mockResolvedValue(mockResponse);
 
     const result = await authorize();
     expect(result).toBe(true);
@@ -254,7 +253,7 @@ describe('authorize', () => {
       }),
     }));
 
-    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 400 });
+    globalThis.fetch = jest.fn().mockResolvedValue({ ok: false, status: 400 });
 
     const result = await authorize();
     expect(result).toBe(false);

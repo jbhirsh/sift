@@ -135,7 +135,6 @@ describe('LoadingScreen', () => {
 // Mock Clipboard on react-native's Clipboard export
 import { Clipboard } from 'react-native';
 const mockClipboardSetString = jest.fn();
-// @ts-expect-error — mock override
 Clipboard.setString = mockClipboardSetString;
 
 describe('DoneScreen', () => {
