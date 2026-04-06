@@ -111,6 +111,9 @@
         "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "package": "com.jessicahirsh.sift"
+    },
+    "experiments": {
+      "reactCompiler": true
     }
   }
 }
