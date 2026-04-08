@@ -20,6 +20,17 @@ export type MusicProvider = 'apple-music' | 'spotify';
 
 export type ConnectionStatus = 'unknown' | 'checking' | 'connected' | 'disconnected';
 
+export interface Playlist {
+  id: string;
+  name: string;
+  trackCount: number;
+  artworkURL?: string;
+}
+
+export type SiftSource =
+  | { type: 'library' }
+  | { type: 'playlist'; playlist: Playlist };
+
 export interface SiftSession {
   tracks: Track[];
   cursor: number;
@@ -29,6 +40,7 @@ export interface SiftSession {
   sortOrder: SortOrder;
   savedAt: string; // ISO 8601
   provider?: MusicProvider;
+  source?: SiftSource;
 }
 
 export const SORT_ORDER_DISPLAY: Record<SortOrder, string> = {

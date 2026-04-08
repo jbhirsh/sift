@@ -141,4 +141,32 @@ describe('MockMusicProvider', () => {
     jest.advanceTimersByTime(1000);
     expect(provider.getPlaybackState().position).toBeGreaterThan(posAtPause);
   });
+
+  test('loadPlaylists returns array of playlists with correct shape', async () => {
+    expect(provider.loadPlaylists).toBeDefined();
+    const playlists = await flushAsync(provider.loadPlaylists());
+    expect(playlists.length).toBeGreaterThan(0);
+    for (const playlist of playlists) {
+      expect(typeof playlist.id).toBe('string');
+      expect(typeof playlist.name).toBe('string');
+      expect(typeof playlist.trackCount).toBe('number');
+    }
+  });
+
+  test('loadPlaylistTracks returns tracks for a valid playlist ID', async () => {
+    const playlists = await flushAsync(provider.loadPlaylists());
+    const tracks = await flushAsync(provider.loadPlaylistTracks(playlists[0].id));
+    expect(tracks.length).toBeGreaterThan(0);
+    for (const track of tracks) {
+      expect(typeof track.id).toBe('string');
+      expect(typeof track.name).toBe('string');
+      expect(typeof track.artist).toBe('string');
+      expect(typeof track.duration).toBe('number');
+    }
+  });
+
+  test('loadPlaylistTracks returns empty array for unknown playlist ID', async () => {
+    const tracks = await flushAsync(provider.loadPlaylistTracks('nonexistent'));
+    expect(tracks).toEqual([]);
+  });
 });

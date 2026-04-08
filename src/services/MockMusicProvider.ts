@@ -1,5 +1,5 @@
 import type { MusicProviderService } from './MusicProviderInterface';
-import type { Track } from '../types';
+import type { Playlist, Track } from '../types';
 
 /**
  * Mock tracks matching the Swift SimulatorMusicService.
@@ -108,6 +108,19 @@ const MOCK_LIBRARY_TRACKS: Track[] = [
   },
 ];
 
+/** Maps each mock playlist ID to a subset of MOCK_LIBRARY_TRACKS by index. */
+const MOCK_PLAYLIST_TRACK_INDICES: Record<string, number[]> = {
+  'playlist-1': [0, 2, 9],
+  'playlist-2': [1, 4, 5, 7],
+  'playlist-3': [3, 6, 8],
+};
+
+const MOCK_PLAYLISTS: Playlist[] = [
+  { id: 'playlist-1', name: 'Chill Vibes', trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-1'].length },
+  { id: 'playlist-2', name: 'Workout Mix', trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-2'].length },
+  { id: 'playlist-3', name: 'Road Trip', trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-3'].length },
+];
+
 /**
  * Mock music provider for development and testing.
  * Simulates playback with a timer-based position counter,
@@ -176,6 +189,18 @@ export class MockMusicProvider implements MusicProviderService {
   async createPlaylist(_name: string, _trackIDs: string[]): Promise<void> {
     // Simulate a short API delay
     await delay(500);
+  }
+
+  async loadPlaylists(): Promise<Playlist[]> {
+    await delay(200);
+    return [...MOCK_PLAYLISTS];
+  }
+
+  async loadPlaylistTracks(playlistID: string): Promise<Track[]> {
+    await delay(300);
+    const indices = MOCK_PLAYLIST_TRACK_INDICES[playlistID];
+    if (!indices) return [];
+    return indices.map((i) => ({ ...MOCK_LIBRARY_TRACKS[i] }));
   }
 
   /** Compute the current position based on elapsed wall-clock time. */
