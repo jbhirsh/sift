@@ -9,6 +9,13 @@ export interface MusicKitTrack {
   artworkURL: string | null;
 }
 
+export interface MusicKitPlaylist {
+  id: string;
+  name: string;
+  trackCount: number;
+  artworkURL: string | null;
+}
+
 export interface PlaybackState {
   position: number;
   isPlaying: boolean;
