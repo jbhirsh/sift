@@ -1,4 +1,4 @@
-import { Track } from '../types';
+import { Playlist, Track } from '../types';
 
 /**
  * Abstract interface for music provider services.
@@ -34,4 +34,10 @@ export interface MusicProviderService {
 
   /** Create a playlist with the given name containing the specified tracks. */
   createPlaylist(name: string, trackIDs: string[]): Promise<void>;
+
+  /** List the user's playlists. Optional — not all providers support it yet. */
+  loadPlaylists?(): Promise<Playlist[]>;
+
+  /** Load all tracks from a specific playlist. */
+  loadPlaylistTracks?(playlistID: string): Promise<Track[]>;
 }
