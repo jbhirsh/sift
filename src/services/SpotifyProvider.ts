@@ -1,6 +1,6 @@
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 
-import type { Track } from '../types';
+import type { Playlist, Track } from '../types';
 import type { MusicProviderService } from './MusicProviderInterface';
 import {
   authorize,
@@ -12,6 +12,8 @@ import {
 import {
   loadLibrary as fetchLibrary,
   createPlaylist as apiCreatePlaylist,
+  loadPlaylists as fetchPlaylists,
+  loadPlaylistTracks as fetchPlaylistTracks,
 } from './spotify/SpotifyAPI';
 
 /**
@@ -129,6 +131,37 @@ export class SpotifyProvider implements MusicProviderService {
     }
 
     await apiCreatePlaylist(token, name, trackIDs);
+  }
+
+  // -- Playlist browsing --
+
+  async loadPlaylists(): Promise<Playlist[]> {
+    await refreshTokenIfNeeded();
+    const token = await getAccessToken();
+    if (!token) {
+      throw new Error('Spotify: not authenticated');
+    }
+
+    return fetchPlaylists(token);
+  }
+
+  async loadPlaylistTracks(playlistID: string): Promise<Track[]> {
+    await refreshTokenIfNeeded();
+    const token = await getAccessToken();
+    if (!token) {
+      throw new Error('Spotify: not authenticated');
+    }
+
+    const tracks = await fetchPlaylistTracks(token, playlistID);
+
+    // Cache preview URLs for playback lookup
+    for (const track of tracks) {
+      if (track.previewURL) {
+        this.previewURLs.set(track.id, track.previewURL);
+      }
+    }
+
+    return tracks;
   }
 
   // -- Internal helpers --
