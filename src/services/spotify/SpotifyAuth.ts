@@ -16,7 +16,7 @@ const REDIRECT_URI = AuthSession.makeRedirectUri({
   scheme: 'sift',
   path: 'spotify-callback',
 });
-const SCOPES = 'user-library-read playlist-modify-public playlist-modify-private';
+const SCOPES = 'user-library-read playlist-read-private playlist-modify-public playlist-modify-private';
 const AUTH_URL = 'https://accounts.spotify.com/authorize';
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';
 

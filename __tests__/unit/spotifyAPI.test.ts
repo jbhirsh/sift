@@ -1,4 +1,4 @@
-import { loadLibrary, createPlaylist, fetchUserProfile } from '../../src/services/spotify/SpotifyAPI';
+import { loadLibrary, createPlaylist, fetchUserProfile, loadPlaylists, loadPlaylistTracks } from '../../src/services/spotify/SpotifyAPI';
 
 // ---------------------------------------------------------------------------
 // Mock fetch globally
@@ -326,5 +326,92 @@ describe('createPlaylist error handling', () => {
     await expect(
       createPlaylist('fake-token', 'Test', ['t1']),
     ).rejects.toThrow('Failed to add tracks to playlist: 500');
+  });
+});
+
+describe('loadPlaylists', () => {
+  test('returns mapped playlists from paginated response', async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        jsonResponse({
+          items: [
+            {
+              id: 'pl1',
+              name: 'Chill Vibes',
+              images: [{ url: 'https://img.spotify.com/pl1.jpg', width: 300 }],
+              tracks: { total: 42 },
+            },
+          ],
+          next: 'https://api.spotify.com/v1/me/playlists?offset=50&limit=50',
+          total: 2,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          items: [
+            {
+              id: 'pl2',
+              name: 'Workout',
+              images: [],
+              tracks: { total: 10 },
+            },
+          ],
+          next: null,
+          total: 2,
+        }),
+      );
+
+    const playlists = await loadPlaylists('fake-token');
+
+    expect(playlists).toHaveLength(2);
+    expect(playlists[0]).toEqual({
+      id: 'pl1',
+      name: 'Chill Vibes',
+      trackCount: 42,
+      artworkURL: 'https://img.spotify.com/pl1.jpg',
+    });
+    expect(playlists[1]).toEqual({
+      id: 'pl2',
+      name: 'Workout',
+      trackCount: 10,
+      artworkURL: undefined,
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('loadPlaylistTracks', () => {
+  test('returns mapped tracks and filters null tracks', async () => {
+    const validTrack = makeSpotifySavedTrack({ id: 'pt1', name: 'Good Track' });
+
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        items: [
+          { added_at: validTrack.added_at, track: validTrack.track },
+          { added_at: '2024-01-01T00:00:00Z', track: null }, // local/unavailable
+        ],
+        next: null,
+        total: 2,
+      }),
+    );
+
+    const tracks = await loadPlaylistTracks('fake-token', 'playlist123');
+
+    expect(tracks).toHaveLength(1);
+    expect(tracks[0].id).toBe('pt1');
+    expect(tracks[0].name).toBe('Good Track');
+    expect(mockFetch.mock.calls[0][0]).toBe(
+      'https://api.spotify.com/v1/playlists/playlist123/tracks?limit=50',
+    );
+  });
+
+  test('handles empty playlist', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ items: [], next: null, total: 0 }),
+    );
+
+    const tracks = await loadPlaylistTracks('fake-token', 'empty-playlist');
+
+    expect(tracks).toHaveLength(0);
   });
 });

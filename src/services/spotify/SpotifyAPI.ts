@@ -1,4 +1,4 @@
-import { Track } from '../../types';
+import { Playlist, Track } from '../../types';
 
 // ---------------------------------------------------------------------------
 // Spotify Web API response types
@@ -31,6 +31,18 @@ interface SpotifyTrackObject {
 interface SpotifySavedTrack {
   added_at: string;
   track: SpotifyTrackObject;
+}
+
+interface SpotifyPlaylistItem {
+  id: string;
+  name: string;
+  images: SpotifyImage[];
+  tracks: { total: number };
+}
+
+interface SpotifyPlaylistTrackItem {
+  added_at: string;
+  track: SpotifyTrackObject | null;
 }
 
 interface SpotifyPage<T> {
@@ -88,9 +100,8 @@ function largestImageURL(images: SpotifyImage[]): string | undefined {
   return sorted[0].url;
 }
 
-/** Map a Spotify saved-track object to the app's Track type. */
-function mapTrack(saved: SpotifySavedTrack): Track {
-  const t = saved.track;
+/** Map a Spotify track object and added_at date to the app's Track type. */
+function mapTrackObject(t: SpotifyTrackObject, addedAt: string): Track {
   return {
     id: t.id,
     name: t.name,
@@ -98,10 +109,15 @@ function mapTrack(saved: SpotifySavedTrack): Track {
     album: t.album.name,
     duration: t.duration_ms / 1000,
     playCount: 0, // Spotify Web API does not expose play counts
-    dateAdded: saved.added_at,
+    dateAdded: addedAt,
     artworkURL: largestImageURL(t.album.images),
     previewURL: t.preview_url ?? undefined,
   };
+}
+
+/** Map a Spotify saved-track object to the app's Track type. */
+function mapTrack(saved: SpotifySavedTrack): Track {
+  return mapTrackObject(saved.track, saved.added_at);
 }
 
 // ---------------------------------------------------------------------------
@@ -196,4 +212,57 @@ export async function createPlaylist(
       throw new Error(`Failed to add tracks to playlist: ${addResponse.status}`);
     }
   }
+}
+
+/**
+ * Load the authenticated user's playlists.
+ *
+ * Paginates through `GET /v1/me/playlists` (50 items per page) until every
+ * playlist has been retrieved, then maps to the app's Playlist type.
+ */
+export async function loadPlaylists(token: string): Promise<Playlist[]> {
+  const playlists: Playlist[] = [];
+  let url: string | null = `${BASE_URL}/v1/me/playlists?limit=50`;
+
+  while (url) {
+    const page: SpotifyPage<SpotifyPlaylistItem> = await apiGet(url, token);
+    for (const item of page.items) {
+      playlists.push({
+        id: item.id,
+        name: item.name,
+        trackCount: item.tracks.total,
+        artworkURL: largestImageURL(item.images),
+      });
+    }
+    url = page.next;
+  }
+
+  return playlists;
+}
+
+/**
+ * Load all tracks from a specific playlist.
+ *
+ * Paginates through `GET /v1/playlists/{id}/tracks` (50 items per page).
+ * Filters out null tracks (local or unavailable items).
+ */
+export async function loadPlaylistTracks(
+  token: string,
+  playlistID: string,
+): Promise<Track[]> {
+  const tracks: Track[] = [];
+  let url: string | null =
+    `${BASE_URL}/v1/playlists/${playlistID}/tracks?limit=50`;
+
+  while (url) {
+    const page: SpotifyPage<SpotifyPlaylistTrackItem> = await apiGet(url, token);
+    for (const item of page.items) {
+      if (item.track) {
+        tracks.push(mapTrackObject(item.track, item.added_at));
+      }
+    }
+    url = page.next;
+  }
+
+  return tracks;
 }
