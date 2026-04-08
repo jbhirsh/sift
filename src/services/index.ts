@@ -10,9 +10,19 @@ import { SpotifyProvider } from './SpotifyProvider';
  *
  * Returns SpotifyProvider for 'spotify' (preview playback via expo-audio).
  * For Apple Music, attempts to load the native MusicKit module and falls
- * back to MockMusicProvider if the native module is unavailable (e.g. Expo Go).
+ * back to MockMusicProvider if the native module is unavailable (e.g. Expo Go)
+ * or if EXPO_PUBLIC_USE_MOCK_PROVIDER is set (e.g. E2E simulator builds).
  */
 export function createMusicProvider(provider: MusicProvider): MusicProviderService {
+  if (process.env.EXPO_PUBLIC_USE_MOCK_PROVIDER === '1') {
+    Sentry.addBreadcrumb({
+      category: 'music-provider',
+      message: 'Using MockMusicProvider (EXPO_PUBLIC_USE_MOCK_PROVIDER)',
+      level: 'info',
+    });
+    return new MockMusicProvider();
+  }
+
   switch (provider) {
     case 'spotify':
       return new SpotifyProvider();

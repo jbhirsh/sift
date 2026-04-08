@@ -1,0 +1,22 @@
+appId: com.jessicahirsh.sift
+name: "App Launch - Setup Screen"
+---
+
+# Verify the app launches to the setup screen
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+- assertVisible:
+    id: "setup-brand"
+
+# Verify provider selector is visible (Apple Music selected by default)
+- assertVisible: "Apple Music"
+- assertVisible: "Spotify"
+
+# Verify sort order picker is visible
+- assertVisible: "Least Played"
+
+# Verify start button is present
+- assertVisible: "Start Sifting"

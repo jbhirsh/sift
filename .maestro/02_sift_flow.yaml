@@ -1,0 +1,45 @@
+appId: com.jessicahirsh.sift
+name: "Setup to Sifting - Full Flow"
+---
+
+# Start fresh and go through setup → loading → sifting
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+# Verify setup screen
+- assertVisible:
+    id: "setup-brand"
+
+# Tap start to begin sifting
+- tapOn: "Start Sifting"
+
+# Wait for loading to complete and sift screen to appear
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 10000
+
+# Verify sift screen elements
+- assertVisible:
+    id: "card-track-name"
+- assertVisible:
+    id: "card-artist-name"
+- assertVisible:
+    id: "remaining-count"
+- assertVisible:
+    id: "stat-kept"
+- assertVisible:
+    id: "stat-removed"
+- assertVisible:
+    id: "stat-skipped"
+
+# Verify action buttons are present
+- assertVisible: "Keep"
+- assertVisible: "Skip"
+- assertVisible: "Remove"
+
+# Verify player controls
+- assertVisible:
+    id: "play-pause-button"

@@ -1,0 +1,57 @@
+appId: com.jessicahirsh.sift
+name: "Pause and Resume Session"
+---
+
+# Test pausing a session and resuming it
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+- tapOn: "Start Sifting"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 10000
+
+# Make a decision so we have progress
+- tapOn: "Keep"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 3000
+
+# Tap stop button to pause session
+- tapOn:
+    id: "stop-button"
+
+# Verify done/paused screen appears
+- extendedWaitUntil:
+    visible:
+      id: "done-title"
+    timeout: 5000
+
+- assertVisible:
+    id: "done-title"
+    text: "Session paused."
+
+# Verify summary shows our 1 kept track
+- assertVisible:
+    id: "summary-count-kept"
+    text: "1"
+
+# Resume the session
+- tapOn: "Resume Session"
+
+# Verify we're back on the sift screen
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 5000
+
+# Stats should still show our previous progress
+- assertVisible:
+    id: "stat-kept"
+    text: "1 kept"
