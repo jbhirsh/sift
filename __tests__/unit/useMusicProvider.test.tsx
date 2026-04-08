@@ -1,7 +1,7 @@
 import React from 'react';
 import { TouchableOpacity } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
-import { SiftProvider } from '../../src/context/SiftContext';
+import { SiftProvider, useSift } from '../../src/context/SiftContext';
 import { useMusicProvider } from '../../src/hooks/useMusicProvider';
 import { Track } from '../../src/types';
 
@@ -26,6 +26,8 @@ const mockProvider = {
   requestAuthorization: jest.fn().mockResolvedValue(true),
   isAuthorized: jest.fn().mockResolvedValue(true),
   loadLibrary: jest.fn().mockResolvedValue([]),
+  loadPlaylists: jest.fn().mockResolvedValue([]),
+  loadPlaylistTracks: jest.fn().mockResolvedValue([]),
   play: jest.fn().mockResolvedValue(undefined),
   pause: jest.fn().mockResolvedValue(undefined),
   resume: jest.fn().mockResolvedValue(undefined),
@@ -49,6 +51,8 @@ const mockTrack: Track = {
   duration: 200, playCount: 10, dateAdded: '2020-01-01T00:00:00.000Z',
 };
 
+let lastLoadPlaylistsResult: unknown[] = [];
+
 function TestConsumer() {
   const provider = useMusicProvider();
   return (
@@ -66,6 +70,28 @@ function TestConsumer() {
       <TouchableOpacity testID="skip-bwd" onPress={() => provider.skipBackward()} />
       <TouchableOpacity testID="create-playlist" onPress={() => provider.createPlaylist('Test', ['1'])} />
       <TouchableOpacity testID="load-library" onPress={() => provider.loadLibrary()} />
+      <TouchableOpacity testID="load-playlists" onPress={async () => {
+        lastLoadPlaylistsResult = await provider.loadPlaylists();
+      }} />
+      <TouchableOpacity testID="load-tracks" onPress={() => provider.loadTracks()} />
+    </>
+  );
+}
+
+function TestConsumerWithSetSource() {
+  const provider = useMusicProvider();
+  const { dispatch } = useSift();
+  return (
+    <>
+      <TouchableOpacity testID="set-source-playlist" onPress={() => {
+        dispatch({
+          type: 'SET_SOURCE',
+          source: { type: 'playlist', playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 } },
+        });
+      }} />
+      <TouchableOpacity testID="load-tracks" onPress={async () => {
+        await provider.loadTracks();
+      }} />
     </>
   );
 }
@@ -82,9 +108,12 @@ describe('useMusicProvider', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    lastLoadPlaylistsResult = [];
     mockProvider.requestAuthorization.mockResolvedValue(true);
     mockProvider.isAuthorized.mockResolvedValue(true);
     mockProvider.loadLibrary.mockResolvedValue([mockTrack]);
+    mockProvider.loadPlaylists.mockResolvedValue([]);
+    mockProvider.loadPlaylistTracks.mockResolvedValue([mockTrack]);
     mockProvider.play.mockResolvedValue(undefined);
     mockProvider.pause.mockResolvedValue(undefined);
     mockProvider.resume.mockResolvedValue(undefined);
@@ -290,5 +319,59 @@ describe('useMusicProvider', () => {
       fireEvent.press(getByTestId('load-library'));
     });
     // Should dispatch generic error message for non-Error objects
+  });
+
+  test('loadPlaylists returns playlists from provider', async () => {
+    const playlists = [{ id: 'p1', name: 'My Playlist', trackCount: 5 }];
+    mockProvider.loadPlaylists.mockResolvedValue(playlists);
+    const { getByTestId } = renderWithProvider();
+    await act(async () => {
+      fireEvent.press(getByTestId('load-playlists'));
+    });
+    expect(mockProvider.loadPlaylists).toHaveBeenCalled();
+    expect(lastLoadPlaylistsResult).toEqual(playlists);
+  });
+
+  test('loadPlaylists returns empty array when provider does not support it', async () => {
+    const originalLoadPlaylists = mockProvider.loadPlaylists;
+    mockProvider.loadPlaylists = undefined as unknown as jest.Mock;
+    const { getByTestId } = renderWithProvider();
+    await act(async () => {
+      fireEvent.press(getByTestId('load-playlists'));
+    });
+    expect(lastLoadPlaylistsResult).toEqual([]);
+    mockProvider.loadPlaylists = originalLoadPlaylists;
+  });
+
+  test('loadTracks loads library when source is library', async () => {
+    const { getByTestId } = renderWithProvider();
+    await act(async () => {
+      fireEvent.press(getByTestId('load-tracks'));
+    });
+    expect(mockProvider.loadLibrary).toHaveBeenCalled();
+  });
+
+  test('loadTracks loads playlist tracks when source is playlist', async () => {
+    mockProvider.loadPlaylistTracks.mockResolvedValue([mockTrack]);
+
+    // We need to render with a provider that has a playlist source set.
+    // The simplest approach is to use the SiftProvider and dispatch SET_SOURCE.
+    const { getByTestId } = render(
+      <SiftProvider initialTracks={[mockTrack]}>
+        <TestConsumerWithSetSource />
+      </SiftProvider>
+    );
+
+    // Set source to playlist
+    await act(async () => {
+      fireEvent.press(getByTestId('set-source-playlist'));
+    });
+
+    // Now load tracks
+    await act(async () => {
+      fireEvent.press(getByTestId('load-tracks'));
+    });
+
+    expect(mockProvider.loadPlaylistTracks).toHaveBeenCalledWith('p1');
   });
 });

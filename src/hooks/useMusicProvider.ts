@@ -3,6 +3,7 @@ import { Alert, Linking } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { useSift } from '../context/SiftContext';
 import { createMusicProvider, MusicProviderService } from '../services';
+import { Playlist, Track } from '../types';
 
 const POLL_INTERVAL_MS = 500;
 const SKIP_SECONDS = 15;
@@ -176,6 +177,72 @@ export function useMusicProvider() {
     dispatch({ type: 'SET_PLAYBACK_POSITION', position: newPos });
   }, [dispatch]);
 
+  const loadPlaylists = useCallback(async (): Promise<Playlist[]> => {
+    try {
+      const isAuth = await providerRef.current.isAuthorized();
+      if (!isAuth) {
+        const granted = await providerRef.current.requestAuthorization();
+        if (!granted) return [];
+      }
+      const playlists = await providerRef.current.loadPlaylists?.();
+      return playlists ?? [];
+    } catch (err) {
+      Sentry.captureException(err, { tags: { flow: 'load-playlists' } });
+      return [];
+    }
+  }, []);
+
+  const loadTracks = useCallback(async () => {
+    const source = state.source;
+    const isPlaylist = source.type === 'playlist';
+    const label = isPlaylist ? `"${source.playlist.name}"` : 'library';
+
+    dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0, message: `Loading ${label}…` });
+    dispatch({ type: 'SET_PHASE', phase: 'loading' });
+
+    try {
+      const isAuth = await providerRef.current.isAuthorized();
+      if (!isAuth) {
+        const granted = await providerRef.current.requestAuthorization();
+        if (!granted) {
+          dispatch({ type: 'SET_LOAD_ERROR', error: 'Music library access is required to use Sift.' });
+          Alert.alert(
+            'Music Access Required',
+            'Sift needs access to your music library. Please enable it in Settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() },
+            ],
+          );
+          return;
+        }
+      }
+
+      dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0.3, message: 'Fetching tracks…' });
+
+      let tracks: Track[];
+      if (isPlaylist) {
+        const result = await providerRef.current.loadPlaylistTracks?.(source.playlist.id);
+        if (!result) throw new Error('This provider does not support playlist loading');
+        tracks = result;
+      } else {
+        tracks = await providerRef.current.loadLibrary();
+      }
+
+      Sentry.addBreadcrumb({
+        category: 'music-provider',
+        message: `Loaded ${tracks.length} tracks from ${label}`,
+        level: 'info',
+      });
+      dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0.9, message: 'Sorting tracks…' });
+      dispatch({ type: 'LOAD_TRACKS', tracks });
+    } catch (err) {
+      Sentry.captureException(err, { tags: { flow: 'load-tracks' } });
+      const message = err instanceof Error ? err.message : 'Failed to load tracks';
+      dispatch({ type: 'SET_LOAD_ERROR', error: message });
+    }
+  }, [dispatch, state.source]);
+
   const createPlaylist = useCallback(
     async (name: string, trackIDs: string[]) => {
       dispatch({ type: 'SET_CREATING_PLAYLIST', creating: true });
@@ -197,6 +264,8 @@ export function useMusicProvider() {
   return {
     authorize,
     loadLibrary,
+    loadPlaylists,
+    loadTracks,
     play,
     pause,
     resume,
