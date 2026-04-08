@@ -1,0 +1,5 @@
+# Maestro E2E test configuration for Sift
+# The app falls back to MockMusicProvider on simulator (no native MusicKit),
+# so all flows run against 10 mock tracks automatically.
+
+appId: com.jessicahirsh.sift

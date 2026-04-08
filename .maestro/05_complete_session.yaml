@@ -1,0 +1,37 @@
+appId: com.jessicahirsh.sift
+name: "Complete All Tracks"
+---
+
+# Sift through all 10 mock tracks to reach the done screen
+- launchApp:
+    clearState: true
+
+- tapOn: "Start Sifting"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 10000
+
+# Sift through all 10 tracks (keep them all for simplicity)
+- repeat:
+    times: 10
+    commands:
+      - tapOn: "Keep"
+      - waitForAnimationToEnd
+
+# Verify done screen
+- assertVisible:
+    id: "done-title"
+    text: "All done."
+
+# Verify summary — all 10 kept
+- assertVisible:
+    id: "summary-count-kept"
+    text: "10"
+- assertVisible:
+    id: "summary-count-skipped"
+    text: "0"
+
+# Verify "Start Over" button is available
+- assertVisible: "Start Over"
