@@ -1,10 +1,11 @@
 import { siftReducer, SiftState } from '../../src/context/SiftContext';
-import { Track } from '../../src/types';
+import { Track, SiftSource } from '../../src/types';
 
 function makeState(overrides: Partial<SiftState> = {}): SiftState {
   return {
     phase: 'sifting',
     provider: 'apple-music',
+    source: { type: 'library' },
     tracks: [],
     cursor: 0,
     kept: [],
@@ -231,6 +232,52 @@ describe('siftReducer', () => {
     const state = makeState();
     const next = siftReducer(state, { type: 'UNKNOWN' } as never);
     expect(next).toBe(state);
+  });
+
+  test('SET_SOURCE sets source on state', () => {
+    const state = makeState();
+    const playlistSource: SiftSource = {
+      type: 'playlist',
+      playlist: { id: 'p1', name: 'My Playlist', trackCount: 10 },
+    };
+    const next = siftReducer(state, { type: 'SET_SOURCE', source: playlistSource });
+    expect(next.source).toEqual(playlistSource);
+  });
+
+  test('START_FRESH resets source to library', () => {
+    const state = makeState({
+      source: { type: 'playlist', playlist: { id: 'p1', name: 'My Playlist', trackCount: 10 } },
+    });
+    const next = siftReducer(state, { type: 'START_FRESH' });
+    expect(next.source).toEqual({ type: 'library' });
+  });
+
+  test('RESUME_SESSION with source preserves it', () => {
+    const state = makeState();
+    const playlistSource: SiftSource = {
+      type: 'playlist',
+      playlist: { id: 'p1', name: 'My Playlist', trackCount: 10 },
+    };
+    const session = {
+      ...state,
+      source: playlistSource,
+      tracks: [trackA],
+      phase: 'sifting' as const,
+    };
+    const next = siftReducer(state, { type: 'RESUME_SESSION', session });
+    expect(next.source).toEqual(playlistSource);
+  });
+
+  test('RESUME_SESSION without source defaults to library', () => {
+    const state = makeState();
+    const session = {
+      ...state,
+      source: { type: 'library' as const },
+      tracks: [trackA],
+      phase: 'sifting' as const,
+    };
+    const next = siftReducer(state, { type: 'RESUME_SESSION', session });
+    expect(next.source).toEqual({ type: 'library' });
   });
 
   test('START_FRESH resets state and sets phase to loading', () => {

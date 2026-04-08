@@ -8,6 +8,7 @@ import {
   MusicProvider,
   ConnectionStatus,
   SiftSession,
+  SiftSource,
 } from '../types';
 import { saveSession, loadSession, clearSession, hasSession } from '../services/SessionStore';
 
@@ -16,6 +17,7 @@ import { saveSession, loadSession, clearSession, hasSession } from '../services/
 export interface SiftState {
   phase: AppPhase;
   provider: MusicProvider;
+  source: SiftSource;
   tracks: Track[];
   cursor: number;
   kept: Track[];
@@ -37,6 +39,7 @@ export interface SiftState {
 const initialState: SiftState = {
   phase: 'setup',
   provider: 'apple-music',
+  source: { type: 'library' },
   tracks: [],
   cursor: 0,
   kept: [],
@@ -73,6 +76,7 @@ type SiftAction =
   | { type: 'SET_PLAYLIST_ERROR'; error: string | null }
   | { type: 'SET_CREATING_PLAYLIST'; creating: boolean }
   | { type: 'SET_HAS_SAVED_SESSION'; has: boolean }
+  | { type: 'SET_SOURCE'; source: SiftSource }
   | { type: 'RESUME_SESSION'; session: Omit<SiftState, 'phase'> & { phase?: AppPhase } }
   | { type: 'START_FRESH' };
 
@@ -160,6 +164,9 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
     case 'SET_HAS_SAVED_SESSION':
       return { ...state, hasSavedSession: action.has };
 
+    case 'SET_SOURCE':
+      return { ...state, source: action.source };
+
     case 'RESUME_SESSION':
       return {
         ...state,
@@ -170,6 +177,7 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
     case 'START_FRESH':
       return {
         ...state,
+        source: { type: 'library' },
         tracks: [],
         cursor: 0,
         kept: [],
@@ -255,6 +263,7 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
       sortOrder: state.sortOrder,
       savedAt: new Date().toISOString(),
       provider: state.provider,
+      source: state.source,
     };
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -265,7 +274,7 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [state.cursor, state.kept, state.removed, state.skipped, state.tracks, state.phase, state.sortOrder, state.provider]);
+  }, [state.cursor, state.kept, state.removed, state.skipped, state.tracks, state.phase, state.sortOrder, state.provider, state.source]);
 
   const currentTrack = state.tracks[state.cursor];
   const nextTrack = state.tracks[state.cursor + 1];
@@ -297,11 +306,12 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
       sortOrder: state.sortOrder,
       savedAt: new Date().toISOString(),
       provider: state.provider,
+      source: state.source,
     };
     saveSession(session);
     dispatch({ type: 'SET_IS_PLAYING', isPlaying: false });
     dispatch({ type: 'SET_PHASE', phase: 'paused' });
-  }, [dispatch, state.tracks, state.cursor, state.kept, state.removed, state.skipped, state.sortOrder, state.provider]);
+  }, [dispatch, state.tracks, state.cursor, state.kept, state.removed, state.skipped, state.sortOrder, state.provider, state.source]);
 
   const resumeFromPause = useCallback(() => {
     Sentry.addBreadcrumb({ category: 'user-action', message: 'Session resumed from pause', level: 'info' });
@@ -330,6 +340,7 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
             skipped: session.skipped,
             sortOrder: session.sortOrder,
             provider: session.provider ?? state.provider,
+            source: session.source ?? { type: 'library' },
             phase: 'sifting',
             loadProgress: 1,
             loadMessage: '',
