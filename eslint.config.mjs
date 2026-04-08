@@ -21,4 +21,10 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    files: ['__tests__/**/*.{ts,tsx}'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
 );

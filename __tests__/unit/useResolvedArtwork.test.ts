@@ -21,7 +21,6 @@ let useResolvedArtwork: typeof import('../../src/hooks/useResolvedArtwork').useR
 let clearArtworkCache: typeof import('../../src/hooks/useResolvedArtwork').clearArtworkCache;
 
 beforeAll(() => {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const mod = require('../../src/hooks/useResolvedArtwork');
   useResolvedArtwork = mod.useResolvedArtwork;
   clearArtworkCache = mod.clearArtworkCache;

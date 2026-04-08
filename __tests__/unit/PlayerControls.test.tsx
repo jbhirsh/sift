@@ -21,11 +21,26 @@ jest.mock('react-native-reanimated', () => ({
   runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
+// Capture gesture callbacks
+type GestureCallback = (event: Record<string, unknown>) => void;
+let tapOnEnd: GestureCallback | undefined;
+let panOnUpdate: GestureCallback | undefined;
+
 jest.mock('react-native-gesture-handler', () => ({
   GestureDetector: ({ children }: { children: React.ReactNode }) => children,
   Gesture: {
-    Tap: () => ({ onEnd: () => ({}) }),
-    Pan: () => ({ onUpdate: () => ({}) }),
+    Tap: () => ({
+      onEnd: (fn: GestureCallback) => {
+        tapOnEnd = fn;
+        return {};
+      },
+    }),
+    Pan: () => ({
+      onUpdate: (fn: GestureCallback) => {
+        panOnUpdate = fn;
+        return {};
+      },
+    }),
     Race: () => ({}),
   },
 }));
@@ -99,6 +114,10 @@ import PlayerControls from '../../src/components/PlayerControls';
 describe('PlayerControls', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    tapOnEnd = undefined;
+    panOnUpdate = undefined;
+    mockState.isPlaying = false;
+    mockState.playbackPosition = 30;
   });
 
   test('renders elapsed and duration time', () => {
@@ -128,9 +147,73 @@ describe('PlayerControls', () => {
     expect(mockToggle).toHaveBeenCalled();
   });
 
+  test('pressing play/pause calls togglePlayPause when isPlaying is true', () => {
+    mockState.playbackPosition = 30;
+    mockState.isPlaying = true;
+    const { getByTestId } = render(<PlayerControls />);
+    fireEvent.press(getByTestId('play-pause-button'));
+    expect(mockToggle).toHaveBeenCalled();
+  });
+
   test('auto-plays track on mount', () => {
     mockState.playbackPosition = 0;
     render(<PlayerControls />);
     expect(mockPlay).toHaveBeenCalledWith('1');
+  });
+
+  test('pauses playback on unmount', () => {
+    const { unmount } = render(<PlayerControls />);
+    unmount();
+    expect(mockPause).toHaveBeenCalled();
+  });
+
+  test('tap gesture with zero slider width does not seek', () => {
+    render(<PlayerControls />);
+    expect(tapOnEnd).toBeDefined();
+    tapOnEnd?.({ x: 100 });
+    expect(mockSeek).not.toHaveBeenCalled();
+  });
+
+  test('pan gesture with zero slider width does not seek', () => {
+    render(<PlayerControls />);
+    expect(panOnUpdate).toBeDefined();
+    panOnUpdate?.({ x: 50 });
+    expect(mockSeek).not.toHaveBeenCalled();
+  });
+
+  test('tap gesture seeks to position after layout', () => {
+    const { UNSAFE_getAllByType } = render(<PlayerControls />);
+    // Find slider container and trigger layout to set sliderWidth > 0
+    const { View } = require('react-native');
+    const views = UNSAFE_getAllByType(View);
+    // The slider container is the View with onLayout prop
+    const sliderContainer = views.find(
+      (v: { props: { onLayout?: unknown } }) => v.props.onLayout,
+    );
+    if (sliderContainer) {
+      fireEvent(sliderContainer, 'layout', {
+        nativeEvent: { layout: { width: 300, height: 30, x: 0, y: 0 } },
+      });
+    }
+    expect(tapOnEnd).toBeDefined();
+    tapOnEnd?.({ x: 150 });
+    expect(mockSeek).toHaveBeenCalled();
+  });
+
+  test('pan gesture seeks to position after layout', () => {
+    const { UNSAFE_getAllByType } = render(<PlayerControls />);
+    const { View } = require('react-native');
+    const views = UNSAFE_getAllByType(View);
+    const sliderContainer = views.find(
+      (v: { props: { onLayout?: unknown } }) => v.props.onLayout,
+    );
+    if (sliderContainer) {
+      fireEvent(sliderContainer, 'layout', {
+        nativeEvent: { layout: { width: 300, height: 30, x: 0, y: 0 } },
+      });
+    }
+    expect(panOnUpdate).toBeDefined();
+    panOnUpdate?.({ x: 100 });
+    expect(mockSeek).toHaveBeenCalled();
   });
 });

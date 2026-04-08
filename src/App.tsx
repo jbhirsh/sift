@@ -79,7 +79,7 @@ function PhaseRouter() {
         presentationStyle="pageSheet"
         onRequestClose={() => setSettingsVisible(false)}
       >
-        <SettingsScreen onClose={() => setSettingsVisible(false)} />
+        <SettingsScreen />
       </Modal>
 
       <StatusBar style="auto" />

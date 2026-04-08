@@ -8,6 +8,11 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(),
 }));
 
+jest.mock('@sentry/react-native', () => ({
+  captureException: jest.fn(),
+  addBreadcrumb: jest.fn(),
+}));
+
 const mockGetItem = AsyncStorage.getItem as jest.Mock;
 const mockSetItem = AsyncStorage.setItem as jest.Mock;
 const mockRemoveItem = AsyncStorage.removeItem as jest.Mock;
@@ -100,5 +105,37 @@ describe('hasSession', () => {
     const result = await hasSession();
 
     expect(result).toBe(false);
+  });
+
+  it('returns false when getItem throws', async () => {
+    mockGetItem.mockRejectedValue(new Error('storage error'));
+
+    const result = await hasSession();
+
+    expect(result).toBe(false);
+  });
+});
+
+describe('saveSession error handling', () => {
+  it('catches and reports error to Sentry', async () => {
+    const Sentry = jest.requireMock('@sentry/react-native');
+    mockSetItem.mockRejectedValue(new Error('write error'));
+
+    await saveSession(sampleSession);
+
+    expect(Sentry.captureException).toHaveBeenCalled();
+  });
+});
+
+describe('clearSession error handling', () => {
+  it('catches error and adds Sentry breadcrumb', async () => {
+    const Sentry = jest.requireMock('@sentry/react-native');
+    mockRemoveItem.mockRejectedValue(new Error('remove error'));
+
+    await clearSession();
+
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'session' }),
+    );
   });
 });
