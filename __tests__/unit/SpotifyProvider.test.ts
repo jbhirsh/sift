@@ -32,6 +32,17 @@ jest.mock('../../src/services/spotify/SpotifyAPI', () => ({
     },
   ]),
   createPlaylist: jest.fn().mockResolvedValue(undefined),
+  loadPlaylists: jest.fn().mockResolvedValue([
+    { id: 'pl1', name: 'Chill', trackCount: 20, artworkURL: 'https://img.spotify.com/pl1.jpg' },
+    { id: 'pl2', name: 'Workout', trackCount: 10 },
+  ]),
+  loadPlaylistTracks: jest.fn().mockResolvedValue([
+    {
+      id: 'pt1', name: 'Playlist Track', artist: 'Artist', album: 'Album',
+      duration: 30, playCount: 0, dateAdded: '2024-01-01',
+      previewURL: 'https://example.com/pt-preview.mp3',
+    },
+  ]),
 }));
 
 import { SpotifyProvider } from '../../src/services/SpotifyProvider';
@@ -152,5 +163,43 @@ describe('SpotifyProvider', () => {
   test('createPlaylist throws when not authenticated', async () => {
     (SpotifyAuth.getAccessToken as jest.Mock).mockResolvedValueOnce(null);
     await expect(provider.createPlaylist('Test', ['1'])).rejects.toThrow('not authenticated');
+  });
+
+  test('loadPlaylists refreshes token and fetches playlists', async () => {
+    const playlists = await provider.loadPlaylists();
+    expect(SpotifyAuth.refreshTokenIfNeeded).toHaveBeenCalled();
+    expect(SpotifyAuth.getAccessToken).toHaveBeenCalled();
+    expect(SpotifyAPI.loadPlaylists).toHaveBeenCalledWith('test-token');
+    expect(playlists).toHaveLength(2);
+    expect(playlists[0].name).toBe('Chill');
+  });
+
+  test('loadPlaylists throws when not authenticated', async () => {
+    (SpotifyAuth.getAccessToken as jest.Mock).mockResolvedValueOnce(null);
+    await expect(provider.loadPlaylists()).rejects.toThrow('not authenticated');
+  });
+
+  test('loadPlaylistTracks refreshes token and fetches tracks', async () => {
+    const tracks = await provider.loadPlaylistTracks('pl1');
+    expect(SpotifyAuth.refreshTokenIfNeeded).toHaveBeenCalled();
+    expect(SpotifyAuth.getAccessToken).toHaveBeenCalled();
+    expect(SpotifyAPI.loadPlaylistTracks).toHaveBeenCalledWith('test-token', 'pl1');
+    expect(tracks).toHaveLength(1);
+    expect(tracks[0].id).toBe('pt1');
+  });
+
+  test('loadPlaylistTracks caches preview URLs', async () => {
+    await provider.loadPlaylistTracks('pl1');
+    // Play the track loaded from playlist — should use cached preview URL
+    await provider.play('pt1');
+    expect(createAudioPlayer).toHaveBeenCalledWith(
+      { uri: 'https://example.com/pt-preview.mp3' },
+      { updateInterval: 0.5 },
+    );
+  });
+
+  test('loadPlaylistTracks throws when not authenticated', async () => {
+    (SpotifyAuth.getAccessToken as jest.Mock).mockResolvedValueOnce(null);
+    await expect(provider.loadPlaylistTracks('pl1')).rejects.toThrow('not authenticated');
   });
 });
