@@ -290,3 +290,41 @@ describe('fetchUserProfile', () => {
     expect(profile.display_name).toBe('Jane Doe');
   });
 });
+
+describe('apiGet error handling', () => {
+  test('throws on non-401/403 error status', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 500));
+
+    await expect(loadLibrary('fake-token')).rejects.toThrow('spotify_api_error_500');
+  });
+});
+
+describe('createPlaylist error handling', () => {
+  test('throws when playlist creation fails', async () => {
+    // GET /v1/me — success
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ id: 'user123', display_name: 'Test User' }),
+    );
+    // POST create playlist — failure
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 403));
+
+    await expect(
+      createPlaylist('fake-token', 'Test', ['t1']),
+    ).rejects.toThrow('Failed to create playlist: 403');
+  });
+
+  test('throws when adding tracks fails', async () => {
+    // GET /v1/me
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ id: 'user123', display_name: 'Test User' }),
+    );
+    // POST create playlist — success
+    mockFetch.mockResolvedValueOnce(jsonResponse({ id: 'pl1' }, 200));
+    // POST add tracks — failure
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 500));
+
+    await expect(
+      createPlaylist('fake-token', 'Test', ['t1']),
+    ).rejects.toThrow('Failed to add tracks to playlist: 500');
+  });
+});

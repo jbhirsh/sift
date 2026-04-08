@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,13 +15,9 @@ export default function LoadingScreen() {
   const { state } = useSift();
   const { colors } = useTheme();
   const { loadLibrary } = useMusicProvider();
-  const loadedRef = useRef(false);
 
   useEffect(() => {
-    if (!loadedRef.current) {
-      loadedRef.current = true;
-      loadLibrary();
-    }
+    loadLibrary();
   }, [loadLibrary]);
 
   return (

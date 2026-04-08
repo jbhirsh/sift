@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render, fireEvent, act } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
@@ -59,18 +59,23 @@ jest.mock('../../src/services/SessionStore', () => ({
   clearSession: jest.fn().mockResolvedValue(undefined),
 }));
 
+const mockProviderInstance = {
+  requestAuthorization: jest.fn().mockResolvedValue(true),
+  isAuthorized: jest.fn().mockResolvedValue(true),
+  loadLibrary: jest.fn().mockResolvedValue([
+    { id: '1', name: 'A', artist: 'B', album: 'C', duration: 100, playCount: 1, dateAdded: '2020-01-01' },
+    { id: '2', name: 'D', artist: 'E', album: 'F', duration: 120, playCount: 2, dateAdded: '2020-01-02' },
+  ]),
+  play: jest.fn().mockResolvedValue(undefined),
+  pause: jest.fn().mockResolvedValue(undefined),
+  resume: jest.fn().mockResolvedValue(undefined),
+  seek: jest.fn(),
+  getPlaybackState: jest.fn().mockReturnValue({ position: 0, isPlaying: false }),
+  createPlaylist: jest.fn().mockResolvedValue(undefined),
+};
+
 jest.mock('../../src/services', () => ({
-  createMusicProvider: jest.fn(() => ({
-    requestAuthorization: jest.fn().mockResolvedValue(true),
-    isAuthorized: jest.fn().mockResolvedValue(true),
-    loadLibrary: jest.fn().mockResolvedValue([]),
-    play: jest.fn().mockResolvedValue(undefined),
-    pause: jest.fn().mockResolvedValue(undefined),
-    resume: jest.fn().mockResolvedValue(undefined),
-    seek: jest.fn(),
-    getPlaybackState: jest.fn().mockReturnValue({ position: 0, isPlaying: false }),
-    createPlaylist: jest.fn().mockResolvedValue(undefined),
-  })),
+  createMusicProvider: jest.fn(() => mockProviderInstance),
 }));
 
 jest.mock('../../src/hooks/useResolvedArtwork', () => ({
@@ -78,16 +83,11 @@ jest.mock('../../src/hooks/useResolvedArtwork', () => ({
 }));
 
 import App from '../../src/App';
-import { SiftProvider } from '../../src/context/SiftContext';
-import { ThemeProvider } from '../../src/theme/ThemeContext';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
 const mockFrame = { x: 0, y: 0, width: 390, height: 844 };
 
 function renderApp() {
-  // App already wraps in SafeAreaProvider, but we need to provide metrics
-  // Since App uses SafeAreaProvider internally, we wrap with one that has metrics
   return render(
     <SafeAreaProvider initialMetrics={{ insets: mockInsets, frame: mockFrame }}>
       <App />
@@ -96,6 +96,14 @@ function renderApp() {
 }
 
 describe('App', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockProviderInstance.loadLibrary.mockResolvedValue([
+      { id: '1', name: 'A', artist: 'B', album: 'C', duration: 100, playCount: 1, dateAdded: '2020-01-01' },
+      { id: '2', name: 'D', artist: 'E', album: 'F', duration: 120, playCount: 2, dateAdded: '2020-01-02' },
+    ]);
+  });
+
   test('renders SetupScreen initially', () => {
     const { getByTestId } = renderApp();
     expect(getByTestId('setup-brand')).toBeTruthy();
@@ -111,25 +119,89 @@ describe('App', () => {
     expect(toJSON()).toBeTruthy();
   });
 
-  test('shows settings button when not in setup phase', async () => {
-    const { getByTestId } = render(
-      <SafeAreaProvider initialMetrics={{ insets: mockInsets, frame: mockFrame }}>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <SafeAreaProvider initialMetrics={{ insets: mockInsets, frame: mockFrame }}>
-            <ThemeProvider>
-              <SiftProvider initialTracks={[
-                { id: '1', name: 'A', artist: 'B', album: 'C', duration: 100, playCount: 1, dateAdded: '2020-01-01' },
-              ]}>
-                {/* Need to import PhaseRouter... but it's not exported.
-                    Instead let's just verify App renders */}
-                <App />
-              </SiftProvider>
-            </ThemeProvider>
-          </SafeAreaProvider>
-        </GestureHandlerRootView>
-      </SafeAreaProvider>
-    );
-    // App renders SetupScreen initially, so settings button won't appear
-    expect(getByTestId('setup-brand')).toBeTruthy();
+  test('shows settings button after leaving setup phase', async () => {
+    const { getByText, getByTestId, queryByTestId } = renderApp();
+    expect(queryByTestId('settings-button')).toBeNull();
+
+    await act(async () => {
+      fireEvent.press(getByText('Start Sifting'));
+    });
+    await act(async () => {});
+
+    // Settings button visible in sifting (loading is transient with instant mock)
+    expect(getByTestId('settings-button')).toBeTruthy();
+  });
+
+  test('transitions to sifting phase after loading', async () => {
+    const { getByText, getByTestId } = renderApp();
+
+    await act(async () => {
+      fireEvent.press(getByText('Start Sifting'));
+    });
+    await act(async () => {});
+
+    expect(getByTestId('remaining-count')).toBeTruthy();
+    expect(getByTestId('settings-button')).toBeTruthy();
+  });
+
+  test('settings button opens modal', async () => {
+    const { getByText, getByTestId } = renderApp();
+
+    await act(async () => {
+      fireEvent.press(getByText('Start Sifting'));
+    });
+    await act(async () => {});
+
+    fireEvent.press(getByTestId('settings-button'));
+    expect(getByTestId('settings-modal').props.visible).toBe(true);
+  });
+
+  test('modal onRequestClose closes the modal', async () => {
+    const { getByText, getByTestId, queryByTestId } = renderApp();
+
+    await act(async () => {
+      fireEvent.press(getByText('Start Sifting'));
+    });
+    await act(async () => {});
+
+    // Open modal
+    await act(async () => {
+      fireEvent.press(getByTestId('settings-button'));
+    });
+    const modal = getByTestId('settings-modal');
+    expect(modal.props.visible).toBe(true);
+
+    // Close via onRequestClose — modal disappears from tree when visible=false
+    await act(async () => {
+      modal.props.onRequestClose();
+    });
+    expect(queryByTestId('settings-modal')).toBeNull();
+  });
+
+  test('transitions to done phase when all tracks sifted', async () => {
+    const { getByText, getByLabelText } = renderApp();
+
+    await act(async () => {
+      fireEvent.press(getByText('Start Sifting'));
+    });
+    await act(async () => {});
+
+    fireEvent.press(getByLabelText('Skip'));
+    fireEvent.press(getByLabelText('Skip'));
+
+    expect(getByText('Start Over')).toBeTruthy();
+  });
+
+  test('transitions to paused phase when stop is pressed', async () => {
+    const { getByText, getByTestId } = renderApp();
+
+    await act(async () => {
+      fireEvent.press(getByText('Start Sifting'));
+    });
+    await act(async () => {});
+
+    fireEvent.press(getByTestId('stop-button'));
+
+    expect(getByText('Resume Session')).toBeTruthy();
   });
 });

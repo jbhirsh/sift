@@ -106,3 +106,4 @@ describe('AppleMusicProvider', () => {
     expect(mockNativeModule.play).toHaveBeenCalledWith('trackId', undefined);
   });
 });
+

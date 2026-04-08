@@ -20,7 +20,10 @@ jest.mock('react-native-reanimated', () => ({
   },
   useSharedValue: (val: number) => ({ value: val }),
   useAnimatedStyle: (fn: () => unknown) => fn(),
-  withTiming: (val: number) => val,
+  withTiming: (val: number, _config: unknown, callback?: (finished: boolean) => void) => {
+    if (callback) callback(true);
+    return val;
+  },
   withSpring: (val: number) => val,
   Easing: { in: (e: unknown) => e, ease: {} },
   interpolate: (val: number, inputRange: number[], outputRange: number[]) => {
@@ -76,6 +79,23 @@ jest.mock('../../src/services', () => ({
 jest.mock('../../src/hooks/useResolvedArtwork', () => ({
   useResolvedArtwork: jest.fn().mockReturnValue(null),
 }));
+
+// Mock InteractiveCard to expose onDecide for testing handleCardDecide
+jest.mock('../../src/components/InteractiveCard', () => {
+  const { TouchableOpacity, Text, View } = require('react-native');
+  return function MockInteractiveCard({ track, onDecide }: { track: { name: string; artist: string; album: string; playCount: number }; onDecide: (d: string) => void }) {
+    return (
+      <View>
+        <Text testID="card-track-name">{track.name}</Text>
+        <Text testID="card-artist-name">{track.artist}</Text>
+        <Text testID="card-album-name">{track.album}</Text>
+        <Text testID="card-play-count">{track.playCount}</Text>
+        <TouchableOpacity testID="mock-card-keep" onPress={() => onDecide('keep')} />
+        <TouchableOpacity testID="mock-card-remove" onPress={() => onDecide('remove')} />
+      </View>
+    );
+  };
+});
 
 import { renderWithProviders, mockTrackA, mockTrackB, mockTrackC } from '../helpers/renderWithProviders';
 import { useSift } from '../../src/context/SiftContext';
@@ -145,5 +165,55 @@ describe('SiftScreen', () => {
     const tree = JSON.stringify(toJSON());
     // The tree should render (back cards are Views with opacity)
     expect(tree).toBeTruthy();
+  });
+
+  test('pressing Remove button triggers animateDecision', () => {
+    const { getByLabelText, getByTestId } = renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+    fireEvent.press(getByLabelText('Remove'));
+    // animateDecision fires withTiming which our mock immediately resolves,
+    // calling decide('remove') and advancing the cursor
+    expect(getByTestId('card-track-name').props.children).toBe('Track B');
+    expect(getByTestId('stat-removed').props.children).toEqual([1, ' ', 'removed']);
+  });
+
+  test('pressing Keep button triggers animateDecision', () => {
+    const { getByLabelText, getByTestId } = renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+    fireEvent.press(getByLabelText('Keep'));
+    expect(getByTestId('card-track-name').props.children).toBe('Track B');
+    expect(getByTestId('stat-kept').props.children).toEqual([1, ' ', 'kept']);
+  });
+
+  test('card swipe keep via handleCardDecide advances track', () => {
+    const { getByTestId } = renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+    expect(getByTestId('card-track-name').props.children).toBe('Track A');
+    // Press the mock card's keep button — triggers handleCardDecide('keep')
+    fireEvent.press(getByTestId('mock-card-keep'));
+    expect(getByTestId('card-track-name').props.children).toBe('Track B');
+    expect(getByTestId('stat-kept').props.children).toEqual([1, ' ', 'kept']);
+  });
+
+  test('card swipe remove via handleCardDecide advances track', () => {
+    const { getByTestId } = renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+    fireEvent.press(getByTestId('mock-card-remove'));
+    expect(getByTestId('card-track-name').props.children).toBe('Track B');
+    expect(getByTestId('stat-removed').props.children).toEqual([1, ' ', 'removed']);
+  });
+
+  test('renders with single track (no back cards)', () => {
+    const { getByTestId } = renderWithProviders(<SiftScreen />, { initialTracks: [mockTrackA] });
+    expect(getByTestId('card-track-name').props.children).toBe('Track A');
+    expect(getByTestId('remaining-count').props.children).toEqual([1, ' left']);
+  });
+
+  test('renders with two tracks (one back card)', () => {
+    const { getByTestId } = renderWithProviders(<SiftScreen />, { initialTracks: [mockTrackA, mockTrackB] });
+    expect(getByTestId('card-track-name').props.children).toBe('Track A');
+    expect(getByTestId('remaining-count').props.children).toEqual([2, ' left']);
+  });
+
+  test('progress is 0 when no tracks', () => {
+    const { getByTestId } = renderWithProviders(<SiftScreen />, { initialTracks: [] });
+    // No current track → no card rendered
+    expect(getByTestId('remaining-count').props.children).toEqual([0, ' left']);
   });
 });

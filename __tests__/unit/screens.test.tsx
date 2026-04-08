@@ -130,6 +130,12 @@ describe('LoadingScreen', () => {
     const { getByTestId } = renderWithProviders(<LoadingScreen />);
     expect(getByTestId('loading-message')).toBeTruthy();
   });
+
+  test('calls loadLibrary on mount', () => {
+    renderWithProviders(<LoadingScreen />);
+    // loadLibrary triggers isAuthorized → loadLibrary chain
+    expect(mockProvider.isAuthorized).toHaveBeenCalled();
+  });
 });
 
 // Mock Clipboard on react-native's Clipboard export

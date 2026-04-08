@@ -28,14 +28,25 @@ jest.mock('react-native-reanimated', () => ({
   runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
+// Capture gesture callbacks so we can invoke them in tests
+type GestureCallback = (event: Record<string, unknown>) => void;
+let panOnUpdate: GestureCallback | undefined;
+let panOnEnd: GestureCallback | undefined;
+
 jest.mock('react-native-gesture-handler', () => ({
   GestureDetector: ({ children }: { children: React.ReactNode }) => children,
   Gesture: {
     Pan: () => ({
       minDistance: () => ({
-        onUpdate: () => ({
-          onEnd: () => ({}),
-        }),
+        onUpdate: (fn: GestureCallback) => {
+          panOnUpdate = fn;
+          return {
+            onEnd: (fn: GestureCallback) => {
+              panOnEnd = fn;
+              return {};
+            },
+          };
+        },
       }),
     }),
   },
@@ -55,12 +66,14 @@ const mockTrack: Track = {
   artworkURL: 'https://example.com/art.jpg',
 };
 
-function renderCard(track = mockTrack) {
-  return render(
+function renderCard(track = mockTrack, onDecide = jest.fn()) {
+  panOnUpdate = undefined;
+  panOnEnd = undefined;
+  return { ...render(
     <ThemeProvider>
-      <InteractiveCard track={track} onDecide={jest.fn()} />
+      <InteractiveCard track={track} onDecide={onDecide} />
     </ThemeProvider>
-  );
+  ), onDecide };
 }
 
 describe('InteractiveCard', () => {
@@ -89,5 +102,49 @@ describe('InteractiveCard', () => {
     const trackNoArt = { ...mockTrack, artworkURL: undefined };
     const { toJSON } = renderCard(trackNoArt);
     expect(toJSON()).toBeTruthy();
+  });
+
+  test('pan gesture onUpdate sets drag values', () => {
+    renderCard();
+    expect(panOnUpdate).toBeDefined();
+    // Should not throw when called
+    panOnUpdate?.({ translationX: 50, translationY: 10 });
+  });
+
+  test('pan gesture beyond threshold right triggers keep', () => {
+    const onDecide = jest.fn();
+    renderCard(mockTrack, onDecide);
+    expect(panOnEnd).toBeDefined();
+    panOnEnd?.({ translationX: 100 });
+    expect(onDecide).toHaveBeenCalledWith('keep');
+  });
+
+  test('pan gesture beyond threshold left triggers remove', () => {
+    const onDecide = jest.fn();
+    renderCard(mockTrack, onDecide);
+    panOnEnd?.({ translationX: -100 });
+    expect(onDecide).toHaveBeenCalledWith('remove');
+  });
+
+  test('pan gesture below threshold does not trigger decision', () => {
+    const onDecide = jest.fn();
+    renderCard(mockTrack, onDecide);
+    panOnEnd?.({ translationX: 30 });
+    expect(onDecide).not.toHaveBeenCalled();
+  });
+
+  test('renders with programmaticOffset prop', () => {
+    const onDecide = jest.fn();
+    const programmaticOffset = { value: 100 };
+    const { getByTestId } = render(
+      <ThemeProvider>
+        <InteractiveCard
+          track={mockTrack}
+          onDecide={onDecide}
+          programmaticOffset={programmaticOffset as never}
+        />
+      </ThemeProvider>
+    );
+    expect(getByTestId('card-track-name').props.children).toBe('Test Track');
   });
 });

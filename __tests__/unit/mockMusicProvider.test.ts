@@ -169,4 +169,46 @@ describe('MockMusicProvider', () => {
     const tracks = await flushAsync(provider.loadPlaylistTracks('nonexistent'));
     expect(tracks).toEqual([]);
   });
+
+  test('pause when not playing is a no-op', async () => {
+    const stateBefore = provider.getPlaybackState();
+    await provider.pause();
+    expect(provider.getPlaybackState()).toEqual(stateBefore);
+  });
+
+  test('resume when already playing is a no-op', async () => {
+    const tracks = await flushAsync(provider.loadLibrary());
+    await provider.play(tracks[0].id);
+    const stateBeforeResume = provider.getPlaybackState();
+    await provider.resume();
+    expect(provider.getPlaybackState().isPlaying).toBe(true);
+    expect(provider.getPlaybackState().position).toBeCloseTo(stateBeforeResume.position, 0);
+  });
+
+  test('seek clamps to 0 when given negative position', async () => {
+    const tracks = await flushAsync(provider.loadLibrary());
+    await provider.play(tracks[0].id);
+    provider.seek(-10);
+    expect(provider.getPlaybackState().position).toBe(0);
+  });
+
+  test('seek clamps to track duration', async () => {
+    const tracks = await flushAsync(provider.loadLibrary());
+    await provider.play(tracks[0].id);
+    provider.seek(99999);
+    expect(provider.getPlaybackState().position).toBe(tracks[0].duration);
+  });
+
+  test('play with unknown track uses default duration', async () => {
+    await provider.play('nonexistent-id');
+    expect(provider.getPlaybackState().isPlaying).toBe(true);
+    expect(provider.getPlaybackState().position).toBe(0);
+  });
+
+  test('position does not exceed track duration', async () => {
+    const tracks = await flushAsync(provider.loadLibrary());
+    await provider.play(tracks[4].id); // Stay (141s)
+    jest.advanceTimersByTime(200000);
+    expect(provider.getPlaybackState().position).toBe(141);
+  });
 });
