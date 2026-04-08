@@ -3,12 +3,26 @@ name: CI
 on:
   pull_request:
     branches: [main]
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+      - '.github/**/*.md'
+      - 'LICENSE'
   push:
     branches: [main]
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+      - '.github/**/*.md'
+      - 'LICENSE'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
-    name: Lint, Typecheck & Test
+    name: Lint, Typecheck & Unit Test
     runs-on: ubuntu-latest
 
     steps:
@@ -29,3 +43,86 @@ jobs:
 
       - name: Test with coverage
         run: npx jest --coverage
+
+      - name: Expo Doctor
+        run: npx expo-doctor@latest
+
+  e2e:
+    name: E2E Tests (Maestro)
+    needs: check
+    runs-on: [self-hosted, macOS, ARM64]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Setup EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Compute project fingerprint
+        id: fingerprint
+        run: |
+          FINGERPRINT=$(npx expo-updates fingerprint:generate --platform ios 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['hash'])")
+          echo "hash=$FINGERPRINT" >> "$GITHUB_OUTPUT"
+          echo "Fingerprint: $FINGERPRINT"
+          CACHE_DIR="$HOME/.cache/sift-e2e"
+          if [ -f "$CACHE_DIR/fingerprint" ] && [ "$(cat "$CACHE_DIR/fingerprint")" = "$FINGERPRINT" ] && [ -d "$CACHE_DIR/app" ]; then
+            echo "cache_hit=true" >> "$GITHUB_OUTPUT"
+            echo "Cache hit — skipping build"
+          else
+            echo "cache_hit=false" >> "$GITHUB_OUTPUT"
+            echo "Cache miss — will rebuild"
+          fi
+
+      - name: Build simulator app
+        if: steps.fingerprint.outputs.cache_hit != 'true'
+        run: eas build --profile e2e-simulator --platform ios --local --non-interactive --output build/Sift-e2e.tar.gz
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          USE_CCACHE: '1'
+
+      - name: Extract and cache build
+        if: steps.fingerprint.outputs.cache_hit != 'true'
+        run: |
+          mkdir -p build/e2e
+          tar -xzf build/Sift-e2e.tar.gz -C build/e2e
+          CACHE_DIR="$HOME/.cache/sift-e2e"
+          rm -rf "$CACHE_DIR"
+          mkdir -p "$CACHE_DIR/app"
+          cp -R build/e2e/* "$CACHE_DIR/app/"
+          echo "${{ steps.fingerprint.outputs.hash }}" > "$CACHE_DIR/fingerprint"
+
+      - name: Restore cached build
+        if: steps.fingerprint.outputs.cache_hit == 'true'
+        run: |
+          mkdir -p build/e2e
+          cp -R "$HOME/.cache/sift-e2e/app/"* build/e2e/
+
+      - name: Boot iOS Simulator
+        run: |
+          DEVICE=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          devices = json.load(sys.stdin)['devices']
+          for runtime, devs in devices.items():
+              if 'iOS' in runtime:
+                  for d in devs:
+                      if 'iPhone' in d['name']:
+                          print(d['udid'])
+                          sys.exit(0)
+          ")
+          xcrun simctl boot "$DEVICE" 2>/dev/null || true
+
+      - name: Install app on simulator
+        run: xcrun simctl install booted build/e2e/*.app
+
+      - name: Run Maestro tests
+        run: |
+          export PATH="$HOME/.maestro/bin:$PATH"
+          maestro test .maestro/
