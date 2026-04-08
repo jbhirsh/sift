@@ -1,0 +1,60 @@
+appId: com.jessicahirsh.sift
+name: "Playlist Source - Select and Sift"
+---
+
+# Test selecting a playlist as the sift source and sifting through it
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+# Verify setup screen
+- assertVisible:
+    id: "setup-brand"
+
+# Tap "Playlist" in the source picker
+- tapOn:
+    id: "source-playlist"
+
+# Wait for playlist picker modal to appear
+- extendedWaitUntil:
+    visible:
+      id: "playlist-picker-modal"
+    timeout: 5000
+
+# Verify picker shows playlists (mock provider returns 3)
+- assertVisible:
+    id: "playlist-picker-list"
+
+# Select the first playlist
+- tapOn:
+    id: "playlist-row-playlist-1"
+
+# Verify modal dismissed and playlist name is shown on setup screen
+- assertNotVisible:
+    id: "playlist-picker-modal"
+- assertVisible: "Change"
+
+# Start sifting with the selected playlist
+- tapOn: "Start Sifting"
+
+# Wait for sift screen to appear
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 10000
+
+# Verify sift screen works with playlist tracks
+- assertVisible:
+    id: "card-track-name"
+- assertVisible: "Keep"
+- assertVisible: "Skip"
+- assertVisible: "Remove"
+
+# Make a decision to verify the flow works
+- tapOn: "Keep"
+- waitForAnimationToEnd
+
+- assertVisible:
+    id: "stat-kept"
+    text: "1 kept"

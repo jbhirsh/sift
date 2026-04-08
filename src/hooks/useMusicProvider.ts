@@ -194,8 +194,7 @@ export function useMusicProvider() {
 
   const loadTracks = useCallback(async () => {
     const source = state.source;
-    const isPlaylist = source.type === 'playlist';
-    const label = isPlaylist ? `"${source.playlist.name}"` : 'library';
+    const label = source.type === 'playlist' ? `"${source.playlist.name}"` : 'library';
 
     dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0, message: `Loading ${label}…` });
     dispatch({ type: 'SET_PHASE', phase: 'loading' });
@@ -221,7 +220,7 @@ export function useMusicProvider() {
       dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0.3, message: 'Fetching tracks…' });
 
       let tracks: Track[];
-      if (isPlaylist) {
+      if (source.type === 'playlist') {
         const result = await providerRef.current.loadPlaylistTracks?.(source.playlist.id);
         if (!result) throw new Error('This provider does not support playlist loading');
         tracks = result;
@@ -238,8 +237,8 @@ export function useMusicProvider() {
       dispatch({ type: 'LOAD_TRACKS', tracks });
     } catch (err) {
       Sentry.captureException(err, { tags: { flow: 'load-tracks' } });
-      const message = err instanceof Error ? err.message : 'Failed to load tracks';
-      dispatch({ type: 'SET_LOAD_ERROR', error: message });
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load tracks';
+      dispatch({ type: 'SET_LOAD_ERROR', error: errorMessage });
     }
   }, [dispatch, state.source]);
 

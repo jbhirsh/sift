@@ -14,11 +14,11 @@ import GlassCard from '../components/GlassCard';
 export default function LoadingScreen() {
   const { state } = useSift();
   const { colors } = useTheme();
-  const { loadLibrary } = useMusicProvider();
+  const { loadTracks } = useMusicProvider();
 
   useEffect(() => {
-    loadLibrary();
-  }, [loadLibrary]);
+    loadTracks();
+  }, [loadTracks]);
 
   return (
     <View style={styles.container}>

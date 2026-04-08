@@ -18,5 +18,10 @@ name: "App Launch - Setup Screen"
 # Verify sort order picker is visible
 - assertVisible: "Least Played"
 
+# Verify source picker is visible
+- assertVisible: "Sift source"
+- assertVisible: "Library"
+- assertVisible: "Playlist"
+
 # Verify start button is present
 - assertVisible: "Start Sifting"

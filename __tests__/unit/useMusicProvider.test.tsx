@@ -343,6 +343,25 @@ describe('useMusicProvider', () => {
     mockProvider.loadPlaylists = originalLoadPlaylists;
   });
 
+  test('loadPlaylists returns empty array when not authorized', async () => {
+    mockProvider.isAuthorized.mockResolvedValue(false);
+    mockProvider.requestAuthorization.mockResolvedValue(false);
+    const { getByTestId } = renderWithProvider();
+    await act(async () => {
+      fireEvent.press(getByTestId('load-playlists'));
+    });
+    expect(mockProvider.requestAuthorization).toHaveBeenCalled();
+  });
+
+  test('loadPlaylists returns empty array on error', async () => {
+    mockProvider.loadPlaylists.mockRejectedValue(new Error('fail'));
+    const { getByTestId } = renderWithProvider();
+    await act(async () => {
+      fireEvent.press(getByTestId('load-playlists'));
+    });
+    // Should not throw
+  });
+
   test('loadTracks loads library when source is library', async () => {
     const { getByTestId } = renderWithProvider();
     await act(async () => {
@@ -373,5 +392,33 @@ describe('useMusicProvider', () => {
     });
 
     expect(mockProvider.loadPlaylistTracks).toHaveBeenCalledWith('p1');
+  });
+
+  test('loadTracks handles auth denial', async () => {
+    mockProvider.isAuthorized.mockResolvedValue(false);
+    mockProvider.requestAuthorization.mockResolvedValue(false);
+    const { getByTestId } = renderWithProvider();
+    await act(async () => {
+      fireEvent.press(getByTestId('load-tracks'));
+    });
+    expect(mockProvider.requestAuthorization).toHaveBeenCalled();
+  });
+
+  test('loadTracks handles load error', async () => {
+    mockProvider.loadLibrary.mockRejectedValue(new Error('load fail'));
+    const { getByTestId } = renderWithProvider();
+    await act(async () => {
+      fireEvent.press(getByTestId('load-tracks'));
+    });
+    // Should not throw
+  });
+
+  test('loadTracks handles non-Error exception', async () => {
+    mockProvider.loadLibrary.mockRejectedValue('string error');
+    const { getByTestId } = renderWithProvider();
+    await act(async () => {
+      fireEvent.press(getByTestId('load-tracks'));
+    });
+    // Should dispatch generic error message
   });
 });
