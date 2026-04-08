@@ -161,11 +161,11 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
     case 'SET_CREATING_PLAYLIST':
       return { ...state, isCreatingPlaylist: action.creating };
 
-    case 'SET_HAS_SAVED_SESSION':
-      return { ...state, hasSavedSession: action.has };
-
     case 'SET_SOURCE':
       return { ...state, source: action.source };
+
+    case 'SET_HAS_SAVED_SESSION':
+      return { ...state, hasSavedSession: action.has };
 
     case 'RESUME_SESSION':
       return {

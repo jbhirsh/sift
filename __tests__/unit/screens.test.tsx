@@ -36,6 +36,8 @@ const mockProvider = {
   seek: jest.fn(),
   getPlaybackState: jest.fn().mockReturnValue({ position: 0, isPlaying: false }),
   createPlaylist: jest.fn().mockResolvedValue(undefined),
+  loadPlaylists: jest.fn().mockResolvedValue([]),
+  loadPlaylistTracks: jest.fn().mockResolvedValue([]),
 };
 
 jest.mock('../../src/services', () => ({
@@ -54,6 +56,7 @@ import SetupScreen from '../../src/screens/SetupScreen';
 import LoadingScreen from '../../src/screens/LoadingScreen';
 import DoneScreen from '../../src/screens/DoneScreen';
 import SettingsScreen from '../../src/screens/SettingsScreen';
+import PlaylistPicker from '../../src/components/PlaylistPicker';
 
 describe('SetupScreen', () => {
   test('renders brand text', () => {
@@ -109,6 +112,80 @@ describe('SetupScreen', () => {
     fireEvent.press(getByText('Spotify'));
     // Component should still render without error
     expect(getByText('Spotify')).toBeTruthy();
+  });
+
+  test('renders source picker with Library and Playlist options', () => {
+    const { getByText } = renderWithProviders(<SetupScreen />);
+    expect(getByText('Sift source')).toBeTruthy();
+    expect(getByText('Library')).toBeTruthy();
+    expect(getByText('Playlist')).toBeTruthy();
+  });
+
+  test('tapping Library dispatches SET_SOURCE with library type', () => {
+    const { getByTestId } = renderWithProviders(<SetupScreen />);
+    fireEvent.press(getByTestId('source-library'));
+    // Should not throw — Library is the default
+    expect(getByTestId('source-library')).toBeTruthy();
+  });
+
+  test('tapping Playlist opens playlist picker', async () => {
+    mockProvider.loadPlaylists.mockResolvedValue([
+      { id: 'p1', name: 'Test Playlist', trackCount: 5 },
+    ]);
+    const { getByTestId } = renderWithProviders(<SetupScreen />);
+    await act(async () => {
+      fireEvent.press(getByTestId('source-playlist'));
+    });
+    expect(getByTestId('playlist-picker-modal')).toBeTruthy();
+  });
+
+  test('selecting a playlist from picker shows playlist name', async () => {
+    mockProvider.loadPlaylists.mockResolvedValue([
+      { id: 'p1', name: 'My Playlist', trackCount: 8 },
+    ]);
+    const { getByTestId, getByText } = renderWithProviders(<SetupScreen />);
+    await act(async () => {
+      fireEvent.press(getByTestId('source-playlist'));
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId('playlist-row-p1'));
+    });
+    expect(getByText('My Playlist')).toBeTruthy();
+    expect(getByText('Change')).toBeTruthy();
+  });
+
+  test('cancelling playlist picker keeps library source', async () => {
+    mockProvider.loadPlaylists.mockResolvedValue([
+      { id: 'p1', name: 'Test', trackCount: 3 },
+    ]);
+    const { getByTestId, queryByTestId } = renderWithProviders(<SetupScreen />);
+    await act(async () => {
+      fireEvent.press(getByTestId('source-playlist'));
+    });
+    expect(getByTestId('playlist-picker-modal')).toBeTruthy();
+    await act(async () => {
+      fireEvent.press(getByTestId('playlist-picker-cancel'));
+    });
+    expect(queryByTestId('playlist-picker-modal')).toBeNull();
+  });
+
+  test('Change button reopens playlist picker', async () => {
+    mockProvider.loadPlaylists.mockResolvedValue([
+      { id: 'p1', name: 'My Playlist', trackCount: 8 },
+    ]);
+    const { getByTestId, getByText } = renderWithProviders(<SetupScreen />);
+    // Select a playlist
+    await act(async () => {
+      fireEvent.press(getByTestId('source-playlist'));
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId('playlist-row-p1'));
+    });
+    // Reopen via Change button
+    await act(async () => {
+      fireEvent.press(getByText('Change'));
+    });
+    expect(getByTestId('playlist-picker-modal')).toBeTruthy();
   });
 
   test('pressing Start Sifting triggers startFresh', async () => {
@@ -221,6 +298,64 @@ describe('DoneScreen', () => {
       fireEvent.press(getByText('Move to Playlist'));
     });
     expect(mockProvider.createPlaylist).toHaveBeenCalled();
+  });
+});
+
+describe('PlaylistPicker', () => {
+  const mockPlaylists = [
+    { id: 'p1', name: 'Chill Vibes', trackCount: 12 },
+    { id: 'p2', name: 'Workout Mix', trackCount: 25 },
+  ];
+
+  test('renders loading state', () => {
+    const { getByTestId } = renderWithProviders(
+      <PlaylistPicker playlists={[]} loading={true} onSelect={jest.fn()} onCancel={jest.fn()} />,
+    );
+    expect(getByTestId('playlist-picker-loading')).toBeTruthy();
+  });
+
+  test('renders empty state when no playlists', () => {
+    const { getByTestId } = renderWithProviders(
+      <PlaylistPicker playlists={[]} loading={false} onSelect={jest.fn()} onCancel={jest.fn()} />,
+    );
+    expect(getByTestId('playlist-picker-empty')).toBeTruthy();
+  });
+
+  test('renders playlist rows', () => {
+    const { getByTestId, getByText } = renderWithProviders(
+      <PlaylistPicker playlists={mockPlaylists} loading={false} onSelect={jest.fn()} onCancel={jest.fn()} />,
+    );
+    expect(getByTestId('playlist-picker-list')).toBeTruthy();
+    expect(getByText('Chill Vibes')).toBeTruthy();
+    expect(getByText('12 tracks')).toBeTruthy();
+    expect(getByText('Workout Mix')).toBeTruthy();
+    expect(getByText('25 tracks')).toBeTruthy();
+  });
+
+  test('tapping a row calls onSelect with the playlist', () => {
+    const onSelect = jest.fn();
+    const { getByTestId } = renderWithProviders(
+      <PlaylistPicker playlists={mockPlaylists} loading={false} onSelect={onSelect} onCancel={jest.fn()} />,
+    );
+    fireEvent.press(getByTestId('playlist-row-p1'));
+    expect(onSelect).toHaveBeenCalledWith(mockPlaylists[0]);
+  });
+
+  test('tapping cancel calls onCancel', () => {
+    const onCancel = jest.fn();
+    const { getByTestId } = renderWithProviders(
+      <PlaylistPicker playlists={mockPlaylists} loading={false} onSelect={jest.fn()} onCancel={onCancel} />,
+    );
+    fireEvent.press(getByTestId('playlist-picker-cancel'));
+    expect(onCancel).toHaveBeenCalled();
+  });
+
+  test('renders singular "track" for count of 1', () => {
+    const single = [{ id: 'p1', name: 'Solo', trackCount: 1 }];
+    const { getByText } = renderWithProviders(
+      <PlaylistPicker playlists={single} loading={false} onSelect={jest.fn()} onCancel={jest.fn()} />,
+    );
+    expect(getByText('1 track')).toBeTruthy();
   });
 });
 

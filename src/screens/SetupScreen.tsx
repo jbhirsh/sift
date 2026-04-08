@@ -9,11 +9,14 @@ import {
 import { SymbolView } from 'expo-symbols';
 import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
+import { useMusicProvider } from '../hooks/useMusicProvider';
 import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
+import PlaylistPicker from '../components/PlaylistPicker';
 import { RADIUS, SPACING } from '../theme';
 import {
   MusicProvider,
+  Playlist,
   SortOrder,
   SORT_ORDER_DISPLAY,
   PROVIDER_DISPLAY,
@@ -28,13 +31,32 @@ const SORT_ORDERS: SortOrder[] = [
   'random',
 ];
 
+const SOURCE_TYPES = ['library', 'playlist'] as const;
+const SOURCE_DISPLAY: Record<typeof SOURCE_TYPES[number], string> = {
+  library: 'Library',
+  playlist: 'Playlist',
+};
+
 export default function SetupScreen() {
   const { state, dispatch, startFresh } = useSift();
   const { colors, glass } = useTheme();
+  const { loadPlaylists } = useMusicProvider();
   const [sortPickerOpen, setSortPickerOpen] = useState(false);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [loadingPlaylists, setLoadingPlaylists] = useState(false);
+  const [showPlaylistPicker, setShowPlaylistPicker] = useState(false);
 
   const handleResume = () => {
     dispatch({ type: 'SET_PHASE', phase: 'sifting' });
+  };
+
+  const openPlaylistPicker = () => {
+    setLoadingPlaylists(true);
+    setShowPlaylistPicker(true);
+    loadPlaylists().then((result) => {
+      setPlaylists(result);
+      setLoadingPlaylists(false);
+    });
   };
 
   return (
@@ -107,6 +129,77 @@ export default function SetupScreen() {
             </View>
           </GlassCard>
         </View>
+
+        {/* Sift source picker */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: colors.text }]}>
+            Sift source
+          </Text>
+          <GlassCard intensity="thin" radius={RADIUS.sm}>
+            <View style={styles.segmentedControl}>
+              {SOURCE_TYPES.map((sourceType) => {
+                const isSelected = state.source.type === sourceType;
+                return (
+                  <TouchableOpacity
+                    key={sourceType}
+                    testID={`source-${sourceType}`}
+                    style={[
+                      styles.segment,
+                      isSelected && [styles.segmentSelected, { borderColor: glass.borderColor }],
+                    ]}
+                    onPress={() => {
+                      if (sourceType === 'library') {
+                        dispatch({ type: 'SET_SOURCE', source: { type: 'library' } });
+                      } else {
+                        openPlaylistPicker();
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentText,
+                        {
+                          color: isSelected ? colors.text : colors.textSecondary,
+                          fontWeight: isSelected ? '600' : '400',
+                        },
+                      ]}
+                    >
+                      {SOURCE_DISPLAY[sourceType]}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </GlassCard>
+          {state.source.type === 'playlist' && (
+            <View style={styles.selectedPlaylist}>
+              <Text style={[styles.selectedPlaylistName, { color: colors.text }]} numberOfLines={1}>
+                {state.source.playlist.name}
+              </Text>
+              <TouchableOpacity
+                onPress={openPlaylistPicker}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.changeButton, { color: colors.accent }]}>
+                  Change
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {showPlaylistPicker && (
+          <PlaylistPicker
+            playlists={playlists}
+            loading={loadingPlaylists}
+            onSelect={(playlist) => {
+              dispatch({ type: 'SET_SOURCE', source: { type: 'playlist', playlist } });
+              setShowPlaylistPicker(false);
+            }}
+            onCancel={() => setShowPlaylistPicker(false)}
+          />
+        )}
 
         {/* Sort order picker */}
         <GlassCard intensity="thin" radius={RADIUS.md}>
@@ -308,6 +401,21 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 17,
+    fontWeight: '600',
+  },
+  selectedPlaylist: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.sm,
+  },
+  selectedPlaylistName: {
+    fontSize: 15,
+    flex: 1,
+    marginRight: SPACING.base,
+  },
+  changeButton: {
+    fontSize: 15,
     fontWeight: '600',
   },
 });
