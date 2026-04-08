@@ -68,7 +68,9 @@ jobs:
       - name: Compute project fingerprint
         id: fingerprint
         run: |
-          FINGERPRINT=$(npx expo-updates fingerprint:generate --platform ios 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['hash'])")
+          NATIVE=$(npx expo-updates fingerprint:generate --platform ios 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['hash'])")
+          SOURCE=$(find src __tests__ -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \) -print0 | sort -z | xargs -0 shasum -a 256 | shasum -a 256 | cut -d' ' -f1)
+          FINGERPRINT="${NATIVE}-${SOURCE}"
           echo "hash=$FINGERPRINT" >> "$GITHUB_OUTPUT"
           echo "Fingerprint: $FINGERPRINT"
           CACHE_DIR="$HOME/.cache/sift-e2e"
