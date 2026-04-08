@@ -100,6 +100,79 @@ public class ExpoMusicKitModule: Module {
       return results
     }
 
+    // MARK: - Playlist Loading
+
+    AsyncFunction("loadPlaylists") { () -> [[String: Any]] in
+      guard MusicAuthorization.currentStatus == .authorized else {
+        throw MusicKitError.notAuthorized
+      }
+
+      var allPlaylists: [MusicKit.Playlist] = []
+      var offset = 0
+      let pageSize = 100
+
+      while true {
+        var request = MusicLibraryRequest<MusicKit.Playlist>()
+        request.limit = pageSize
+        request.offset = offset
+        let response = try await request.response()
+        let page = Array(response.items)
+        allPlaylists.append(contentsOf: page)
+        if page.count < pageSize { break }
+        offset += pageSize
+      }
+
+      return allPlaylists.map { playlist in
+        var dict: [String: Any] = [
+          "id": playlist.id.rawValue,
+          "name": playlist.name,
+          "trackCount": playlist.tracks?.count ?? 0,
+        ]
+
+        if let artwork = playlist.artwork, let url = artwork.url(width: 300, height: 300),
+           url.scheme == "https" || url.scheme == "http" {
+          dict["artworkURL"] = url.absoluteString
+        } else {
+          dict["artworkURL"] = NSNull()
+        }
+
+        return dict
+      }
+    }
+
+    AsyncFunction("loadPlaylistTracks") { (playlistID: String) -> [[String: Any]] in
+      guard MusicAuthorization.currentStatus == .authorized else {
+        throw MusicKitError.notAuthorized
+      }
+
+      var request = MusicLibraryRequest<MusicKit.Playlist>()
+      request.filter(matching: \.id, equalTo: MusicItemID(playlistID))
+      let response = try await request.response()
+
+      guard let playlist = response.items.first else {
+        throw MusicKitError.noTracksFound
+      }
+
+      let detailedPlaylist = try await playlist.with([.tracks])
+
+      guard let tracks = detailedPlaylist.tracks else {
+        return []
+      }
+
+      var results: [[String: Any]] = []
+      for track in tracks {
+        // MusicKit playlist tracks are Track items; cast to Song for full metadata
+        var songRequest = MusicLibraryRequest<Song>()
+        songRequest.filter(matching: \.id, equalTo: track.id)
+        let songResponse = try await songRequest.response()
+        if let song = songResponse.items.first {
+          self.songCache[song.id.rawValue] = song
+          results.append(self.songToDictionary(song))
+        }
+      }
+      return results
+    }
+
     // MARK: - Playback
 
     AsyncFunction("play") { (trackID: String, position: Double) in

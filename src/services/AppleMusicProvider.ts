@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import type { MusicProviderService } from './MusicProviderInterface';
-import type { Track } from '../types';
+import type { Playlist, Track } from '../types';
 
 /**
  * Raw track shape returned by the native MusicKit module.
@@ -14,6 +14,13 @@ interface MusicKitTrack {
   duration: number;
   playCount: number;
   dateAdded: string;
+  artworkURL: string | null;
+}
+
+interface MusicKitPlaylist {
+  id: string;
+  name: string;
+  trackCount: number;
   artworkURL: string | null;
 }
 
@@ -63,6 +70,8 @@ function getNativeModule() {
     seek(position: number): void;
     getPlaybackState(): { position: number; isPlaying: boolean };
     createPlaylist(name: string, trackIDs: string[]): Promise<void>;
+    loadPlaylists(): Promise<MusicKitPlaylist[]>;
+    loadPlaylistTracks(playlistID: string): Promise<MusicKitTrack[]>;
   };
 }
 
@@ -105,5 +114,20 @@ export class AppleMusicProvider implements MusicProviderService {
 
   async createPlaylist(name: string, trackIDs: string[]): Promise<void> {
     return this.native.createPlaylist(name, trackIDs);
+  }
+
+  async loadPlaylists(): Promise<Playlist[]> {
+    const raw = await this.native.loadPlaylists();
+    return raw.map((p) => ({
+      id: p.id,
+      name: p.name,
+      trackCount: p.trackCount,
+      artworkURL: p.artworkURL ?? undefined,
+    }));
+  }
+
+  async loadPlaylistTracks(playlistID: string): Promise<Track[]> {
+    const raw = await this.native.loadPlaylistTracks(playlistID);
+    return raw.map(mapTrack);
   }
 }

@@ -3,6 +3,23 @@ import { Platform } from 'react-native';
 const mockNativeModule = {
   requestAuthorization: jest.fn().mockResolvedValue(true),
   getAuthorizationStatus: jest.fn().mockReturnValue('authorized'),
+  loadPlaylists: jest.fn().mockResolvedValue([
+    {
+      id: 'pl-1', name: 'Chill Vibes', trackCount: 12,
+      artworkURL: 'https://example.com/playlist-art.jpg',
+    },
+    {
+      id: 'pl-2', name: 'Workout Mix', trackCount: 30,
+      artworkURL: null,
+    },
+  ]),
+  loadPlaylistTracks: jest.fn().mockResolvedValue([
+    {
+      id: '1', name: 'Song', artist: 'Artist', album: 'Album',
+      duration: 200, playCount: 10, dateAdded: '2020-01-01',
+      artworkURL: 'https://example.com/art.jpg',
+    },
+  ]),
   loadFullLibrary: jest.fn().mockResolvedValue([
     {
       id: '1', name: 'Song', artist: 'Artist', album: 'Album',
@@ -104,6 +121,27 @@ describe('AppleMusicProvider', () => {
   test('play with no position passes undefined', async () => {
     await provider.play('trackId');
     expect(mockNativeModule.play).toHaveBeenCalledWith('trackId', undefined);
+  });
+
+  test('loadPlaylists maps native playlists to app Playlist type', async () => {
+    const playlists = await provider.loadPlaylists();
+    expect(playlists).toHaveLength(2);
+    expect(playlists[0]).toEqual({
+      id: 'pl-1', name: 'Chill Vibes', trackCount: 12,
+      artworkURL: 'https://example.com/playlist-art.jpg',
+    });
+    expect(playlists[1].artworkURL).toBeUndefined();
+  });
+
+  test('loadPlaylistTracks maps native tracks to app Track type', async () => {
+    const tracks = await provider.loadPlaylistTracks('pl-1');
+    expect(tracks).toHaveLength(1);
+    expect(tracks[0]).toEqual({
+      id: '1', name: 'Song', artist: 'Artist', album: 'Album',
+      duration: 200, playCount: 10, dateAdded: '2020-01-01',
+      artworkURL: 'https://example.com/art.jpg',
+    });
+    expect(mockNativeModule.loadPlaylistTracks).toHaveBeenCalledWith('pl-1');
   });
 });
 

@@ -1,5 +1,5 @@
 import { requireNativeModule } from 'expo-modules-core';
-import type { MusicKitTrack, PlaybackState } from './ExpoMusicKit.types';
+import type { MusicKitPlaylist, MusicKitTrack, PlaybackState } from './ExpoMusicKit.types';
 
 const ExpoMusicKit = requireNativeModule('ExpoMusicKit');
 
@@ -43,8 +43,16 @@ export async function createPlaylist(name: string, trackIDs: string[]): Promise<
   return ExpoMusicKit.createPlaylist(name, trackIDs);
 }
 
+export async function loadPlaylists(): Promise<MusicKitPlaylist[]> {
+  return ExpoMusicKit.loadPlaylists();
+}
+
+export async function loadPlaylistTracks(playlistID: string): Promise<MusicKitTrack[]> {
+  return ExpoMusicKit.loadPlaylistTracks(playlistID);
+}
+
 export async function resolveArtworkURL(trackID: string, width: number, height: number): Promise<string | null> {
   return ExpoMusicKit.resolveArtworkURL(trackID, width, height);
 }
 
-export type { MusicKitTrack, PlaybackState };
+export type { MusicKitPlaylist, MusicKitTrack, PlaybackState };
