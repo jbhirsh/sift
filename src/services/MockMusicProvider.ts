@@ -191,6 +191,22 @@ export class MockMusicProvider implements MusicProviderService {
     await delay(500);
   }
 
+  async removeFromLibrary(_trackIDs: string[]): Promise<void> {
+    await delay(200);
+  }
+
+  async removeFromPlaylist(_playlistID: string, _trackIDs: string[]): Promise<void> {
+    await delay(200);
+  }
+
+  async addToLibrary(_trackIDs: string[]): Promise<void> {
+    await delay(200);
+  }
+
+  async addToPlaylist(_playlistID: string, _trackIDs: string[]): Promise<void> {
+    await delay(200);
+  }
+
   async loadPlaylists(): Promise<Playlist[]> {
     await delay(200);
     return [...MOCK_PLAYLISTS];

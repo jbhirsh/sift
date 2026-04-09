@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Platform,
   Clipboard,
+  ActivityIndicator,
 } from 'react-native';
 import type { Track } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,10 +24,28 @@ export default function DoneScreen() {
   const { state, resumeFromPause, startFresh } = useSift();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { createPlaylist } = useMusicProvider();
+  const { restoreTrack, saveSiftedPlaylist } = useMusicProvider();
   const [copied, setCopied] = useState(false);
+  const [restoringIds, setRestoringIds] = useState<Set<string>>(new Set());
 
   const isPaused = state.phase === 'paused';
+  const isAppleMusicLibrary = state.source.type === 'library' && state.provider === 'apple-music';
+  const sourceLabel = state.source.type === 'playlist'
+    ? `"${state.source.playlist.name}"`
+    : 'your library';
+
+  // Auto-create/update sifted playlist for non-app-created playlists
+  useEffect(() => {
+    if (
+      state.source.type === 'playlist' &&
+      state.kept.length > 0 &&
+      state.removalErrors.length > 0 &&
+      !state.removalPlaylistCreated &&
+      !state.isCreatingPlaylist
+    ) {
+      saveSiftedPlaylist(state.source.playlist.name, state.kept);
+    }
+  }, [state.source, state.kept, state.removalErrors, state.removalPlaylistCreated, state.isCreatingPlaylist, saveSiftedPlaylist]);
 
   const copyRemovedList = useCallback(() => {
     const text = state.removed
@@ -37,11 +56,18 @@ export default function DoneScreen() {
     setTimeout(() => setCopied(false), 2000);
   }, [state.removed]);
 
-  const handleMoveToPlaylist = useCallback(async () => {
-    const trackIDs = state.removed.map((t) => t.id);
-    const name = `Sift — Removed ${new Date().toLocaleDateString()}`;
-    await createPlaylist(name, trackIDs);
-  }, [state.removed, createPlaylist]);
+  const handleRestore = useCallback(
+    async (track: Track) => {
+      setRestoringIds((prev) => new Set(prev).add(track.id));
+      await restoreTrack(track);
+      setRestoringIds((prev) => {
+        const next = new Set(prev);
+        next.delete(track.id);
+        return next;
+      });
+    },
+    [restoreTrack],
+  );
 
   const renderTrackRow = useCallback(
     ({ item: track, index }: { item: Track; index: number }) => (
@@ -65,9 +91,17 @@ export default function DoneScreen() {
             {track.artist}
           </Text>
         </View>
+        <TouchableOpacity
+          onPress={() => handleRestore(track)}
+          disabled={restoringIds.has(track.id)}
+          style={[styles.restoreButton, restoringIds.has(track.id) && { opacity: 0.4 }]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <SymbolView name="plus.circle.fill" size={22} tintColor={colors.accent} />
+        </TouchableOpacity>
       </View>
     ),
-    [colors.quaternary, colors.text, colors.textSecondary],
+    [colors.quaternary, colors.text, colors.textSecondary, colors.accent, handleRestore, restoringIds],
   );
 
   const keyExtractor = useCallback((track: Track) => track.id, []);
@@ -103,7 +137,7 @@ export default function DoneScreen() {
             />
             <SummaryItem
               count={state.removed.length}
-              label="to remove"
+              label="removed"
               symbolName="xmark.circle.fill"
               color="#FF3B30"
               textColor={colors.text}
@@ -127,39 +161,15 @@ export default function DoneScreen() {
           <View style={styles.removedHeader}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.removedTitle, { color: colors.text }]}>
-                Tracks to Remove
+                Tracks Removed
               </Text>
               <Text style={[styles.removedSubtitle, { color: colors.textSecondary }]}>
-                Move these to a playlist in Music, then delete them there.
+                {isAppleMusicLibrary
+                  ? 'These tracks have been moved to "Sift — Removed" in Music.'
+                  : `These tracks have been removed from ${sourceLabel}.`}
               </Text>
             </View>
             <View style={styles.removedActions}>
-              {state.removalPlaylistCreated ? (
-                <View style={styles.movedLabel}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <SymbolView name="checkmark.circle.fill" size={14} tintColor="#34C759" />
-                    <Text style={styles.movedLabelText}>
-                      Moved to Playlist
-                    </Text>
-                  </View>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={[
-                    styles.smallPrimaryButton,
-                    state.isCreatingPlaylist && { opacity: 0.5 },
-                  ]}
-                  onPress={handleMoveToPlaylist}
-                  disabled={state.isCreatingPlaylist}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.smallPrimaryButtonText}>
-                    {state.isCreatingPlaylist
-                      ? 'Moving...'
-                      : 'Move to Playlist'}
-                  </Text>
-                </TouchableOpacity>
-              )}
               <TouchableOpacity
                 style={[styles.smallSecondaryButton, { borderColor: colors.accent }]}
                 onPress={copyRemovedList}
@@ -172,11 +182,6 @@ export default function DoneScreen() {
             </View>
           </View>
 
-          {state.removalPlaylistError && (
-            <Text style={styles.playlistError}>
-              {state.removalPlaylistError}
-            </Text>
-          )}
         </View>
       )}
     </>
@@ -184,6 +189,28 @@ export default function DoneScreen() {
 
   const listFooter = (
     <View style={styles.buttonSection}>
+      {state.isCreatingPlaylist && state.source.type === 'playlist' && (
+        <View style={styles.siftedConfirmation}>
+          <ActivityIndicator size="small" color={colors.accent} />
+          <Text style={[styles.siftedConfirmationText, { color: colors.textSecondary }]}>
+            Creating sifted playlist…
+          </Text>
+        </View>
+      )}
+
+      {state.removalPlaylistCreated && state.source.type === 'playlist' && (
+        <View style={styles.siftedConfirmation}>
+          <SymbolView name="checkmark.circle.fill" size={18} tintColor="#34C759" />
+          <Text style={[styles.siftedConfirmationText, { color: colors.text }]}>
+            Sifted playlist created!
+          </Text>
+        </View>
+      )}
+
+      {state.removalPlaylistError && (
+        <Text style={styles.playlistError}>{state.removalPlaylistError}</Text>
+      )}
+
       {isPaused ? (
         <>
           <TouchableOpacity
@@ -344,26 +371,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 8,
   },
-  movedLabel: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  movedLabelText: {
-    fontSize: 12,
-    color: '#34C759',
-    fontWeight: '500',
-  },
-  smallPrimaryButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: RADIUS.sm,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-  },
-  smallPrimaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
   smallSecondaryButton: {
     borderRadius: RADIUS.sm,
     paddingVertical: 6,
@@ -384,6 +391,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING['2xl'],
     paddingVertical: 8,
+  },
+  restoreButton: {
+    paddingLeft: 12,
   },
   trackName: {
     fontSize: 16,
@@ -419,6 +429,15 @@ const styles = StyleSheet.create({
   },
   glassButtonText: {
     fontSize: 17,
+    fontWeight: '600',
+  },
+  siftedConfirmation: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  siftedConfirmationText: {
+    fontSize: 15,
     fontWeight: '600',
   },
 });

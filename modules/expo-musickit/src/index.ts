@@ -51,6 +51,22 @@ export async function loadPlaylistTracks(playlistID: string): Promise<MusicKitTr
   return ExpoMusicKit.loadPlaylistTracks(playlistID);
 }
 
+export async function removeFromLibrary(trackIDs: string[]): Promise<void> {
+  return ExpoMusicKit.removeFromLibrary(trackIDs);
+}
+
+export async function removeFromPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
+  return ExpoMusicKit.removeFromPlaylist(playlistID, trackIDs);
+}
+
+export async function addToLibrary(trackIDs: string[]): Promise<void> {
+  return ExpoMusicKit.addToLibrary(trackIDs);
+}
+
+export async function addToPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
+  return ExpoMusicKit.addToPlaylist(playlistID, trackIDs);
+}
+
 export async function resolveArtworkURL(trackID: string, width: number, height: number): Promise<string | null> {
   return ExpoMusicKit.resolveArtworkURL(trackID, width, height);
 }

@@ -43,6 +43,13 @@ export interface SiftSession {
   source?: SiftSource;
 }
 
+export interface RemovalRecord {
+  track: Track;
+  source: SiftSource;
+  provider: MusicProvider;
+  removedAt: string; // ISO 8601
+}
+
 export const SORT_ORDER_DISPLAY: Record<SortOrder, string> = {
   'least-played': 'Least Played',
   'most-played': 'Most Played',

@@ -12,6 +12,10 @@ import {
 import {
   loadLibrary as fetchLibrary,
   createPlaylist as apiCreatePlaylist,
+  removeFromLibrary as apiRemoveFromLibrary,
+  removeFromPlaylist as apiRemoveFromPlaylist,
+  addToLibrary as apiAddToLibrary,
+  addToPlaylist as apiAddToPlaylist,
   loadPlaylists as fetchPlaylists,
   loadPlaylistTracks as fetchPlaylistTracks,
 } from './spotify/SpotifyAPI';
@@ -131,6 +135,38 @@ export class SpotifyProvider implements MusicProviderService {
     }
 
     await apiCreatePlaylist(token, name, trackIDs);
+  }
+
+  // -- Removal --
+
+  async removeFromLibrary(trackIDs: string[]): Promise<void> {
+    await refreshTokenIfNeeded();
+    const token = await getAccessToken();
+    if (!token) throw new Error('Spotify: not authenticated');
+    await apiRemoveFromLibrary(token, trackIDs);
+  }
+
+  async removeFromPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
+    await refreshTokenIfNeeded();
+    const token = await getAccessToken();
+    if (!token) throw new Error('Spotify: not authenticated');
+    await apiRemoveFromPlaylist(token, playlistID, trackIDs);
+  }
+
+  // -- Re-adding --
+
+  async addToLibrary(trackIDs: string[]): Promise<void> {
+    await refreshTokenIfNeeded();
+    const token = await getAccessToken();
+    if (!token) throw new Error('Spotify: not authenticated');
+    await apiAddToLibrary(token, trackIDs);
+  }
+
+  async addToPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
+    await refreshTokenIfNeeded();
+    const token = await getAccessToken();
+    if (!token) throw new Error('Spotify: not authenticated');
+    await apiAddToPlaylist(token, playlistID, trackIDs);
   }
 
   // -- Playlist browsing --

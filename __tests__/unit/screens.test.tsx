@@ -231,7 +231,7 @@ describe('DoneScreen', () => {
   test('renders summary counts', () => {
     const { getByTestId } = renderWithProviders(<DoneScreen />, { initialTracks: tracks });
     expect(getByTestId('summary-count-kept')).toBeTruthy();
-    expect(getByTestId('summary-count-to remove')).toBeTruthy();
+    expect(getByTestId('summary-count-removed')).toBeTruthy();
     expect(getByTestId('summary-count-skipped')).toBeTruthy();
   });
 
@@ -268,8 +268,7 @@ describe('DoneScreen', () => {
       return <DoneScreen />;
     };
     const { getByText } = renderWithProviders(<DecideThenDone />, { initialTracks: tracks });
-    expect(getByText('Tracks to Remove')).toBeTruthy();
-    expect(getByText('Move to Playlist')).toBeTruthy();
+    expect(getByText('Tracks Removed')).toBeTruthy();
     expect(getByText('Copy List')).toBeTruthy();
   });
 
@@ -286,19 +285,6 @@ describe('DoneScreen', () => {
     expect(getByText('Copied!')).toBeTruthy();
   });
 
-  test('move to playlist button calls createPlaylist', async () => {
-    const DecideThenDone = () => {
-      const { decide, state } = useSift();
-      React.useEffect(() => { decide('remove'); }, [decide]);
-      if (state.removed.length === 0) return null;
-      return <DoneScreen />;
-    };
-    const { getByText } = renderWithProviders(<DecideThenDone />, { initialTracks: tracks });
-    await act(async () => {
-      fireEvent.press(getByText('Move to Playlist'));
-    });
-    expect(mockProvider.createPlaylist).toHaveBeenCalled();
-  });
 });
 
 describe('PlaylistPicker', () => {

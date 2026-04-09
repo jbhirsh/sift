@@ -60,6 +60,7 @@ const BASE_URL = 'https://api.spotify.com';
 // Maximum number of track URIs per "add tracks to playlist" request
 const ADD_TRACKS_BATCH_SIZE = 100;
 
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -265,4 +266,88 @@ export async function loadPlaylistTracks(
   }
 
   return tracks;
+}
+
+/**
+ * Delete a track from the user's Spotify library (Saved Tracks).
+ */
+export async function removeFromLibrary(
+  token: string,
+  trackIDs: string[],
+): Promise<void> {
+  const response = await fetch(`${BASE_URL}/v1/me/tracks`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+    body: JSON.stringify({ ids: trackIDs }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to remove tracks from library: ${response.status}`);
+  }
+}
+
+/**
+ * Remove a track from a Spotify playlist (does not delete from library).
+ */
+export async function removeFromPlaylist(
+  token: string,
+  playlistID: string,
+  trackIDs: string[],
+): Promise<void> {
+  const tracks = trackIDs.map((id) => ({ uri: `spotify:track:${id}` }));
+
+  const response = await fetch(
+    `${BASE_URL}/v1/playlists/${playlistID}/tracks`,
+    {
+      method: 'DELETE',
+      headers: authHeaders(token),
+      body: JSON.stringify({ tracks }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to remove tracks from playlist: ${response.status}`);
+  }
+}
+
+/**
+ * Add tracks to the user's Spotify library (Saved Tracks).
+ */
+export async function addToLibrary(
+  token: string,
+  trackIDs: string[],
+): Promise<void> {
+  const response = await fetch(`${BASE_URL}/v1/me/tracks`, {
+    method: 'PUT',
+    headers: authHeaders(token),
+    body: JSON.stringify({ ids: trackIDs }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to add tracks to library: ${response.status}`);
+  }
+}
+
+/**
+ * Add tracks to a Spotify playlist.
+ */
+export async function addToPlaylist(
+  token: string,
+  playlistID: string,
+  trackIDs: string[],
+): Promise<void> {
+  const uris = trackIDs.map((id) => `spotify:track:${id}`);
+
+  const response = await fetch(
+    `${BASE_URL}/v1/playlists/${playlistID}/tracks`,
+    {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: JSON.stringify({ uris }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Failed to add tracks to playlist: ${response.status}`);
+  }
 }

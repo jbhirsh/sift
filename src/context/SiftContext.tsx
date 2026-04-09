@@ -33,6 +33,7 @@ export interface SiftState {
   removalPlaylistCreated: boolean;
   removalPlaylistError: string | null;
   isCreatingPlaylist: boolean;
+  removalErrors: string[];
   connectionStatus: ConnectionStatus;
 }
 
@@ -55,6 +56,7 @@ const initialState: SiftState = {
   removalPlaylistCreated: false,
   removalPlaylistError: null,
   isCreatingPlaylist: false,
+  removalErrors: [],
   connectionStatus: 'unknown',
 };
 
@@ -76,6 +78,8 @@ type SiftAction =
   | { type: 'SET_PLAYLIST_ERROR'; error: string | null }
   | { type: 'SET_CREATING_PLAYLIST'; creating: boolean }
   | { type: 'SET_HAS_SAVED_SESSION'; has: boolean }
+  | { type: 'ADD_REMOVAL_ERROR'; error: string }
+  | { type: 'RESTORE_TRACK'; trackId: string }
   | { type: 'SET_SOURCE'; source: SiftSource }
   | { type: 'RESUME_SESSION'; session: Omit<SiftState, 'phase'> & { phase?: AppPhase } }
   | { type: 'START_FRESH' };
@@ -126,6 +130,7 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         kept: [],
         removed: [],
         skipped: [],
+        removalErrors: [],
         phase: 'sifting',
         loadProgress: 1,
       };
@@ -161,6 +166,19 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
     case 'SET_CREATING_PLAYLIST':
       return { ...state, isCreatingPlaylist: action.creating };
 
+    case 'ADD_REMOVAL_ERROR':
+      return { ...state, removalErrors: [...state.removalErrors, action.error] };
+
+    case 'RESTORE_TRACK': {
+      const track = state.removed.find((t) => t.id === action.trackId);
+      if (!track) return state;
+      return {
+        ...state,
+        removed: state.removed.filter((t) => t.id !== action.trackId),
+        kept: [...state.kept, track],
+      };
+    }
+
     case 'SET_SOURCE':
       return { ...state, source: action.source };
 
@@ -177,7 +195,7 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
     case 'START_FRESH':
       return {
         ...state,
-        source: { type: 'library' },
+        source: state.source,
         tracks: [],
         cursor: 0,
         kept: [],
@@ -185,9 +203,10 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         skipped: [],
         loadProgress: 0,
         loadError: null,
-        loadMessage: 'Loading library…',
+        loadMessage: state.source.type === 'playlist' ? 'Loading playlist…' : 'Loading library…',
         removalPlaylistCreated: false,
         removalPlaylistError: null,
+        removalErrors: [],
         phase: 'loading',
       };
 
@@ -351,6 +370,7 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
             removalPlaylistCreated: false,
             removalPlaylistError: null,
             isCreatingPlaylist: false,
+            removalErrors: [],
             connectionStatus: state.connectionStatus,
           },
         });

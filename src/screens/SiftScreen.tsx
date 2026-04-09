@@ -16,6 +16,7 @@ import {
 } from 'react-native-reanimated';
 import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
+import { useMusicProvider } from '../hooks/useMusicProvider';
 import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
 import InteractiveCard from '../components/InteractiveCard';
@@ -36,6 +37,7 @@ export default function SiftScreen() {
     stopSession,
   } = useSift();
 
+  const { removeTrack } = useMusicProvider();
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [isAnimating, setIsAnimating] = useState(false);
@@ -50,10 +52,14 @@ export default function SiftScreen() {
       if (isAnimating) return;
       setIsAnimating(true);
 
+      const track = currentTrack;
       const direction = decision === 'keep' ? 500 : -500;
 
       const onComplete = () => {
         decide(decision);
+        if (decision === 'remove' && track) {
+          removeTrack(track);
+        }
         programmaticOffset.value = 0;
         setIsAnimating(false);
       };
@@ -69,7 +75,7 @@ export default function SiftScreen() {
         },
       );
     },
-    [isAnimating, decide, programmaticOffset],
+    [isAnimating, decide, currentTrack, removeTrack, programmaticOffset],
   );
 
   const handleSkip = useCallback(() => {
@@ -78,9 +84,13 @@ export default function SiftScreen() {
 
   const handleCardDecide = useCallback(
     (decision: Decision) => {
+      const track = currentTrack;
       decide(decision);
+      if (decision === 'remove' && track) {
+        removeTrack(track);
+      }
     },
-    [decide],
+    [decide, currentTrack, removeTrack],
   );
 
   return (
