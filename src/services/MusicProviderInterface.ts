@@ -35,6 +35,18 @@ export interface MusicProviderService {
   /** Create a playlist with the given name containing the specified tracks. */
   createPlaylist(name: string, trackIDs: string[]): Promise<void>;
 
+  /** Delete tracks from the user's music library entirely. */
+  removeFromLibrary?(trackIDs: string[]): Promise<void>;
+
+  /** Remove tracks from a playlist (does not delete from library). */
+  removeFromPlaylist?(playlistID: string, trackIDs: string[]): Promise<void>;
+
+  /** Add tracks back to the user's music library. */
+  addToLibrary?(trackIDs: string[]): Promise<void>;
+
+  /** Add tracks to a playlist. */
+  addToPlaylist?(playlistID: string, trackIDs: string[]): Promise<void>;
+
   /** List the user's playlists. Optional — not all providers support it yet. */
   loadPlaylists?(): Promise<Playlist[]>;
 

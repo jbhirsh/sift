@@ -3,6 +3,7 @@ import { Alert, Linking } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { useSift } from '../context/SiftContext';
 import { createMusicProvider, MusicProviderService } from '../services';
+import { logRemoval, loadHistory } from '../services/RemovalHistoryStore';
 import { Playlist, Track } from '../types';
 
 const POLL_INTERVAL_MS = 500;
@@ -224,6 +225,25 @@ export function useMusicProvider() {
         const result = await providerRef.current.loadPlaylistTracks?.(source.playlist.id);
         if (!result) throw new Error('This provider does not support playlist loading');
         tracks = result;
+
+        // Exclude tracks already in the sifted playlist
+        const siftedName = `${source.playlist.name} - Sifted`;
+        const playlists = await providerRef.current.loadPlaylists?.() ?? [];
+        const sifted = playlists.find((p) => p.name === siftedName);
+        if (sifted) {
+          const siftedTracks = await providerRef.current.loadPlaylistTracks?.(sifted.id) ?? [];
+          const siftedIds = new Set(siftedTracks.map((t) => t.id));
+          tracks = tracks.filter((t) => !siftedIds.has(t.id));
+        }
+
+        // Exclude tracks previously removed from this playlist
+        const history = await loadHistory();
+        const removedIds = new Set(
+          history
+            .filter((r) => r.source.type === 'playlist' && r.source.playlist.id === source.playlist.id)
+            .map((r) => r.track.id),
+        );
+        tracks = tracks.filter((t) => !removedIds.has(t.id));
       } else {
         tracks = await providerRef.current.loadLibrary();
       }
@@ -241,6 +261,49 @@ export function useMusicProvider() {
       dispatch({ type: 'SET_LOAD_ERROR', error: errorMessage });
     }
   }, [dispatch, state.source]);
+
+  const removeTrack = useCallback(
+    async (track: Track) => {
+      const source = state.source;
+      // Always log removal — the user's intent is what matters
+      await logRemoval({
+        track,
+        source,
+        provider: state.provider,
+        removedAt: new Date().toISOString(),
+      });
+      try {
+        if (source.type === 'playlist') {
+          await providerRef.current.removeFromPlaylist?.(source.playlist.id, [track.id]);
+        } else {
+          await providerRef.current.removeFromLibrary?.([track.id]);
+        }
+      } catch (err) {
+        Sentry.captureException(err, { tags: { flow: 'remove-track' } });
+        dispatch({ type: 'ADD_REMOVAL_ERROR', error: track.name });
+      }
+    },
+    [dispatch, state.source, state.provider],
+  );
+
+  const restoreTrack = useCallback(
+    async (track: Track) => {
+      try {
+        const source = state.source;
+        if (source.type === 'playlist') {
+          await providerRef.current.addToPlaylist?.(source.playlist.id, [track.id]);
+        } else {
+          await providerRef.current.addToLibrary?.([track.id]);
+        }
+        dispatch({ type: 'RESTORE_TRACK', trackId: track.id });
+      } catch (err) {
+        Sentry.captureException(err, { tags: { flow: 'restore-track' } });
+        const message = err instanceof Error ? err.message : 'Failed to restore track';
+        dispatch({ type: 'ADD_REMOVAL_ERROR', error: `${track.name}: ${message}` });
+      }
+    },
+    [dispatch, state.source],
+  );
 
   const createPlaylist = useCallback(
     async (name: string, trackIDs: string[]) => {
@@ -260,6 +323,42 @@ export function useMusicProvider() {
     [dispatch]
   );
 
+  const saveSiftedPlaylist = useCallback(
+    async (playlistName: string, keptTracks: Track[]) => {
+      if (keptTracks.length === 0) return;
+      const siftedName = `${playlistName} - Sifted`;
+
+      dispatch({ type: 'SET_CREATING_PLAYLIST', creating: true });
+      dispatch({ type: 'SET_PLAYLIST_ERROR', error: null });
+      try {
+        const playlists = await providerRef.current.loadPlaylists?.() ?? [];
+        const existing = playlists.find((p) => p.name === siftedName);
+
+        if (existing) {
+          const existingTracks = await providerRef.current.loadPlaylistTracks?.(existing.id) ?? [];
+          const existingIds = new Set(existingTracks.map((t) => t.id));
+          const newTrackIDs = keptTracks
+            .filter((t) => !existingIds.has(t.id))
+            .map((t) => t.id);
+          if (newTrackIDs.length > 0) {
+            await providerRef.current.addToPlaylist?.(existing.id, newTrackIDs);
+          }
+        } else {
+          await providerRef.current.createPlaylist(siftedName, keptTracks.map((t) => t.id));
+        }
+
+        dispatch({ type: 'SET_PLAYLIST_CREATED', created: true });
+      } catch (err) {
+        Sentry.captureException(err, { tags: { flow: 'save-sifted-playlist' } });
+        const message = err instanceof Error ? err.message : 'Failed to save sifted playlist';
+        dispatch({ type: 'SET_PLAYLIST_ERROR', error: message });
+      } finally {
+        dispatch({ type: 'SET_CREATING_PLAYLIST', creating: false });
+      }
+    },
+    [dispatch],
+  );
+
   return {
     authorize,
     loadLibrary,
@@ -273,5 +372,8 @@ export function useMusicProvider() {
     skipForward,
     skipBackward,
     createPlaylist,
+    saveSiftedPlaylist,
+    removeTrack,
+    restoreTrack,
   };
 }

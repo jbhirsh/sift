@@ -21,6 +21,7 @@ function makeState(overrides: Partial<SiftState> = {}): SiftState {
     removalPlaylistCreated: false,
     removalPlaylistError: null,
     isCreatingPlaylist: false,
+    removalErrors: [],
     connectionStatus: 'unknown',
     ...overrides,
   };
@@ -244,12 +245,11 @@ describe('siftReducer', () => {
     expect(next.source).toEqual(playlistSource);
   });
 
-  test('START_FRESH resets source to library', () => {
-    const state = makeState({
-      source: { type: 'playlist', playlist: { id: 'p1', name: 'My Playlist', trackCount: 10 } },
-    });
+  test('START_FRESH preserves selected source', () => {
+    const playlistSource = { type: 'playlist' as const, playlist: { id: 'p1', name: 'My Playlist', trackCount: 10 } };
+    const state = makeState({ source: playlistSource });
     const next = siftReducer(state, { type: 'START_FRESH' });
-    expect(next.source).toEqual({ type: 'library' });
+    expect(next.source).toEqual(playlistSource);
   });
 
   test('RESUME_SESSION with source preserves it', () => {
@@ -304,5 +304,43 @@ describe('siftReducer', () => {
     expect(next.loadError).toBeNull();
     expect(next.removalPlaylistCreated).toBe(false);
     expect(next.removalPlaylistError).toBeNull();
+    expect(next.removalErrors).toEqual([]);
+  });
+
+  test('ADD_REMOVAL_ERROR appends to removalErrors', () => {
+    const state = makeState({ removalErrors: ['first error'] });
+    const next = siftReducer(state, { type: 'ADD_REMOVAL_ERROR', error: 'second error' });
+    expect(next.removalErrors).toEqual(['first error', 'second error']);
+  });
+
+  test('ADD_REMOVAL_ERROR on empty array', () => {
+    const state = makeState();
+    const next = siftReducer(state, { type: 'ADD_REMOVAL_ERROR', error: 'some error' });
+    expect(next.removalErrors).toEqual(['some error']);
+  });
+
+  test('LOAD_TRACKS resets removalErrors', () => {
+    const state = makeState({ removalErrors: ['old error'] });
+    const next = siftReducer(state, { type: 'LOAD_TRACKS', tracks: [trackA] });
+    expect(next.removalErrors).toEqual([]);
+  });
+
+  test('START_FRESH resets removalErrors', () => {
+    const state = makeState({ removalErrors: ['old error'] });
+    const next = siftReducer(state, { type: 'START_FRESH' });
+    expect(next.removalErrors).toEqual([]);
+  });
+
+  test('RESTORE_TRACK moves track from removed to kept', () => {
+    const state = makeState({ removed: [trackA, trackB], kept: [] });
+    const next = siftReducer(state, { type: 'RESTORE_TRACK', trackId: trackA.id });
+    expect(next.removed).toEqual([trackB]);
+    expect(next.kept).toEqual([trackA]);
+  });
+
+  test('RESTORE_TRACK is a no-op if track not in removed', () => {
+    const state = makeState({ removed: [trackA], kept: [] });
+    const next = siftReducer(state, { type: 'RESTORE_TRACK', trackId: 'nonexistent' });
+    expect(next).toBe(state);
   });
 });

@@ -70,6 +70,10 @@ function getNativeModule() {
     seek(position: number): void;
     getPlaybackState(): { position: number; isPlaying: boolean };
     createPlaylist(name: string, trackIDs: string[]): Promise<void>;
+    removeFromLibrary(trackIDs: string[]): Promise<void>;
+    removeFromPlaylist(playlistID: string, trackIDs: string[]): Promise<void>;
+    addToLibrary(trackIDs: string[]): Promise<void>;
+    addToPlaylist(playlistID: string, trackIDs: string[]): Promise<void>;
     loadPlaylists(): Promise<MusicKitPlaylist[]>;
     loadPlaylistTracks(playlistID: string): Promise<MusicKitTrack[]>;
   };
@@ -114,6 +118,22 @@ export class AppleMusicProvider implements MusicProviderService {
 
   async createPlaylist(name: string, trackIDs: string[]): Promise<void> {
     return this.native.createPlaylist(name, trackIDs);
+  }
+
+  async removeFromLibrary(trackIDs: string[]): Promise<void> {
+    return this.native.removeFromLibrary(trackIDs);
+  }
+
+  async removeFromPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
+    return this.native.removeFromPlaylist(playlistID, trackIDs);
+  }
+
+  async addToLibrary(trackIDs: string[]): Promise<void> {
+    return this.native.addToLibrary(trackIDs);
+  }
+
+  async addToPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
+    return this.native.addToPlaylist(playlistID, trackIDs);
   }
 
   async loadPlaylists(): Promise<Playlist[]> {

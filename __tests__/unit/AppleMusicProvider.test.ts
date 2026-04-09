@@ -40,7 +40,7 @@ const mockNativeModule = {
   createPlaylist: jest.fn().mockResolvedValue(undefined),
 };
 
-jest.mock('../../modules/expo-musickit/src/index', () => mockNativeModule, { virtual: true });
+jest.mock('../../modules/expo-musickit/src/index', () => mockNativeModule);
 
 // Override Platform.OS to ios at object level
 const originalOS = Platform.OS;
@@ -49,6 +49,7 @@ beforeAll(() => {
 });
 afterAll(() => {
   Object.defineProperty(Platform, 'OS', { value: originalOS, writable: true });
+  jest.resetModules();
 });
 
 import { AppleMusicProvider } from '../../src/services/AppleMusicProvider';

@@ -122,11 +122,15 @@ public class ExpoMusicKitModule: Module {
         offset += pageSize
       }
 
-      return allPlaylists.map { playlist in
+      var results: [[String: Any]] = []
+      for playlist in allPlaylists {
+        let detailed = try await playlist.with([.tracks])
+        let trackCount = detailed.tracks?.count ?? 0
+
         var dict: [String: Any] = [
           "id": playlist.id.rawValue,
           "name": playlist.name,
-          "trackCount": playlist.tracks?.count ?? 0,
+          "trackCount": trackCount,
         ]
 
         if let artwork = playlist.artwork, let url = artwork.url(width: 300, height: 300),
@@ -136,8 +140,9 @@ public class ExpoMusicKitModule: Module {
           dict["artworkURL"] = NSNull()
         }
 
-        return dict
+        results.append(dict)
       }
+      return results
     }
 
     AsyncFunction("loadPlaylistTracks") { (playlistID: String) -> [[String: Any]] in
@@ -241,6 +246,120 @@ public class ExpoMusicKitModule: Module {
       }
 
       _ = try await MusicLibrary.shared.createPlaylist(name: name, items: songs)
+    }
+
+    // MARK: - Removal
+
+    AsyncFunction("removeFromLibrary") { (trackIDs: [String]) in
+      guard MusicAuthorization.currentStatus == .authorized else {
+        throw MusicKitError.notAuthorized
+      }
+
+      var songs: [Song] = []
+      for id in trackIDs {
+        if let song = self.songCache[id] {
+          songs.append(song)
+        } else {
+          var request = MusicLibraryRequest<Song>()
+          request.filter(matching: \.id, equalTo: MusicItemID(id))
+          let response = try await request.response()
+          if let song = response.items.first {
+            songs.append(song)
+          }
+        }
+      }
+
+      guard !songs.isEmpty else {
+        throw MusicKitError.noTracksFound
+      }
+
+      // MusicKit does not support deleting from the library.
+      // Move tracks to a "Sift — Removed" playlist so the user can
+      // review and delete them manually in the Music app.
+      let playlistName = "Sift — Removed"
+      var playlistRequest = MusicLibraryRequest<MusicKit.Playlist>()
+      let allPlaylists = try await playlistRequest.response()
+      let existing = allPlaylists.items.first { $0.name == playlistName }
+
+      if let playlist = existing {
+        for song in songs {
+          _ = try await MusicLibrary.shared.add(song, to: playlist)
+        }
+      } else {
+        _ = try await MusicLibrary.shared.createPlaylist(name: playlistName, items: songs)
+      }
+    }
+
+    AsyncFunction("removeFromPlaylist") { (playlistID: String, trackIDs: [String]) in
+      guard MusicAuthorization.currentStatus == .authorized else {
+        throw MusicKitError.notAuthorized
+      }
+
+      var request = MusicLibraryRequest<MusicKit.Playlist>()
+      request.filter(matching: \.id, equalTo: MusicItemID(playlistID))
+      let response = try await request.response()
+
+      guard let playlist = response.items.first else {
+        throw MusicKitError.noTracksFound
+      }
+
+      let detailedPlaylist = try await playlist.with([.tracks])
+      guard let currentTracks = detailedPlaylist.tracks else { return }
+
+      let idsToRemove = Set(trackIDs)
+      let remaining = currentTracks.filter { !idsToRemove.contains($0.id.rawValue) }
+
+      try await MusicLibrary.shared.edit(detailedPlaylist, items: remaining)
+    }
+
+    AsyncFunction("addToLibrary") { (trackIDs: [String]) in
+      guard MusicAuthorization.currentStatus == .authorized else {
+        throw MusicKitError.notAuthorized
+      }
+
+      for id in trackIDs {
+        let song: Song
+        if let cached = self.songCache[id] {
+          song = cached
+        } else {
+          var request = MusicLibraryRequest<Song>()
+          request.filter(matching: \.id, equalTo: MusicItemID(id))
+          let response = try await request.response()
+          guard let found = response.items.first else { continue }
+          song = found
+          self.songCache[id] = song
+        }
+        try await MusicLibrary.shared.add(song)
+      }
+    }
+
+    AsyncFunction("addToPlaylist") { (playlistID: String, trackIDs: [String]) in
+      guard MusicAuthorization.currentStatus == .authorized else {
+        throw MusicKitError.notAuthorized
+      }
+
+      var request = MusicLibraryRequest<MusicKit.Playlist>()
+      request.filter(matching: \.id, equalTo: MusicItemID(playlistID))
+      let response = try await request.response()
+
+      guard let playlist = response.items.first else {
+        throw MusicKitError.noTracksFound
+      }
+
+      for id in trackIDs {
+        let song: Song
+        if let cached = self.songCache[id] {
+          song = cached
+        } else {
+          var songRequest = MusicLibraryRequest<Song>()
+          songRequest.filter(matching: \.id, equalTo: MusicItemID(id))
+          let songResponse = try await songRequest.response()
+          guard let found = songResponse.items.first else { continue }
+          song = found
+          self.songCache[id] = song
+        }
+        _ = try await MusicLibrary.shared.add(song, to: playlist)
+      }
     }
 
     // MARK: - Artwork Resolution
