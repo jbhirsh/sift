@@ -1,0 +1,43 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+concurrency:
+  group: claude-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Claude Review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Review this pull request for correctness, bugs, and adherence to the
+            project conventions in CLAUDE.md. This is a React Native (Expo SDK 55,
+            RN 0.83, TypeScript strict) app. Focus on:
+              - Logic errors and edge cases
+              - Type safety and null/undefined handling
+              - React/React Native pitfalls (stale closures, effect deps, re-renders)
+              - Violations of the project's architecture (SiftContext reducer pattern,
+                phase routing, provider interface, theme tokens)
+              - Missing unit tests for new reducer actions, services, or utilities
+              - New UI experiences or user-facing flows without corresponding E2E
+                coverage in __tests__/e2e/ (Maestro)
+            Be concise. Leave inline comments on specific lines when possible. Skip
+            style nits already enforced by ESLint/Prettier.
+          claude_args: "--max-turns 5"
