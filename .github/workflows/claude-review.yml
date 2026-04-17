@@ -52,5 +52,5 @@ jobs:
             ESLint/Prettier. Be concise.
           classify_inline_comments: "true"
           claude_args: |
-            --max-turns 15
+            --max-turns 40
             --allowedTools "mcp__github_inline_comment__create_inline_comment"
