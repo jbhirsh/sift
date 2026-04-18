@@ -55,7 +55,6 @@ jobs:
         if: steps.pr.outputs.skip == 'false'
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          track_progress: true
           prompt: |
             REPO_DIR: ${{ github.workspace }}
             PR: ${{ steps.pr.outputs.number }}
