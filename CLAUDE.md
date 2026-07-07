@@ -3,8 +3,8 @@
 ## What This Project Is
 A React Native (Expo) mobile app for rapidly reviewing a music library.
 Users swipe/tap through their tracks: keep, remove, or skip.
-Supports Apple Music and Spotify. Built with Expo SDK 54, React Native 0.81,
-and TypeScript.
+Supports Apple Music and Spotify. Built with Expo SDK 55, React Native 0.83,
+React 19, and TypeScript.
 
 ---
 
@@ -36,11 +36,11 @@ especially when test files were modified.
 | Layer | What it tests | Speed | When to use |
 |-------|--------------|-------|-------------|
 | Unit tests (`make test`) | Reducers, utils, hooks, services | Seconds | Every commit + CI |
-| E2E tests (`make test-e2e`) | Full app flows | Minutes | PR time (Maestro — not yet configured) |
+| E2E tests (`make test-e2e`) | Full app flows | Minutes | PR time (Maestro flows in `.maestro/`) |
 
 **Test coverage requirements:**
 - Every new reducer action, service function, or utility must have a unit test in `__tests__/unit/`.
-- Every new user-facing flow should have an E2E test in `__tests__/e2e/` (when Maestro is set up).
+- Every new user-facing flow should have a Maestro E2E flow in `.maestro/`.
 - Unit tests must be pure logic — no device rendering.
 - Tests are written alongside the implementation, not after the commit.
 
@@ -78,13 +78,14 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 src/
     App.tsx             Phase router + settings modal
     components/         Reusable UI (Button, GlassCard, GlassBackground,
-                        InteractiveCard, PlayerControls)
+                        InteractiveCard, PlayerControls, PlaylistPicker)
     screens/            SetupScreen, LoadingScreen, SiftScreen,
                         DoneScreen, SettingsScreen
     context/            SiftContext (useReducer state management)
     services/           MusicProviderInterface, AppleMusicProvider,
-                        SpotifyProvider, MockMusicProvider, SessionStore
-    hooks/              useKeyboardShortcuts, useMusicProvider
+                        SpotifyProvider (+ spotify/ API & auth), MockMusicProvider,
+                        SessionStore, RemovalHistoryStore
+    hooks/              useKeyboardShortcuts, useMusicProvider, useResolvedArtwork
     theme/              Design tokens (SPACING, RADIUS, COLORS, SHADOWS,
                         FONTS, GLASS, GRADIENTS), ThemeContext
     types/              Track, Decision, AppPhase, SortOrder, MusicProvider,
@@ -94,7 +95,8 @@ modules/
   expo-musickit/        Custom Expo native module for MusicKit
 __tests__/
   unit/                 Jest unit tests
-  e2e/                  E2E tests (Maestro — placeholder)
+  helpers/              Test render helpers
+.maestro/               Maestro E2E flows
 assets/                 App icons, splash screen
 app.json                Expo config
 jest.config.js          Jest configuration
@@ -123,7 +125,11 @@ Makefile                Dev commands (test, lint, typecheck, check)
 ---
 
 ## CI/CD
-- CI workflow not yet configured for React Native. Will run in `.github/workflows/ci.yml`.
+- CI runs in `.github/workflows/ci.yml` on GitHub-hosted runners: lint,
+  typecheck, and Jest with coverage on Ubuntu, then a Maestro iOS E2E job
+  on macOS.
+- Claude Code PR review + auto-fix workflows live alongside it
+  (`.github/workflows/claude-review.yml`, `claude-autofix.yml`).
 - All changes reach main via PR — never by pushing directly.
 
 ---
