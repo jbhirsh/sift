@@ -2,7 +2,7 @@ name: Claude Auto-Fix PR Comments
 
 on:
   workflow_run:
-    workflows: ["Claude Code Review"]
+    workflows: ["CI"]
     types: [completed]
 
 concurrency:
