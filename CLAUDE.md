@@ -126,8 +126,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
 
 ## CI/CD
 - CI runs in `.github/workflows/ci.yml` on GitHub-hosted runners: lint,
-  typecheck, and Jest with coverage on Ubuntu, then a Maestro iOS E2E job
-  on macOS.
+  typecheck, and Jest with coverage on Ubuntu on every PR. The Maestro iOS
+  E2E job (macOS) runs on demand via `workflow_dispatch`.
 - Claude Code PR review + auto-fix workflows live alongside it
   (`.github/workflows/claude-review.yml`, `claude-autofix.yml`).
 - All changes reach main via PR — never by pushing directly.
