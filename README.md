@@ -25,7 +25,7 @@ Sift is a production-quality React Native (Expo) app built in TypeScript, with a
 - **"Liquid glass" UI** — a reusable blur/material design system (`GlassCard`, `GlassBackground`) with centralized design tokens and automatic light/dark theming.
 - **Crash-safe sessions** — all state lives in a single typed `useReducer`; sessions auto-save (debounced) to `AsyncStorage` after every decision and resume exactly where you left off.
 - **Observability** — Sentry is wired for errors, tracing, and session replay, with breadcrumbs on every user action and provider call.
-- **Tested & CI-gated** — 28 Jest unit suites (80% coverage threshold) plus 7 Maestro E2E flows, all run on every PR via GitHub Actions.
+- **Tested & CI-gated** — 28 Jest unit suites (80% coverage threshold) run on every PR via GitHub Actions, plus 7 Maestro E2E flows runnable on demand.
 
 ---
 
@@ -115,4 +115,4 @@ A `Makefile` mirrors these (`make test`, `make lint`, `make typecheck`, `make ch
 
 ## CI/CD
 
-Every PR runs lint, typecheck, and unit tests (with coverage) on Ubuntu, followed by a Maestro iOS E2E job on a GitHub-hosted macOS runner. Dependabot keeps npm and Actions dependencies current. All changes reach `main` via PR.
+Every PR runs lint, typecheck, and unit tests (with coverage) on Ubuntu. The Maestro iOS E2E job (macOS) runs on demand via `workflow_dispatch`. Dependabot keeps npm and Actions dependencies current. All changes reach `main` via PR.

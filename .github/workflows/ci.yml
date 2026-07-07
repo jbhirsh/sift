@@ -15,6 +15,7 @@ on:
       - 'docs/**'
       - '.github/**/*.md'
       - 'LICENSE'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -54,6 +55,11 @@ jobs:
   e2e:
     name: E2E Tests (Maestro)
     needs: check
+    # The iOS Maestro E2E job was built for a self-hosted Mac (preinstalled
+    # Maestro + a persistent build cache). It runs on demand rather than on
+    # every PR, since it can't pass on ephemeral GitHub-hosted macOS runners
+    # as-is. Trigger it manually from the Actions tab (workflow_dispatch).
+    if: github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
 
     steps:
