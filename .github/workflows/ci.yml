@@ -26,7 +26,7 @@ env:
 jobs:
   check:
     name: Lint, Typecheck & Unit Test
-    runs-on: [self-hosted, macOS, ARM64]
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v5
@@ -54,7 +54,7 @@ jobs:
   e2e:
     name: E2E Tests (Maestro)
     needs: check
-    runs-on: [self-hosted, macOS, ARM64]
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v5

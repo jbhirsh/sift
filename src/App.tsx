@@ -20,7 +20,10 @@ import DoneScreen from './screens/DoneScreen';
 import SettingsScreen from './screens/SettingsScreen';
 
 Sentry.init({
-  dsn: 'https://34686f32423b6ac06bd69e774107cab0@o4511157588918272.ingest.us.sentry.io/4511164573548544',
+  // DSN is read from the EXPO_PUBLIC_SENTRY_DSN env var (see .env.example).
+  // Provide the real value in an untracked .env.local for local runs; leave
+  // it unset to disable Sentry reporting entirely.
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
   sendDefaultPii: true,
   tracesSampleRate: 0.2,
   enableLogs: true,
