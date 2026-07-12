@@ -54,7 +54,7 @@ jobs:
           ref: ${{ steps.pr.outputs.branch }}
           fetch-depth: 0
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         if: steps.pr.outputs.skip == 'false'
         with:
           node-version: 24
