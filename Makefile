@@ -40,7 +40,7 @@ build-ios:
 doctor:
 	npx expo-doctor@latest
 
-# Check everything (lint + types + tests + expo doctor)
-check: lint typecheck test doctor
+# Check everything (lint + types + tests with coverage + expo doctor)
+check: lint typecheck test-coverage doctor
 
 .PHONY: test test-coverage test-watch build-e2e test-e2e test-all lint typecheck build-ios check doctor
