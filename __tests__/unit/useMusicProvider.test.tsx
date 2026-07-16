@@ -3,6 +3,7 @@ import { Text, TouchableOpacity } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
 import { useMusicProvider } from '../../src/hooks/useMusicProvider';
+import { removeFromHistory } from '../../src/services/RemovalHistoryStore';
 import { Track } from '../../src/types';
 
 // Mock Sentry
@@ -34,11 +35,23 @@ const mockProvider = {
   seek: jest.fn(),
   getPlaybackState: jest.fn().mockReturnValue({ position: 30, isPlaying: true }),
   createPlaylist: jest.fn().mockResolvedValue(undefined),
+  addToLibrary: jest.fn().mockResolvedValue(undefined),
+  addToPlaylist: jest.fn().mockResolvedValue(undefined),
+  removeFromLibrary: jest.fn().mockResolvedValue(undefined),
+  removeFromPlaylist: jest.fn().mockResolvedValue(undefined),
 };
 
 jest.mock('../../src/services', () => ({
   createMusicProvider: jest.fn(() => mockProvider),
   MusicProviderService: {},
+}));
+
+// Mock the removal-history store so restore/remove wiring is observable and
+// loadHistory is deterministic (no file IO).
+jest.mock('../../src/services/RemovalHistoryStore', () => ({
+  logRemoval: jest.fn(() => Promise.resolve()),
+  loadHistory: jest.fn(() => Promise.resolve([])),
+  removeFromHistory: jest.fn(() => Promise.resolve()),
 }));
 
 // Mock Alert
@@ -81,6 +94,7 @@ function TestConsumer() {
         lastLoadPlaylistsResult = await provider.loadPlaylists();
       }} />
       <TouchableOpacity testID="load-tracks" onPress={() => provider.loadTracks()} />
+      <TouchableOpacity testID="restore" onPress={() => provider.restoreTrack(mockTrack)} />
     </>
   );
 }
@@ -99,6 +113,7 @@ function TestConsumerWithSetSource() {
       <TouchableOpacity testID="load-tracks" onPress={async () => {
         await provider.loadTracks();
       }} />
+      <TouchableOpacity testID="restore-pl" onPress={() => provider.restoreTrack(mockTrack)} />
     </>
   );
 }
@@ -487,5 +502,39 @@ describe('useMusicProvider', () => {
     });
     // Default sortOrder is 'least-played' → ascending by playCount.
     expect(getByTestId('track-order').props.children).toBe('3,5,10');
+  });
+
+  test('restoreTrack re-adds to the library and purges its history record', async () => {
+    const { getByTestId } = renderWithProvider();
+    await act(async () => {
+      fireEvent.press(getByTestId('restore'));
+    });
+    // Default source is library, so it re-adds to the library…
+    expect(mockProvider.addToLibrary).toHaveBeenCalledWith(['1']);
+    // …and clears the history entry (kept consistent with removeTrack, which
+    // logs removals for both source types).
+    expect(removeFromHistory).toHaveBeenCalledWith('1', { type: 'library' });
+  });
+
+  test('restoreTrack on a playlist re-adds to the playlist and purges the exclusion record', async () => {
+    // This is the user-facing fix: the playlist load path filters out tracks in
+    // removal history, so restoring must clear that record or the track stays
+    // hidden on the next sift of the playlist.
+    const { getByTestId } = render(
+      <SiftProvider initialTracks={[mockTrack]}>
+        <TestConsumerWithSetSource />
+      </SiftProvider>
+    );
+    await act(async () => {
+      fireEvent.press(getByTestId('set-source-playlist'));
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId('restore-pl'));
+    });
+    expect(mockProvider.addToPlaylist).toHaveBeenCalledWith('p1', ['1']);
+    expect(removeFromHistory).toHaveBeenCalledWith('1', {
+      type: 'playlist',
+      playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 },
+    });
   });
 });
