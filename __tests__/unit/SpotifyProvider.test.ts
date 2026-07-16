@@ -58,14 +58,16 @@ describe('SpotifyProvider', () => {
     provider = new SpotifyProvider();
   });
 
-  test('requestAuthorization calls authorize', async () => {
+  test('requestAuthorization returns true when authorize succeeds', async () => {
     const result = await provider.requestAuthorization();
     expect(result).toBe(true);
     expect(SpotifyAuth.authorize).toHaveBeenCalled();
   });
 
-  test('requestAuthorization returns false on error', async () => {
-    (SpotifyAuth.authorize as jest.Mock).mockRejectedValueOnce(new Error('fail'));
+  test('requestAuthorization returns false when user cancels', async () => {
+    // authorize() resolves false on cancel/failure; the result must propagate
+    // rather than being discarded and reported as success.
+    (SpotifyAuth.authorize as jest.Mock).mockResolvedValueOnce(false);
     const result = await provider.requestAuthorization();
     expect(result).toBe(false);
   });

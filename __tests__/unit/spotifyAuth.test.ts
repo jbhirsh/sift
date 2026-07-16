@@ -1,3 +1,7 @@
+import * as SecureStore from 'expo-secure-store';
+// Real code reads/writes tokens via SecureStore; AsyncStorage is used only to
+// purge legacy plaintext tokens. It resolves to the project's async-storage
+// jest mock via moduleNameMapper in jest.config.js.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   isAuthenticated,
@@ -13,13 +17,10 @@ import {
 // Mocks
 // ---------------------------------------------------------------------------
 
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  getItem: jest.fn(),
-  setItem: jest.fn(),
-  removeItem: jest.fn(),
-  multiGet: jest.fn(),
-  multiSet: jest.fn(),
-  multiRemove: jest.fn(),
+jest.mock('expo-secure-store', () => ({
+  getItemAsync: jest.fn(),
+  setItemAsync: jest.fn(),
+  deleteItemAsync: jest.fn(),
 }));
 
 jest.mock('expo-crypto', () => ({
@@ -44,13 +45,16 @@ jest.mock('expo-web-browser', () => ({
 // Typed mock references
 // ---------------------------------------------------------------------------
 
-const mockGetItem = AsyncStorage.getItem as jest.MockedFunction<
-  typeof AsyncStorage.getItem
+const mockGetItem = SecureStore.getItemAsync as jest.MockedFunction<
+  typeof SecureStore.getItemAsync
 >;
-const mockSetItem = AsyncStorage.setItem as jest.MockedFunction<
-  typeof AsyncStorage.setItem
+const mockSetItem = SecureStore.setItemAsync as jest.MockedFunction<
+  typeof SecureStore.setItemAsync
 >;
-const mockRemoveItem = AsyncStorage.removeItem as jest.MockedFunction<
+const mockRemoveItem = SecureStore.deleteItemAsync as jest.MockedFunction<
+  typeof SecureStore.deleteItemAsync
+>;
+const mockLegacyRemove = AsyncStorage.removeItem as jest.MockedFunction<
   typeof AsyncStorage.removeItem
 >;
 
@@ -123,6 +127,39 @@ describe('logout', () => {
     expect(mockRemoveItem).toHaveBeenCalledWith('spotify_access_token');
     expect(mockRemoveItem).toHaveBeenCalledWith('spotify_refresh_token');
     expect(mockRemoveItem).toHaveBeenCalledWith('spotify_token_expiration');
+  });
+});
+
+describe('legacy plaintext token migration', () => {
+  test('isAuthenticated purges legacy plaintext tokens from AsyncStorage', async () => {
+    // A migrated user has nothing in SecureStore yet.
+    mockGetItem.mockResolvedValue(null);
+
+    await isAuthenticated();
+
+    expect(mockLegacyRemove).toHaveBeenCalledWith('spotify_access_token');
+    expect(mockLegacyRemove).toHaveBeenCalledWith('spotify_refresh_token');
+    expect(mockLegacyRemove).toHaveBeenCalledWith('spotify_token_expiration');
+  });
+
+  test('logout purges legacy plaintext tokens from AsyncStorage', async () => {
+    await logout();
+
+    expect(mockLegacyRemove).toHaveBeenCalledWith('spotify_access_token');
+    expect(mockLegacyRemove).toHaveBeenCalledWith('spotify_refresh_token');
+    expect(mockLegacyRemove).toHaveBeenCalledWith('spotify_token_expiration');
+  });
+
+  test('a failed legacy purge does not break authentication', async () => {
+    const futureExpiration = String(Date.now() + 3600_000);
+    mockGetItem.mockResolvedValueOnce('valid-token');    // SecureStore access token
+    mockGetItem.mockResolvedValueOnce(futureExpiration); // SecureStore expiration
+    mockLegacyRemove.mockRejectedValueOnce(new Error('storage unavailable'));
+
+    // The best-effort purge swallows the error and auth still resolves.
+    const result = await isAuthenticated();
+
+    expect(result).toBe(true);
   });
 });
 

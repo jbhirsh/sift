@@ -2,6 +2,8 @@ import * as Sentry from '@sentry/react-native';
 import * as AuthSession from 'expo-auth-session';
 import * as Crypto from 'expo-crypto';
 import * as WebBrowser from 'expo-web-browser';
+import * as SecureStore from 'expo-secure-store';
+// Imported solely to purge tokens that pre-migration builds wrote in plaintext.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Ensure the browser session is dismissed when the auth completes
@@ -20,7 +22,7 @@ const SCOPES = 'user-library-read playlist-read-private playlist-modify-public p
 const AUTH_URL = 'https://accounts.spotify.com/authorize';
 const TOKEN_URL = 'https://accounts.spotify.com/api/token';
 
-// AsyncStorage keys
+// SecureStore keys (alphanumeric + `_` — valid SecureStore key characters)
 const STORAGE_KEY_ACCESS_TOKEN = 'spotify_access_token';
 const STORAGE_KEY_REFRESH_TOKEN = 'spotify_refresh_token';
 const STORAGE_KEY_TOKEN_EXPIRATION = 'spotify_token_expiration';
@@ -62,22 +64,44 @@ async function storeTokens(data: {
   expires_in: number;
 }): Promise<void> {
   const expiration = Date.now() + data.expires_in * 1000;
-  await AsyncStorage.setItem(STORAGE_KEY_ACCESS_TOKEN, data.access_token);
-  await AsyncStorage.setItem(STORAGE_KEY_TOKEN_EXPIRATION, String(expiration));
+  await SecureStore.setItemAsync(STORAGE_KEY_ACCESS_TOKEN, data.access_token);
+  await SecureStore.setItemAsync(STORAGE_KEY_TOKEN_EXPIRATION, String(expiration));
   if (data.refresh_token) {
-    await AsyncStorage.setItem(STORAGE_KEY_REFRESH_TOKEN, data.refresh_token);
+    await SecureStore.setItemAsync(STORAGE_KEY_REFRESH_TOKEN, data.refresh_token);
   }
 }
 
 /** Read the current access token from storage. */
 export async function getAccessToken(): Promise<string | null> {
-  return AsyncStorage.getItem(STORAGE_KEY_ACCESS_TOKEN);
+  return SecureStore.getItemAsync(STORAGE_KEY_ACCESS_TOKEN);
+}
+
+/**
+ * Best-effort removal of Spotify tokens that pre-migration builds persisted in
+ * plaintext AsyncStorage. The current code only ever reads/writes tokens via
+ * SecureStore, so deleting these legacy keys can never affect a live session.
+ * Wrapped in try/catch so a storage failure can never break authentication.
+ */
+async function clearLegacyPlaintextTokens(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEY_ACCESS_TOKEN);
+    await AsyncStorage.removeItem(STORAGE_KEY_REFRESH_TOKEN);
+    await AsyncStorage.removeItem(STORAGE_KEY_TOKEN_EXPIRATION);
+  } catch {
+    // Purging the old plaintext copy is best-effort; leave the (unused) keys
+    // in place rather than disturb the auth flow.
+  }
 }
 
 /** Check whether the user has a non-expired access token. */
 export async function isAuthenticated(): Promise<boolean> {
-  const token = await AsyncStorage.getItem(STORAGE_KEY_ACCESS_TOKEN);
-  const expiration = await AsyncStorage.getItem(STORAGE_KEY_TOKEN_EXPIRATION);
+  // Proactively purge any legacy plaintext tokens on the auth-check path, so a
+  // user who authenticated before the SecureStore migration is cleaned up on
+  // their next use even if they never explicitly log out or re-authenticate.
+  await clearLegacyPlaintextTokens();
+
+  const token = await SecureStore.getItemAsync(STORAGE_KEY_ACCESS_TOKEN);
+  const expiration = await SecureStore.getItemAsync(STORAGE_KEY_TOKEN_EXPIRATION);
   if (!token || !expiration) return false;
   return Date.now() < Number(expiration);
 }
@@ -87,9 +111,9 @@ export async function isAuthenticated(): Promise<boolean> {
  * token to obtain a fresh access token.
  */
 export async function refreshTokenIfNeeded(): Promise<void> {
-  const tokenValue = await AsyncStorage.getItem(STORAGE_KEY_ACCESS_TOKEN);
-  const expirationValue = await AsyncStorage.getItem(STORAGE_KEY_TOKEN_EXPIRATION);
-  const refreshToken = await AsyncStorage.getItem(STORAGE_KEY_REFRESH_TOKEN);
+  const tokenValue = await SecureStore.getItemAsync(STORAGE_KEY_ACCESS_TOKEN);
+  const expirationValue = await SecureStore.getItemAsync(STORAGE_KEY_TOKEN_EXPIRATION);
+  const refreshToken = await SecureStore.getItemAsync(STORAGE_KEY_REFRESH_TOKEN);
 
   const expiration = Number(expirationValue);
 
@@ -131,7 +155,7 @@ export async function refreshTokenIfNeeded(): Promise<void> {
  *
  * Opens the system browser to the Spotify consent screen, waits for the
  * redirect callback, exchanges the authorization code for tokens, and
- * persists them in AsyncStorage.
+ * persists them in the device's secure keystore (expo-secure-store).
  *
  * @returns `true` when tokens were obtained and stored, `false` otherwise.
  */
@@ -193,11 +217,12 @@ export async function authorize(): Promise<boolean> {
 // Logout
 // ---------------------------------------------------------------------------
 
-/** Clear all stored Spotify tokens. */
+/** Clear all stored Spotify tokens (both SecureStore and any legacy plaintext). */
 export async function logout(): Promise<void> {
-  await AsyncStorage.removeItem(STORAGE_KEY_ACCESS_TOKEN);
-  await AsyncStorage.removeItem(STORAGE_KEY_REFRESH_TOKEN);
-  await AsyncStorage.removeItem(STORAGE_KEY_TOKEN_EXPIRATION);
+  await SecureStore.deleteItemAsync(STORAGE_KEY_ACCESS_TOKEN);
+  await SecureStore.deleteItemAsync(STORAGE_KEY_REFRESH_TOKEN);
+  await SecureStore.deleteItemAsync(STORAGE_KEY_TOKEN_EXPIRATION);
+  await clearLegacyPlaintextTokens();
 }
 
 // ---------------------------------------------------------------------------

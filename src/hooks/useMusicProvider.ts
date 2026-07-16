@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/react-native';
 import { useSift } from '../context/SiftContext';
 import { createMusicProvider, MusicProviderService } from '../services';
 import { logRemoval, loadHistory } from '../services/RemovalHistoryStore';
+import { sortTracks } from '../utils/sorting';
 import { Playlist, Track } from '../types';
 
 const POLL_INTERVAL_MS = 500;
@@ -107,13 +108,13 @@ export function useMusicProvider() {
         level: 'info',
       });
       dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0.9, message: 'Sorting tracks\u2026' });
-      dispatch({ type: 'LOAD_TRACKS', tracks });
+      dispatch({ type: 'LOAD_TRACKS', tracks: sortTracks(tracks, state.sortOrder) });
     } catch (err) {
       Sentry.captureException(err, { tags: { flow: 'load-library' } });
       const message = err instanceof Error ? err.message : 'Failed to load library';
       dispatch({ type: 'SET_LOAD_ERROR', error: message });
     }
-  }, [dispatch]);
+  }, [dispatch, state.sortOrder]);
 
   const play = useCallback(
     async (trackID: string, position?: number) => {
@@ -254,13 +255,13 @@ export function useMusicProvider() {
         level: 'info',
       });
       dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0.9, message: 'Sorting tracks…' });
-      dispatch({ type: 'LOAD_TRACKS', tracks });
+      dispatch({ type: 'LOAD_TRACKS', tracks: sortTracks(tracks, state.sortOrder) });
     } catch (err) {
       Sentry.captureException(err, { tags: { flow: 'load-tracks' } });
       const errorMessage = err instanceof Error ? err.message : 'Failed to load tracks';
       dispatch({ type: 'SET_LOAD_ERROR', error: errorMessage });
     }
-  }, [dispatch, state.source]);
+  }, [dispatch, state.source, state.sortOrder]);
 
   const removeTrack = useCallback(
     async (track: Track) => {
