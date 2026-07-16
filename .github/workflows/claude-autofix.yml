@@ -88,6 +88,12 @@ jobs:
         if: steps.pr.outputs.skip == 'false' && steps.threads.outputs.count != '0'
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Now that the Claude Review job runs on Dependabot PRs, it can leave
+          # review threads that this autofix step acts on. This job is triggered
+          # by workflow_run, where github.actor is the actor of the initiating CI
+          # run — dependabot[bot] for a Dependabot PR. Allow that one trusted bot
+          # so autofix can run instead of failing the non-human-actor check.
+          allowed_bots: "dependabot[bot]"
           track_progress: true
           prompt: |
             REPO_DIR: ${{ github.workspace }}
