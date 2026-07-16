@@ -162,6 +162,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Let the AI review run on Dependabot's dependency-bump PRs. Without
+          # this, claude-code-action refuses to run for the bot actor and fails
+          # with "Workflow initiated by non-human actor: dependabot (type: Bot)".
+          # Allow-list only this one trusted bot rather than "*".
+          allowed_bots: "dependabot[bot]"
           prompt: |
             REPO_DIR: ${{ github.workspace }}
             PR: ${{ github.event.pull_request.number }}
