@@ -12,7 +12,8 @@
     "test:coverage": "jest --coverage",
     "lint": "eslint src/ __tests__/",
     "typecheck": "tsc --noEmit",
-    "check": "npm run lint && npm run typecheck && npm run test"
+    "check": "npm run lint && npm run typecheck && npm run test:coverage",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
