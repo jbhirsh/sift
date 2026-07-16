@@ -537,4 +537,17 @@ describe('useMusicProvider', () => {
       playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 },
     });
   });
+
+  test('restoreTrack does not purge history when the re-add fails', async () => {
+    mockProvider.addToLibrary.mockRejectedValueOnce(new Error('network'));
+    const { getByTestId } = renderWithProvider();
+    await act(async () => {
+      fireEvent.press(getByTestId('restore'));
+    });
+    // The re-add was attempted…
+    expect(mockProvider.addToLibrary).toHaveBeenCalledWith(['1']);
+    // …but history is purged only after a successful re-add, so a failed
+    // restore must leave the exclusion record in place.
+    expect(removeFromHistory).not.toHaveBeenCalled();
+  });
 });

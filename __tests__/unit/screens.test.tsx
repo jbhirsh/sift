@@ -362,7 +362,24 @@ describe('SettingsScreen', () => {
     expect(getByTestId('connection-status-indicator')).toBeTruthy();
   });
 
-  test('check connection reports Connected when authorization succeeds', async () => {
+  test('check connection reports Connected without prompting when already authorized', async () => {
+    mockProvider.isAuthorized.mockResolvedValueOnce(true);
+    mockProvider.requestAuthorization.mockClear();
+    const { getByTestId } = renderWithProviders(<SettingsScreen />);
+
+    await act(async () => {
+      fireEvent.press(getByTestId('check-connection-button'));
+    });
+
+    await waitFor(() => {
+      expect(getByTestId('connection-status-label').props.children).toBe('Connected');
+    });
+    // Already authorized → must not re-open the consent flow.
+    expect(mockProvider.requestAuthorization).not.toHaveBeenCalled();
+  });
+
+  test('check connection prompts and reports Connected when authorization is granted', async () => {
+    mockProvider.isAuthorized.mockResolvedValueOnce(false);
     mockProvider.requestAuthorization.mockResolvedValueOnce(true);
     const { getByTestId } = renderWithProviders(<SettingsScreen />);
 
@@ -376,7 +393,8 @@ describe('SettingsScreen', () => {
     expect(mockProvider.requestAuthorization).toHaveBeenCalled();
   });
 
-  test('check connection reports Not connected when authorization fails', async () => {
+  test('check connection prompts and reports Not connected when authorization is denied', async () => {
+    mockProvider.isAuthorized.mockResolvedValueOnce(false);
     mockProvider.requestAuthorization.mockResolvedValueOnce(false);
     const { getByTestId } = renderWithProviders(<SettingsScreen />);
 

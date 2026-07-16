@@ -4,7 +4,6 @@ import * as Sentry from '@sentry/react-native';
 import { useSift } from '../context/SiftContext';
 import { createMusicProvider, MusicProviderService } from '../services';
 import { logRemoval, loadHistory, removeFromHistory } from '../services/RemovalHistoryStore';
-import { useProviderAuthorization } from './useProviderAuthorization';
 import { sortTracks } from '../utils/sorting';
 import { Playlist, Track } from '../types';
 
@@ -62,10 +61,31 @@ export function useMusicProvider() {
 
   // ── Provider methods ──────────────────────────────────
 
-  // Authorization is delegated to a dedicated poll-free hook so the same logic
-  // can be reused by screens (e.g. Settings) that must not spin up a second
-  // playback poller.
-  const authorize = useProviderAuthorization();
+  /** Whether the provider is already authorized (no prompt). */
+  const isAuthorized = useCallback(async (): Promise<boolean> => {
+    return providerRef.current.isAuthorized();
+  }, []);
+
+  /**
+   * Prompt for authorization and mirror the result into connectionStatus.
+   * Only call this when {@link isAuthorized} is false — it opens the provider's
+   * consent flow (e.g. the Spotify browser).
+   */
+  const authorize = useCallback(async (): Promise<boolean> => {
+    dispatch({ type: 'SET_CONNECTION_STATUS', status: 'checking' });
+    try {
+      const granted = await providerRef.current.requestAuthorization();
+      dispatch({
+        type: 'SET_CONNECTION_STATUS',
+        status: granted ? 'connected' : 'disconnected',
+      });
+      return granted;
+    } catch (err) {
+      Sentry.captureException(err, { tags: { flow: 'authorize' } });
+      dispatch({ type: 'SET_CONNECTION_STATUS', status: 'disconnected' });
+      return false;
+    }
+  }, [dispatch]);
 
   const loadLibrary = useCallback(async () => {
     dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0, message: 'Loading library\u2026' });
@@ -355,6 +375,7 @@ export function useMusicProvider() {
 
   return {
     authorize,
+    isAuthorized,
     loadLibrary,
     loadPlaylists,
     loadTracks,
