@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity } from 'react-native';
+import { Text, TouchableOpacity } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
 import { useMusicProvider } from '../../src/hooks/useMusicProvider';
@@ -53,6 +53,13 @@ const mockTrack: Track = {
 
 let lastLoadPlaylistsResult: unknown[] = [];
 
+// Deliberately unsorted by playCount so a real sort is observable.
+const unsortedTracks: Track[] = [
+  { id: 'high', name: 'High', artist: 'A', album: 'A', duration: 200, playCount: 10, dateAdded: '2020-01-01T00:00:00.000Z' },
+  { id: 'low', name: 'Low', artist: 'B', album: 'B', duration: 200, playCount: 3, dateAdded: '2020-01-01T00:00:00.000Z' },
+  { id: 'mid', name: 'Mid', artist: 'C', album: 'C', duration: 200, playCount: 5, dateAdded: '2020-01-01T00:00:00.000Z' },
+];
+
 function TestConsumer() {
   const provider = useMusicProvider();
   return (
@@ -101,6 +108,21 @@ function renderWithProvider() {
     <SiftProvider initialTracks={[mockTrack]}>
       <TestConsumer />
     </SiftProvider>
+  );
+}
+
+// Renders the current state.tracks order as text and lets the test drive the
+// sort order + load path, so we can assert the loaded order reflects it.
+function SortConsumer() {
+  const provider = useMusicProvider();
+  const { state, dispatch } = useSift();
+  return (
+    <>
+      <Text testID="track-order">{state.tracks.map((t) => t.playCount).join(',')}</Text>
+      <TouchableOpacity testID="set-most-played" onPress={() => dispatch({ type: 'SET_SORT_ORDER', sortOrder: 'most-played' })} />
+      <TouchableOpacity testID="sort-load-library" onPress={() => provider.loadLibrary()} />
+      <TouchableOpacity testID="sort-load-tracks" onPress={() => provider.loadTracks()} />
+    </>
   );
 }
 
@@ -420,5 +442,50 @@ describe('useMusicProvider', () => {
       fireEvent.press(getByTestId('load-tracks'));
     });
     // Should dispatch generic error message
+  });
+
+  test('loadLibrary sorts tracks by state.sortOrder (least-played default)', async () => {
+    mockProvider.loadLibrary.mockResolvedValue(unsortedTracks);
+    const { getByTestId } = render(
+      <SiftProvider initialTracks={[mockTrack]}>
+        <SortConsumer />
+      </SiftProvider>
+    );
+    // Default sortOrder is 'least-played' → ascending by playCount.
+    await act(async () => {
+      fireEvent.press(getByTestId('sort-load-library'));
+    });
+    expect(getByTestId('track-order').props.children).toBe('3,5,10');
+  });
+
+  test('loadLibrary re-sorts when state.sortOrder changes to most-played', async () => {
+    mockProvider.loadLibrary.mockResolvedValue(unsortedTracks);
+    const { getByTestId } = render(
+      <SiftProvider initialTracks={[mockTrack]}>
+        <SortConsumer />
+      </SiftProvider>
+    );
+    await act(async () => {
+      fireEvent.press(getByTestId('set-most-played'));
+    });
+    await act(async () => {
+      fireEvent.press(getByTestId('sort-load-library'));
+    });
+    // 'most-played' → descending by playCount.
+    expect(getByTestId('track-order').props.children).toBe('10,5,3');
+  });
+
+  test('loadTracks sorts library tracks by state.sortOrder', async () => {
+    mockProvider.loadLibrary.mockResolvedValue(unsortedTracks);
+    const { getByTestId } = render(
+      <SiftProvider initialTracks={[mockTrack]}>
+        <SortConsumer />
+      </SiftProvider>
+    );
+    await act(async () => {
+      fireEvent.press(getByTestId('sort-load-tracks'));
+    });
+    // Default sortOrder is 'least-played' → ascending by playCount.
+    expect(getByTestId('track-order').props.children).toBe('3,5,10');
   });
 });
