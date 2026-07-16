@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/react-native';
 import { useSift } from '../context/SiftContext';
 import { createMusicProvider, MusicProviderService } from '../services';
 import { logRemoval, loadHistory } from '../services/RemovalHistoryStore';
+import { useProviderAuthorization } from './useProviderAuthorization';
 import { sortTracks } from '../utils/sorting';
 import { Playlist, Track } from '../types';
 
@@ -61,21 +62,10 @@ export function useMusicProvider() {
 
   // ── Provider methods ──────────────────────────────────
 
-  const authorize = useCallback(async (): Promise<boolean> => {
-    dispatch({ type: 'SET_CONNECTION_STATUS', status: 'checking' });
-    try {
-      const granted = await providerRef.current.requestAuthorization();
-      dispatch({
-        type: 'SET_CONNECTION_STATUS',
-        status: granted ? 'connected' : 'disconnected',
-      });
-      return granted;
-    } catch (err) {
-      Sentry.captureException(err, { tags: { flow: 'authorize' } });
-      dispatch({ type: 'SET_CONNECTION_STATUS', status: 'disconnected' });
-      return false;
-    }
-  }, [dispatch]);
+  // Authorization is delegated to a dedicated poll-free hook so the same logic
+  // can be reused by screens (e.g. Settings) that must not spin up a second
+  // playback poller.
+  const authorize = useProviderAuthorization();
 
   const loadLibrary = useCallback(async () => {
     dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0, message: 'Loading library\u2026' });

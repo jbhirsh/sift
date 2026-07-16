@@ -10,6 +10,7 @@ import { SymbolView } from 'expo-symbols';
 import type { SFSymbol } from 'sf-symbols-typescript';
 import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
+import { useProviderAuthorization } from '../hooks/useProviderAuthorization';
 import GlassCard from '../components/GlassCard';
 import { RADIUS, SPACING } from '../theme';
 import { PROVIDER_DISPLAY } from '../types';
@@ -24,15 +25,16 @@ interface SettingsScreenProps {
 }
 
 export default function SettingsScreen({ onClose: _onClose }: SettingsScreenProps) {
-  const { state, dispatch } = useSift();
+  const { state } = useSift();
   const { colors } = useTheme();
+  const authorize = useProviderAuthorization();
 
   const handleCheckConnection = useCallback(() => {
-    dispatch({ type: 'SET_CONNECTION_STATUS', status: 'checking' });
-    setTimeout(() => {
-      dispatch({ type: 'SET_CONNECTION_STATUS', status: 'connected' });
-    }, 1500);
-  }, [dispatch]);
+    // Run the provider's real authorization check. authorize() dispatches
+    // 'checking' immediately, then 'connected' or 'disconnected' based on the
+    // actual result — no fake success.
+    void authorize();
+  }, [authorize]);
 
   const connectionLabelText = (() => {
     switch (state.connectionStatus) {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, act } from '@testing-library/react-native';
+import { fireEvent, act, waitFor } from '@testing-library/react-native';
 
 // Common mocks
 jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
@@ -362,24 +362,31 @@ describe('SettingsScreen', () => {
     expect(getByTestId('connection-status-indicator')).toBeTruthy();
   });
 
-  test('check connection button updates status', async () => {
-    jest.useFakeTimers();
+  test('check connection reports Connected when authorization succeeds', async () => {
+    mockProvider.requestAuthorization.mockResolvedValueOnce(true);
     const { getByTestId } = renderWithProviders(<SettingsScreen />);
 
     await act(async () => {
       fireEvent.press(getByTestId('check-connection-button'));
     });
 
-    // Status should be 'checking' initially
-    expect(getByTestId('connection-status-label').props.children).toBe('Checking…');
+    await waitFor(() => {
+      expect(getByTestId('connection-status-label').props.children).toBe('Connected');
+    });
+    expect(mockProvider.requestAuthorization).toHaveBeenCalled();
+  });
 
-    // Advance timer to complete the check
+  test('check connection reports Not connected when authorization fails', async () => {
+    mockProvider.requestAuthorization.mockResolvedValueOnce(false);
+    const { getByTestId } = renderWithProviders(<SettingsScreen />);
+
     await act(async () => {
-      jest.advanceTimersByTime(1500);
+      fireEvent.press(getByTestId('check-connection-button'));
     });
 
-    expect(getByTestId('connection-status-label').props.children).toBe('Connected');
-    jest.useRealTimers();
+    await waitFor(() => {
+      expect(getByTestId('connection-status-label').props.children).toBe('Not connected');
+    });
   });
 
   test('renders provider display name', () => {
