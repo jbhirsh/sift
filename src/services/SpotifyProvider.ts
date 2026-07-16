@@ -36,12 +36,10 @@ export class SpotifyProvider implements MusicProviderService {
   // -- Authorization --
 
   async requestAuthorization(): Promise<boolean> {
-    try {
-      await authorize();
-      return true;
-    } catch {
-      return false;
-    }
+    // authorize() resolves true on success and false on cancel/failure
+    // (it catches its own errors internally), so return its result directly
+    // instead of discarding it and always reporting success.
+    return authorize();
   }
 
   async isAuthorized(): Promise<boolean> {
