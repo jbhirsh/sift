@@ -10,7 +10,7 @@ import { SymbolView } from 'expo-symbols';
 import type { SFSymbol } from 'sf-symbols-typescript';
 import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
-import { useProviderAuthorization } from '../hooks/useProviderAuthorization';
+import { useMusicProvider } from '../hooks/useMusicProvider';
 import GlassCard from '../components/GlassCard';
 import { RADIUS, SPACING } from '../theme';
 import { PROVIDER_DISPLAY } from '../types';
@@ -25,16 +25,21 @@ interface SettingsScreenProps {
 }
 
 export default function SettingsScreen({ onClose: _onClose }: SettingsScreenProps) {
-  const { state } = useSift();
+  const { state, dispatch } = useSift();
   const { colors } = useTheme();
-  const authorize = useProviderAuthorization();
+  const { authorize, isAuthorized } = useMusicProvider();
 
-  const handleCheckConnection = useCallback(() => {
-    // Run the provider's real authorization check. authorize() dispatches
-    // 'checking' immediately, then 'connected' or 'disconnected' based on the
-    // actual result — no fake success.
-    void authorize();
-  }, [authorize]);
+  const handleCheckConnection = useCallback(async () => {
+    dispatch({ type: 'SET_CONNECTION_STATUS', status: 'checking' });
+    // Only open the provider's consent flow when we're not already authorized,
+    // mirroring the load paths — checking an existing connection must never
+    // re-prompt (e.g. re-open the Spotify browser).
+    if (await isAuthorized()) {
+      dispatch({ type: 'SET_CONNECTION_STATUS', status: 'connected' });
+      return;
+    }
+    await authorize();
+  }, [dispatch, isAuthorized, authorize]);
 
   const connectionLabelText = (() => {
     switch (state.connectionStatus) {
