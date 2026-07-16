@@ -20,7 +20,7 @@ jest.mock('@sentry/react-native', () => ({
 }));
 
 // Import after mocks are set up
-const { logRemoval, loadHistory } = require('../../src/services/RemovalHistoryStore');
+const { logRemoval, loadHistory, removeFromHistory } = require('../../src/services/RemovalHistoryStore');
 
 const record: RemovalRecord = {
   track: {
@@ -79,5 +79,67 @@ describe('logRemoval', () => {
     await logRemoval(record);
 
     expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([record]));
+  });
+});
+
+describe('removeFromHistory', () => {
+  const playlistSource = { type: 'playlist' as const, playlist: { id: 'p1', name: 'Mix', trackCount: 3 } };
+  const playlistRecord: RemovalRecord = {
+    ...record,
+    track: { ...record.track, id: 'track-2' },
+    source: playlistSource,
+  };
+
+  test('drops the matching library record and rewrites the file', async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([record]));
+
+    await removeFromHistory('track-1', { type: 'library' });
+
+    expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([]));
+  });
+
+  test('drops only the matching playlist record, keyed by playlist id', async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([record, playlistRecord]));
+
+    await removeFromHistory('track-2', playlistSource);
+
+    // The library record survives; the playlist record for p1/track-2 is gone.
+    expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([record]));
+  });
+
+  test('does not rewrite the file when nothing matches', async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([record]));
+
+    // Same track id but a different playlist source → no match.
+    await removeFromHistory('track-1', playlistSource);
+
+    expect(mockWrite).not.toHaveBeenCalled();
+  });
+
+  test('a restored track no longer appears in history on the next sift', async () => {
+    // The track was previously removed and is present in history…
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([record]));
+    const before = await loadHistory();
+    expect(before.some((r: RemovalRecord) => r.track.id === 'track-1')).toBe(true);
+
+    // …restoring it purges the record…
+    await removeFromHistory('track-1', { type: 'library' });
+    expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([]));
+
+    // …so a re-sift reads a history that no longer excludes it.
+    mockText.mockResolvedValue(JSON.stringify([]));
+    const after = await loadHistory();
+    expect(after.some((r: RemovalRecord) => r.track.id === 'track-1')).toBe(false);
+  });
+
+  test('reports but never throws on a read/write error', async () => {
+    mockExists.mockImplementation(() => { throw new Error('disk error'); });
+
+    await expect(removeFromHistory('track-1', { type: 'library' })).resolves.toBeUndefined();
+    expect(mockWrite).not.toHaveBeenCalled();
   });
 });

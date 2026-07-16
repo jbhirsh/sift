@@ -3,7 +3,7 @@ import { Alert, Linking } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { useSift } from '../context/SiftContext';
 import { createMusicProvider, MusicProviderService } from '../services';
-import { logRemoval, loadHistory } from '../services/RemovalHistoryStore';
+import { logRemoval, loadHistory, removeFromHistory } from '../services/RemovalHistoryStore';
 import { useProviderAuthorization } from './useProviderAuthorization';
 import { sortTracks } from '../utils/sorting';
 import { Playlist, Track } from '../types';
@@ -286,6 +286,9 @@ export function useMusicProvider() {
         } else {
           await providerRef.current.addToLibrary?.([track.id]);
         }
+        // Purge the removal-history record so the restored track is offered
+        // again on the next sift of this source instead of being filtered out.
+        await removeFromHistory(track.id, source);
         dispatch({ type: 'RESTORE_TRACK', trackId: track.id });
       } catch (err) {
         Sentry.captureException(err, { tags: { flow: 'restore-track' } });
