@@ -50,7 +50,6 @@ function PhaseRouter() {
         return <LoadingScreen />;
       case 'sifting':
         return <SiftScreen />;
-      case 'paused':
       case 'done':
         return <DoneScreen />;
     }

@@ -27,7 +27,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const borderColor = isDark ? GLASS_BORDER.dark : GLASS_BORDER.light;
 
     const gradientColors = (phase: AppPhase): [string, string] => {
-      const phaseKey = phase === 'paused' ? 'done' : phase;
+      const phaseKey = phase;
       const gradient = GRADIENTS[phaseKey as keyof typeof GRADIENTS];
       if (!gradient) return isDark ? ['#000000', '#0A0A0A'] : ['#F2F2F7', '#FFFFFF'];
       return isDark ? gradient.dark : gradient.light;

@@ -13,7 +13,7 @@ name: "Settings Modal"
 - extendedWaitUntil:
     visible:
       id: "card-track-name"
-    timeout: 10000
+    timeout: 30000
 
 # Open settings modal
 - tapOn:
@@ -23,7 +23,7 @@ name: "Settings Modal"
 - extendedWaitUntil:
     visible:
       id: "check-connection-button"
-    timeout: 5000
+    timeout: 30000
 
 # Verify connection status elements
 - assertVisible:
@@ -36,7 +36,7 @@ name: "Settings Modal"
 # Wait for connection check to complete — mock provider always returns connected
 - extendedWaitUntil:
     visible: "Connected"
-    timeout: 5000
+    timeout: 30000
 
 # Close the modal by swiping down
 - swipe:

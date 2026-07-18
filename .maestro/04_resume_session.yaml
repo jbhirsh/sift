@@ -1,0 +1,152 @@
+appId: com.jessicahirsh.sift
+name: "Resume Session Modal"
+---
+
+# Exercise the resume affordances. Behavior (pinned by unit tests in
+# screens.test.tsx): backing out of an active sift shows the INLINE
+# "Resume Sifting" button — the modal must NOT pop over an in-memory-
+# resumable sift. The ResumeSessionModal appears only when the setup
+# screen mounts with a persisted session and no live one: cold start.
+
+# ── Build up a session with progress ──
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+- tapOn: "Start Sifting"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000
+
+# Make one decision so the session has progress
+- tapOn: "Keep"
+- waitForAnimationToEnd
+
+# ── Back out mid-session: inline resume, no modal ──
+- tapOn:
+    id: "back-button"
+
+- extendedWaitUntil:
+    visible: "Resume Sifting"
+    timeout: 30000
+
+- assertNotVisible:
+    id: "resume-session-modal"
+
+# Inline resume continues where the sift left off
+- tapOn: "Resume Sifting"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000
+
+- assertVisible:
+    id: "stat-kept"
+    text: "1 kept"
+
+# ── Cold start: the persisted session triggers the modal ──
+- tapOn:
+    id: "back-button"
+
+- extendedWaitUntil:
+    visible: "Resume Sifting"
+    timeout: 30000
+
+- launchApp
+
+- extendedWaitUntil:
+    visible:
+      id: "resume-session-modal"
+    timeout: 30000
+
+# Modal shows the saved progress
+- assertVisible:
+    id: "resume-stat-kept"
+- assertVisible:
+    id: "resume-stat-removed"
+
+# Resume from the modal continues the session
+- tapOn:
+    id: "resume-modal-resume"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000
+
+- assertVisible:
+    id: "stat-kept"
+    text: "1 kept"
+
+# ── Cancel: dismissing must not re-trigger on re-selecting the source ──
+- tapOn:
+    id: "back-button"
+
+- extendedWaitUntil:
+    visible: "Resume Sifting"
+    timeout: 30000
+
+- launchApp
+
+- extendedWaitUntil:
+    visible:
+      id: "resume-session-modal"
+    timeout: 30000
+
+- tapOn:
+    id: "resume-modal-cancel"
+
+- assertNotVisible:
+    id: "resume-session-modal"
+
+# Re-selecting the matching source after Cancel must NOT re-show the modal
+- tapOn:
+    id: "source-library"
+
+- assertNotVisible:
+    id: "resume-session-modal"
+
+# Cancel discarded the saved session — a fresh sift is offered
+- assertVisible: "Start Sifting"
+
+# ── Start Over from the modal wipes progress ──
+- tapOn: "Start Sifting"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000
+
+- tapOn: "Keep"
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "back-button"
+
+- extendedWaitUntil:
+    visible: "Resume Sifting"
+    timeout: 30000
+
+- launchApp
+
+- extendedWaitUntil:
+    visible:
+      id: "resume-session-modal"
+    timeout: 30000
+
+- tapOn:
+    id: "resume-modal-start-over"
+
+# Start over reloads the source from scratch — no kept progress remains
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000
+
+- assertVisible:
+    id: "stat-kept"
+    text: "0 kept"

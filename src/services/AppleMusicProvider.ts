@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 import type { MusicProviderService } from './MusicProviderInterface';
 import type { Playlist, Track } from '../types';
 
@@ -69,13 +70,16 @@ function getNativeModule() {
     resume(): Promise<void>;
     seek(position: number): void;
     getPlaybackState(): { position: number; isPlaying: boolean };
-    createPlaylist(name: string, trackIDs: string[]): Promise<void>;
+    createPlaylist(name: string, trackIDs: string[]): Promise<number>;
     removeFromLibrary(trackIDs: string[]): Promise<void>;
     removeFromPlaylist(playlistID: string, trackIDs: string[]): Promise<void>;
     addToLibrary(trackIDs: string[]): Promise<void>;
-    addToPlaylist(playlistID: string, trackIDs: string[]): Promise<void>;
+    addToPlaylist(playlistID: string, trackIDs: string[]): Promise<number>;
     loadPlaylists(): Promise<MusicKitPlaylist[]>;
     loadPlaylistTracks(playlistID: string): Promise<MusicKitTrack[]>;
+    // Optional: development builds made before the cache-warming native
+    // function shipped don't expose it.
+    warmSongCache?(trackIDs: string[]): Promise<number>;
   };
 }
 
@@ -117,7 +121,15 @@ export class AppleMusicProvider implements MusicProviderService {
   }
 
   async createPlaylist(name: string, trackIDs: string[]): Promise<void> {
-    return this.native.createPlaylist(name, trackIDs);
+    const included = await this.native.createPlaylist(name, trackIDs);
+    // The native module skips IDs it cannot resolve via library or catalog
+    // and reports how many tracks actually made it in. Surface any shortfall
+    // as an error so callers buffer/report instead of assuming success.
+    if (included < trackIDs.length) {
+      throw new Error(
+        `${trackIDs.length - included} of ${trackIDs.length} tracks could not be resolved and were left out of "${name}"`,
+      );
+    }
   }
 
   async removeFromLibrary(trackIDs: string[]): Promise<void> {
@@ -133,7 +145,15 @@ export class AppleMusicProvider implements MusicProviderService {
   }
 
   async addToPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
-    return this.native.addToPlaylist(playlistID, trackIDs);
+    const added = await this.native.addToPlaylist(playlistID, trackIDs);
+    // See createPlaylist: a shortfall means some tracks were unresolvable
+    // and silently skipped natively — turn that into a visible failure so
+    // keepTrack buffers the track via ADD_PENDING_KEEP.
+    if (added < trackIDs.length) {
+      throw new Error(
+        `${trackIDs.length - added} of ${trackIDs.length} tracks could not be added to the playlist`,
+      );
+    }
   }
 
   async loadPlaylists(): Promise<Playlist[]> {
@@ -148,6 +168,25 @@ export class AppleMusicProvider implements MusicProviderService {
 
   async loadPlaylistTracks(playlistID: string): Promise<Track[]> {
     const raw = await this.native.loadPlaylistTracks(playlistID);
+    // Observability: tracks the native module could not resolve to a library
+    // Song fall back to bare Track metadata, which carries playCount 0 and
+    // dateAdded "" — silently mis-sorting least-played/oldest sifts. That
+    // signature (both fields defaulted together) is how a fallback presents
+    // in the payload; breadcrumb only, the tracks themselves are still fine.
+    const fellBack = raw.filter((t) => t.playCount === 0 && t.dateAdded === '').length;
+    if (fellBack > 0) {
+      Sentry.addBreadcrumb({
+        category: 'music-provider',
+        message: `loadPlaylistTracks: ${fellBack} of ${raw.length} tracks fell back to Track metadata (playCount 0 / dateAdded "") — least-played/oldest sorts may misplace them`,
+        level: 'warning',
+      });
+    }
     return raw.map(mapTrack);
+  }
+
+  async warmSongCache(trackIDs: string[]): Promise<number> {
+    // Tolerate a native module that predates warmSongCache (stale dev
+    // build): resume then simply skips cache warming instead of throwing.
+    return (await this.native.warmSongCache?.(trackIDs)) ?? 0;
   }
 }

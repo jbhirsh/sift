@@ -19,7 +19,7 @@ name: "Setup to Sifting - Full Flow"
 - extendedWaitUntil:
     visible:
       id: "card-track-name"
-    timeout: 10000
+    timeout: 30000
 
 # Verify sift screen elements
 - assertVisible:

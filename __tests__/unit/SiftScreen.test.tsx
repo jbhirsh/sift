@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text } from 'react-native';
-import { fireEvent } from '@testing-library/react-native';
+import { fireEvent, act } from '@testing-library/react-native';
 
 jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
   __esModule: true,
@@ -106,7 +106,7 @@ describe('SiftScreen', () => {
 
   test('renders remaining count', () => {
     const { getByTestId } = renderWithProviders(<SiftScreen />, { initialTracks: tracks });
-    expect(getByTestId('remaining-count').props.children).toEqual([3, ' left']);
+    expect(getByTestId('remaining-count').props.children).toEqual([3, ' ', 'left']);
   });
 
   test('renders stat badges', () => {
@@ -116,9 +116,9 @@ describe('SiftScreen', () => {
     expect(getByTestId('stat-skipped')).toBeTruthy();
   });
 
-  test('renders stop button', () => {
+  test('renders back button', () => {
     const { getByTestId } = renderWithProviders(<SiftScreen />, { initialTracks: tracks });
-    expect(getByTestId('stop-button')).toBeTruthy();
+    expect(getByTestId('back-button')).toBeTruthy();
   });
 
   test('renders action buttons', () => {
@@ -140,8 +140,8 @@ describe('SiftScreen', () => {
     expect(getByTestId('stat-skipped').props.children).toEqual([1, ' ', 'skipped']);
   });
 
-  test('pressing stop button transitions to paused', () => {
-    const StopAndCheck = () => {
+  test('pressing back button transitions to setup', () => {
+    const BackAndCheck = () => {
       const { state } = useSift();
       return (
         <>
@@ -150,9 +150,9 @@ describe('SiftScreen', () => {
         </>
       );
     };
-    const { getByTestId } = renderWithProviders(<StopAndCheck />, { initialTracks: tracks });
-    fireEvent.press(getByTestId('stop-button'));
-    expect(getByTestId('current-phase').props.children).toBe('paused');
+    const { getByTestId } = renderWithProviders(<BackAndCheck />, { initialTracks: tracks });
+    fireEvent.press(getByTestId('back-button'));
+    expect(getByTestId('current-phase').props.children).toBe('setup');
   });
 
   test('renders progress segments', () => {
@@ -202,18 +202,94 @@ describe('SiftScreen', () => {
   test('renders with single track (no back cards)', () => {
     const { getByTestId } = renderWithProviders(<SiftScreen />, { initialTracks: [mockTrackA] });
     expect(getByTestId('card-track-name').props.children).toBe('Track A');
-    expect(getByTestId('remaining-count').props.children).toEqual([1, ' left']);
+    expect(getByTestId('remaining-count').props.children).toEqual([1, ' ', 'left']);
   });
 
   test('renders with two tracks (one back card)', () => {
     const { getByTestId } = renderWithProviders(<SiftScreen />, { initialTracks: [mockTrackA, mockTrackB] });
     expect(getByTestId('card-track-name').props.children).toBe('Track A');
-    expect(getByTestId('remaining-count').props.children).toEqual([2, ' left']);
+    expect(getByTestId('remaining-count').props.children).toEqual([2, ' ', 'left']);
   });
 
   test('progress is 0 when no tracks', () => {
     const { getByTestId } = renderWithProviders(<SiftScreen />, { initialTracks: [] });
     // No current track → no card rendered
-    expect(getByTestId('remaining-count').props.children).toEqual([0, ' left']);
+    expect(getByTestId('remaining-count').props.children).toEqual([0, ' ', 'left']);
+  });
+
+  test('back button flushes the debounced session save before leaving', () => {
+    jest.useFakeTimers();
+    try {
+      const { saveSession } = require('../../src/services/SessionStore');
+      (saveSession as jest.Mock).mockClear();
+      const { getByTestId, getByLabelText } = renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+
+      // A decision schedules a debounced (500ms) session save…
+      fireEvent.press(getByLabelText('Skip'));
+      expect(saveSession).not.toHaveBeenCalled();
+
+      // …and leaving before it fires must persist it instead of dropping it
+      // (the autosave effect's cleanup cancels the pending timer on phase
+      // change, which used to lose the last decisions).
+      fireEvent.press(getByTestId('back-button'));
+      expect(saveSession).toHaveBeenCalledTimes(1);
+      expect((saveSession as jest.Mock).mock.calls[0][0]).toMatchObject({ cursor: 1 });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('a skip press immediately after a swipe decide cannot double-decide', () => {
+    jest.useFakeTimers();
+    try {
+      const { getByTestId, getByLabelText } = renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+
+      // Swipe-decide (via the card's onDecide)…
+      fireEvent.press(getByTestId('mock-card-keep'));
+      // …then a Skip press in the settle window must be ignored — Skip used
+      // to rely only on the render-lagged disabled prop.
+      fireEvent.press(getByLabelText('Skip'));
+
+      expect(getByTestId('stat-kept').props.children).toEqual([1, ' ', 'kept']);
+      expect(getByTestId('stat-skipped').props.children).toEqual([0, ' ', 'skipped']);
+      expect(getByTestId('card-track-name').props.children).toBe('Track B');
+
+      // After the settle window, skipping works again — and holds the guard
+      // itself, so an immediate second skip is also ignored.
+      act(() => {
+        jest.advanceTimersByTime(400);
+      });
+      fireEvent.press(getByLabelText('Skip'));
+      fireEvent.press(getByLabelText('Skip'));
+      expect(getByTestId('stat-skipped').props.children).toEqual([1, ' ', 'skipped']);
+      expect(getByTestId('card-track-name').props.children).toBe('Track C');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('a button press immediately after a swipe decide cannot decide twice', () => {
+    jest.useFakeTimers();
+    try {
+      const { getByTestId, getByLabelText } = renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+
+      // Swipe-decide (via the card's onDecide)…
+      fireEvent.press(getByTestId('mock-card-keep'));
+      // …then a button press in the settle window must be ignored.
+      fireEvent.press(getByLabelText('Keep'));
+
+      expect(getByTestId('stat-kept').props.children).toEqual([1, ' ', 'kept']);
+      expect(getByTestId('card-track-name').props.children).toBe('Track B');
+
+      // After the settle window, decisions work again.
+      act(() => {
+        jest.advanceTimersByTime(400);
+      });
+      fireEvent.press(getByLabelText('Keep'));
+      expect(getByTestId('stat-kept').props.children).toEqual([2, ' ', 'kept']);
+      expect(getByTestId('card-track-name').props.children).toBe('Track C');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

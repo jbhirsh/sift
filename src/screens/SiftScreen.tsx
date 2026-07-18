@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -29,68 +29,101 @@ const SEGMENT_COUNT = 10;
 export default function SiftScreen() {
   const {
     state,
+    dispatch,
     currentTrack,
     nextTrack,
     nextNextTrack,
     remaining,
     decide,
-    stopSession,
+    flushPendingSave,
   } = useSift();
 
-  const { removeTrack } = useMusicProvider();
+  const { keepTrack, removeTrack } = useMusicProvider();
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [isAnimating, setIsAnimating] = useState(false);
+  // Synchronous mirror of isAnimating: a swipe-decide followed by an
+  // immediate button press can both fire before React re-renders, so the
+  // state value alone cannot close the double-decide window.
+  const isAnimatingRef = useRef(false);
+  const settleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const programmaticOffset = useSharedValue(0);
+
+  const beginDecision = useCallback((): boolean => {
+    if (isAnimatingRef.current) return false;
+    isAnimatingRef.current = true;
+    setIsAnimating(true);
+    return true;
+  }, []);
+
+  const endDecision = useCallback(() => {
+    isAnimatingRef.current = false;
+    setIsAnimating(false);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current);
+    };
+  }, []);
 
   const progress = state.tracks.length > 0
     ? state.cursor / state.tracks.length
     : 0;
 
-  const animateDecision = useCallback(
-    (decision: Decision) => {
-      if (isAnimating) return;
-      setIsAnimating(true);
+  // Plain function, not useCallback: the React Compiler (enabled in app.json)
+  // memoizes it, and hook-argument freezing is what made the shared-value
+  // write inside a useCallback an immutability violation.
+  const animateDecision = (decision: Decision) => {
+    if (!beginDecision()) return;
 
-      const track = currentTrack;
-      const direction = decision === 'keep' ? 500 : -500;
+    const track = currentTrack;
+    const direction = decision === 'keep' ? 500 : -500;
 
-      const onComplete = () => {
-        decide(decision);
-        if (decision === 'remove' && track) {
-          removeTrack(track);
+    const onComplete = () => {
+      decide(decision);
+      if (track) {
+        if (decision === 'remove') removeTrack(track);
+        if (decision === 'keep') keepTrack(track);
+      }
+      programmaticOffset.value = 0;
+      endDecision();
+    };
+
+    programmaticOffset.value = withTiming(
+      direction,
+      { duration: 300, easing: Easing.in(Easing.ease) },
+      (finished) => {
+        if (finished) {
+          runOnJS(onComplete)();
         }
-        programmaticOffset.value = 0;
-        setIsAnimating(false);
-      };
-
-      // eslint-disable-next-line react-hooks/immutability
-      programmaticOffset.value = withTiming(
-        direction,
-        { duration: 300, easing: Easing.in(Easing.ease) },
-        (finished) => {
-          if (finished) {
-            runOnJS(onComplete)();
-          }
-        },
-      );
-    },
-    [isAnimating, decide, currentTrack, removeTrack, programmaticOffset],
-  );
+      },
+    );
+  };
 
   const handleSkip = useCallback(() => {
+    // Same synchronous lock as the other decide paths: the disabled prop
+    // alone lags a render behind the ref, so a skip tap racing a card swipe
+    // could double-decide the still-current track.
+    if (!beginDecision()) return;
     decide('skip');
-  }, [decide]);
+    settleTimeoutRef.current = setTimeout(endDecision, 300);
+  }, [beginDecision, endDecision, decide]);
 
   const handleCardDecide = useCallback(
     (decision: Decision) => {
+      if (!beginDecision()) return;
       const track = currentTrack;
       decide(decision);
-      if (decision === 'remove' && track) {
-        removeTrack(track);
+      if (track) {
+        if (decision === 'remove') removeTrack(track);
+        if (decision === 'keep') keepTrack(track);
       }
+      // Hold the guard briefly while the swiped card settles so a button
+      // press right after a swipe cannot decide the next card too.
+      settleTimeoutRef.current = setTimeout(endDecision, 300);
     },
-    [decide, currentTrack, removeTrack],
+    [beginDecision, endDecision, decide, currentTrack, removeTrack, keepTrack],
   );
 
   return (
@@ -101,9 +134,15 @@ export default function SiftScreen() {
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <GlassCard intensity="thin" radius={20}>
           <TouchableOpacity
-            onPress={stopSession}
+            onPress={() => {
+              // Persist any debounced-but-unsaved decisions before leaving —
+              // the autosave effect's cleanup would otherwise cancel them.
+              flushPendingSave();
+              dispatch({ type: 'SET_IS_PLAYING', isPlaying: false });
+              dispatch({ type: 'SET_PHASE', phase: 'setup' });
+            }}
             style={styles.backButton}
-            testID="stop-button"
+            testID="back-button"
           >
             <SymbolView name="chevron.backward" size={18} tintColor={colors.textSecondary} />
           </TouchableOpacity>
@@ -111,9 +150,7 @@ export default function SiftScreen() {
 
         <Text style={[styles.title, { color: colors.text }]}>Sift</Text>
 
-        <Text style={[styles.remaining, { color: colors.textSecondary }]} testID="remaining-count">
-          {remaining} left
-        </Text>
+        <View style={styles.headerSpacer} />
       </View>
 
       {/* Stats row in glass pill */}
@@ -123,6 +160,7 @@ export default function SiftScreen() {
             <StatBadge label="kept" value={state.kept.length} color="#34C759" textColor={colors.textSecondary} testID="stat-kept" />
             <StatBadge label="removed" value={state.removed.length} color="#FF3B30" textColor={colors.textSecondary} testID="stat-removed" />
             <StatBadge label="skipped" value={state.skipped.length} color="#FF9500" textColor={colors.textSecondary} testID="stat-skipped" />
+            <StatBadge label="left" value={remaining} color={colors.textTertiary} textColor={colors.textSecondary} testID="remaining-count" />
           </View>
         </GlassCard>
       </View>
@@ -319,10 +357,8 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
-  remaining: {
-    fontSize: 13,
-    minWidth: 40,
-    textAlign: 'right',
+  headerSpacer: {
+    width: 40,
   },
   statsRowContainer: {
     paddingHorizontal: SPACING['2xl'],

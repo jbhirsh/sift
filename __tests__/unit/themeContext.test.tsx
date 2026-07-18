@@ -20,7 +20,6 @@ function TestConsumer() {
       <Text testID="borderColor">{theme.glass.borderColor}</Text>
       <Text testID="text">{theme.colors.text}</Text>
       <Text testID="gradient-setup">{JSON.stringify(theme.gradientColors('setup'))}</Text>
-      <Text testID="gradient-paused">{JSON.stringify(theme.gradientColors('paused'))}</Text>
       <Text testID="gradient-sifting">{JSON.stringify(theme.gradientColors('sifting'))}</Text>
     </>
   );
@@ -59,14 +58,6 @@ describe('ThemeContext', () => {
       <ThemeProvider><TestConsumer /></ThemeProvider>
     );
     expect(JSON.parse(getByTestId('gradient-setup').props.children)).toEqual(GRADIENTS.setup.light);
-  });
-
-  test('gradientColors maps paused to done gradient', () => {
-    mockUseColorScheme.mockReturnValue('light');
-    const { getByTestId } = render(
-      <ThemeProvider><TestConsumer /></ThemeProvider>
-    );
-    expect(JSON.parse(getByTestId('gradient-paused').props.children)).toEqual(GRADIENTS.done.light);
   });
 
   test('gradientColors returns dark gradient in dark mode', () => {

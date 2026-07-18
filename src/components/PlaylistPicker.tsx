@@ -49,9 +49,8 @@ export default function PlaylistPicker({
       visible
       transparent
       animationType="slide"
-      testID="playlist-picker-modal"
     >
-      <View style={styles.overlay}>
+      <View style={styles.overlay} testID="playlist-picker-modal">
         <View style={styles.sheetContainer}>
           <GlassCard intensity="thick" radius={RADIUS.lg} style={styles.sheet}>
             <View style={styles.header}>

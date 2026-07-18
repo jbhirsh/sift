@@ -37,7 +37,17 @@ const mockNativeModule = {
   resume: jest.fn().mockResolvedValue(undefined),
   seek: jest.fn(),
   getPlaybackState: jest.fn().mockReturnValue({ position: 42, isPlaying: true }),
-  createPlaylist: jest.fn().mockResolvedValue(undefined),
+  // The native module reports how many tracks it actually included/added.
+  createPlaylist: jest.fn().mockImplementation(
+    async (_name: string, trackIDs: string[]) => trackIDs.length,
+  ),
+  addToPlaylist: jest.fn().mockImplementation(
+    async (_playlistID: string, trackIDs: string[]) => trackIDs.length,
+  ),
+  // Reports how many songs were newly cached.
+  warmSongCache: jest.fn().mockImplementation(
+    async (trackIDs: string[]) => trackIDs.length,
+  ),
 };
 
 jest.mock('../../modules/expo-musickit/src/index', () => mockNativeModule);
@@ -119,6 +129,25 @@ describe('AppleMusicProvider', () => {
     expect(mockNativeModule.createPlaylist).toHaveBeenCalledWith('My Playlist', ['1', '2']);
   });
 
+  test('createPlaylist throws when the native module could not include every track', async () => {
+    mockNativeModule.createPlaylist.mockResolvedValueOnce(1);
+    await expect(provider.createPlaylist('My Playlist', ['1', '2'])).rejects.toThrow(
+      '1 of 2 tracks could not be resolved',
+    );
+  });
+
+  test('addToPlaylist delegates and resolves when every track was added', async () => {
+    await expect(provider.addToPlaylist('pl-1', ['1', '2'])).resolves.toBeUndefined();
+    expect(mockNativeModule.addToPlaylist).toHaveBeenCalledWith('pl-1', ['1', '2']);
+  });
+
+  test('addToPlaylist throws when the native module skipped unresolvable tracks', async () => {
+    mockNativeModule.addToPlaylist.mockResolvedValueOnce(0);
+    await expect(provider.addToPlaylist('pl-1', ['1'])).rejects.toThrow(
+      '1 of 1 tracks could not be added',
+    );
+  });
+
   test('play with no position passes undefined', async () => {
     await provider.play('trackId');
     expect(mockNativeModule.play).toHaveBeenCalledWith('trackId', undefined);
@@ -143,6 +172,25 @@ describe('AppleMusicProvider', () => {
       artworkURL: 'https://example.com/art.jpg',
     });
     expect(mockNativeModule.loadPlaylistTracks).toHaveBeenCalledWith('pl-1');
+  });
+
+  test('warmSongCache delegates to the native module and returns its count', async () => {
+    mockNativeModule.warmSongCache.mockResolvedValueOnce(2);
+    const warmed = await provider.warmSongCache(['1', '2', '3']);
+    expect(mockNativeModule.warmSongCache).toHaveBeenCalledWith(['1', '2', '3']);
+    expect(warmed).toBe(2);
+  });
+
+  test('warmSongCache tolerates a native module without the method', async () => {
+    // Development builds made before warmSongCache shipped don't expose it:
+    // resume must skip cache warming instead of throwing.
+    const original = mockNativeModule.warmSongCache;
+    mockNativeModule.warmSongCache = undefined as unknown as jest.Mock;
+    try {
+      await expect(provider.warmSongCache(['1'])).resolves.toBe(0);
+    } finally {
+      mockNativeModule.warmSongCache = original;
+    }
   });
 });
 

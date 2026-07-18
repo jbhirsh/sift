@@ -41,10 +41,4 @@ describe('GlassBackground', () => {
     expect(toJSON()).toBeTruthy();
   });
 
-  test('renders for paused phase', () => {
-    const { toJSON } = render(
-      <ThemeProvider><GlassBackground phase="paused" /></ThemeProvider>
-    );
-    expect(toJSON()).toBeTruthy();
-  });
 });

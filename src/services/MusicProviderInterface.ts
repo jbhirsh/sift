@@ -52,4 +52,7 @@ export interface MusicProviderService {
 
   /** Load all tracks from a specific playlist. */
   loadPlaylistTracks?(playlistID: string): Promise<Track[]>;
+
+  /** Warm the native song cache for a list of track IDs (used on session resume). */
+  warmSongCache?(trackIDs: string[]): Promise<number>;
 }

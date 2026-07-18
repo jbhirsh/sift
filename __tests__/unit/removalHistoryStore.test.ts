@@ -20,7 +20,7 @@ jest.mock('@sentry/react-native', () => ({
 }));
 
 // Import after mocks are set up
-const { logRemoval, loadHistory, removeFromHistory } = require('../../src/services/RemovalHistoryStore');
+const { logRemoval, loadHistory, removeFromHistory, clearHistoryForSource } = require('../../src/services/RemovalHistoryStore');
 
 const record: RemovalRecord = {
   track: {
@@ -141,5 +141,122 @@ describe('removeFromHistory', () => {
 
     await expect(removeFromHistory('track-1', { type: 'library' })).resolves.toBeUndefined();
     expect(mockWrite).not.toHaveBeenCalled();
+  });
+});
+
+describe('clearHistoryForSource', () => {
+  const playlistRecord: RemovalRecord = {
+    track: record.track,
+    source: { type: 'playlist', playlist: { id: 'p1', name: 'My Playlist', trackCount: 10 } },
+    provider: 'apple-music',
+    removedAt: '2026-04-08T12:00:00.000Z',
+  };
+
+  const otherPlaylistRecord: RemovalRecord = {
+    track: { ...record.track, id: 'track-2' },
+    source: { type: 'playlist', playlist: { id: 'p2', name: 'Other Playlist', trackCount: 5 } },
+    provider: 'apple-music',
+    removedAt: '2026-04-08T13:00:00.000Z',
+  };
+
+  test('removes records matching the given playlist ID', async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([record, playlistRecord, otherPlaylistRecord]));
+
+    await clearHistoryForSource('p1');
+
+    expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([record, otherPlaylistRecord]));
+  });
+
+  test('keeps all records when no match', async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([record, otherPlaylistRecord]));
+
+    await clearHistoryForSource('p1');
+
+    expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([record, otherPlaylistRecord]));
+  });
+
+  test('handles empty history', async () => {
+    mockExists.mockReturnValue(false);
+
+    await clearHistoryForSource('p1');
+
+    expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([]));
+  });
+});
+
+describe('mutation serialization', () => {
+  const playlistSource = {
+    type: 'playlist' as const,
+    playlist: { id: 'p1', name: 'My Playlist', trackCount: 10 },
+  };
+  const recordA: RemovalRecord = {
+    track: { ...record.track, id: 'track-a' },
+    source: playlistSource,
+    provider: 'apple-music',
+    removedAt: '2026-04-08T12:00:00.000Z',
+  };
+  const recordB: RemovalRecord = {
+    track: { ...record.track, id: 'track-b' },
+    source: playlistSource,
+    provider: 'apple-music',
+    removedAt: '2026-04-08T13:00:00.000Z',
+  };
+
+  test('a restore in flight when Start Over clears cannot resurrect cleared records', async () => {
+    // Emulate the real file: writes persist and later reads see them, but
+    // the FIRST read (the restore's snapshot) is slow — it captures its
+    // content at issue time and delivers it only when released. Without the
+    // mutation queue, the clear would read+write while the restore is
+    // parked, and the restore's stale-snapshot write would then resurrect
+    // recordB, which Start Over had just wiped.
+    let fileContent = JSON.stringify([recordA, recordB]);
+    mockExists.mockReturnValue(true);
+    mockWrite.mockImplementation((content: string) => {
+      fileContent = content;
+    });
+    let releaseFirstRead: (() => void) | undefined;
+    let reads = 0;
+    mockText.mockImplementation(() => {
+      reads += 1;
+      if (reads === 1) {
+        const snapshot = fileContent;
+        return new Promise<string>((resolve) => {
+          releaseFirstRead = () => resolve(snapshot);
+        });
+      }
+      return Promise.resolve(fileContent);
+    });
+
+    const restorePromise = removeFromHistory('track-a', playlistSource);
+    const clearPromise = clearHistoryForSource('p1');
+
+    // Let the queue issue the restore's read, then release it.
+    for (let i = 0; i < 10 && !releaseFirstRead; i += 1) {
+      await Promise.resolve();
+    }
+    expect(releaseFirstRead).toBeDefined();
+    releaseFirstRead?.();
+    await Promise.all([restorePromise, clearPromise]);
+
+    // Serialized order: the restore writes [recordB], THEN the clear
+    // re-reads that and wipes p1 entirely. Nothing resurrected.
+    expect(JSON.parse(fileContent)).toEqual([]);
+  });
+
+  test('operations queued behind a mutation observe its write', async () => {
+    let fileContent = JSON.stringify([]);
+    mockExists.mockReturnValue(true);
+    mockWrite.mockImplementation((content: string) => {
+      fileContent = content;
+    });
+    mockText.mockImplementation(() => Promise.resolve(fileContent));
+
+    // Two appends issued back to back must not lose either record to a
+    // stale read.
+    await Promise.all([logRemoval(recordA), logRemoval(recordB)]);
+
+    expect(JSON.parse(fileContent)).toEqual([recordA, recordB]);
   });
 });

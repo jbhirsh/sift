@@ -1,0 +1,41 @@
+appId: com.jessicahirsh.sift
+name: "Sort Picker - Action Sheet Changes Track Order"
+---
+
+# The sort picker is a native ActionSheetIOS sheet. This flow verifies the
+# full path end-to-end: open the sheet, pick a different order, see the
+# label update, and confirm the loaded sift actually honors it — the mock
+# library's most-played track is "Bohemian Rhapsody" (playCount 142), which
+# must be the FIRST card under Most Played (the default Least Played would
+# lead with "Peaches", playCount 28).
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+- assertVisible:
+    id: "setup-brand"
+- assertVisible: "Least Played"
+
+# Open the native action sheet and pick Most Played
+- tapOn: "Least Played"
+- extendedWaitUntil:
+    visible: "Most Played"
+    timeout: 30000
+- tapOn: "Most Played"
+
+# The sheet dismissed and the sort button label updated
+- assertVisible: "Most Played"
+- assertNotVisible: "Least Played"
+
+# Start a library sift and verify the order took effect
+- tapOn: "Start Sifting"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000
+
+- assertVisible:
+    id: "card-track-name"
+    text: "Bohemian Rhapsody"
