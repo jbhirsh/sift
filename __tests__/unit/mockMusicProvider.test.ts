@@ -170,6 +170,25 @@ describe('MockMusicProvider', () => {
     expect(tracks).toEqual([]);
   });
 
+  test('seeds an already-sifted companion playlist for the re-sift E2E flow', async () => {
+    const playlists = await flushAsync(provider.loadPlaylists());
+    const roadTrip = playlists.find((p) => p.name === 'Road Trip');
+    const sifted = playlists.find((p) => p.name === 'Road Trip - Sifted');
+    if (!roadTrip || !sifted) {
+      throw new Error('Road Trip and Road Trip - Sifted must both be seeded');
+    }
+
+    // The companion's tracks must be a subset of the source playlist so the
+    // sifted-filtering path stays coherent.
+    const sourceTracks = await flushAsync(provider.loadPlaylistTracks(roadTrip.id));
+    const siftedTracks = await flushAsync(provider.loadPlaylistTracks(sifted.id));
+    expect(siftedTracks.length).toBeGreaterThan(0);
+    const sourceIds = new Set(sourceTracks.map((t) => t.id));
+    for (const track of siftedTracks) {
+      expect(sourceIds.has(track.id)).toBe(true);
+    }
+  });
+
   test('pause when not playing is a no-op', async () => {
     const stateBefore = provider.getPlaybackState();
     await provider.pause();
@@ -210,5 +229,98 @@ describe('MockMusicProvider', () => {
     await provider.play(tracks[4].id); // Stay (141s)
     jest.advanceTimersByTime(200000);
     expect(provider.getPlaybackState().position).toBe(141);
+  });
+});
+
+describe('MockMusicProvider failure injection (EXPO_PUBLIC_MOCK_FAIL_ADDS / _REMOVES)', () => {
+  const ENV_KEY = 'EXPO_PUBLIC_MOCK_FAIL_ADDS';
+  const REMOVES_ENV_KEY = 'EXPO_PUBLIC_MOCK_FAIL_REMOVES';
+  let originalValue: string | undefined;
+  let originalRemovesValue: string | undefined;
+
+  beforeEach(() => {
+    originalValue = process.env[ENV_KEY];
+    originalRemovesValue = process.env[REMOVES_ENV_KEY];
+  });
+
+  afterEach(() => {
+    if (originalValue === undefined) {
+      delete process.env.EXPO_PUBLIC_MOCK_FAIL_ADDS;
+    } else {
+      process.env[ENV_KEY] = originalValue;
+    }
+    if (originalRemovesValue === undefined) {
+      delete process.env.EXPO_PUBLIC_MOCK_FAIL_REMOVES;
+    } else {
+      process.env[REMOVES_ENV_KEY] = originalRemovesValue;
+    }
+  });
+
+  /**
+   * Fresh copy of the module so its launch-wide failure counter starts at
+   * zero — mirroring a fresh app launch, which is the knob's unit of scope.
+   */
+  function freshMockClass(): typeof MockMusicProvider {
+    let fresh: typeof MockMusicProvider | undefined;
+    jest.isolateModules(() => {
+      ({ MockMusicProvider: fresh } = require('../../src/services/MockMusicProvider'));
+    });
+    if (!fresh) throw new Error('failed to isolate MockMusicProvider module');
+    return fresh;
+  }
+
+  test('default: with the env unset, addToPlaylist and removeFromLibrary never reject', async () => {
+    delete process.env.EXPO_PUBLIC_MOCK_FAIL_ADDS;
+    delete process.env.EXPO_PUBLIC_MOCK_FAIL_REMOVES;
+    const Fresh = freshMockClass();
+    const provider = new Fresh();
+    await expect(provider.addToPlaylist('p1', ['t1'])).resolves.toBeUndefined();
+    await expect(provider.addToPlaylist('p1', ['t2'])).resolves.toBeUndefined();
+    await expect(provider.removeFromLibrary(['t1'])).resolves.toBeUndefined();
+    await expect(provider.removeFromLibrary(['t2'])).resolves.toBeUndefined();
+  });
+
+  test('"2" rejects the first two adds launch-wide (across instances), then succeeds', async () => {
+    process.env[ENV_KEY] = '2';
+    const Fresh = freshMockClass();
+    // Two instances on purpose: in the app every useMusicProvider hook
+    // constructs its own provider (keeps add through the sifting screen's,
+    // the Done fallback saves through its own), and the injection must
+    // count them as one series or the E2E flow could never reach the
+    // failed-save state.
+    const first = new Fresh();
+    const second = new Fresh();
+    await expect(first.addToPlaylist('p1', ['t1'])).rejects.toThrow(
+      'Simulated add failure (EXPO_PUBLIC_MOCK_FAIL_ADDS)',
+    );
+    await expect(second.addToPlaylist('p1', ['t2'])).rejects.toThrow(
+      'Simulated add failure (EXPO_PUBLIC_MOCK_FAIL_ADDS)',
+    );
+    await expect(first.addToPlaylist('p1', ['t3'])).resolves.toBeUndefined();
+    await expect(second.addToPlaylist('p1', ['t4'])).resolves.toBeUndefined();
+  });
+
+  test('FAIL_REMOVES=1 rejects the first removeFromLibrary launch-wide, then succeeds; playlist removes and adds are untouched', async () => {
+    process.env[REMOVES_ENV_KEY] = '1';
+    const Fresh = freshMockClass();
+    const provider = new Fresh();
+    await expect(provider.removeFromLibrary(['t1'])).rejects.toThrow(
+      'Simulated remove failure (EXPO_PUBLIC_MOCK_FAIL_REMOVES)',
+    );
+    await expect(provider.removeFromLibrary(['t2'])).resolves.toBeUndefined();
+    // removeFromPlaylist is deliberately never injected (Start Over /
+    // Re-sift clears depend on it), and adds have their own knob.
+    await expect(provider.removeFromPlaylist('p1', ['t1'])).resolves.toBeUndefined();
+    await expect(provider.addToPlaylist('p1', ['t1'])).resolves.toBeUndefined();
+  });
+
+  test('invalid or negative knob values inject nothing', async () => {
+    process.env[ENV_KEY] = 'nonsense';
+    let Fresh = freshMockClass();
+    await expect(new Fresh().addToPlaylist('p1', ['t1'])).resolves.toBeUndefined();
+
+    process.env[ENV_KEY] = '-3';
+    Fresh = freshMockClass();
+    await expect(new Fresh().addToPlaylist('p1', ['t1'])).resolves.toBeUndefined();
   });
 });

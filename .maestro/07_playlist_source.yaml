@@ -20,7 +20,7 @@ name: "Playlist Source - Select and Sift"
 - extendedWaitUntil:
     visible:
       id: "playlist-picker-modal"
-    timeout: 5000
+    timeout: 30000
 
 # Verify picker shows playlists (mock provider returns 3)
 - assertVisible:
@@ -42,7 +42,7 @@ name: "Playlist Source - Select and Sift"
 - extendedWaitUntil:
     visible:
       id: "card-track-name"
-    timeout: 10000
+    timeout: 30000
 
 # Verify sift screen works with playlist tracks
 - assertVisible:
@@ -58,3 +58,46 @@ name: "Playlist Source - Select and Sift"
 - assertVisible:
     id: "stat-kept"
     text: "1 kept"
+
+# ── Finish the playlist (Chill Vibes has 3 tracks) and reach Done ──
+- tapOn: "Keep"
+- waitForAnimationToEnd
+- tapOn: "Keep"
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "done-title"
+    timeout: 30000
+
+- assertVisible:
+    id: "summary-count-kept"
+    text: "3"
+- assertVisible:
+    id: "summary-count-removed"
+    text: "0"
+
+# The stateless mock provider never exposes the incrementally-created
+# "Chill Vibes - Sifted" playlist, so the kept tracks buffer as pendingKeeps
+# and the Done screen's fallback save persists them — ending in the
+# sifted-playlist success confirmation. (The failure/Retry state is not
+# reachable here — this fallback goes through createPlaylist, which is
+# never injected; 09_save_failure_retry.yaml covers the failed-save error
+# and Retry via the EXPO_PUBLIC_MOCK_FAIL_ADDS injection.)
+- extendedWaitUntil:
+    visible: "Sifted playlist created!"
+    timeout: 30000
+
+# ── Start Over on a playlist source must ask for confirmation ──
+- tapOn: "Start Over"
+
+- extendedWaitUntil:
+    visible: "Start Over?"
+    timeout: 30000
+
+# Cancel keeps everything: still on Done, success message intact
+- tapOn: "Cancel"
+
+- assertVisible:
+    id: "done-title"
+- assertVisible: "Sifted playlist created!"

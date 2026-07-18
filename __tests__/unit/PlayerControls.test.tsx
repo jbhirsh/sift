@@ -82,11 +82,9 @@ const mockState = {
   loadProgress: 1,
   loadMessage: '',
   loadError: null,
-  hasSavedSession: false,
   removalPlaylistCreated: false,
   removalPlaylistError: null,
   isCreatingPlaylist: false,
-  connectionStatus: 'unknown' as const,
 };
 
 jest.mock('../../src/context/SiftContext', () => ({

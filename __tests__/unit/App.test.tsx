@@ -179,20 +179,30 @@ describe('App', () => {
   });
 
   test('transitions to done phase when all tracks sifted', async () => {
-    const { getByText, getByLabelText } = renderApp();
+    jest.useFakeTimers();
+    try {
+      const { getByText, getByLabelText } = renderApp();
 
-    await act(async () => {
-      fireEvent.press(getByText('Start Sifting'));
-    });
-    await act(async () => {});
+      await act(async () => {
+        fireEvent.press(getByText('Start Sifting'));
+      });
+      await act(async () => {});
 
-    fireEvent.press(getByLabelText('Skip'));
-    fireEvent.press(getByLabelText('Skip'));
+      // Skip decisions hold the double-decide guard for a 300ms settle
+      // window, so advance past it between presses.
+      fireEvent.press(getByLabelText('Skip'));
+      act(() => {
+        jest.advanceTimersByTime(400);
+      });
+      fireEvent.press(getByLabelText('Skip'));
 
-    expect(getByText('Start Over')).toBeTruthy();
+      expect(getByText('Start Over')).toBeTruthy();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
-  test('transitions to paused phase when stop is pressed', async () => {
+  test('back button returns to setup', async () => {
     const { getByText, getByTestId } = renderApp();
 
     await act(async () => {
@@ -200,8 +210,8 @@ describe('App', () => {
     });
     await act(async () => {});
 
-    fireEvent.press(getByTestId('stop-button'));
+    fireEvent.press(getByTestId('back-button'));
 
-    expect(getByText('Resume Session')).toBeTruthy();
+    expect(getByText('Resume Sifting')).toBeTruthy();
   });
 });

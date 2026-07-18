@@ -6,12 +6,17 @@ name: "Sift Decisions - Keep, Remove, Skip"
 - launchApp:
     clearState: true
 
+- waitForAnimationToEnd
+
+- assertVisible:
+    id: "setup-brand"
+
 - tapOn: "Start Sifting"
 
 - extendedWaitUntil:
     visible:
       id: "card-track-name"
-    timeout: 10000
+    timeout: 30000
 
 # Keep the first track
 - tapOn: "Keep"

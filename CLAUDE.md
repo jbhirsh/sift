@@ -137,7 +137,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
 ## App Identity
 - **Bundle ID**: `com.jessicahirsh.sift`
 - **Display name**: Sift
-- **Platform**: iOS (iPhone and iPad), with Android possible via Expo
+- **Platform**: iOS only (iPhone and iPad) — the expo-musickit native module is iOS-only and Apple MusicKit has no Android SDK
 
 ---
 

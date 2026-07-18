@@ -20,11 +20,16 @@
         "simulator": true
       },
       "env": {
-        "EXPO_PUBLIC_USE_MOCK_PROVIDER": "1"
+        "EXPO_PUBLIC_USE_MOCK_PROVIDER": "1",
+        "EXPO_PUBLIC_MOCK_FAIL_ADDS": "2",
+        "EXPO_PUBLIC_MOCK_FAIL_REMOVES": "1"
       }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "SENTRY_DISABLE_AUTO_UPLOAD": "true"
+      }
     },
     "production": {
       "autoIncrement": true

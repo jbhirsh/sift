@@ -12,7 +12,7 @@ export interface Track {
 
 export type Decision = 'keep' | 'remove' | 'skip';
 
-export type AppPhase = 'setup' | 'loading' | 'sifting' | 'paused' | 'done';
+export type AppPhase = 'setup' | 'loading' | 'sifting' | 'done';
 
 export type SortOrder = 'least-played' | 'most-played' | 'oldest' | 'newest' | 'random';
 
@@ -41,6 +41,16 @@ export interface SiftSession {
   savedAt: string; // ISO 8601
   provider?: MusicProvider;
   source?: SiftSource;
+  /** Keeps that never landed in the "- Sifted" playlist, persisted so the
+   *  Done-screen repair pass survives an app kill/relaunch. Optional because
+   *  sessions saved by older builds don't carry it. */
+  pendingKeeps?: Track[];
+  /** Failed-removal messages, persisted for the same reason. */
+  removalErrors?: string[];
+  /** Id of the "<name> - Sifted" companion playlist, persisted so a resumed
+   *  session resolves it by id (rename-proof). Optional because sessions
+   *  saved by older builds don't carry it — those fall back to name match. */
+  siftedPlaylistId?: string | null;
 }
 
 export interface RemovalRecord {

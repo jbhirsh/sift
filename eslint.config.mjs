@@ -27,4 +27,16 @@ export default tseslint.config(
       '@typescript-eslint/no-require-imports': 'off',
     },
   },
+  {
+    // Jest manual mocks are CommonJS modules evaluated in the Jest runtime.
+    files: ['__mocks__/**/*.js'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: {
+        jest: 'readonly',
+        module: 'writable',
+        require: 'readonly',
+      },
+    },
+  },
 );

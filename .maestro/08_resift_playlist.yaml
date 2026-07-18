@@ -1,0 +1,67 @@
+appId: com.jessicahirsh.sift
+name: "Re-sift an Already-Sifted Playlist"
+---
+
+# The mock provider seeds "Road Trip" alongside a "Road Trip - Sifted"
+# companion, so selecting it triggers the already-sifted state: the primary
+# button swaps to "Re-sift Playlist" and re-sifting requires an explicit
+# destructive confirmation before the sifted playlist and history are wiped.
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+- assertVisible:
+    id: "setup-brand"
+
+# Pick the already-sifted playlist
+- tapOn:
+    id: "source-playlist"
+
+- extendedWaitUntil:
+    visible:
+      id: "playlist-picker-modal"
+    timeout: 30000
+
+- tapOn:
+    id: "playlist-row-playlist-3"
+
+- assertNotVisible:
+    id: "playlist-picker-modal"
+
+# The button swaps: no plain "Start Sifting" for an already-sifted playlist
+- assertVisible: "Re-sift Playlist"
+- assertNotVisible: "Start Sifting"
+
+# ── Cancel path: confirmation appears, cancelling changes nothing ──
+- tapOn: "Re-sift Playlist"
+
+- extendedWaitUntil:
+    visible: "Start Over?"
+    timeout: 30000
+
+- tapOn: "Cancel"
+
+- assertVisible: "Re-sift Playlist"
+
+# ── Confirm path: re-sift starts a fresh unfiltered sift ──
+- tapOn: "Re-sift Playlist"
+
+- extendedWaitUntil:
+    visible: "Start Over?"
+    timeout: 30000
+
+- tapOn: "Start Over"
+
+# Road Trip has 3 tracks; the fresh sift starts from zero
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000
+
+- assertVisible:
+    id: "stat-kept"
+    text: "0 kept"
+- assertVisible:
+    id: "remaining-count"
+    text: "3 left"

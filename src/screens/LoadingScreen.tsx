@@ -16,9 +16,10 @@ export default function LoadingScreen() {
   const { colors } = useTheme();
   const { loadTracks } = useMusicProvider();
 
+  const { skipFiltering } = state;
   useEffect(() => {
-    loadTracks();
-  }, [loadTracks]);
+    loadTracks({ skipFiltering });
+  }, [loadTracks, skipFiltering]);
 
   return (
     <View style={styles.container}>

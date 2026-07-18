@@ -1,0 +1,96 @@
+appId: com.jessicahirsh.sift
+name: "Save Failure Shows Retry, Retry Recovers"
+---
+
+# Exercises the failed-save error + Retry path on the Done screen, which is
+# unreachable without failure injection (the mock's playlist calls never
+# fail on their own).
+#
+# Injection: the e2e-simulator build bakes EXPO_PUBLIC_MOCK_FAIL_ADDS=2 into
+# the bundle (eas.json), which makes MockMusicProvider reject the FIRST TWO
+# addToPlaylist calls of each app launch; later calls succeed. Build-time
+# env cannot be scoped to a single flow, so this is only safe because no
+# other flow calls addToPlaylist at all: library sifts (02-05, 10, 11)
+# no-op keepTrack, "Chill Vibes" (07) has no pre-seeded "- Sifted" companion
+# (keeps buffer and the Done fallback goes through createPlaylist), and flow
+# 08's re-sift only clears. This flow sifts "Road Trip", whose pre-seeded
+# companion
+# ("Road Trip - Sifted", containing 2 of its 3 tracks) makes keepTrack
+# attempt a direct add for the third track:
+#   add #1 (keepTrack of "Kiss Me More")  rejects -> keep buffers as pending
+#   add #2 (Done's fallback save)         rejects -> error + Retry appear
+#   add #3 (Retry)                        succeeds -> success confirmation
+# Scoping injection to exactly one flow at runtime (e.g. launch arguments)
+# needs a launch-arg mechanism in the app and is deliberate follow-up work.
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+- assertVisible:
+    id: "setup-brand"
+
+# Pick the already-sifted playlist (companion pre-seeded in the mock)
+- tapOn:
+    id: "source-playlist"
+
+- extendedWaitUntil:
+    visible:
+      id: "playlist-picker-modal"
+    timeout: 30000
+
+- tapOn:
+    id: "playlist-row-playlist-3"
+
+- assertNotVisible:
+    id: "playlist-picker-modal"
+
+# Companion exists -> the primary button is Re-sift Playlist; confirm the
+# destructive prompt to start an unfiltered sift of all 3 tracks.
+- assertVisible: "Re-sift Playlist"
+- tapOn: "Re-sift Playlist"
+
+- extendedWaitUntil:
+    visible: "Start Over?"
+    timeout: 30000
+
+- tapOn: "Start Over"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000
+
+# Keep all 3. Two are already in the companion (no add); the third triggers
+# add #1, which the injection rejects — the keep buffers as a pending keep.
+- tapOn: "Keep"
+- waitForAnimationToEnd
+- tapOn: "Keep"
+- waitForAnimationToEnd
+- tapOn: "Keep"
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "done-title"
+    timeout: 30000
+
+# The Done fallback save flushes the buffered keep; its add (#2) rejects,
+# surfacing the failed-save error and the Retry affordance.
+- extendedWaitUntil:
+    visible:
+      id: "retry-save-button"
+    timeout: 30000
+
+- assertVisible: ".*Simulated add failure.*"
+
+# Retry: add #3 succeeds — error clears, success confirmation appears.
+- tapOn:
+    id: "retry-save-button"
+
+- extendedWaitUntil:
+    visible: "Sifted playlist created!"
+    timeout: 30000
+
+- assertNotVisible:
+    id: "retry-save-button"

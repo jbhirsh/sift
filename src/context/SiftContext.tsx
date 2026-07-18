@@ -10,7 +10,8 @@ import {
   SiftSession,
   SiftSource,
 } from '../types';
-import { saveSession, loadSession, clearSession, hasSession } from '../services/SessionStore';
+import { saveSession, clearSession } from '../services/SessionStore';
+import { sortTracks } from '../utils/sorting';
 
 // ── State ──────────────────────────────────────────────
 
@@ -18,6 +19,8 @@ export interface SiftState {
   phase: AppPhase;
   provider: MusicProvider;
   source: SiftSource;
+  /** The source that the current tracks were loaded from. */
+  activeSource: SiftSource | null;
   tracks: Track[];
   cursor: number;
   kept: Track[];
@@ -29,18 +32,36 @@ export interface SiftState {
   loadError: string | null;
   playbackPosition: number;
   isPlaying: boolean;
-  hasSavedSession: boolean;
   removalPlaylistCreated: boolean;
   removalPlaylistError: string | null;
   isCreatingPlaylist: boolean;
   removalErrors: string[];
   connectionStatus: ConnectionStatus;
+  /**
+   * Kept tracks whose add to the sifted playlist could not land yet (e.g. the
+   * freshly-created playlist was not queryable within the retry window).
+   * Flushed via saveSiftedPlaylist on the Done screen — never silently
+   * dropped while the sift they belong to is alive. Only the deliberate
+   * session-abandonment exits (LOAD_TRACKS / START_FRESH / RESET_TO_SETUP)
+   * discard them, because they discard the whole kept list along with them.
+   */
+  pendingKeeps: Track[];
+  /** When true, the next loadTracks call skips sifted/removal filtering. */
+  skipFiltering: boolean;
+  /**
+   * Id of the "<name> - Sifted" companion playlist for the current playlist
+   * source, captured by keepTrack when it creates or first resolves the
+   * playlist. Lets later lookups resolve by id (rename-proof) instead of by
+   * name; null until known (and for legacy sessions that predate the field).
+   */
+  siftedPlaylistId: string | null;
 }
 
 const initialState: SiftState = {
   phase: 'setup',
   provider: 'apple-music',
   source: { type: 'library' },
+  activeSource: null,
   tracks: [],
   cursor: 0,
   kept: [],
@@ -52,12 +73,14 @@ const initialState: SiftState = {
   loadError: null,
   playbackPosition: 0,
   isPlaying: false,
-  hasSavedSession: false,
   removalPlaylistCreated: false,
   removalPlaylistError: null,
   isCreatingPlaylist: false,
   removalErrors: [],
   connectionStatus: 'unknown',
+  pendingKeeps: [],
+  skipFiltering: false,
+  siftedPlaylistId: null,
 };
 
 // ── Actions ────────────────────────────────────────────
@@ -77,12 +100,15 @@ type SiftAction =
   | { type: 'SET_PLAYLIST_CREATED'; created: boolean }
   | { type: 'SET_PLAYLIST_ERROR'; error: string | null }
   | { type: 'SET_CREATING_PLAYLIST'; creating: boolean }
-  | { type: 'SET_HAS_SAVED_SESSION'; has: boolean }
   | { type: 'ADD_REMOVAL_ERROR'; error: string }
+  | { type: 'ADD_PENDING_KEEP'; track: Track }
+  | { type: 'REMOVE_PENDING_KEEPS'; trackIds: string[] }
+  | { type: 'SET_SIFTED_PLAYLIST_ID'; id: string | null }
   | { type: 'RESTORE_TRACK'; trackId: string }
   | { type: 'SET_SOURCE'; source: SiftSource }
   | { type: 'RESUME_SESSION'; session: Omit<SiftState, 'phase'> & { phase?: AppPhase } }
-  | { type: 'START_FRESH' };
+  | { type: 'START_FRESH'; skipFiltering?: boolean }
+  | { type: 'RESET_TO_SETUP' };
 
 // ── Reducer ────────────────────────────────────────────
 
@@ -119,8 +145,16 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
     case 'SET_PROVIDER':
       return { ...state, provider: action.provider };
 
-    case 'SET_SORT_ORDER':
-      return { ...state, sortOrder: action.sortOrder };
+    case 'SET_SORT_ORDER': {
+      const hasActiveSift = state.tracks.length > 0 && state.cursor < state.tracks.length;
+      if (!hasActiveSift) {
+        return { ...state, sortOrder: action.sortOrder };
+      }
+      // Re-sort only the remaining unsifted tracks
+      const decided = state.tracks.slice(0, state.cursor);
+      const remaining = sortTracks(state.tracks.slice(state.cursor), action.sortOrder);
+      return { ...state, sortOrder: action.sortOrder, tracks: [...decided, ...remaining] };
+    }
 
     case 'LOAD_TRACKS':
       return {
@@ -131,8 +165,15 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         removed: [],
         skipped: [],
         removalErrors: [],
+        // Intentional discard: loading a fresh track list abandons the
+        // previous sift wholesale (kept/removed/skipped included), so any
+        // still-buffered keeps from it are deliberately dropped with it.
+        // Mid-sift cleanup must use REMOVE_PENDING_KEEPS instead.
+        pendingKeeps: [],
         phase: 'sifting',
         loadProgress: 1,
+        activeSource: state.source,
+        skipFiltering: false,
       };
 
     case 'SET_LOAD_PROGRESS':
@@ -169,6 +210,27 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
     case 'ADD_REMOVAL_ERROR':
       return { ...state, removalErrors: [...state.removalErrors, action.error] };
 
+    case 'ADD_PENDING_KEEP': {
+      if (state.pendingKeeps.some((t) => t.id === action.track.id)) return state;
+      return { ...state, pendingKeeps: [...state.pendingKeeps, action.track] };
+    }
+
+    case 'REMOVE_PENDING_KEEPS': {
+      // Remove exactly the tracks the caller persisted — never the whole
+      // array. A keep that gets buffered while a save is in flight must
+      // survive that save's cleanup so the Done fallback can fire again.
+      const ids = new Set(action.trackIds);
+      const remaining = state.pendingKeeps.filter((t) => !ids.has(t.id));
+      return remaining.length === state.pendingKeeps.length
+        ? state
+        : { ...state, pendingKeeps: remaining };
+    }
+
+    case 'SET_SIFTED_PLAYLIST_ID':
+      return state.siftedPlaylistId === action.id
+        ? state
+        : { ...state, siftedPlaylistId: action.id };
+
     case 'RESTORE_TRACK': {
       const track = state.removed.find((t) => t.id === action.trackId);
       if (!track) return state;
@@ -179,23 +241,34 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
       };
     }
 
-    case 'SET_SOURCE':
-      return { ...state, source: action.source };
-
-    case 'SET_HAS_SAVED_SESSION':
-      return { ...state, hasSavedSession: action.has };
+    case 'SET_SOURCE': {
+      // The sifted-playlist id is only meaningful for the playlist it was
+      // resolved for — switching to a different source must not let a stale
+      // id point id-first lookups at the wrong "<name> - Sifted" playlist.
+      const samePlaylist =
+        action.source.type === 'playlist' &&
+        state.source.type === 'playlist' &&
+        action.source.playlist.id === state.source.playlist.id;
+      return {
+        ...state,
+        source: action.source,
+        siftedPlaylistId: samePlaylist ? state.siftedPlaylistId : null,
+      };
+    }
 
     case 'RESUME_SESSION':
       return {
         ...state,
         ...action.session,
         phase: action.session.phase ?? 'sifting',
+        activeSource: action.session.source ?? state.source,
       };
 
     case 'START_FRESH':
       return {
         ...state,
         source: state.source,
+        activeSource: null,
         tracks: [],
         cursor: 0,
         kept: [],
@@ -207,7 +280,39 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         removalPlaylistCreated: false,
         removalPlaylistError: null,
         removalErrors: [],
+        // Intentional discard — START_FRESH is a deliberate abandonment of
+        // the previous sift (its kept list included), not mid-sift cleanup.
+        pendingKeeps: [],
         phase: 'loading',
+        skipFiltering: action.skipFiltering ?? false,
+        isPlaying: false,
+        playbackPosition: 0,
+        isCreatingPlaylist: false,
+      };
+
+    case 'RESET_TO_SETUP':
+      return {
+        ...state,
+        activeSource: null,
+        tracks: [],
+        cursor: 0,
+        kept: [],
+        removed: [],
+        skipped: [],
+        loadProgress: 0,
+        loadError: null,
+        loadMessage: '',
+        removalPlaylistCreated: false,
+        removalPlaylistError: null,
+        removalErrors: [],
+        // Intentional discard — RESET_TO_SETUP abandons the finished sift
+        // entirely; see the LOAD_TRACKS note above.
+        pendingKeeps: [],
+        phase: 'setup',
+        skipFiltering: false,
+        isPlaying: false,
+        playbackPosition: 0,
+        isCreatingPlaylist: false,
       };
 
     default:
@@ -227,10 +332,14 @@ interface SiftContextValue {
   remaining: number;
   total: number;
   decide: (decision: Decision) => void;
-  stopSession: () => void;
-  resumeFromPause: () => void;
-  startFresh: () => void;
-  resumeSession: () => void;
+  startFresh: (skipFiltering?: boolean) => void;
+  resetToSetup: () => void;
+  /**
+   * Immediately persist any debounced-but-unsaved session write. Call before
+   * navigating away from sifting (e.g. back to setup) so the last decisions
+   * are not lost when the autosave effect's cleanup cancels the pending timer.
+   */
+  flushPendingSave: () => void;
   togglePlayPause: () => void;
   seek: (position: number) => void;
   skipBackward: () => void;
@@ -246,13 +355,7 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
 
   const [state, dispatch] = useReducer(siftReducer, init);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Check for saved session on mount
-  useEffect(() => {
-    hasSession().then((exists) => {
-      dispatch({ type: 'SET_HAS_SAVED_SESSION', has: exists });
-    });
-  }, []);
+  const pendingSessionRef = useRef<SiftSession | null>(null);
 
   // Keep Sentry context in sync with app state
   useEffect(() => {
@@ -270,7 +373,7 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
 
   // Auto-save session after every decision (debounced to avoid rapid-fire writes during fast swiping)
   useEffect(() => {
-    if (state.phase !== 'sifting' && state.phase !== 'paused' && state.phase !== 'done') return;
+    if (state.phase !== 'sifting' && state.phase !== 'done') return;
     if (state.tracks.length === 0) return;
 
     const session: SiftSession = {
@@ -283,17 +386,40 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
       savedAt: new Date().toISOString(),
       provider: state.provider,
       source: state.source,
+      // Persisted so the never-silently-dropped guarantee survives an app
+      // kill/relaunch: without these, a resumed session forgets the repair
+      // signal and Done's fallback save never fires.
+      pendingKeeps: state.pendingKeeps,
+      removalErrors: state.removalErrors,
+      // Persisted so a resumed session keeps resolving its sifted playlist
+      // by id (rename-proof) instead of falling back to the name match.
+      siftedPlaylistId: state.siftedPlaylistId,
     };
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    pendingSessionRef.current = session;
     saveTimeoutRef.current = setTimeout(() => {
+      pendingSessionRef.current = null;
       saveSession(session);
     }, 500);
 
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [state.cursor, state.kept, state.removed, state.skipped, state.tracks, state.phase, state.sortOrder, state.provider, state.source]);
+  }, [state.cursor, state.kept, state.removed, state.skipped, state.tracks, state.phase, state.sortOrder, state.provider, state.source, state.pendingKeeps, state.removalErrors, state.siftedPlaylistId]);
+
+  // Flush a debounced session write immediately (see SiftContextValue docs).
+  const flushPendingSave = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    const pending = pendingSessionRef.current;
+    if (pending) {
+      pendingSessionRef.current = null;
+      saveSession(pending);
+    }
+  }, []);
 
   const currentTrack = state.tracks[state.cursor];
   const nextTrack = state.tracks[state.cursor + 1];
@@ -314,69 +440,19 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     [dispatch, state.tracks, state.cursor]
   );
 
-  const stopSession = useCallback(() => {
-    Sentry.addBreadcrumb({ category: 'user-action', message: 'Session stopped', level: 'info' });
-    const session: SiftSession = {
-      tracks: state.tracks,
-      cursor: state.cursor,
-      kept: state.kept,
-      removed: state.removed,
-      skipped: state.skipped,
-      sortOrder: state.sortOrder,
-      savedAt: new Date().toISOString(),
-      provider: state.provider,
-      source: state.source,
-    };
-    saveSession(session);
-    dispatch({ type: 'SET_IS_PLAYING', isPlaying: false });
-    dispatch({ type: 'SET_PHASE', phase: 'paused' });
-  }, [dispatch, state.tracks, state.cursor, state.kept, state.removed, state.skipped, state.sortOrder, state.provider, state.source]);
-
-  const resumeFromPause = useCallback(() => {
-    Sentry.addBreadcrumb({ category: 'user-action', message: 'Session resumed from pause', level: 'info' });
-    dispatch({ type: 'SET_PHASE', phase: 'sifting' });
-  }, [dispatch]);
-
-  const startFresh = useCallback(() => {
+  const startFresh = useCallback((skipFiltering?: boolean) => {
     Sentry.addBreadcrumb({ category: 'user-action', message: 'Started fresh session', level: 'info' });
     clearSession().then(() => {
-      dispatch({ type: 'SET_HAS_SAVED_SESSION', has: false });
-      dispatch({ type: 'START_FRESH' });
+      dispatch({ type: 'START_FRESH', skipFiltering });
     });
   }, [dispatch]);
 
-  const resumeSession = useCallback(() => {
-    Sentry.addBreadcrumb({ category: 'user-action', message: 'Resumed saved session', level: 'info' });
-    loadSession().then((session) => {
-      if (session) {
-        dispatch({
-          type: 'RESUME_SESSION',
-          session: {
-            tracks: session.tracks,
-            cursor: session.cursor,
-            kept: session.kept,
-            removed: session.removed,
-            skipped: session.skipped,
-            sortOrder: session.sortOrder,
-            provider: session.provider ?? state.provider,
-            source: session.source ?? { type: 'library' },
-            phase: 'sifting',
-            loadProgress: 1,
-            loadMessage: '',
-            loadError: null,
-            playbackPosition: 0,
-            isPlaying: false,
-            hasSavedSession: true,
-            removalPlaylistCreated: false,
-            removalPlaylistError: null,
-            isCreatingPlaylist: false,
-            removalErrors: [],
-            connectionStatus: state.connectionStatus,
-          },
-        });
-      }
+  const resetToSetup = useCallback(() => {
+    Sentry.addBreadcrumb({ category: 'user-action', message: 'Reset to setup', level: 'info' });
+    clearSession().then(() => {
+      dispatch({ type: 'RESET_TO_SETUP' });
     });
-  }, [dispatch, state.provider, state.connectionStatus]);
+  }, [dispatch]);
 
   const togglePlayPause = useCallback(
     () => dispatch({ type: 'TOGGLE_PLAY_PAUSE' }),
@@ -410,16 +486,15 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
       remaining,
       total,
       decide,
-      stopSession,
-      resumeFromPause,
       startFresh,
-      resumeSession,
+      resetToSetup,
+      flushPendingSave,
       togglePlayPause,
       seek,
       skipBackward,
       skipForward,
     }),
-    [state, dispatch, currentTrack, nextTrack, nextNextTrack, remaining, total, decide, stopSession, resumeFromPause, startFresh, resumeSession, togglePlayPause, seek, skipBackward, skipForward]
+    [state, dispatch, currentTrack, nextTrack, nextNextTrack, remaining, total, decide, startFresh, resetToSetup, flushPendingSave, togglePlayPause, seek, skipBackward, skipForward]
   );
 
   return <SiftContext.Provider value={value}>{children}</SiftContext.Provider>;

@@ -94,7 +94,6 @@ Configuration lives in environment variables — see [`.env.example`](.env.examp
 |---------|--------------|
 | `npm start` | Start the Expo dev server |
 | `npm run ios` | Build & run on iOS (compiles native modules) |
-| `npm run android` | Build & run on Android |
 | `npm run web` | Run in the browser (Expo Web) |
 | `npm test` | Unit tests (Jest) |
 | `npm run test:coverage` | Unit tests with coverage (80% threshold) |

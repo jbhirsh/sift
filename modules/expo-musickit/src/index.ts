@@ -39,7 +39,8 @@ export function getPlaybackState(): PlaybackState {
   return ExpoMusicKit.getPlaybackState();
 }
 
-export async function createPlaylist(name: string, trackIDs: string[]): Promise<void> {
+/** Returns the number of tracks actually included in the new playlist. */
+export async function createPlaylist(name: string, trackIDs: string[]): Promise<number> {
   return ExpoMusicKit.createPlaylist(name, trackIDs);
 }
 
@@ -63,8 +64,13 @@ export async function addToLibrary(trackIDs: string[]): Promise<void> {
   return ExpoMusicKit.addToLibrary(trackIDs);
 }
 
-export async function addToPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
+/** Returns the number of tracks actually added to the playlist. */
+export async function addToPlaylist(playlistID: string, trackIDs: string[]): Promise<number> {
   return ExpoMusicKit.addToPlaylist(playlistID, trackIDs);
+}
+
+export async function warmSongCache(trackIDs: string[]): Promise<number> {
+  return ExpoMusicKit.warmSongCache(trackIDs);
 }
 
 export async function resolveArtworkURL(trackID: string, width: number, height: number): Promise<string | null> {

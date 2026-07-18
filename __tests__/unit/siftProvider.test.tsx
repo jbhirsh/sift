@@ -44,10 +44,26 @@ function TestConsumer() {
       <TouchableOpacity testID="decide-keep" onPress={() => ctx.decide('keep')} />
       <TouchableOpacity testID="decide-remove" onPress={() => ctx.decide('remove')} />
       <TouchableOpacity testID="decide-skip" onPress={() => ctx.decide('skip')} />
-      <TouchableOpacity testID="stop" onPress={ctx.stopSession} />
-      <TouchableOpacity testID="resume-pause" onPress={ctx.resumeFromPause} />
-      <TouchableOpacity testID="start-fresh" onPress={ctx.startFresh} />
-      <TouchableOpacity testID="resume-session" onPress={ctx.resumeSession} />
+      <TouchableOpacity testID="start-fresh" onPress={() => ctx.startFresh()} />
+      <TouchableOpacity testID="reset-to-setup" onPress={ctx.resetToSetup} />
+      <TouchableOpacity testID="flush-pending-save" onPress={ctx.flushPendingSave} />
+      <Text testID="pendingKeepsCount">{ctx.state.pendingKeeps.length}</Text>
+      <TouchableOpacity testID="add-pending-keep" onPress={() => ctx.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrackC })} />
+      <TouchableOpacity testID="add-removal-error" onPress={() => ctx.dispatch({ type: 'ADD_REMOVAL_ERROR', error: 'Could not remove Track B' })} />
+      <TouchableOpacity
+        testID="resume-with-pending"
+        onPress={() => ctx.dispatch({
+          type: 'RESUME_SESSION',
+          session: {
+            ...ctx.state,
+            tracks: [mockTrackA, mockTrackB],
+            cursor: 1,
+            pendingKeeps: [mockTrackC],
+            removalErrors: ['Could not remove Track B'],
+          },
+        })}
+      />
+      <TouchableOpacity testID="set-phase-setup" onPress={() => ctx.dispatch({ type: 'SET_PHASE', phase: 'setup' })} />
       <TouchableOpacity testID="toggle-play" onPress={ctx.togglePlayPause} />
       <TouchableOpacity testID="seek" onPress={() => ctx.seek(42)} />
       <TouchableOpacity testID="skip-backward" onPress={ctx.skipBackward} />
@@ -67,7 +83,6 @@ function renderWithProvider(initialTracks?: Track[]) {
 describe('SiftProvider', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (SessionStore.hasSession as jest.Mock).mockResolvedValue(false);
     (SessionStore.saveSession as jest.Mock).mockResolvedValue(undefined);
     (SessionStore.clearSession as jest.Mock).mockResolvedValue(undefined);
     (SessionStore.loadSession as jest.Mock).mockResolvedValue(null);
@@ -110,21 +125,6 @@ describe('SiftProvider', () => {
     expect(getByTestId('skippedCount').props.children).toBe(1);
   });
 
-  test('stopSession saves session and sets phase to paused', () => {
-    const { getByTestId } = renderWithProvider([mockTrackA, mockTrackB]);
-    fireEvent.press(getByTestId('stop'));
-    expect(getByTestId('phase').props.children).toBe('paused');
-    expect(SessionStore.saveSession).toHaveBeenCalled();
-  });
-
-  test('resumeFromPause sets phase to sifting', () => {
-    const { getByTestId } = renderWithProvider([mockTrackA, mockTrackB]);
-    fireEvent.press(getByTestId('stop'));
-    expect(getByTestId('phase').props.children).toBe('paused');
-    fireEvent.press(getByTestId('resume-pause'));
-    expect(getByTestId('phase').props.children).toBe('sifting');
-  });
-
   test('startFresh clears session and resets state', async () => {
     const { getByTestId } = renderWithProvider([mockTrackA]);
     await act(async () => {
@@ -136,7 +136,7 @@ describe('SiftProvider', () => {
     });
   });
 
-  test('resumeSession loads and restores session', async () => {
+  test('does not auto-resume saved session on mount (resume is handled by SetupScreen)', async () => {
     (SessionStore.loadSession as jest.Mock).mockResolvedValue({
       tracks: [mockTrackA, mockTrackB],
       cursor: 1,
@@ -148,12 +148,9 @@ describe('SiftProvider', () => {
       provider: 'spotify',
     });
     const { getByTestId } = renderWithProvider();
-    await act(async () => {
-      fireEvent.press(getByTestId('resume-session'));
-    });
+    // Should stay in setup — SiftProvider no longer auto-resumes
     await waitFor(() => {
-      expect(getByTestId('phase').props.children).toBe('sifting');
-      expect(getByTestId('currentTrack').props.children).toBe('Track B');
+      expect(getByTestId('phase').props.children).toBe('setup');
     });
   });
 
@@ -198,11 +195,125 @@ describe('SiftProvider', () => {
     consoleError.mockRestore();
   });
 
-  test('checks for saved session on mount', async () => {
-    (SessionStore.hasSession as jest.Mock).mockResolvedValue(true);
+  test('does not load session on mount (handled by SetupScreen)', () => {
     renderWithProvider();
-    await waitFor(() => {
-      expect(SessionStore.hasSession).toHaveBeenCalled();
+    expect(SessionStore.loadSession).not.toHaveBeenCalled();
+  });
+
+  test('resetToSetup clears the saved session and resets state to setup', async () => {
+    const { getByTestId } = renderWithProvider([mockTrackA, mockTrackB]);
+    expect(getByTestId('phase').props.children).toBe('sifting');
+    fireEvent.press(getByTestId('decide-keep'));
+    await act(async () => {
+      fireEvent.press(getByTestId('reset-to-setup'));
     });
+    await waitFor(() => {
+      expect(SessionStore.clearSession).toHaveBeenCalled();
+      expect(getByTestId('phase').props.children).toBe('setup');
+    });
+    expect(getByTestId('total').props.children).toBe(0);
+    expect(getByTestId('cursor').props.children).toBe(0);
+    expect(getByTestId('keptCount').props.children).toBe(0);
+    expect(getByTestId('isPlaying').props.children).toBe('false');
+  });
+
+  test('autosave persists pendingKeeps and removalErrors in the session', () => {
+    jest.useFakeTimers();
+    try {
+      const { getByTestId } = renderWithProvider([mockTrackA, mockTrackB]);
+      fireEvent.press(getByTestId('decide-keep'));
+      fireEvent.press(getByTestId('add-pending-keep'));
+      fireEvent.press(getByTestId('add-removal-error'));
+      act(() => {
+        jest.advanceTimersByTime(600);
+      });
+      // The on-disk session must carry the repair signal, or a kill/relaunch
+      // would silently forget that a keep never reached the Sifted playlist.
+      expect(SessionStore.saveSession).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          pendingKeeps: [expect.objectContaining({ id: mockTrackC.id })],
+          removalErrors: ['Could not remove Track B'],
+        }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('RESUME_SESSION restores persisted pendingKeeps and removalErrors', () => {
+    const { getByTestId } = renderWithProvider([mockTrackA, mockTrackB]);
+    fireEvent.press(getByTestId('resume-with-pending'));
+    expect(getByTestId('pendingKeepsCount').props.children).toBe(1);
+    expect(getByTestId('phase').props.children).toBe('sifting');
+  });
+
+  test('flushPendingSave writes the debounced session synchronously', () => {
+    jest.useFakeTimers();
+    try {
+      const { getByTestId } = renderWithProvider([mockTrackA, mockTrackB]);
+      fireEvent.press(getByTestId('decide-keep'));
+      // The autosave is debounced — nothing has been written yet.
+      expect(SessionStore.saveSession).not.toHaveBeenCalled();
+
+      fireEvent.press(getByTestId('flush-pending-save'));
+      // The pending session is persisted immediately, with the last decision.
+      expect(SessionStore.saveSession).toHaveBeenCalledTimes(1);
+      expect(SessionStore.saveSession).toHaveBeenCalledWith(
+        expect.objectContaining({ cursor: 1, kept: [mockTrackA] }),
+      );
+
+      // The cancelled debounce timer must not fire a duplicate write.
+      act(() => {
+        jest.advanceTimersByTime(1000);
+      });
+      expect(SessionStore.saveSession).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('flushPendingSave before leaving sifting preserves the last decision', () => {
+    jest.useFakeTimers();
+    try {
+      const { getByTestId } = renderWithProvider([mockTrackA, mockTrackB]);
+      fireEvent.press(getByTestId('decide-keep'));
+      expect(SessionStore.saveSession).not.toHaveBeenCalled();
+
+      // Mirrors the SiftScreen back button: flush, then flip phase to setup.
+      // Without the flush, the autosave effect's cleanup would cancel the
+      // debounced write and the keep decision would be lost.
+      fireEvent.press(getByTestId('flush-pending-save'));
+      fireEvent.press(getByTestId('set-phase-setup'));
+
+      expect(getByTestId('phase').props.children).toBe('setup');
+      expect(SessionStore.saveSession).toHaveBeenCalledTimes(1);
+      expect(SessionStore.saveSession).toHaveBeenCalledWith(
+        expect.objectContaining({ cursor: 1, kept: [mockTrackA] }),
+      );
+
+      act(() => {
+        jest.advanceTimersByTime(1000);
+      });
+      expect(SessionStore.saveSession).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('flushPendingSave is a no-op when the debounced write already fired', () => {
+    jest.useFakeTimers();
+    try {
+      const { getByTestId } = renderWithProvider([mockTrackA, mockTrackB]);
+      fireEvent.press(getByTestId('decide-keep'));
+      act(() => {
+        jest.advanceTimersByTime(600);
+      });
+      expect(SessionStore.saveSession).toHaveBeenCalledTimes(1);
+
+      fireEvent.press(getByTestId('flush-pending-save'));
+      expect(SessionStore.saveSession).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
