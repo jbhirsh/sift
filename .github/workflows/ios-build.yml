@@ -44,16 +44,45 @@ jobs:
       - name: Setup EAS CLI
         run: npm install -g eas-cli
 
+      # Dependabot-triggered runs receive Dependabot secrets, not Actions
+      # secrets — without EXPO_TOKEN there, eas can't authenticate, so skip
+      # green with a notice rather than run a build that can only fail.
+      # SENTRY_AUTH_TOKEN is only needed for the source-map upload inside the
+      # build: when absent, keep the compile check and disable the upload
+      # instead of skipping. Registering both as Dependabot secrets upgrades
+      # bot PRs to the full check.
+      - name: Check for EAS credentials
+        id: creds
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          if [ -n "$EXPO_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            if [ -n "$SENTRY_AUTH_TOKEN" ]; then
+              echo "sentry_upload=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "sentry_upload=true" >> "$GITHUB_OUTPUT"
+              echo "::notice::SENTRY_AUTH_TOKEN unavailable — building with source-map upload disabled."
+            fi
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::EXPO_TOKEN unavailable in this trigger context (Dependabot/fork) — skipping the iOS compile check."
+          fi
+
       - name: Build simulator app (compiles expo-musickit Swift)
+        if: steps.creds.outputs.present == 'true'
         run: eas build --profile e2e-simulator --platform ios --local --non-interactive --output build/Sift-e2e.tar.gz
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_DISABLE_AUTO_UPLOAD: ${{ steps.creds.outputs.sentry_upload }}
           USE_CCACHE: '1'
 
       # The E2E job (ci.yml) can reuse this instead of rebuilding: download the
       # artifact from a recent run if the fingerprint matches.
       - uses: actions/upload-artifact@v7
+        if: steps.creds.outputs.present == 'true'
         with:
           name: sift-simulator-app
           path: build/Sift-e2e.tar.gz
