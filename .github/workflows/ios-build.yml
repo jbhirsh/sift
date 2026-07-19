@@ -1,0 +1,60 @@
+# Compile gate for the iOS native code. Lint, typecheck, and Jest never touch
+# the Swift in modules/expo-musickit — this job is the only PR check that
+# proves it still compiles. GitHub-hosted macOS runners are free on public
+# repos, so it costs nothing; it's path-filtered to native-affecting files to
+# keep PR feedback fast everywhere else.
+name: iOS Build
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'modules/**'
+      - 'app.json'
+      - 'eas.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/ios-build.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    name: Build iOS simulator app
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Setup EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Build simulator app (compiles expo-musickit Swift)
+        run: eas build --profile e2e-simulator --platform ios --local --non-interactive --output build/Sift-e2e.tar.gz
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          USE_CCACHE: '1'
+
+      # The E2E job (ci.yml) can reuse this instead of rebuilding: download the
+      # artifact from a recent run if the fingerprint matches.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sift-simulator-app
+          path: build/Sift-e2e.tar.gz
+          retention-days: 7
