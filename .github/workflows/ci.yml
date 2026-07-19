@@ -55,10 +55,10 @@ jobs:
   e2e:
     name: E2E Tests (Maestro)
     needs: check
-    # The iOS Maestro E2E job was built for a self-hosted Mac (preinstalled
-    # Maestro + a persistent build cache). It runs on demand rather than on
-    # every PR, since it can't pass on ephemeral GitHub-hosted macOS runners
-    # as-is. Trigger it manually from the Actions tab (workflow_dispatch).
+    # Runs on GitHub-hosted macOS (free on public repos). Manual dispatch only:
+    # a cold run rebuilds the simulator app (~20-30 min); warm runs restore it
+    # from actions/cache keyed on the project fingerprint. Trigger from the
+    # Actions tab (workflow_dispatch).
     if: github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
 
@@ -83,39 +83,32 @@ jobs:
           FINGERPRINT="${NATIVE}-${SOURCE}"
           echo "hash=$FINGERPRINT" >> "$GITHUB_OUTPUT"
           echo "Fingerprint: $FINGERPRINT"
-          CACHE_DIR="$HOME/.cache/sift-e2e"
-          if [ -f "$CACHE_DIR/fingerprint" ] && [ "$(cat "$CACHE_DIR/fingerprint")" = "$FINGERPRINT" ] && [ -d "$CACHE_DIR/app" ]; then
-            echo "cache_hit=true" >> "$GITHUB_OUTPUT"
-            echo "Cache hit — skipping build"
-          else
-            echo "cache_hit=false" >> "$GITHUB_OUTPUT"
-            echo "Cache miss — will rebuild"
-          fi
+
+      - name: Restore build cache
+        id: build-cache
+        uses: actions/cache@v4
+        with:
+          path: build/e2e
+          key: sift-e2e-${{ steps.fingerprint.outputs.hash }}
 
       - name: Build simulator app
-        if: steps.fingerprint.outputs.cache_hit != 'true'
+        if: steps.build-cache.outputs.cache-hit != 'true'
         run: eas build --profile e2e-simulator --platform ios --local --non-interactive --output build/Sift-e2e.tar.gz
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           USE_CCACHE: '1'
 
-      - name: Extract and cache build
-        if: steps.fingerprint.outputs.cache_hit != 'true'
+      - name: Extract build
+        if: steps.build-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p build/e2e
           tar -xzf build/Sift-e2e.tar.gz -C build/e2e
-          CACHE_DIR="$HOME/.cache/sift-e2e"
-          rm -rf "$CACHE_DIR"
-          mkdir -p "$CACHE_DIR/app"
-          cp -R build/e2e/* "$CACHE_DIR/app/"
-          echo "${{ steps.fingerprint.outputs.hash }}" > "$CACHE_DIR/fingerprint"
 
-      - name: Restore cached build
-        if: steps.fingerprint.outputs.cache_hit == 'true'
+      - name: Install Maestro
         run: |
-          mkdir -p build/e2e
-          cp -R "$HOME/.cache/sift-e2e/app/"* build/e2e/
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
       - name: Boot iOS Simulator
         run: |
