@@ -16,6 +16,11 @@ on:
       - '.github/**/*.md'
       - 'LICENSE'
   workflow_dispatch:
+  schedule:
+    # Nightly E2E (09:00 UTC = 2am PT): the suite is manual-dispatch on PRs,
+    # so without this a flow regression stays invisible until someone
+    # remembers to press the button.
+    - cron: '0 9 * * *'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -59,7 +64,7 @@ jobs:
     # a cold run rebuilds the simulator app (~20-30 min); warm runs restore it
     # from actions/cache keyed on the project fingerprint. Trigger from the
     # Actions tab (workflow_dispatch).
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     # Pinned (not macos-latest) so a runner-image migration can't silently
     # change simulator/Xcode behavior; bump deliberately. macos-26 is the
     # image the working builds resolve to (Xcode 26; Expo SDK 55 requires
