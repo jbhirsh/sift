@@ -100,8 +100,28 @@ jobs:
           path: build/e2e
           key: sift-e2e-${{ steps.fingerprint.outputs.hash }}
 
-      - name: Build simulator app
+      # The ios-build job builds the identical e2e-simulator profile on PR CI
+      # and uploads it; reusing that artifact turns a ~30-minute cold rebuild
+      # into a ~1-minute download whenever this head already built there.
+      - name: Reuse ios-build artifact if available
+        id: reuse
         if: steps.build-cache.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_id=$(gh api "repos/${{ github.repository }}/actions/workflows/ios-build.yml/runs?head_sha=${{ github.sha }}&status=success&per_page=1" --jq '.workflow_runs[0].id // empty')
+          if [ -n "$run_id" ] && gh run download "$run_id" --repo "${{ github.repository }}" --name sift-simulator-app --dir build/; then
+            mkdir -p build/e2e
+            tar -xzf build/Sift-e2e.tar.gz -C build/e2e
+            echo "hit=true" >> "$GITHUB_OUTPUT"
+            echo "Reused simulator app from ios-build run $run_id"
+          else
+            echo "hit=false" >> "$GITHUB_OUTPUT"
+            echo "No reusable ios-build artifact for this sha — building."
+          fi
+
+      - name: Build simulator app
+        if: steps.build-cache.outputs.cache-hit != 'true' && steps.reuse.outputs.hit != 'true'
         run: eas build --profile e2e-simulator --platform ios --local --non-interactive --output build/Sift-e2e.tar.gz
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -109,7 +129,7 @@ jobs:
           USE_CCACHE: '1'
 
       - name: Extract build
-        if: steps.build-cache.outputs.cache-hit != 'true'
+        if: steps.build-cache.outputs.cache-hit != 'true' && steps.reuse.outputs.hit != 'true'
         run: |
           mkdir -p build/e2e
           tar -xzf build/Sift-e2e.tar.gz -C build/e2e
