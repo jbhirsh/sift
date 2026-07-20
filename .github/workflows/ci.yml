@@ -61,8 +61,10 @@ jobs:
     # Actions tab (workflow_dispatch).
     if: github.event_name == 'workflow_dispatch'
     # Pinned (not macos-latest) so a runner-image migration can't silently
-    # change simulator/Xcode behavior; bump deliberately.
-    runs-on: macos-15
+    # change simulator/Xcode behavior; bump deliberately. macos-26 is the
+    # image the working builds resolve to (Xcode 26; Expo SDK 55 requires
+    # >=26 — macos-15's default Xcode 16.4 cannot compile expo-modules-core).
+    runs-on: macos-26
     timeout-minutes: 60
 
     steps:
