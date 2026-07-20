@@ -60,7 +60,10 @@ jobs:
     # from actions/cache keyed on the project fingerprint. Trigger from the
     # Actions tab (workflow_dispatch).
     if: github.event_name == 'workflow_dispatch'
-    runs-on: macos-latest
+    # Pinned (not macos-latest) so a runner-image migration can't silently
+    # change simulator/Xcode behavior; bump deliberately.
+    runs-on: macos-15
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@v7
@@ -123,14 +126,35 @@ jobs:
                           sys.exit(0)
           ")
           xcrun simctl boot "$DEVICE" 2>/dev/null || true
+          # Block until SpringBoard is actually up — attaching the XCUITest
+          # driver to a half-booted simulator is the main startup-flake source.
+          xcrun simctl bootstatus "$DEVICE" -b
 
       - name: Install app on simulator
         run: xcrun simctl install booted build/e2e/*.app
 
       - name: Run Maestro tests
+        env:
+          # GitHub-hosted macOS runners can be slow enough that the XCUITest
+          # driver misses Maestro's default startup window (seen as
+          # IOSDriverTimeoutException in run 29703273714). Give it 5 minutes.
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: "300000"
+          # No analytics network call — one less nondeterministic dependency.
+          MAESTRO_CLI_NO_ANALYTICS: "1"
         run: |
           export PATH="$HOME/.maestro/bin:$PATH"
-          maestro test .maestro/
+          # No automatic retry: a retry would mask residual nondeterminism as
+          # green runs. Every failure surfaces loudly with debug artifacts,
+          # and the fix goes to the root cause, not another attempt.
+          maestro test --debug-output maestro-debug .maestro/
+
+      - name: Upload Maestro debug artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: maestro-debug
+          path: maestro-debug
+          retention-days: 7
 
   review:
     name: Claude Review
