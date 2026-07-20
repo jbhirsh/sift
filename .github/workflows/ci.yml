@@ -152,7 +152,17 @@ jobs:
           # No automatic retry: a retry would mask residual nondeterminism as
           # green runs. Every failure surfaces loudly with debug artifacts,
           # and the fix goes to the root cause, not another attempt.
-          maestro test --debug-output maestro-debug .maestro/
+          maestro test --debug-output maestro-debug --format junit --output maestro-report.xml .maestro/
+
+      # Ground truth on where this Maestro version writes debug output —
+      # two artifact-capture attempts have come up empty against the
+      # documented paths.
+      - name: Locate Maestro output (diagnostics)
+        if: failure()
+        run: |
+          echo "=== CWD candidates ==="; find . -maxdepth 2 \( -name 'maestro-*' -o -name '*.png' -o -name 'debug*' \) -not -path './node_modules/*' 2>/dev/null | head -20
+          echo "=== HOME/.maestro ==="; find "$HOME/.maestro" -maxdepth 3 2>/dev/null | head -30
+          echo "=== junit report ==="; ls -la maestro-report.xml 2>/dev/null && head -50 maestro-report.xml
 
       - name: Upload Maestro debug artifacts
         if: failure()
@@ -165,7 +175,9 @@ jobs:
           # artifact silently defeats the whole no-retry diagnosis doctrine.
           path: |
             maestro-debug
+            maestro-report.xml
             ~/.maestro/tests
+            ~/.maestro/**/*.png
           if-no-files-found: error
           retention-days: 7
 
