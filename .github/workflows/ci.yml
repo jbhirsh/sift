@@ -16,11 +16,6 @@ on:
       - '.github/**/*.md'
       - 'LICENSE'
   workflow_dispatch:
-  schedule:
-    # Nightly E2E (09:00 UTC = 2am PT): the suite is manual-dispatch on PRs,
-    # so without this a flow regression stays invisible until someone
-    # remembers to press the button.
-    - cron: '0 9 * * *'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -64,7 +59,11 @@ jobs:
     # a cold run rebuilds the simulator app (~20-30 min); warm runs restore it
     # from actions/cache keyed on the project fingerprint. Trigger from the
     # Actions tab (workflow_dispatch).
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    # E2E runs when merged code can actually change its outcome: pushes to
+    # main touching app/native/flow code, plus manual dispatch. (A nightly
+    # cron was tried and reverted: it burns runs on unchanged code and GitHub
+    # silently disables cron workflows after 60 idle days.)
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     # Pinned (not macos-latest) so a runner-image migration can't silently
     # change simulator/Xcode behavior; bump deliberately. macos-26 is the
     # image the working builds resolve to (Xcode 26; Expo SDK 55 requires
