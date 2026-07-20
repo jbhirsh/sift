@@ -155,7 +155,14 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: maestro-debug
-          path: maestro-debug
+          # Maestro writes per-flow screenshots and view hierarchies under
+          # ~/.maestro/tests regardless of --debug-output on some versions;
+          # capture both, and fail loudly if neither exists — an empty debug
+          # artifact silently defeats the whole no-retry diagnosis doctrine.
+          path: |
+            maestro-debug
+            ~/.maestro/tests
+          if-no-files-found: error
           retention-days: 7
 
   review:
