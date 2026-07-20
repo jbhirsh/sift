@@ -34,6 +34,33 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Native-logic unit tests: the expo-musickit module's pure logic lives
+      # in a SwiftPM package (modules/expo-musickit/logic) precisely so it can
+      # be tested without MusicKit, a simulator, or an Xcode project. Guarded
+      # on the manifest so this step is a no-op until the package lands.
+      - name: Swift logic tests (coverage-gated)
+        run: |
+          if [ -f modules/expo-musickit/logic/Package.swift ]; then
+            swift test --package-path modules/expo-musickit/logic --enable-code-coverage
+            COV_JSON=$(swift test --package-path modules/expo-musickit/logic --show-codecov-path)
+            # Enforce the same 80% line-coverage floor the JS suite has,
+            # measured over package Sources only (tests excluded).
+            TOTAL=$(jq -r '[.data[0].files[] | select(.filename | contains("/Sources/"))] | map(.summary.lines.count) | add // 0' "$COV_JSON")
+            if [ "$TOTAL" -eq 0 ]; then
+              echo "::error::No coverage data for package Sources — empty test target or report-format drift. Refusing to treat missing data as 100%."
+              exit 1
+            fi
+            COV=$(jq -r '[.data[0].files[] | select(.filename | contains("/Sources/"))] | (map(.summary.lines.covered) | add) as $c | (map(.summary.lines.count) | add) as $t | 100 * $c / $t' "$COV_JSON")
+            printf 'Swift logic line coverage: %.1f%%\n' "$COV"
+            awk -v c="$COV" 'BEGIN { exit (c < 80) ? 1 : 0 }' || {
+              echo "::error::Swift logic coverage ${COV}% is below the 80% floor"
+              exit 1
+            }
+          else
+            echo "No Swift logic package yet — skipping."
+          fi
+
+
       - uses: actions/setup-node@v6
         with:
           node-version: 24
