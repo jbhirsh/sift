@@ -10,7 +10,7 @@ Pod::Spec.new do |s|
   s.license        = 'MIT'
   s.author         = 'Jessica Hirsh'
   s.homepage       = 'https://github.com/jessicahirsh/sift'
-  s.platforms      = { :ios => '16.0' }
+  s.platforms      = { :ios => '16.4' }
   s.swift_version  = '5.9'
   s.source         = { git: 'https://github.com/jessicahirsh/sift.git' }
   s.static_framework = true

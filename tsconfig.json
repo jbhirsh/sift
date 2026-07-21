@@ -2,6 +2,15 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
-    "types": ["jest", "@types/react"]
+    "types": ["jest", "@types/react"],
+    "paths": {
+      // SDK 57 nests expo-modules-core under expo, but expo-audio@57.0.2's
+      // typings and jest-expo's preset setup still import it bare. Metro
+      // aliases this at runtime; mirror that here for tsc — and jest-expo
+      // translates these paths into Jest's moduleNameMapper, so this single
+      // block fixes both typecheck (AudioPlayer.addListener) and test runs.
+      "expo-modules-core": ["./node_modules/expo/node_modules/expo-modules-core"],
+      "expo-modules-core/*": ["./node_modules/expo/node_modules/expo-modules-core/*"]
+    }
   }
 }
