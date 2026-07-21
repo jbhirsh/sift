@@ -3,7 +3,7 @@
 ## What This Project Is
 A React Native (Expo) mobile app for rapidly reviewing a music library.
 Users swipe/tap through their tracks: keep, remove, or skip.
-Supports Apple Music and Spotify. Built with Expo SDK 55, React Native 0.83,
+Supports Apple Music and Spotify. Built with Expo SDK 57, React Native 0.86,
 React 19, and TypeScript.
 
 ---

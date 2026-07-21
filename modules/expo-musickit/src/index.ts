@@ -1,4 +1,4 @@
-import { requireNativeModule } from 'expo-modules-core';
+import { requireNativeModule } from 'expo';
 import type { MusicKitPlaylist, MusicKitTrack, PlaybackState } from './ExpoMusicKit.types';
 
 const ExpoMusicKit = requireNativeModule('ExpoMusicKit');

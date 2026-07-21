@@ -8,7 +8,11 @@ module.exports = {
     'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|@sentry/.*|native-base|react-native-svg|react-native-reanimated|react-native-gesture-handler|react-native-worklets|@react-native-async-storage/async-storage)'
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
-  testPathIgnorePatterns: ['/node_modules/', '__tests__/helpers/', '\\.claude/worktrees/'],
+  // Anchor the worktree exclusion to this config's rootDir: the main checkout
+  // must not pick up test copies inside .claude/worktrees/, but a jest run
+  // started from within a worktree (whose rootDir is the worktree itself)
+  // still needs to find that worktree's own tests.
+  testPathIgnorePatterns: ['/node_modules/', '__tests__/helpers/', '<rootDir>/\\.claude/worktrees/'],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     '!src/types/**',
