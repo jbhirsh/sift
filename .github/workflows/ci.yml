@@ -55,15 +55,14 @@ jobs:
   e2e:
     name: E2E Tests (Maestro)
     needs: check
-    # Runs on GitHub-hosted macOS (free on public repos). Manual dispatch only:
-    # a cold run rebuilds the simulator app (~20-30 min); warm runs restore it
-    # from actions/cache keyed on the project fingerprint. Trigger from the
-    # Actions tab (workflow_dispatch).
-    # E2E runs when merged code can actually change its outcome: pushes to
-    # main touching app/native/flow code, plus manual dispatch. (A nightly
-    # cron was tried and reverted: it burns runs on unchanged code and GitHub
-    # silently disables cron workflows after 60 idle days.)
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    # Runs on GitHub-hosted macOS (free on public repos) on every PR and push
+    # to main. A cold run rebuilds the simulator app (~20-30 min); warm runs
+    # restore it from actions/cache keyed on the project fingerprint, or reuse
+    # the ios-build artifact for the same head SHA (~1 min).
+    # Caveat: the build step needs EXPO_TOKEN, which dependabot-triggered PRs
+    # don't receive (they read Dependabot secrets, not Actions secrets) — on a
+    # cache miss those PRs fail here until the token is mirrored into
+    # Dependabot secrets.
     # Pinned (not macos-latest) so a runner-image migration can't silently
     # change simulator/Xcode behavior; bump deliberately. macos-26 is the
     # image the working builds resolve to (Xcode 26; Expo SDK 55 requires
