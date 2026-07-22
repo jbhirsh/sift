@@ -1,0 +1,113 @@
+name: Mutation Testing
+
+# Assertion-depth sensor: Stryker mutates the reducer, services, utils, and
+# hooks and checks how many mutants the unit tests kill — gaps line coverage
+# can't see.
+#
+# Two placements:
+#   - Pull requests: mutate only the in-scope files the PR touched. Fast,
+#     targeted feedback on exactly the code under review.
+#   - Weekly schedule (+ manual dispatch): full sweep as a drift sensor,
+#     catching erosion from changes that didn't trip the PR-scoped run.
+#
+# `break` is null while we establish a baseline — ratchet it up in
+# stryker.config.json once stable.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - '__tests__/**'
+      - '__mocks__/**'
+      - 'stryker.config.json'
+      - 'jest.config.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/mutation.yml'
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  mutation:
+    name: Mutation Tests (Stryker)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history so PR runs can diff against the base branch.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # On PRs, narrow mutation to changed files that are inside the
+      # configured mutation scope. SYNC POINT: `--mutate` REPLACES the
+      # `mutate` array in stryker.config.json (no merge), so that array is
+      # the source of truth and the pathspec + grep filters below are a
+      # duplicate of it that must be updated in the same commit as any
+      # change to the config's include/exclude entries — otherwise PR runs
+      # and the weekly sweep silently diverge in scope.
+      # --diff-filter=d drops deletions: a removed file must not be passed
+      # to --mutate. If the workflow triggered but no mutable source changed
+      # (config/test/mock/workflow edits, pure deletions), fall back to a
+      # fast smoke scope over the small utils so the Stryker wiring itself
+      # is still validated at PR time, not just weekly.
+      - name: Determine mutation scope
+        id: scope
+        if: github.event_name == 'pull_request'
+        # Context values enter as env vars, not ${{ }} splices inside `run:`,
+        # so the shell treats them as data — PR-controlled filenames (and, for
+        # defense-in-depth, the base ref) must never be parsed as script text.
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          CHANGED=$(git diff --name-only --diff-filter=d "origin/${BASE_REF}"...HEAD -- \
+              src/context src/services src/utils src/hooks \
+            | grep -E '\.(ts|tsx)$' \
+            | grep -Ev '(/index\.ts$|MusicProviderInterface\.ts$|useKeyboardShortcuts\.ts$|mockData\.ts$)' \
+            || true)
+          if [ -z "$CHANGED" ]; then
+            echo "No mutable files changed — running utils smoke scope to validate the Stryker setup."
+            echo "mutate=src/utils/formatTime.ts,src/utils/sorting.ts,src/utils/trackIdentity.ts" >> "$GITHUB_OUTPUT"
+          else
+            echo "Mutating changed files:"; echo "$CHANGED"
+            echo "mutate=$(echo "$CHANGED" | paste -sd, -)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Stryker (changed files)
+        if: github.event_name == 'pull_request'
+        env:
+          MUTATE_SCOPE: ${{ steps.scope.outputs.mutate }}
+        run: npx stryker run --mutate "$MUTATE_SCOPE"
+
+      - name: Run Stryker (full sweep)
+        if: github.event_name != 'pull_request'
+        run: npx stryker run
+
+      # always(): when thresholds.break ratchets up, a breaking Stryker run
+      # exits nonzero after writing the report — that report is exactly what's
+      # needed to diagnose the failure, so upload it anyway. warn (not error):
+      # if the runner kills Stryker at timeout-minutes, no report exists and
+      # an upload error would only mask the timeout as a secondary failure.
+      - name: Upload mutation report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mutation-report
+          path: reports/mutation
+          if-no-files-found: warn
+          retention-days: 30

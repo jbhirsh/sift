@@ -10,6 +10,12 @@ test-coverage:
 test-watch:
 	npx jest --watch
 
+# Run mutation tests (Stryker) on reducer, services, utils, and hooks.
+# Slow — not part of `make check`. CI (mutation.yml) mutates changed files
+# on every PR and does a full sweep weekly.
+test-mutation:
+	npx stryker run
+
 # Build standalone simulator app for E2E testing (no dev server needed)
 build-e2e:
 	eas build --profile e2e-simulator --platform ios --local --output build/Sift-e2e.tar.gz
@@ -43,4 +49,4 @@ doctor:
 # Check everything (lint + types + tests with coverage + expo doctor)
 check: lint typecheck test-coverage doctor
 
-.PHONY: test test-coverage test-watch build-e2e test-e2e test-all lint typecheck build-ios check doctor
+.PHONY: test test-coverage test-watch test-mutation build-e2e test-e2e test-all lint typecheck build-ios check doctor

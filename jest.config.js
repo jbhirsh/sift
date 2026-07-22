@@ -12,7 +12,12 @@ module.exports = {
   // must not pick up test copies inside .claude/worktrees/, but a jest run
   // started from within a worktree (whose rootDir is the worktree itself)
   // still needs to find that worktree's own tests.
-  testPathIgnorePatterns: ['/node_modules/', '__tests__/helpers/', '<rootDir>/\\.claude/worktrees/'],
+  // .stryker-tmp is anchored for the same reason: a leftover Stryker sandbox
+  // must not be scanned from the main checkout (it doubles every suite and
+  // duplicates manual mocks), but Stryker's own in-sandbox jest runs — whose
+  // rootDir is the sandbox — must not have their paths filtered.
+  testPathIgnorePatterns: ['/node_modules/', '__tests__/helpers/', '<rootDir>/\\.claude/worktrees/', '<rootDir>/\\.stryker-tmp/'],
+  modulePathIgnorePatterns: ['<rootDir>/\\.stryker-tmp/'],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     '!src/types/**',

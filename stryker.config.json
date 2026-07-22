@@ -1,0 +1,42 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "jest",
+  "jest": {
+    "projectType": "custom",
+    "configFile": "jest.config.js"
+  },
+  "coverageAnalysis": "perTest",
+  "ignoreStatic": true,
+  "timeoutMS": 60000,
+  "dryRunTimeoutMinutes": 15,
+  "ignorePatterns": [
+    "ios",
+    "android",
+    ".expo",
+    ".claude",
+    "assets",
+    "build",
+    "coverage",
+    ".maestro"
+  ],
+  "mutate": [
+    "src/context/**/*.{ts,tsx}",
+    "src/services/**/*.ts",
+    "src/utils/**/*.ts",
+    "src/hooks/**/*.ts",
+    "!src/**/index.ts",
+    "!src/services/MusicProviderInterface.ts",
+    "!src/hooks/useKeyboardShortcuts.ts",
+    "!src/utils/mockData.ts"
+  ],
+  "reporters": ["progress", "clear-text", "html"],
+  "htmlReporter": {
+    "fileName": "reports/mutation/mutation.html"
+  },
+  "thresholds": {
+    "high": 80,
+    "low": 65,
+    "break": null
+  },
+  "tempDirName": ".stryker-tmp"
+}

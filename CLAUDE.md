@@ -37,6 +37,7 @@ especially when test files were modified.
 |-------|--------------|-------|-------------|
 | Unit tests (`make test`) | Reducers, utils, hooks, services | Seconds | Every commit + CI |
 | E2E tests (`make test-e2e`) | Full app flows | Minutes | PR time (Maestro flows in `.maestro/`) |
+| Mutation tests (`make test-mutation`) | Assertion depth of unit tests (Stryker) | Minutes–hour | PR time (changed files) + weekly full sweep (`mutation.yml`) |
 
 **Test coverage requirements:**
 - Every new reducer action, service function, or utility must have a unit test in `__tests__/unit/`.
