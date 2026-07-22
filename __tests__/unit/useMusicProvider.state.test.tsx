@@ -1471,8 +1471,12 @@ describe('useMusicProvider — observable state', () => {
 
   // ── Providers without optional APIs ──────────────────
   // MusicProviderService marks the playlist/library-mutation APIs optional.
-  // Every flow must degrade gracefully on a provider that lacks them —
-  // never crash, never lose a kept track, never claim false failure.
+  // When a flow has no real work for the missing API, it must degrade
+  // gracefully on a provider that lacks it — never crash, never lose a kept
+  // track, never claim false failure. But when there IS work only the
+  // missing API could do, the flow must surface its normal failure path —
+  // silent success would clear buffers and local state for work that never
+  // happened.
 
   test('keepTrack on a minimal provider creates the companion and loses nothing', async () => {
     const minimal = makeMinimalProvider();
@@ -1698,5 +1702,144 @@ describe('useMusicProvider — observable state', () => {
     // Unreadable contents read as empty — nothing to remove, still a success.
     expect(cleared).toBe(true);
     expect(removeFromPlaylist).not.toHaveBeenCalled();
+  });
+
+  test('saveSiftedPlaylist surfaces a missing addToPlaylist instead of claiming success', async () => {
+    // An existing companion plus tracks to add is real work only
+    // addToPlaylist can do — its absence must fail the save, not clear
+    // pendingKeeps for keeps that never landed.
+    const minimal = makeMinimalProvider({
+      loadPlaylists: jest.fn().mockResolvedValue([
+        { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 0 },
+      ]),
+    });
+    mockActiveProvider = minimal;
+    renderHarness([mockTrack]);
+
+    await act(async () => {
+      sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
+    });
+    await act(async () => {
+      await api.saveSiftedPlaylist('My Playlist', [mockTrack]);
+    });
+
+    expect(sift.state.removalPlaylistError).toBe(
+      'This provider does not support adding to playlists',
+    );
+    expect(sift.state.removalPlaylistCreated).toBe(false);
+    expect(sift.state.pendingKeeps.map((t) => t.id)).toEqual(['1']);
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      { tags: { flow: 'save-sifted-playlist' } },
+    );
+  });
+
+  test('saveSiftedPlaylist without addToPlaylist still succeeds when every keep already landed', async () => {
+    // Every kept track is already in the companion — there is no work for
+    // the missing API, so this remains a genuine success.
+    const minimal = makeMinimalProvider({
+      loadPlaylists: jest.fn().mockResolvedValue([
+        { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
+      ]),
+      loadPlaylistTracks: jest.fn().mockResolvedValue([mockTrack]),
+    });
+    mockActiveProvider = minimal;
+    renderHarness([mockTrack]);
+
+    await act(async () => {
+      sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
+    });
+    await act(async () => {
+      await api.saveSiftedPlaylist('My Playlist', [mockTrack]);
+    });
+
+    expect(sift.state.removalPlaylistCreated).toBe(true);
+    expect(sift.state.removalPlaylistError).toBeNull();
+    expect(sift.state.pendingKeeps).toEqual([]);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  test('keepTrack without addToPlaylist buffers the keep instead of recording it as landed', async () => {
+    // The companion already exists (known id), so the keep needs a direct
+    // add. With no addToPlaylist the track must land in pendingKeeps — not
+    // in the contents cache, which would silently drop it forever.
+    const minimal = makeMinimalProvider();
+    mockActiveProvider = minimal;
+    renderHarness([mockTrack]);
+    await setPlaylistSource();
+    await act(async () => {
+      sift.dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: 'known-id' });
+    });
+
+    await act(async () => {
+      await api.keepTrack(mockTrack);
+    });
+    expect(sift.state.pendingKeeps.map((t) => t.id)).toEqual(['1']);
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'This provider does not support adding to playlists' }),
+      { tags: { flow: 'keep-track' } },
+    );
+  });
+
+  test('keepTrack without addToPlaylist is a no-op when the track already landed', async () => {
+    // The duplicate guard finds the track already present — nothing left
+    // for the missing API to do, so nothing is buffered or captured.
+    const minimal = makeMinimalProvider({
+      loadPlaylistTracks: jest.fn().mockResolvedValue([mockTrack]),
+    });
+    mockActiveProvider = minimal;
+    renderHarness([mockTrack]);
+    await setPlaylistSource();
+    await act(async () => {
+      sift.dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: 'known-id' });
+    });
+
+    await act(async () => {
+      await api.keepTrack(mockTrack);
+    });
+    expect(sift.state.pendingKeeps).toEqual([]);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  test('clearSiftedPlaylist without removeFromPlaylist fails when tracks remain', async () => {
+    // Tracks are present and cannot be removed — reporting success would
+    // let callers wipe the local state needed to reconcile the leftover.
+    const minimal = makeMinimalProvider({
+      loadPlaylists: jest.fn().mockResolvedValue([
+        { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
+      ]),
+      loadPlaylistTracks: jest.fn().mockResolvedValue([mockTrack]),
+    });
+    mockActiveProvider = minimal;
+    renderHarness([mockTrack]);
+
+    let cleared = true;
+    await act(async () => {
+      cleared = await api.clearSiftedPlaylist('My Playlist');
+    });
+    expect(cleared).toBe(false);
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'This provider does not support removing from playlists' }),
+      { tags: { flow: 'clear-sifted-playlist' } },
+    );
+  });
+
+  test('clearSiftedPlaylist without removeFromPlaylist still succeeds on an empty companion', async () => {
+    const minimal = makeMinimalProvider({
+      loadPlaylists: jest.fn().mockResolvedValue([
+        { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 0 },
+      ]),
+      loadPlaylistTracks: jest.fn().mockResolvedValue([]),
+    });
+    mockActiveProvider = minimal;
+    renderHarness([mockTrack]);
+
+    let cleared = false;
+    await act(async () => {
+      cleared = await api.clearSiftedPlaylist('My Playlist');
+    });
+    // Readable and empty — no work for the missing API, still a success.
+    expect(cleared).toBe(true);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 });

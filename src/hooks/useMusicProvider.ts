@@ -474,7 +474,14 @@ export function useMusicProvider() {
             .filter((t) => !existingIds.has(t.id) && !existingIdentities.has(trackIdentity(t)))
             .map((t) => t.id);
           if (newTrackIDs.length > 0) {
-            await providerRef.current.addToPlaylist?.(existing.id, newTrackIDs);
+            // A provider without addToPlaylist cannot land these tracks.
+            // Optional-chaining past the gap would report success and clear
+            // pendingKeeps for keeps that never happened — throw into the
+            // normal failure path so the snapshot stays buffered for retry.
+            if (!providerRef.current.addToPlaylist) {
+              throw new Error('This provider does not support adding to playlists');
+            }
+            await providerRef.current.addToPlaylist(existing.id, newTrackIDs);
           }
         } else {
           await providerRef.current.createPlaylist(siftedName, keptTracks.map((t) => t.id));
@@ -614,7 +621,14 @@ export function useMusicProvider() {
             }
             const contents = siftedContentsRef.current;
             if (!contents.has(track.id) && !contents.has(trackIdentity(track))) {
-              await providerRef.current.addToPlaylist?.(siftedPlaylistIdRef.current, [track.id]);
+              // Without addToPlaylist the keep cannot land — recording it in
+              // the contents cache anyway would silently drop the track.
+              // Throw into the normal failure path so it gets buffered and
+              // retried by the Done screen's saveSiftedPlaylist flush.
+              if (!providerRef.current.addToPlaylist) {
+                throw new Error('This provider does not support adding to playlists');
+              }
+              await providerRef.current.addToPlaylist(siftedPlaylistIdRef.current, [track.id]);
               contents.add(track.id);
               contents.add(trackIdentity(track));
             }
@@ -706,7 +720,14 @@ export function useMusicProvider() {
         if (sifted) {
           const tracks = await providerRef.current.loadPlaylistTracks?.(sifted.id) ?? [];
           if (tracks.length > 0) {
-            await providerRef.current.removeFromPlaylist?.(sifted.id, tracks.map((t) => t.id));
+            // Tracks are present but a provider without removeFromPlaylist
+            // cannot clear them. Returning true here would let callers wipe
+            // the local state needed to reconcile the leftover playlist —
+            // throw into the normal failure path so this reports false.
+            if (!providerRef.current.removeFromPlaylist) {
+              throw new Error('This provider does not support removing from playlists');
+            }
+            await providerRef.current.removeFromPlaylist(sifted.id, tracks.map((t) => t.id));
           }
         }
         return true;
