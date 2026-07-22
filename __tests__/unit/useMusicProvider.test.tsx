@@ -56,9 +56,14 @@ jest.mock('../../src/services/RemovalHistoryStore', () => ({
   clearHistoryForSource: jest.fn(() => Promise.resolve()),
 }));
 
-// Mock Alert
+// Mock Alert. React Native's index re-exports this module via `.default`,
+// so the mock must provide that key — a bare { alert } object makes the
+// `import { Alert }` in the hook resolve to undefined, and every
+// Alert.alert call would throw a TypeError instead of alerting (silently
+// rerouting the auth-denial flows through their catch blocks).
 jest.mock('react-native/Libraries/Alert/Alert', () => ({
-  alert: jest.fn(),
+  __esModule: true,
+  default: { alert: jest.fn() },
 }));
 
 const mockTrack: Track = {
@@ -1166,6 +1171,9 @@ describe('useMusicProvider', () => {
     // be buffered via ADD_PENDING_KEEP, not silently dropped.
     expect(getByTestId('probe-pending-keeps').props.children).toBe('1');
     expect(mockProvider.createPlaylist).toHaveBeenCalledTimes(1);
+    // And no zombie work: once unmounted, the retry loop must stop querying
+    // the provider (initial lookup + the one pre-unmount retry attempt).
+    expect(mockProvider.loadPlaylists).toHaveBeenCalledTimes(2);
   });
 
   test('keepTrack buffers the track when the playlist add throws', async () => {
