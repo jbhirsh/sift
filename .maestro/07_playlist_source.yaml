@@ -9,8 +9,10 @@ name: "Playlist Source - Select and Sift"
 - waitForAnimationToEnd
 
 # Verify setup screen
-- assertVisible:
-    id: "setup-brand"
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
 
 # Tap "Playlist" in the source picker
 - tapOn:

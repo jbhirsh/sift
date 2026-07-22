@@ -8,8 +8,10 @@ name: "App Launch - Setup Screen"
 
 - waitForAnimationToEnd
 
-- assertVisible:
-    id: "setup-brand"
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
 
 # Verify provider selector is visible (Apple Music selected by default)
 - assertVisible: "Apple Music"

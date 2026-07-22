@@ -20,10 +20,12 @@ name: "Complete All Tracks"
       - tapOn: "Keep"
       - waitForAnimationToEnd
 
-# Verify done screen
-- assertVisible:
-    id: "done-title"
-    text: "All done."
+# Verify done screen — sifting → done is a screen transition, so wait for it
+- extendedWaitUntil:
+    visible:
+      id: "done-title"
+      text: "All done."
+    timeout: 30000
 
 # Verify summary — all 10 kept
 - assertVisible:

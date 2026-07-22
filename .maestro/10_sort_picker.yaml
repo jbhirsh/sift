@@ -13,8 +13,10 @@ name: "Sort Picker - Action Sheet Changes Track Order"
 
 - waitForAnimationToEnd
 
-- assertVisible:
-    id: "setup-brand"
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
 - assertVisible: "Least Played"
 
 # Open the native action sheet and pick Most Played

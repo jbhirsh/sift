@@ -9,8 +9,10 @@ name: "Setup to Sifting - Full Flow"
 - waitForAnimationToEnd
 
 # Verify setup screen
-- assertVisible:
-    id: "setup-brand"
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
 
 # Tap start to begin sifting
 - tapOn: "Start Sifting"
