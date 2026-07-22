@@ -53,6 +53,16 @@ export default function DoneScreen() {
   useEffect(() => {
     isCreatingPlaylistRef.current = state.isCreatingPlaylist;
   }, [state.isCreatingPlaylist]);
+  // The "Copied!" toast reset timer must not outlive the screen: an
+  // uncleared timeout fires setState on an unmounted component and holds
+  // the process open (surfaced as Jest's "did not exit" warning). Same
+  // pattern as settleTimeoutRef in SiftScreen.
+  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
+    };
+  }, []);
 
   const isAppleMusicLibrary = state.source.type === 'library' && state.provider === 'apple-music';
   const sourceLabel = state.source.type === 'playlist'
@@ -102,7 +112,10 @@ export default function DoneScreen() {
       .join('\n');
     Clipboard.setString(text);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    // Re-presses restart the 2s window instead of letting the first
+    // press's timer hide the toast early.
+    if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
+    copiedTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
   }, [state.removed]);
 
   const handleRestore = useCallback(

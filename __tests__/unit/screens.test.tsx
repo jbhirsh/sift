@@ -974,6 +974,41 @@ describe('DoneScreen', () => {
     expect(getByText('Copied!')).toBeTruthy();
   });
 
+  test('copy toast reset timer is cleared on unmount', () => {
+    // Regression: the 2s "Copied!" reset timeout leaked past unmount,
+    // firing setState on an unmounted screen and holding the process open
+    // (Jest's "did not exit one second after the test run" warning).
+    jest.useFakeTimers();
+    try {
+      const DecideThenDone = () => {
+        const { decide, state } = useSift();
+        React.useEffect(() => { decide('remove'); }, [decide]);
+        if (state.removed.length === 0) return null;
+        return <DoneScreen />;
+      };
+      const { getByText, unmount } = renderWithProviders(<DecideThenDone />, { initialTracks: tracks });
+      // Spy on the timer pair rather than counting pending timers — the
+      // press also schedules framework-internal timers, so identify the
+      // toast timer by its unique 2000ms delay and assert that exact
+      // handle is what unmount clears.
+      const setSpy = jest.spyOn(globalThis, 'setTimeout');
+      const clearSpy = jest.spyOn(globalThis, 'clearTimeout');
+      try {
+        fireEvent.press(getByText('Copy List'));
+        const toastCallIndex = setSpy.mock.calls.findIndex((call) => call[1] === 2000);
+        expect(toastCallIndex).toBeGreaterThanOrEqual(0);
+        const toastHandle = setSpy.mock.results[toastCallIndex].value;
+        unmount();
+        expect(clearSpy).toHaveBeenCalledWith(toastHandle);
+      } finally {
+        setSpy.mockRestore();
+        clearSpy.mockRestore();
+      }
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   test('Done fallback saves only buffered keeps, never the whole kept list', async () => {
     // Regression: replaying the full kept list double-added tracks whose
     // Apple Music id changed between keep-time (catalog) and playlist
