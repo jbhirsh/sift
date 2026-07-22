@@ -175,13 +175,32 @@ jobs:
 
       # Ground truth on where this Maestro version writes debug output —
       # two artifact-capture attempts have come up empty against the
-      # documented paths.
+      # documented paths. This step is also the guaranteed-evidence fallback:
+      # when the XCUITest driver times out at startup, Maestro dies before any
+      # flow runs and writes nothing (empty maestro-debug, no junit report, no
+      # ~/.maestro/tests), so the probes below land in the artifact
+      # (diagnostics.txt) alongside a simulator log tail. That guarantee of a
+      # non-empty, meaningful artifact is what lets the upload step keep
+      # `if-no-files-found: error` strict. Diagnostics must never themselves
+      # fail — every command here is guarded.
       - name: Locate Maestro output (diagnostics)
         if: failure()
         run: |
-          echo "=== CWD candidates ==="; find . -maxdepth 2 \( -name 'maestro-*' -o -name '*.png' -o -name 'debug*' \) -not -path './node_modules/*' 2>/dev/null | head -20
-          echo "=== HOME/.maestro ==="; find "$HOME/.maestro" -maxdepth 3 2>/dev/null | head -30
-          echo "=== junit report ==="; ls -la maestro-report.xml 2>/dev/null && head -50 maestro-report.xml
+          mkdir -p maestro-debug
+          {
+            echo "=== CWD candidates ==="
+            find . -maxdepth 2 \( -name 'maestro-*' -o -name '*.png' -o -name 'debug*' \) -not -path './node_modules/*' 2>/dev/null | head -20 || true
+            echo "=== HOME/.maestro ==="
+            find "$HOME/.maestro" -maxdepth 3 2>/dev/null | head -30 || true
+            echo "=== junit report ==="
+            if [ -f maestro-report.xml ]; then
+              ls -la maestro-report.xml || true
+              head -50 maestro-report.xml || true
+            else
+              echo "maestro-report.xml not written — likely driver startup failure"
+            fi
+          } 2>&1 | tee maestro-debug/diagnostics.txt || true
+          xcrun simctl spawn booted log show --style compact --last 10m 2>/dev/null | tail -300 > maestro-debug/simulator-log-tail.txt || true
 
       - name: Upload Maestro debug artifacts
         if: failure()
