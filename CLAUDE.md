@@ -130,8 +130,9 @@ Makefile                Dev commands (test, lint, typecheck, check)
   typecheck, and Jest with coverage on Ubuntu on every PR. The Maestro iOS
   E2E job (macOS) also runs on every PR and push to main, with
   `workflow_dispatch` available for manual runs.
-- Claude Code PR review + auto-fix workflows live alongside it
-  (`.github/workflows/claude-review.yml`, `claude-autofix.yml`).
+- The Claude Code PR review runs as the `review` job inside `ci.yml`
+  (dependent on the `check` job, pull requests only); the auto-fix workflow
+  lives alongside it in `.github/workflows/claude-autofix.yml`.
 - All changes reach main via PR — never by pushing directly.
 
 ---
