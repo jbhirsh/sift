@@ -27,8 +27,10 @@ name: "Save Failure Shows Retry, Retry Recovers"
 
 - waitForAnimationToEnd
 
-- assertVisible:
-    id: "setup-brand"
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
 
 # Pick the already-sifted playlist (companion pre-seeded in the mock)
 - tapOn:

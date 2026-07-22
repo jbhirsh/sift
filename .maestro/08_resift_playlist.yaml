@@ -11,8 +11,10 @@ name: "Re-sift an Already-Sifted Playlist"
 
 - waitForAnimationToEnd
 
-- assertVisible:
-    id: "setup-brand"
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
 
 # Pick the already-sifted playlist
 - tapOn:

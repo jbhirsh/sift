@@ -8,8 +8,10 @@ name: "Sift Decisions - Keep, Remove, Skip"
 
 - waitForAnimationToEnd
 
-- assertVisible:
-    id: "setup-brand"
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
 
 - tapOn: "Start Sifting"
 

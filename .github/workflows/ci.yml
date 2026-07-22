@@ -158,6 +158,20 @@ jobs:
       - name: Install app on simulator
         run: xcrun simctl install booted build/e2e/*.app
 
+      # Warm the app before the suite runs. Maestro executes the suite's
+      # flows in a non-deterministic order (observed: a 00_-prefixed flow ran
+      # mid-suite, not first), so a warmup *flow* cannot guarantee it primes
+      # ahead of the first real flow. Do it here instead: a plain
+      # launch + settle + terminate loads the baked JS bundle and warms the
+      # dyld/simulator caches, cutting the cold-start latency the flake
+      # clusters on. Best effort — a warmup hiccup must never fail the job,
+      # and the first real flow's clearState wipes any residual state.
+      - name: Warm up the app (prime caches before the suite)
+        run: |
+          xcrun simctl launch booted com.jessicahirsh.sift || true
+          sleep 25
+          xcrun simctl terminate booted com.jessicahirsh.sift || true
+
       - name: Run Maestro tests
         env:
           # GitHub-hosted macOS runners can be slow enough that the XCUITest
@@ -201,6 +215,19 @@ jobs:
             fi
           } 2>&1 | tee maestro-debug/diagnostics.txt || true
           xcrun simctl spawn booted log show --style compact --last 10m 2>/dev/null | tail -300 > maestro-debug/simulator-log-tail.txt || true
+          # Which SCREEN was up when the wait timed out? Everything above proves
+          # the app is alive but not WHERE it was — a 30s card-wait timeout
+          # looks identical whether we stalled on Loading (a real stall) or were
+          # already on Sifting with the element merely unseen (transition flake).
+          # A screenshot disambiguates the two and is captured straight off the
+          # simulator, so it works regardless of Maestro's debug-output quirks
+          # and guarantees the artifact is non-empty on any in-flow failure.
+          xcrun simctl io booted screenshot maestro-debug/failure-screenshot.png || true
+          # Maestro writes per-flow screenshots + view hierarchies (its XCUITest
+          # accessibility snapshot) on failure, but the directory varies by
+          # version; copy whatever landed under ~/.maestro/tests into the folder
+          # so the UI hierarchy at the point of failure travels with the shot.
+          cp -R "$HOME/.maestro/tests" maestro-debug/maestro-tests 2>/dev/null || true
 
       - name: Upload Maestro debug artifacts
         if: failure()
