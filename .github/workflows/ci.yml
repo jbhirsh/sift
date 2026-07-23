@@ -3,18 +3,8 @@ name: CI
 on:
   pull_request:
     branches: [main]
-    paths-ignore:
-      - '*.md'
-      - 'docs/**'
-      - '.github/**/*.md'
-      - 'LICENSE'
   push:
     branches: [main]
-    paths-ignore:
-      - '*.md'
-      - 'docs/**'
-      - '.github/**/*.md'
-      - 'LICENSE'
   workflow_dispatch:
 
 concurrency:
@@ -28,9 +18,27 @@ jobs:
   check:
     name: Lint, Typecheck & Unit Test
     runs-on: ubuntu-latest
+    # Expose whether any non-docs file changed so the expensive macOS `e2e`
+    # job below can skip docs-only PRs. Kept as a step in this existing job
+    # (not a separate job) so it adds no extra status check — and because
+    # `check` itself always runs, the required check is never left pending on a
+    # docs-only PR the way a workflow-level `paths-ignore` did.
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
 
     steps:
       - uses: actions/checkout@v7
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - '**'
+              - '!*.md'
+              - '!docs/**'
+              - '!.github/**/*.md'
+              - '!LICENSE'
 
       - uses: actions/setup-node@v7
         with:
@@ -55,6 +63,9 @@ jobs:
   e2e:
     name: E2E Tests (Maestro)
     needs: check
+    # Skip the ~30-min macOS build on docs-only changes (the required `check`
+    # still runs and gates the merge). Always runs on manual dispatch.
+    if: needs.check.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
     # Runs on GitHub-hosted macOS (free on public repos) on every PR and push
     # to main. A cold run rebuilds the simulator app (~20-30 min); warm runs
     # restore it from actions/cache keyed on the project fingerprint, or reuse
