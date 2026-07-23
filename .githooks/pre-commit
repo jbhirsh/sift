@@ -1,5 +1,17 @@
-#!/bin/bash
-# Pre-commit hook: enforce unit test line coverage threshold.
-# Install: git config core.hooksPath .githooks
+#!/bin/sh
+# Fast local sensors before a commit — the static half of CI (lint + typecheck),
+# so failures surface here instead of after a push. The slower coverage suite
+# runs in pre-push; the full matrix runs in CI.
+# Install: git config core.hooksPath .githooks (done automatically by the
+# package.json "prepare" script on `npm install`).
+#
+# No-op in CI: the CI jobs run these checks as explicit steps, and the
+# claude-autofix agent commits from inside a CI job (`npm ci`, then commit) —
+# the hook must not fire on its commits.
+[ -n "$CI" ] && exit 0
 
-exec "$(git rev-parse --show-toplevel)/scripts/check_coverage.sh"
+set -e
+echo "▶ pre-commit: lint"
+npm run lint
+echo "▶ pre-commit: typecheck"
+npm run typecheck

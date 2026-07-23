@@ -1,0 +1,10 @@
+#!/bin/sh
+# Full pre-flight before code leaves the machine — the half of CI too slow to
+# run on every commit: the Jest suite under the coverage thresholds CI enforces
+# (jest.config.js). sift has no lightweight JS bundle build to add here — the
+# only build is the native iOS build, which runs in its own macOS CI job.
+#
+# No-op in CI (see pre-commit).
+[ -n "$CI" ] && exit 0
+
+exec "$(git rev-parse --show-toplevel)/scripts/check_coverage.sh"
