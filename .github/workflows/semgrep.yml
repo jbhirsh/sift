@@ -1,0 +1,65 @@
+# Static analysis (Semgrep SAST). Complements the other sensors — gitleaks
+# catches committed secrets, mutation.yml probes assertion depth — by scanning
+# source for insecure or bug-prone patterns (tainted paths, unsafe React
+# Native / JS idioms, injection sinks) that lint and the Claude review don't
+# systematically enforce.
+#
+# Two placements (same pattern as gitleaks.yml / mutation.yml):
+#   - Pull requests: scan the tree and BLOCK the merge on any finding, so a new
+#     insecure pattern can't land on main. `--error` makes Semgrep exit
+#     non-zero when findings exist, turning the scan into a red check.
+#   - Weekly schedule (+ manual dispatch): full sweep as a drift sensor. The
+#     registry's `auto` rules evolve, so a scheduled re-scan surfaces newly
+#     published rules that match already-merged code even when no PR is open.
+#     The tree was verified clean (0 findings) when this was added.
+#
+# Scan-only by design: this workflow is purely a gate. It does NOT run the
+# Claude-autofix loop that BoardGames' semgrep-autofix.yml uses — that agent
+# turns already-merged findings into fix PRs and needs write scopes plus
+# CLAUDE_CODE_OAUTH_TOKEN. Keeping this a self-contained, deterministic check
+# is the right shape for a blocking PR gate; a fix-generating loop can be added
+# later as a separate scheduled workflow if desired.
+#
+# No SEMGREP_APP_TOKEN is needed: the free CLI with `--config auto` pulls the
+# public registry rulesets anonymously. If a real false positive ever appears,
+# triage it precisely (a targeted entry in a `.semgrepignore` path glob or a
+# tuned rule), never a blanket disable.
+name: Semgrep
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+# Read-only: findings surface via the job log and the non-zero exit code that
+# fails the check. No PR comments, so no write scopes are needed.
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    name: SAST scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Semgrep
+        run: pipx install semgrep
+
+      # Scan the app's own source only (src, __tests__, the custom native
+      # module, and the entry point) — not node_modules, generated build
+      # output, or the .maestro flows. `--error` exits non-zero on any finding
+      # so this step blocks the PR; `--config auto` selects registry rulesets
+      # by language with no token.
+      - name: Run Semgrep
+        run: semgrep scan --config auto --error src __tests__ modules index.ts
