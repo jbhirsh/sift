@@ -19,7 +19,7 @@ npx expo start       # subsequent launches (use after first build)
 ---
 
 ## Test Commands
-**Always run tests before committing.**
+**Run lint + typecheck before every commit; run the test suite before every push.**
 
 ```bash
 make test            # unit tests (Jest)
@@ -28,14 +28,17 @@ make typecheck       # TypeScript type checking
 make check           # lint + typecheck + tests (all three)
 ```
 
-Tests must be green before any commit. Always re-run tests before committing —
-especially when test files were modified.
+The local git hooks (installed by the `prepare` script via `core.hooksPath`)
+enforce this in two stages: **pre-commit** runs lint + typecheck, and
+**pre-push** runs the unit-test suite under coverage — so tests must be green
+before code leaves the machine, rather than on every commit. Both hooks no-op
+when `$CI` is set. Re-run the suite yourself when you touch test files.
 
 **Testing pyramid:**
 
 | Layer | What it tests | Speed | When to use |
 |-------|--------------|-------|-------------|
-| Unit tests (`make test`) | Reducers, utils, hooks, services | Seconds | Every commit + CI |
+| Unit tests (`make test`) | Reducers, utils, hooks, services | Seconds | Every push + CI |
 | E2E tests (`make test-e2e`) | Full app flows | Minutes | PR time (Maestro flows in `.maestro/`) |
 | Mutation tests (`make test-mutation`) | Assertion depth of unit tests (Stryker) | Minutes–hour | PR time (changed files) + weekly full sweep (`mutation.yml`) |
 
