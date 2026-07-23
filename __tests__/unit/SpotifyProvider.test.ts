@@ -32,6 +32,10 @@ jest.mock('../../src/services/spotify/SpotifyAPI', () => ({
     },
   ]),
   createPlaylist: jest.fn().mockResolvedValue(undefined),
+  removeFromLibrary: jest.fn().mockResolvedValue(undefined),
+  removeFromPlaylist: jest.fn().mockResolvedValue(undefined),
+  addToLibrary: jest.fn().mockResolvedValue(undefined),
+  addToPlaylist: jest.fn().mockResolvedValue(undefined),
   loadPlaylists: jest.fn().mockResolvedValue([
     { id: 'pl1', name: 'Chill', trackCount: 20, artworkURL: 'https://img.spotify.com/pl1.jpg' },
     { id: 'pl2', name: 'Workout', trackCount: 10 },
@@ -203,5 +207,76 @@ describe('SpotifyProvider', () => {
   test('loadPlaylistTracks throws when not authenticated', async () => {
     (SpotifyAuth.getAccessToken as jest.Mock).mockResolvedValueOnce(null);
     await expect(provider.loadPlaylistTracks('pl1')).rejects.toThrow('not authenticated');
+  });
+
+  test('removeFromLibrary refreshes token and delegates to the API', async () => {
+    await provider.removeFromLibrary(['t1', 't2']);
+    expect(SpotifyAuth.refreshTokenIfNeeded).toHaveBeenCalled();
+    expect(SpotifyAPI.removeFromLibrary).toHaveBeenCalledWith('test-token', ['t1', 't2']);
+  });
+
+  test('removeFromLibrary throws when not authenticated', async () => {
+    (SpotifyAuth.getAccessToken as jest.Mock).mockResolvedValueOnce(null);
+    await expect(provider.removeFromLibrary(['t1'])).rejects.toThrow('not authenticated');
+  });
+
+  test('removeFromPlaylist refreshes token and delegates to the API', async () => {
+    await provider.removeFromPlaylist('pl1', ['t1']);
+    expect(SpotifyAuth.refreshTokenIfNeeded).toHaveBeenCalled();
+    expect(SpotifyAPI.removeFromPlaylist).toHaveBeenCalledWith('test-token', 'pl1', ['t1']);
+  });
+
+  test('removeFromPlaylist throws when not authenticated', async () => {
+    (SpotifyAuth.getAccessToken as jest.Mock).mockResolvedValueOnce(null);
+    await expect(provider.removeFromPlaylist('pl1', ['t1'])).rejects.toThrow('not authenticated');
+  });
+
+  test('addToLibrary refreshes token and delegates to the API', async () => {
+    await provider.addToLibrary(['t1', 't2']);
+    expect(SpotifyAuth.refreshTokenIfNeeded).toHaveBeenCalled();
+    expect(SpotifyAPI.addToLibrary).toHaveBeenCalledWith('test-token', ['t1', 't2']);
+  });
+
+  test('addToLibrary throws when not authenticated', async () => {
+    (SpotifyAuth.getAccessToken as jest.Mock).mockResolvedValueOnce(null);
+    await expect(provider.addToLibrary(['t1'])).rejects.toThrow('not authenticated');
+  });
+
+  test('addToPlaylist refreshes token and delegates to the API', async () => {
+    await provider.addToPlaylist('pl1', ['t1']);
+    expect(SpotifyAuth.refreshTokenIfNeeded).toHaveBeenCalled();
+    expect(SpotifyAPI.addToPlaylist).toHaveBeenCalledWith('test-token', 'pl1', ['t1']);
+  });
+
+  test('addToPlaylist throws when not authenticated', async () => {
+    (SpotifyAuth.getAccessToken as jest.Mock).mockResolvedValueOnce(null);
+    await expect(provider.addToPlaylist('pl1', ['t1'])).rejects.toThrow('not authenticated');
+  });
+
+  test('playback status updates are reflected in getPlaybackState', async () => {
+    await provider.loadLibrary();
+    await provider.play('1');
+
+    // Grab the listener the provider registered and drive a status update
+    // through it, exercising the handlePlaybackStatus callback.
+    const statusCalls = mockPlayer.addListener.mock.calls.filter(
+      ([event]) => event === 'playbackStatusUpdate',
+    );
+    expect(statusCalls.length).toBeGreaterThan(0);
+    const onStatus = statusCalls[0][1] as (s: { currentTime: number; playing: boolean }) => void;
+
+    onStatus({ currentTime: 42, playing: true });
+
+    const state = provider.getPlaybackState();
+    expect(state.position).toBe(42);
+    expect(state.isPlaying).toBe(true);
+  });
+
+  test('playing a new track removes the previous player', async () => {
+    await provider.loadLibrary();
+    await provider.play('1');
+    // Second play must tear down the existing player before creating a new one.
+    await provider.play('1');
+    expect(mockPlayer.remove).toHaveBeenCalled();
   });
 });
