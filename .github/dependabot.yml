@@ -1,11 +1,18 @@
 version: 2
 updates:
+  # Pinned to the shared Monday 06:00 UTC sweep slot (gitleaks.yml,
+  # mutation.yml, semgrep.yml) so all weekly robot output — dependency bumps
+  # and scheduled scans alike — lands together on Monday morning instead of at
+  # whatever time Dependabot's default weekly window happens to fire.
   - package-ecosystem: "npm"
     directory: "/"
     assignees:
       - jbhirsh
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -13,3 +20,6 @@ updates:
       - jbhirsh
     schedule:
       interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Etc/UTC"
