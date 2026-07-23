@@ -1,7 +1,8 @@
 #!/bin/sh
-# Fast local sensors before a commit — the static half of CI (lint + typecheck),
-# so failures surface here instead of after a push. The slower coverage suite
-# runs in pre-push; the full matrix runs in CI.
+# Fast local sensors before a commit — the static half of CI (lint + typecheck
+# + dependency-cruiser layering rules), so failures surface here instead of
+# after a push. The slower coverage suite runs in pre-push; the full matrix
+# runs in CI.
 # Install: git config core.hooksPath .githooks (done automatically by the
 # package.json "prepare" script on `npm install`).
 #
@@ -15,3 +16,5 @@ echo "▶ pre-commit: lint"
 npm run lint
 echo "▶ pre-commit: typecheck"
 npm run typecheck
+echo "▶ pre-commit: depcruise"
+npm run depcruise

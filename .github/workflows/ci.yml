@@ -58,6 +58,9 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      - name: Dependency graph
+        run: npx depcruise src
+
       - name: Test with coverage
         run: npx jest --coverage
 

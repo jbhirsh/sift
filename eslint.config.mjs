@@ -5,7 +5,7 @@ import eslintComments from '@eslint-community/eslint-plugin-eslint-comments';
 
 export default tseslint.config(
   {
-    ignores: ['node_modules/', 'ios/', 'android/', '.expo/', '*.config.js'],
+    ignores: ['node_modules/', 'ios/', 'android/', '.expo/', '*.config.js', '.dependency-cruiser.cjs'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.strict,
