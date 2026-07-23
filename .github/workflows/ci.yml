@@ -52,16 +52,13 @@ jobs:
         run: npx expo-doctor@latest
         continue-on-error: true
 
-  build:
-    name: Build E2E Simulator App
+  e2e:
+    name: E2E Tests (Maestro)
     needs: check
-    # Build the simulator .app ONCE here, then fan it out to the sharded e2e
-    # jobs below (R4 in the CI perf report). Previously ci.yml's e2e job and
-    # ios-build.yml each cold-built the *identical* e2e-simulator profile
-    # (~13 min each), and the sequential 11-flow Maestro suite couldn't be
-    # parallelized because every shard would have had to rebuild. Building
-    # once and uploading the extracted .app lets the e2e shards download it
-    # (~1 min) instead of rebuilding.
+    # Runs on GitHub-hosted macOS (free on public repos) on every PR and push
+    # to main. A cold run rebuilds the simulator app (~20-30 min); warm runs
+    # restore it from actions/cache keyed on the project fingerprint, or reuse
+    # the ios-build artifact for the same head SHA (~1 min).
     # Caveat: the build step needs EXPO_TOKEN, which dependabot-triggered PRs
     # don't receive (they read Dependabot secrets, not Actions secrets) — on a
     # cache miss those PRs fail here until the token is mirrored into
@@ -136,102 +133,6 @@ jobs:
           mkdir -p build/e2e
           tar -xzf build/Sift-e2e.tar.gz -C build/e2e
 
-      # Re-tar the extracted .app into a single artifact for the e2e shards.
-      # Whichever path populated build/e2e (cache restore, ios-build reuse, or
-      # a fresh eas build), the .app now lives there — package it so every
-      # shard downloads the same binary instead of rebuilding.
-      - name: Package app for E2E shards
-        run: tar -czf sift-e2e-app.tar.gz -C build/e2e .
-
-      - name: Upload built app for E2E shards
-        uses: actions/upload-artifact@v7
-        with:
-          name: sift-e2e-app
-          path: sift-e2e-app.tar.gz
-          if-no-files-found: error
-          retention-days: 7
-
-  e2e:
-    name: E2E Tests (Maestro shard ${{ matrix.shard }})
-    needs: [check, build]
-    # Runs on GitHub-hosted macOS (free on public repos) on every PR and push
-    # to main. Each shard downloads the single .app built by the `build` job
-    # above (~1 min) — no shard rebuilds.
-    #
-    # Sharded Maestro suite (R2 in the CI perf report): the 11 flows used to
-    # run sequentially on one simulator, a ~14-min cache-independent floor that
-    # a warm build cache could not touch. They're now split across 3 parallel
-    # shards (~4-5 min of Maestro each). 3 shards balances parallelism against
-    # GitHub's concurrent macOS-runner limit — oversharding just queues behind
-    # that cap and negates the win; the perf report found 3-4 the sweet spot.
-    # Each shard still boots its own simulator and warms the app, so per-shard
-    # fixed overhead is the floor on the return.
-    #
-    # fail-fast: false so one failing shard never cancels its siblings — we
-    # want every shard's failures surfaced, consistent with the no-retry /
-    # fail-loudly doctrine. This is NOT a retry (no --retry, no re-run); it
-    # only stops the first failure from hiding the others.
-    #
-    # Flow-to-shard split — the union is exactly the 11 flows, none dropped,
-    # none double-run. Balanced by rough duration: the longer flows
-    # (04_resume ~1m14s, 07_playlist, 09_save_failure, 11_removal ~1m27s) are
-    # spread across shards and padded with shorter ones (01/03/05/10) so each
-    # shard's wall-clock is roughly even (~4-5 min).
-    #   shard 1: 02_sift_flow, 03_sift_decisions, 05_complete_session,
-    #            11_removal_error
-    #   shard 2: 01_app_launch, 06_settings_modal, 07_playlist_source,
-    #            08_resift_playlist
-    #   shard 3: 04_resume_session, 09_save_failure_retry, 10_sort_picker
-    #
-    # Pinned (not macos-latest) so a runner-image migration can't silently
-    # change simulator/Xcode behavior; bump deliberately. macos-26 is the
-    # image the working builds resolve to (Xcode 26; Expo SDK 55 requires
-    # >=26 — macos-15's default Xcode 16.4 cannot compile expo-modules-core).
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - shard: 1
-            flows: >-
-              .maestro/02_sift_flow.yaml
-              .maestro/03_sift_decisions.yaml
-              .maestro/05_complete_session.yaml
-              .maestro/11_removal_error.yaml
-          - shard: 2
-            flows: >-
-              .maestro/01_app_launch.yaml
-              .maestro/06_settings_modal.yaml
-              .maestro/07_playlist_source.yaml
-              .maestro/08_resift_playlist.yaml
-          - shard: 3
-            flows: >-
-              .maestro/04_resume_session.yaml
-              .maestro/09_save_failure_retry.yaml
-              .maestro/10_sort_picker.yaml
-    runs-on: macos-26
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-
-      - run: npm ci
-
-      # Pull the app the `build` job produced instead of rebuilding it.
-      - name: Download built app
-        uses: actions/download-artifact@v7
-        with:
-          name: sift-e2e-app
-
-      - name: Unpack built app
-        run: |
-          mkdir -p build/e2e
-          tar -xzf sift-e2e-app.tar.gz -C build/e2e
-
       - name: Install Maestro
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
@@ -257,14 +158,14 @@ jobs:
       - name: Install app on simulator
         run: xcrun simctl install booted build/e2e/*.app
 
-      # Warm the app before the shard's flows run. Maestro executes flows in a
-      # non-deterministic order, so a warmup *flow* cannot guarantee it primes
+      # Warm the app before the suite runs. Maestro executes the suite's
+      # flows in a non-deterministic order (observed: a 00_-prefixed flow ran
+      # mid-suite, not first), so a warmup *flow* cannot guarantee it primes
       # ahead of the first real flow. Do it here instead: a plain
       # launch + settle + terminate loads the baked JS bundle and warms the
       # dyld/simulator caches, cutting the cold-start latency the flake
       # clusters on. Best effort — a warmup hiccup must never fail the job,
       # and the first real flow's clearState wipes any residual state.
-      # Replicated per shard because every shard boots its own fresh simulator.
       - name: Warm up the app (prime caches before the suite)
         run: |
           xcrun simctl launch booted com.jessicahirsh.sift || true
@@ -284,9 +185,7 @@ jobs:
           # No automatic retry: a retry would mask residual nondeterminism as
           # green runs. Every failure surfaces loudly with debug artifacts,
           # and the fix goes to the root cause, not another attempt.
-          # Only this shard's flows run here — the matrix carries the explicit
-          # flow-file list so the three shards together cover all 11 exactly.
-          maestro test --debug-output maestro-debug --format junit --output maestro-report.xml ${{ matrix.flows }}
+          maestro test --debug-output maestro-debug --format junit --output maestro-report.xml .maestro/
 
       # Ground truth on where this Maestro version writes debug output —
       # two artifact-capture attempts have come up empty against the
@@ -334,8 +233,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          # Per-shard name so parallel shards don't collide on one artifact.
-          name: maestro-debug-shard-${{ matrix.shard }}
+          name: maestro-debug
           # Maestro writes per-flow screenshots and view hierarchies under
           # ~/.maestro/tests regardless of --debug-output on some versions;
           # capture both, and fail loudly if neither exists — an empty debug
