@@ -3,18 +3,8 @@ name: CI
 on:
   pull_request:
     branches: [main]
-    paths-ignore:
-      - '*.md'
-      - 'docs/**'
-      - '.github/**/*.md'
-      - 'LICENSE'
   push:
     branches: [main]
-    paths-ignore:
-      - '*.md'
-      - 'docs/**'
-      - '.github/**/*.md'
-      - 'LICENSE'
   workflow_dispatch:
 
 concurrency:
@@ -25,6 +15,29 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # Detect whether any non-docs file changed. The fast `check` job (the
+  # required status check) always runs — path-filtering the whole workflow, as
+  # this once did, left that required check permanently pending on a docs-only
+  # PR and blocked its merge. Only the expensive macOS `e2e` job is gated on
+  # this, so docs PRs still get the required check but skip the ~30-min build.
+  changes:
+    name: Detect code changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - '**'
+              - '!*.md'
+              - '!docs/**'
+              - '!.github/**/*.md'
+              - '!LICENSE'
+
   check:
     name: Lint, Typecheck & Unit Test
     runs-on: ubuntu-latest
@@ -54,7 +67,10 @@ jobs:
 
   e2e:
     name: E2E Tests (Maestro)
-    needs: check
+    needs: [check, changes]
+    # Skip the ~30-min macOS build on docs-only changes (the required `check`
+    # still runs and gates the merge). Always runs on manual dispatch.
+    if: needs.changes.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
     # Runs on GitHub-hosted macOS (free on public repos) on every PR and push
     # to main. A cold run rebuilds the simulator app (~20-30 min); warm runs
     # restore it from actions/cache keyed on the project fingerprint, or reuse
