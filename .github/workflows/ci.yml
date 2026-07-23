@@ -69,6 +69,19 @@ jobs:
     # >=26 — macos-15's default Xcode 16.4 cannot compile expo-modules-core).
     runs-on: macos-26
     timeout-minutes: 60
+    # ccache tuning shared by every step in this job. Expo's USE_CCACHE=1 wires
+    # ccache into the pod/Xcode build (React Native's post_install sets CC/CXX/
+    # LD to its ccache-clang wrappers), but ccache reads its cache location and
+    # limits from the environment — so these must be exported here for the
+    # persisted cache (restored below) to actually be used. CCACHE_DIR is set
+    # per-step (needs $HOME expansion) via GITHUB_ENV in "Set up ccache".
+    # SLOPPINESS mirrors React Native's bundled scripts/xcode/ccache.conf (a
+    # superset of the requested clang_index_store/pch_defines/time_macros/
+    # include_file_*time keys) so precompiled-header, index-store, VFS-overlay
+    # and timestamp noise doesn't defeat hits on the Xcode/clang builds.
+    env:
+      CCACHE_MAXSIZE: 2G
+      CCACHE_SLOPPINESS: clang_index_store,file_stat_matches,include_file_ctime,include_file_mtime,ivfsoverlay,pch_defines,modules,system_headers,time_macros
 
     steps:
       - uses: actions/checkout@v7
@@ -89,6 +102,9 @@ jobs:
           NATIVE=$(npx expo-updates fingerprint:generate --platform ios 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['hash'])")
           SOURCE=$(find src __tests__ -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \) -print0 | sort -z | xargs -0 shasum -a 256 | shasum -a 256 | cut -d' ' -f1)
           FINGERPRINT="${NATIVE}-${SOURCE}"
+          # The full fingerprint (native+source) keys the built .app cache; the
+          # native part alone keys ccache, whose objects don't depend on JS.
+          echo "native=$NATIVE" >> "$GITHUB_OUTPUT"
           echo "hash=$FINGERPRINT" >> "$GITHUB_OUTPUT"
           echo "Fingerprint: $FINGERPRINT"
 
@@ -119,13 +135,58 @@ jobs:
             echo "No reusable ios-build artifact for this sha — building."
           fi
 
+      # ccache must be on PATH *before* the build: React Native's pod post_install
+      # resolves it with `command -v ccache` at prebuild/pod-install time and
+      # bakes that path into the pods' CC/CXX/LD build settings. Homebrew ccache
+      # is bottled and installs in seconds; GitHub's macOS images usually ship it
+      # already, so only install on a miss. CCACHE_DIR is set here (not job-level)
+      # so $HOME expands to an absolute path; it then flows to every later step.
+      - name: Set up ccache
+        if: steps.build-cache.outputs.cache-hit != 'true' && steps.reuse.outputs.hit != 'true'
+        run: |
+          which ccache || brew install ccache
+          echo "CCACHE_DIR=$HOME/.cache/ccache" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.cache/ccache"
+
+      # Persist ccache across runs. KEYED ON THE NATIVE FINGERPRINT ONLY — the
+      # compiled pod/Swift/C++ objects ccache stores don't depend on the JS
+      # source, so unlike the source-keyed build/e2e cache above this restores
+      # across ordinary code PRs and makes a build/e2e MISS cheap (~1-3m instead
+      # of ~13m cold). restore-keys lets an older ccache seed a partial hit when
+      # the native fingerprint changes (e.g. a dependency bump).
+      - name: Restore ccache
+        if: steps.build-cache.outputs.cache-hit != 'true' && steps.reuse.outputs.hit != 'true'
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: sift-ccache-${{ steps.fingerprint.outputs.native }}
+          restore-keys: |
+            sift-ccache-
+
+      # Zero the hit/miss counters (not the cached objects) so the post-build
+      # `ccache --show-stats` reflects only this run.
+      - name: Zero ccache stats
+        if: steps.build-cache.outputs.cache-hit != 'true' && steps.reuse.outputs.hit != 'true'
+        run: ccache --zero-stats
+
       - name: Build simulator app
         if: steps.build-cache.outputs.cache-hit != 'true' && steps.reuse.outputs.hit != 'true'
+        # CCACHE_DIR (from "Set up ccache") and CCACHE_MAXSIZE/CCACHE_SLOPPINESS
+        # (job env) are inherited here, so USE_CCACHE's ccache wrappers read and
+        # write the persisted, tuned cache restored above.
         run: eas build --profile e2e-simulator --platform ios --local --non-interactive --output build/Sift-e2e.tar.gz
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           USE_CCACHE: '1'
+
+      # Print cache hit/miss counts so the PR run proves ccache is working. Run
+      # #1 on a branch is cold (all misses, expected); the SECOND run — after a
+      # code-only push that busts the source-keyed build/e2e cache but not the
+      # native ccache key — is where the hits appear and the build time drops.
+      - name: Show ccache stats
+        if: steps.build-cache.outputs.cache-hit != 'true' && steps.reuse.outputs.hit != 'true'
+        run: ccache --show-stats
 
       - name: Extract build
         if: steps.build-cache.outputs.cache-hit != 'true' && steps.reuse.outputs.hit != 'true'

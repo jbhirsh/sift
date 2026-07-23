@@ -31,6 +31,15 @@ jobs:
   build:
     name: Build iOS simulator app
     runs-on: macos-latest
+    # ccache tuning, mirroring ci.yml's e2e job so both workflows share one
+    # persisted ccache keyed on the native fingerprint. USE_CCACHE=1 wires
+    # ccache into the pod/Xcode build; ccache reads its location/limits/sloppiness
+    # from the environment. CCACHE_DIR is set per-step (needs $HOME) in
+    # "Set up ccache". SLOPPINESS mirrors React Native's scripts/xcode/ccache.conf
+    # so PCH/index-store/VFS-overlay/timestamp noise doesn't defeat hits.
+    env:
+      CCACHE_MAXSIZE: 2G
+      CCACHE_SLOPPINESS: clang_index_store,file_stat_matches,include_file_ctime,include_file_mtime,ivfsoverlay,pch_defines,modules,system_headers,time_macros
     steps:
       - uses: actions/checkout@v7
 
@@ -71,6 +80,16 @@ jobs:
       - name: Setup EAS CLI
         run: npm install -g eas-cli
 
+      # Native-only fingerprint, computed the same way as ci.yml's e2e job so
+      # both workflows key their ccache identically (sift-ccache-<native>) and
+      # warm each other's cache.
+      - name: Compute native fingerprint
+        id: fingerprint
+        run: |
+          NATIVE=$(npx expo-updates fingerprint:generate --platform ios 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['hash'])")
+          echo "native=$NATIVE" >> "$GITHUB_OUTPUT"
+          echo "Native fingerprint: $NATIVE"
+
       # Dependabot-triggered runs receive Dependabot secrets, not Actions
       # secrets — without EXPO_TOKEN there, eas can't authenticate, so skip
       # green with a notice rather than run a build that can only fail.
@@ -97,14 +116,50 @@ jobs:
             echo "::notice::EXPO_TOKEN unavailable in this trigger context (Dependabot/fork) — skipping the iOS compile check."
           fi
 
+      # ccache must be on PATH before the build so React Native's pod
+      # post_install (`command -v ccache`) wires it into the pods' CC/CXX/LD.
+      # CCACHE_DIR is set here so $HOME expands; it flows to later steps.
+      - name: Set up ccache
+        if: steps.creds.outputs.present == 'true'
+        run: |
+          which ccache || brew install ccache
+          echo "CCACHE_DIR=$HOME/.cache/ccache" >> "$GITHUB_ENV"
+          mkdir -p "$HOME/.cache/ccache"
+
+      # Persist ccache keyed on the NATIVE fingerprint only — the compiled
+      # native objects don't depend on JS source, so this hits across code PRs.
+      # restore-keys seeds a partial hit when the native fingerprint changes.
+      - name: Restore ccache
+        if: steps.creds.outputs.present == 'true'
+        uses: actions/cache@v6
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: sift-ccache-${{ steps.fingerprint.outputs.native }}
+          restore-keys: |
+            sift-ccache-
+
+      # Zero the counters (not the objects) so post-build stats reflect this run.
+      - name: Zero ccache stats
+        if: steps.creds.outputs.present == 'true'
+        run: ccache --zero-stats
+
       - name: Build simulator app (compiles expo-musickit Swift)
         if: steps.creds.outputs.present == 'true'
+        # CCACHE_DIR (from "Set up ccache") and CCACHE_MAXSIZE/CCACHE_SLOPPINESS
+        # (job env) are inherited here, so USE_CCACHE's ccache wrappers read and
+        # write the persisted, tuned cache restored above.
         run: eas build --profile e2e-simulator --platform ios --local --non-interactive --output build/Sift-e2e.tar.gz
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_DISABLE_AUTO_UPLOAD: ${{ steps.creds.outputs.sentry_upload }}
           USE_CCACHE: '1'
+
+      # Print hit/miss counts so the run proves ccache is working (cold on the
+      # first run for a given native fingerprint, warm afterwards).
+      - name: Show ccache stats
+        if: steps.creds.outputs.present == 'true'
+        run: ccache --show-stats
 
       # The E2E job (ci.yml) can reuse this instead of rebuilding: download the
       # artifact from a recent run if the fingerprint matches.
