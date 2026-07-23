@@ -1,4 +1,14 @@
-import { loadLibrary, createPlaylist, fetchUserProfile, loadPlaylists, loadPlaylistTracks } from '../../src/services/spotify/SpotifyAPI';
+import {
+  loadLibrary,
+  createPlaylist,
+  fetchUserProfile,
+  loadPlaylists,
+  loadPlaylistTracks,
+  removeFromLibrary,
+  removeFromPlaylist,
+  addToLibrary,
+  addToPlaylist,
+} from '../../src/services/spotify/SpotifyAPI';
 
 // ---------------------------------------------------------------------------
 // Mock fetch globally
@@ -413,5 +423,97 @@ describe('loadPlaylistTracks', () => {
     const tracks = await loadPlaylistTracks('fake-token', 'empty-playlist');
 
     expect(tracks).toHaveLength(0);
+  });
+});
+
+describe('removeFromLibrary', () => {
+  test('DELETEs the given track IDs from Saved Tracks', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 200));
+
+    await removeFromLibrary('fake-token', ['t1', 't2']);
+
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe('https://api.spotify.com/v1/me/tracks');
+    expect((init as RequestInit).method).toBe('DELETE');
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      ids: ['t1', 't2'],
+    });
+  });
+
+  test('throws when the request fails', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 500));
+
+    await expect(removeFromLibrary('fake-token', ['t1'])).rejects.toThrow(
+      'Failed to remove tracks from library: 500',
+    );
+  });
+});
+
+describe('removeFromPlaylist', () => {
+  test('DELETEs track URIs from the playlist', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 200));
+
+    await removeFromPlaylist('fake-token', 'pl1', ['t1', 't2']);
+
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe('https://api.spotify.com/v1/playlists/pl1/tracks');
+    expect((init as RequestInit).method).toBe('DELETE');
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      tracks: [{ uri: 'spotify:track:t1' }, { uri: 'spotify:track:t2' }],
+    });
+  });
+
+  test('throws when the request fails', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 403));
+
+    await expect(
+      removeFromPlaylist('fake-token', 'pl1', ['t1']),
+    ).rejects.toThrow('Failed to remove tracks from playlist: 403');
+  });
+});
+
+describe('addToLibrary', () => {
+  test('PUTs the given track IDs into Saved Tracks', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 200));
+
+    await addToLibrary('fake-token', ['t1', 't2']);
+
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe('https://api.spotify.com/v1/me/tracks');
+    expect((init as RequestInit).method).toBe('PUT');
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      ids: ['t1', 't2'],
+    });
+  });
+
+  test('throws when the request fails', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 500));
+
+    await expect(addToLibrary('fake-token', ['t1'])).rejects.toThrow(
+      'Failed to add tracks to library: 500',
+    );
+  });
+});
+
+describe('addToPlaylist', () => {
+  test('POSTs track URIs to the playlist', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 200));
+
+    await addToPlaylist('fake-token', 'pl1', ['t1', 't2']);
+
+    const [url, init] = mockFetch.mock.calls[0];
+    expect(url).toBe('https://api.spotify.com/v1/playlists/pl1/tracks');
+    expect((init as RequestInit).method).toBe('POST');
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({
+      uris: ['spotify:track:t1', 'spotify:track:t2'],
+    });
+  });
+
+  test('throws when the request fails', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({}, 502));
+
+    await expect(
+      addToPlaylist('fake-token', 'pl1', ['t1']),
+    ).rejects.toThrow('Failed to add tracks to playlist: 502');
   });
 });
