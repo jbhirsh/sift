@@ -19,7 +19,6 @@ npx expo start       # subsequent launches (use after first build)
 ---
 
 ## Test Commands
-**Run lint + typecheck before every commit; run the test suite before every push.**
 
 ```bash
 make test            # unit tests (Jest)
@@ -28,11 +27,10 @@ make typecheck       # TypeScript type checking
 make check           # lint + typecheck + tests (all three)
 ```
 
-The local git hooks (installed by the `prepare` script via `core.hooksPath`)
-enforce this in two stages: **pre-commit** runs lint + typecheck, and
-**pre-push** runs the unit-test suite under coverage — so tests must be green
-before code leaves the machine, rather than on every commit. Both hooks no-op
-when `$CI` is set. Re-run the suite yourself when you touch test files.
+Git hooks (installed by the `prepare` script via `core.hooksPath`) run these
+automatically: **pre-commit** runs lint + typecheck; **pre-push** runs the
+unit-test suite under coverage. Both no-op when `$CI` is set. CI re-runs
+everything.
 
 **Testing pyramid:**
 
