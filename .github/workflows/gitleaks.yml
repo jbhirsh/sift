@@ -1,0 +1,56 @@
+# Secret scanning (gitleaks). The only sensor that catches a leaked credential
+# *before* it lands on main. .gitignore keeps .env.local out of the index and
+# the Claude review can flag a committed secret, but both are advisory and fire
+# after the secret is already in pushed branch history. This job makes it a red
+# check instead — high value here because sift handles Spotify OAuth tokens and
+# CI holds EXPO_TOKEN / SENTRY_AUTH_TOKEN.
+#
+# Two placements (same pattern as mutation.yml):
+#   - Pull requests: scan the PR's commits — fast, targeted, blocks the merge.
+#   - Weekly schedule (+ manual dispatch): full-history sweep as a drift
+#     sensor, so a secret that slips in outside the PR path (direct push,
+#     rewritten history, new gitleaks rules catching an old leak) still
+#     surfaces. The full history was verified clean when this was added.
+#
+# No GITLEAKS_LICENSE is needed: the action is free for personal-account
+# repos. If a false positive ever appears, allowlist it in a .gitleaks.toml
+# at the repo root rather than disabling the job.
+name: Gitleaks
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+# Read-only: findings are reported via the job summary and a results artifact.
+# PR comments are disabled below so the job never needs write scopes.
+permissions:
+  contents: read
+
+jobs:
+  gitleaks:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history: PR runs diff the PR's commit range; scheduled runs
+          # sweep every commit.
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          # Read-only token; the action uses it to resolve the PR's commit
+          # range via the API.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: 'false'
