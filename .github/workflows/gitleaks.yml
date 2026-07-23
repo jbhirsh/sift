@@ -48,7 +48,7 @@ jobs:
           # sweep every commit.
           fetch-depth: 0
 
-      - uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@v3
         env:
           # Read-only token; the action uses it to resolve the PR's commit
           # range via the API.
