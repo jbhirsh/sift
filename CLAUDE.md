@@ -63,10 +63,11 @@ Guard against undefined track lookups in AppleMusicProvider
 instead of assuming the track exists, which caused crashes
 when the library hadn't finished loading.
 
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
-**Never amend a pushed commit. Never use --no-verify.**
+**Amend or squash your own feature branch freely before it merges, but never
+amend, rebase, or force-push `main`. Never use `--no-verify`.**
 
 ---
 
@@ -136,7 +137,16 @@ Makefile                Dev commands (test, lint, typecheck, check)
 - The Claude Code PR review runs as the `review` job inside `ci.yml`
   (dependent on the `check` job, pull requests only); the auto-fix workflow
   lives alongside it in `.github/workflows/claude-autofix.yml`.
-- All changes reach main via PR — never by pushing directly.
+
+---
+
+## Workflow
+- **Issues are the source of truth.** Check `gh issue list` (and
+  `gh issue view <n>`) before designing or implementing a feature — issues
+  carry rationale the code doesn't.
+- **Review before raising a PR.** Review the full diff (e.g. a review subagent
+  reading it) before opening the PR — review gates PR creation, rather than
+  opening first and reviewing after.
 
 ---
 
@@ -149,11 +159,13 @@ Makefile                Dev commands (test, lint, typecheck, check)
 
 ## Things to Never Do
 - Never use `git add -A` — add files explicitly
-- Never commit secrets, API keys, or `.env` files
 - Never modify tests to make them pass — fix the implementation
-- Never push directly to main — always create a branch and open a PR
-- Never push a commit without first running tests locally to confirm they pass
 - Never install packages outside of the project root
+
+(Rules enforced by tooling — committing secrets (gitleaks), pushing to `main`
+(branch protection), pushing with failing tests (the pre-push hook), and inline
+lint/type suppression (the `no-use` and `ban-ts-comment` lint rules) — are the
+source of truth and aren't repeated here.)
 
 ---
 
