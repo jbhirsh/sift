@@ -7,7 +7,6 @@ let resolveNative: ResolveArtworkFn | null = null;
 
 if (Platform.OS === 'ios') {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mod = require('../../modules/expo-musickit/src/index');
     resolveNative = mod.resolveArtworkURL as ResolveArtworkFn;
   } catch {

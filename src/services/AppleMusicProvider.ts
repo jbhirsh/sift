@@ -52,7 +52,6 @@ function getNativeModule() {
     );
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const mod = require('../../modules/expo-musickit/src/index');
   if (!mod) {
     throw new Error(
