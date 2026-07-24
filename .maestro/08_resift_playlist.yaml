@@ -42,6 +42,12 @@ name: "Re-sift an Already-Sifted Playlist"
     visible: "Start Over?"
     timeout: 30000
 
+# Wait for the Cancel button itself, not just the "Start Over?" title: on a
+# slow runner the native alert's buttons enter the accessibility tree a beat
+# after its title, so a bare tapOn "Cancel" intermittently misses it.
+- extendedWaitUntil:
+    visible: "Cancel"
+    timeout: 30000
 - tapOn: "Cancel"
 
 - assertVisible: "Re-sift Playlist"
