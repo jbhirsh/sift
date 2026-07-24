@@ -10,8 +10,11 @@ name: Mutation Testing
 #   - Weekly schedule (+ manual dispatch): full sweep as a drift sensor,
 #     catching erosion from changes that didn't trip the PR-scoped run.
 #
-# `break` is null while we establish a baseline — ratchet it up in
-# stryker.config.json once stable.
+# Gate: stryker.config.json sets thresholds.break=80 (a global floor), and
+# scripts/check-mutation-threshold.mjs enforces the stricter per-file bar —
+# EVERY mutated file must score >= 80%. MockMusicProvider.ts is excluded from
+# the mutate scope (fixture-heavy scaffolding; its survivors are seed-data
+# strings), so it is neither mutated nor gated.
 on:
   pull_request:
     branches: [main]
@@ -24,6 +27,7 @@ on:
       - 'package.json'
       - 'package-lock.json'
       - '.github/workflows/mutation.yml'
+      - 'scripts/check-mutation-threshold.mjs'
   schedule:
     - cron: '0 6 * * 1'
   workflow_dispatch:
@@ -78,7 +82,7 @@ jobs:
           CHANGED=$(git diff --name-only --diff-filter=d "origin/${BASE_REF}"...HEAD -- \
               src/context src/services src/utils src/hooks \
             | grep -E '\.(ts|tsx)$' \
-            | grep -Ev '(/index\.ts$|MusicProviderInterface\.ts$|useKeyboardShortcuts\.ts$|mockData\.ts$)' \
+            | grep -Ev '(/index\.ts$|MusicProviderInterface\.ts$|useKeyboardShortcuts\.ts$|mockData\.ts$|MockMusicProvider\.ts$)' \
             || true)
           if [ -z "$CHANGED" ]; then
             echo "No mutable files changed — running utils smoke scope to validate the Stryker setup."
@@ -97,6 +101,14 @@ jobs:
       - name: Run Stryker (full sweep)
         if: github.event_name != 'pull_request'
         run: npx stryker run
+
+      # Per-file gate: Stryker's break only enforces the global aggregate, so
+      # this fails the build if any individual mutated file is below 80% even
+      # when the overall score passes. Runs after a successful Stryker run;
+      # the report upload below is always() so a gate failure is still
+      # diagnosable from the artifact.
+      - name: Enforce per-file mutation threshold
+        run: node scripts/check-mutation-threshold.mjs
 
       # always(): when thresholds.break ratchets up, a breaking Stryker run
       # exits nonzero after writing the report — that report is exactly what's
