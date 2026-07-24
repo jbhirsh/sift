@@ -73,6 +73,9 @@ amend, rebase, or force-push `main`. Never use `--no-verify`.**
 - **TypeScript**: strict mode enabled. All new code must be typed.
 - **ESLint**: flat config in `eslint.config.mjs`. Fix all violations before committing.
 - **Testing**: Jest + React Native Testing Library.
+- **Architecture layering**: `npm run depcruise` enforces the import rules in
+  `.dependency-cruiser.cjs` (pure `utils`, `types` a leaf, `services`/`context`
+  below the UI). Runs in CI and the pre-commit hook.
 
 ---
 
@@ -129,12 +132,15 @@ Makefile                Dev commands (test, lint, typecheck, check)
 
 ## CI/CD
 - CI runs in `.github/workflows/ci.yml` on GitHub-hosted runners: lint,
-  typecheck, and Jest with coverage on Ubuntu on every PR. The Maestro iOS
-  E2E job (macOS) also runs on every PR and push to main, with
+  typecheck, dependency-cruiser, and Jest with coverage on Ubuntu on every PR.
+  The Maestro iOS E2E job (macOS) also runs on every PR and push to main, with
   `workflow_dispatch` available for manual runs.
 - The Claude Code PR review runs as the `review` job inside `ci.yml`
   (dependent on the `check` job, pull requests only); the auto-fix workflow
   lives alongside it in `.github/workflows/claude-autofix.yml`.
+- Security/quality gates run per PR and sweep weekly (Mon 06:00 UTC):
+  `gitleaks.yml` (secret scanning), `semgrep.yml` (SAST, `--config auto`), and
+  `mutation.yml` (Stryker), alongside the weekly Dependabot bumps.
 
 ---
 
