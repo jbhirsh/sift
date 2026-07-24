@@ -97,7 +97,13 @@ name: "Playlist Source - Select and Sift"
     visible: "Start Over?"
     timeout: 30000
 
-# Cancel keeps everything: still on Done, success message intact
+# Cancel keeps everything: still on Done, success message intact.
+# Wait for the Cancel button itself, not just the "Start Over?" title above:
+# on a slow runner the native alert's buttons enter the accessibility tree a
+# beat after its title, so a bare tapOn "Cancel" intermittently misses it.
+- extendedWaitUntil:
+    visible: "Cancel"
+    timeout: 30000
 - tapOn: "Cancel"
 
 - assertVisible:
