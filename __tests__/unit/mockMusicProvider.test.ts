@@ -230,6 +230,79 @@ describe('MockMusicProvider', () => {
     jest.advanceTimersByTime(200000);
     expect(provider.getPlaybackState().position).toBe(141);
   });
+
+  test('resume while already playing does not rewind the elapsed position', async () => {
+    const tracks = await flushAsync(provider.loadLibrary());
+    await provider.play(tracks[0].id);
+    jest.advanceTimersByTime(5000);
+    const before = provider.getPlaybackState().position;
+    // ~5s of playback has elapsed before the redundant resume.
+    expect(before).toBeGreaterThan(4);
+    // resume() is guarded on `!this.playing`; calling it while already
+    // playing must be a no-op. A mutant that drops the guard re-seeds
+    // playStartPosition from the stale `this.position` (still 0) and resets
+    // playStartTime, snapping the reported position back toward 0.
+    await provider.resume();
+    expect(provider.getPlaybackState().position).toBeCloseTo(before, 1);
+  });
+
+  /**
+   * Drain the microtask queue without advancing fake timers, so a promise
+   * that should still be waiting on a setTimeout has every chance to settle
+   * early if the delay were removed.
+   */
+  async function flushMicrotasks(): Promise<void> {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  }
+
+  test('createPlaylist stays pending until its simulated delay elapses', async () => {
+    const settle = jest.fn();
+    const promise = provider.createPlaylist('New Mix', ['mock-1', 'mock-2']);
+    void promise.then(settle, settle);
+    await flushMicrotasks();
+    // Nothing has advanced the timer, so the simulated API call is still in
+    // flight. Emptying the method body (or delay's body) resolves it now.
+    expect(settle).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(500);
+    await expect(promise).resolves.toBeUndefined();
+    expect(settle).toHaveBeenCalledTimes(1);
+  });
+
+  test('addToLibrary resolves undefined, but only after its simulated delay', async () => {
+    const settle = jest.fn();
+    const promise = provider.addToLibrary(['mock-1']);
+    void promise.then(settle, settle);
+    await flushMicrotasks();
+    expect(settle).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(200);
+    await expect(promise).resolves.toBeUndefined();
+    expect(settle).toHaveBeenCalledTimes(1);
+  });
+
+  test('removeFromPlaylist resolves undefined, but only after its simulated delay', async () => {
+    const settle = jest.fn();
+    const promise = provider.removeFromPlaylist('playlist-1', ['mock-1']);
+    void promise.then(settle, settle);
+    await flushMicrotasks();
+    expect(settle).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(200);
+    await expect(promise).resolves.toBeUndefined();
+    expect(settle).toHaveBeenCalledTimes(1);
+  });
+
+  test('loadPlaylistTracks returns exactly the seeded tracks for a known playlist', async () => {
+    // playlist-1 ("Chill Vibes") maps to library indices [0, 2, 9].
+    const tracks = await flushAsync(provider.loadPlaylistTracks('playlist-1'));
+    expect(tracks.map((t) => t.id)).toEqual(['mock-1', 'mock-3', 'mock-10']);
+    // Returned tracks must be copies, not the shared library objects, so a
+    // caller mutating them cannot corrupt the mock library.
+    const library = await flushAsync(provider.loadLibrary());
+    expect(tracks[0]).not.toBe(library[0]);
+    expect(tracks[0]).toEqual(library[0]);
+  });
 });
 
 describe('MockMusicProvider failure injection (EXPO_PUBLIC_MOCK_FAIL_ADDS / _REMOVES)', () => {

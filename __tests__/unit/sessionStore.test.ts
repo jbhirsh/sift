@@ -117,25 +117,72 @@ describe('hasSession', () => {
 });
 
 describe('saveSession error handling', () => {
-  it('catches and reports error to Sentry', async () => {
+  it('reports the caught error to Sentry with the session-save flow tag', async () => {
     const Sentry = jest.requireMock('@sentry/react-native');
-    mockSetItem.mockRejectedValue(new Error('write error'));
+    const error = new Error('write error');
+    mockSetItem.mockRejectedValue(error);
 
     await saveSession(sampleSession);
 
-    expect(Sentry.captureException).toHaveBeenCalled();
+    // Pins both the reported error and the exact tag payload so mutations that
+    // blank the flow string or empty the tags object are caught.
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(error, {
+      tags: { flow: 'session-save' },
+    });
+  });
+});
+
+describe('loadSession error handling', () => {
+  it('reports parse failures to Sentry with the session-load flow tag', async () => {
+    const Sentry = jest.requireMock('@sentry/react-native');
+    mockGetItem.mockResolvedValue('not valid json {{{');
+
+    const result = await loadSession();
+
+    expect(result).toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'session-load' },
+    });
   });
 });
 
 describe('clearSession error handling', () => {
-  it('catches error and adds Sentry breadcrumb', async () => {
+  it('records a warning breadcrumb describing the clear failure', async () => {
     const Sentry = jest.requireMock('@sentry/react-native');
     mockRemoveItem.mockRejectedValue(new Error('remove error'));
 
     await clearSession();
 
+    // Pins the breadcrumb category, level, and message text so mutations that
+    // empty the breadcrumb object, blank the level, or blank the message survive no more.
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledTimes(1);
     expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
-      expect.objectContaining({ category: 'session' }),
+      expect.objectContaining({
+        category: 'session',
+        level: 'warning',
+        message: expect.stringContaining('Clear session failed'),
+      }),
+    );
+  });
+});
+
+describe('hasSession error handling', () => {
+  it('records a warning breadcrumb describing the check failure', async () => {
+    const Sentry = jest.requireMock('@sentry/react-native');
+    mockGetItem.mockRejectedValue(new Error('storage error'));
+
+    const result = await hasSession();
+
+    expect(result).toBe(false);
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledTimes(1);
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'session',
+        level: 'warning',
+        message: expect.stringContaining('Check session failed'),
+      }),
     );
   });
 });

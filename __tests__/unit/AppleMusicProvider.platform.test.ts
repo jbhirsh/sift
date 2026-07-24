@@ -22,4 +22,11 @@ describe('AppleMusicProvider platform guard', () => {
       'AppleMusicProvider is only available on iOS',
     );
   });
+
+  test('names the current platform in the error', () => {
+    // Pins the `Current platform: ${Platform.OS}` template so emptying that
+    // static text can't slip past the first-sentence-only assertion above.
+    const { AppleMusicProvider } = require('../../src/services/AppleMusicProvider');
+    expect(() => new AppleMusicProvider()).toThrow('Current platform: android');
+  });
 });

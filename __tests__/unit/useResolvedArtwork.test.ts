@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { renderHook, waitFor, act } from '@testing-library/react-native';
 
 // Must set Platform.OS before the hook module loads
 const originalOS = Platform.OS;
@@ -101,5 +101,56 @@ describe('useResolvedArtwork', () => {
 
     rerender({ url: 'https://example.com/new-artwork.jpg' });
     expect(result.current).toBe('https://example.com/new-artwork.jpg');
+  });
+
+  it('ignores a stale native resolve after the trackID changed', async () => {
+    // First track's resolve is deferred so it settles *after* the trackID
+    // switches — the effect cleanup must cancel it so its late value is
+    // never adopted. Pins the `cancelled` guard + cleanup assignment.
+    let resolveFirst: (url: string | null) => void = () => {};
+    const firstPromise = new Promise<string | null>((res) => {
+      resolveFirst = res;
+    });
+    const secondPromise = new Promise<string | null>(() => {
+      /* never resolves — the second track stays pending */
+    });
+    mockResolveArtworkURL
+      .mockReturnValueOnce(firstPromise)
+      .mockReturnValueOnce(secondPromise);
+
+    const { result, rerender } = renderHook(
+      ({ id }: { id: string }) => useResolvedArtwork(id, undefined),
+      { initialProps: { id: 'track-stale-a' } },
+    );
+
+    // Switch to a different track: cleanup cancels track-a's in-flight resolve
+    // and a fresh (pending) resolve starts for track-b.
+    rerender({ id: 'track-stale-b' });
+    expect(mockResolveArtworkURL).toHaveBeenCalledTimes(2);
+    expect(mockResolveArtworkURL).toHaveBeenLastCalledWith('track-stale-b', 600, 600);
+
+    // Now let track-a's resolve settle late. Because it was cancelled, the
+    // hook must NOT surface track-a's artwork while showing track-b.
+    await act(async () => {
+      resolveFirst('file:///caches/stale-track-a.jpg');
+      await firstPromise;
+      await Promise.resolve();
+    });
+
+    expect(result.current).toBeUndefined();
+  });
+
+  it('preserves an empty-string resolution instead of dropping it', async () => {
+    // Distinguishes `url ?? undefined` from `url || undefined`: an empty
+    // string is a valid (non-nullish) resolved value and must pass through.
+    mockResolveArtworkURL.mockResolvedValue('');
+
+    const { result } = renderHook(() => useResolvedArtwork('track-empty', undefined));
+
+    await waitFor(() => {
+      expect(result.current).toBe('');
+    });
+
+    expect(mockResolveArtworkURL).toHaveBeenCalledWith('track-empty', 600, 600);
   });
 });
