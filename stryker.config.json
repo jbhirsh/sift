@@ -27,16 +27,20 @@
     "!src/**/index.ts",
     "!src/services/MusicProviderInterface.ts",
     "!src/hooks/useKeyboardShortcuts.ts",
-    "!src/utils/mockData.ts"
+    "!src/utils/mockData.ts",
+    "!src/services/MockMusicProvider.ts"
   ],
-  "reporters": ["progress", "clear-text", "html"],
+  "reporters": ["progress", "clear-text", "html", "json"],
+  "jsonReporter": {
+    "fileName": "reports/mutation/mutation.json"
+  },
   "htmlReporter": {
     "fileName": "reports/mutation/mutation.html"
   },
   "thresholds": {
     "high": 80,
     "low": 65,
-    "break": null
+    "break": 80
   },
   "tempDirName": ".stryker-tmp"
 }
