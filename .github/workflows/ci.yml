@@ -196,61 +196,135 @@ jobs:
           MAESTRO_CLI_NO_ANALYTICS: "1"
         run: |
           export PATH="$HOME/.maestro/bin:$PATH"
+          mkdir -p maestro-debug
+          # One invocation for the whole folder. Per-flow invocation was tried
+          # (run 34546956234) to get evidence captured at the failure: it works,
+          # but costs 34 min against this step's 10 min, because each flow then
+          # pays a fresh JVM start and driver attach (~13 min total) AND loses
+          # the warm simulator, which doubles the flows themselves —
+          # 01_app_launch alone went 21s -> 4m11s. With a ~20 min cold build
+          # that overruns the job's 60 min cap, so the verdict is produced here,
+          # fast, and evidence is gathered in the next step only on failure.
+          #
           # No automatic retry: a retry would mask residual nondeterminism as
           # green runs. Every failure surfaces loudly with debug artifacts,
           # and the fix goes to the root cause, not another attempt.
-          maestro test --debug-output maestro-debug --format junit --output maestro-report.xml .maestro/
+          maestro test \
+            --format junit --output maestro-report.xml \
+            --test-output-dir maestro-debug/suite \
+            .maestro/
 
-      # Ground truth on where this Maestro version writes debug output —
-      # two artifact-capture attempts have come up empty against the
-      # documented paths. This step is also the guaranteed-evidence fallback:
-      # when the XCUITest driver times out at startup, Maestro dies before any
-      # flow runs and writes nothing (empty maestro-debug, no junit report, no
-      # ~/.maestro/tests), so the probes below land in the artifact
-      # (diagnostics.txt) alongside a simulator log tail. That guarantee of a
-      # non-empty, meaningful artifact is what lets the upload step keep
-      # `if-no-files-found: error` strict. Diagnostics must never themselves
-      # fail — every command here is guarded.
-      - name: Locate Maestro output (diagnostics)
+      # Re-run each failed flow ALONE to capture the evidence the suite run
+      # cannot: a single invocation only returns once all 11 flows are done, so
+      # by then the failing screen is long gone. Run 34149516339 is the case in
+      # point — 10_sort_picker failed at 00:03:48 and the post-suite screenshot
+      # was stamped 00:18, showing an unrelated later flow mid-sift. That is
+      # worse than no evidence: it looked like proof of a sort bug.
+      #
+      # This is NOT a retry and cannot rescue the job: the verdict was already
+      # recorded by the step above, this step only runs `if: failure()`, and it
+      # always exits 0 so it can never turn a red run green. A flow that passes
+      # when re-run alone has told us something too — that the failure is
+      # order- or timing-dependent rather than deterministic — and that is
+      # written into the capture notes below.
+      - name: Capture evidence for failed flows
+        if: failure()
+        env:
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: "300000"
+          MAESTRO_CLI_NO_ANALYTICS: "1"
+        run: |
+          export PATH="$HOME/.maestro/bin:$PATH"
+          mkdir -p maestro-debug
+          [ -f maestro-report.xml ] || {
+            echo "No junit report — Maestro died before any flow ran; nothing to re-run."
+            exit 0
+          }
+          # Flow files whose testcase carries a <failure>/<error>, straight from
+          # the report's `file` attribute.
+          failed_flows=$(python3 - <<'PY' || true
+          import xml.etree.ElementTree as ET
+          try:
+              root = ET.parse("maestro-report.xml").getroot()
+          except Exception:
+              raise SystemExit
+          for tc in root.iter("testcase"):
+              if tc.find("failure") is not None or tc.find("error") is not None:
+                  f = tc.get("file")
+                  if f:
+                      print(f)
+          PY
+          )
+          [ -n "$failed_flows" ] || { echo "No failed flow recorded in the report."; exit 0; }
+          for flow in $failed_flows; do
+            name=$(basename "$flow" .yaml)
+            echo "::group::Re-running $name to capture evidence"
+            if maestro test --no-reinstall-driver \
+                 --test-output-dir "maestro-debug/$name-rerun" "$flow"; then
+              echo "NOTE: $name PASSED when re-run alone — the failure is not deterministic" \
+                | tee "maestro-debug/$name-rerun-passed.txt"
+            fi
+            # Capture whatever is on screen now. After a failing re-run that is
+            # the screen the flow died on; the hierarchy is the decisive part,
+            # because assertVisible matches the accessibility tree, not pixels,
+            # and only the tree separates "the label is absent" from "the label
+            # is drawn but not yet exposed to accessibility".
+            xcrun simctl io booted screenshot "maestro-debug/$name-failure.png" || true
+            maestro hierarchy --no-reinstall-driver \
+              > "maestro-debug/$name-hierarchy.txt" 2>&1 || true
+            echo "::endgroup::"
+          done
+          # Never fail the job from here: the verdict is the suite step's.
+          exit 0
+
+      # Whole-job fallback, NOT the per-failure evidence — that is captured in
+      # the step above, against the screen each failing flow actually died on.
+      # This step runs once, after the suite, so anything it samples live from
+      # the simulator reflects the END of the run. That is exactly what is
+      # wanted for the case it exists to cover: when the XCUITest driver times
+      # out at startup, Maestro dies before any flow runs and writes nothing —
+      # no per-flow capture, no reports — and the probes below are then the only
+      # evidence. They also guarantee the artifact is non-empty, which is what
+      # lets the upload step keep `if-no-files-found: error` strict.
+      # Diagnostics must never themselves fail — every command here is guarded.
+      - name: Collect run-level diagnostics (fallback)
         if: failure()
         run: |
           mkdir -p maestro-debug
           {
-            echo "=== CWD candidates ==="
-            find . -maxdepth 2 \( -name 'maestro-*' -o -name '*.png' -o -name 'debug*' \) -not -path './node_modules/*' 2>/dev/null | head -20 || true
+            echo "=== captured debug tree ==="
+            # Listed in full, not name-filtered: the previous probe matched only
+            # 'maestro-*'/'*.png' at depth 2 and so reported the debug directory
+            # while staying blind to everything inside it.
+            find maestro-debug -type f 2>/dev/null | sort | head -60 || true
             echo "=== HOME/.maestro ==="
             find "$HOME/.maestro" -maxdepth 3 2>/dev/null | head -30 || true
             echo "=== junit report ==="
             if [ -f maestro-report.xml ]; then
-              ls -la maestro-report.xml || true
-              head -50 maestro-report.xml || true
+              # One line per flow: which failed, and the assertion message.
+              grep -E "<testcase|<failure|<error" maestro-report.xml 2>/dev/null | head -40 || true
             else
-              echo "maestro-report.xml not written — likely driver startup failure"
+              echo "maestro-report.xml not written — Maestro died before the first flow"
             fi
           } 2>&1 | tee maestro-debug/diagnostics.txt || true
           xcrun simctl spawn booted log show --style compact --last 10m 2>/dev/null | tail -300 > maestro-debug/simulator-log-tail.txt || true
-          # Which SCREEN was up when the wait timed out? Everything above proves
-          # the app is alive but not WHERE it was — a 30s card-wait timeout
-          # looks identical whether we stalled on Loading (a real stall) or were
-          # already on Sifting with the element merely unseen (transition flake).
-          # A screenshot disambiguates the two and is captured straight off the
-          # simulator, so it works regardless of Maestro's debug-output quirks
-          # and guarantees the artifact is non-empty on any in-flow failure.
-          xcrun simctl io booted screenshot maestro-debug/failure-screenshot.png || true
-          # Maestro writes per-flow screenshots + view hierarchies (its XCUITest
-          # accessibility snapshot) on failure, but the directory varies by
-          # version; copy whatever landed under ~/.maestro/tests into the folder
-          # so the UI hierarchy at the point of failure travels with the shot.
-          cp -R "$HOME/.maestro/tests" maestro-debug/maestro-tests 2>/dev/null || true
+          # End-of-run screenshot. Meaningful when Maestro never started a flow
+          # (nothing else captured anything); for an in-flow failure prefer
+          # maestro-debug/<flow>-failure.png, which is the failing screen.
+          xcrun simctl io booted screenshot maestro-debug/end-of-run-screenshot.png || true
 
       - name: Upload Maestro debug artifacts
         if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: maestro-debug
-          # Maestro writes per-flow screenshots and view hierarchies under
-          # ~/.maestro/tests regardless of --debug-output on some versions;
-          # capture both, and fail loudly if neither exists — an empty debug
+          # maestro-debug holds the per-failure capture (<flow>-failure.png,
+          # <flow>-hierarchy.txt) plus whatever --test-output-dir wrote.
+          # ~/.maestro/tests is Maestro's default output location, kept as a
+          # fallback in case --test-output-dir does not land where its help text
+          # says: two earlier attempts to capture Maestro's own debug output
+          # came up empty, so do not rely on a third reading of the docs. It
+          # costs nothing when absent — if-no-files-found only fires when NO
+          # listed path matches. Fail loudly if none exists: an empty debug
           # artifact silently defeats the whole no-retry diagnosis doctrine.
           path: |
             maestro-debug
