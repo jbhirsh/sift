@@ -19,16 +19,24 @@ name: "Sort Picker - Action Sheet Changes Track Order"
     timeout: 30000
 - assertVisible: "Least Played"
 
-# Open the native action sheet and pick Most Played
+# Open the native action sheet and pick Most Played.
+# Let the sheet finish sliding in before tapping: its buttons are in the
+# accessibility tree (so the wait above passes) while it is still animating,
+# and a tap landing mid-animation can dismiss the sheet without selecting —
+# seen in CI as the label never changing ('"Most Played" is visible' false).
 - tapOn: "Least Played"
 - extendedWaitUntil:
     visible: "Most Played"
     timeout: 30000
+- waitForAnimationToEnd
 - tapOn: "Most Played"
 
-# The sheet dismissed and the sort button label updated
+# The sheet dismissed and the sort button label updated. Wait for the old
+# label to go (sheet dismissal animates) rather than asserting instantly.
+- extendedWaitUntil:
+    notVisible: "Least Played"
+    timeout: 30000
 - assertVisible: "Most Played"
-- assertNotVisible: "Least Played"
 
 # Start a library sift and verify the order took effect
 - tapOn: "Start Sifting"

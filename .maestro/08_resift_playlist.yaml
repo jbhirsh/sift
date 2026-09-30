@@ -28,8 +28,11 @@ name: "Re-sift an Already-Sifted Playlist"
 - tapOn:
     id: "playlist-row-playlist-3"
 
-- assertNotVisible:
-    id: "playlist-picker-modal"
+# The picker modal slides out — wait for it to leave, don't assert instantly.
+- extendedWaitUntil:
+    notVisible:
+      id: "playlist-picker-modal"
+    timeout: 30000
 
 # The button swaps: no plain "Start Sifting" for an already-sifted playlist
 - assertVisible: "Re-sift Playlist"
