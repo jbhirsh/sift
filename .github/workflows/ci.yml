@@ -82,9 +82,11 @@ jobs:
     # image the working builds resolve to (Xcode 26; Expo SDK 57 requires
     # >=26 — macos-15's default Xcode 16.4 cannot compile expo-modules-core).
     runs-on: macos-26
-    # Headroom for run-e2e.sh starting a fresh XCUITest driver per flow (and
-    # at most one driver retry per flow) on top of a cold ~30-min build.
-    timeout-minutes: 75
+    # Cold path: ~10 min setup + ~30 min build + the Maestro step's own
+    # 40-min cap below. The step cap must expire before this one: a JOB
+    # timeout counts as cancellation, which skips the failure()/!cancelled()
+    # diagnostics and upload steps and loses all evidence.
+    timeout-minutes: 90
 
     steps:
       - uses: actions/checkout@v7
@@ -189,6 +191,10 @@ jobs:
           xcrun simctl terminate booted com.jessicahirsh.sift || true
 
       - name: Run Maestro tests
+        # A step timeout counts as a failure (not a cancellation), so the
+        # diagnostics and artifact upload below still run. run-e2e.sh also
+        # fails fast when the driver is down rather than timing out per flow.
+        timeout-minutes: 40
         env:
           # GitHub-hosted macOS runners can be slow enough that the XCUITest
           # driver misses Maestro's default startup window (seen as

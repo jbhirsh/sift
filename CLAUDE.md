@@ -153,10 +153,12 @@ Makefile                Dev commands (test, lint, typecheck, check)
   `mutation.yml`). A job skipped by its `if:` counts as passing.
 - **E2E runner.** `scripts/run-e2e.sh` runs each Maestro flow in its own
   `maestro test` invocation, each with a fresh XCUITest driver, in filename
-  order. Assertion failures are never retried. A pure driver/transport
-  failure gets one retry, flagged with a `::warning::` annotation. Fix flaky
-  flows at the root: wait for the element (`extendedWaitUntil`), never
-  assert right after an animated transition.
+  order. Assertion failures and app crashes are never retried. A pure
+  driver/transport failure gets one retry, flagged with a `::warning::`
+  annotation. If the retry also hits a driver error, the runner stops and
+  marks the remaining flows "not run". Fix flaky flows at the root: wait
+  for the element (`extendedWaitUntil`), never assert right after an
+  animated transition.
 
 ---
 
