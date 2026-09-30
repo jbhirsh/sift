@@ -25,7 +25,7 @@ build-e2e:
 # Run E2E tests (requires build-e2e first)
 test-e2e:
 	xcrun simctl install booted build/e2e/*.app
-	maestro test .maestro/
+	scripts/run-e2e.sh .maestro
 
 # All tests
 test-all: test test-e2e
