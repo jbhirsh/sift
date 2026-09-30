@@ -75,6 +75,13 @@ for flow in "${flows[@]}"; do
       break
     fi
 
+    # Capture the screen NOW, while it still shows where this flow stalled.
+    # Maestro's --debug-output has come back empty in CI, and the job-level
+    # screenshot runs after the last flow, so it shows the wrong flow's screen.
+    if command -v xcrun >/dev/null 2>&1; then
+      xcrun simctl io booted screenshot "$OUT_DIR/$name.attempt$attempt.png" >/dev/null 2>&1 || true
+    fi
+
     evidence=("$log")
     [ -f "$OUT_DIR/$name.xml" ] && evidence+=("$OUT_DIR/$name.xml")
     infra=""
