@@ -17,6 +17,10 @@
 #     XCUITest server became unreachable or never started) gets one retry on a
 #     fresh driver, and the retry is surfaced as a ::warning:: annotation so
 #     infra flakes stay visible instead of silently absorbed.
+#   - If a flow's retry ALSO dies on a driver error, the driver is down, not
+#     flaky: stop and fail fast instead of burning a 5-minute driver-startup
+#     timeout on every remaining flow (which would outlast the job timeout and
+#     lose the diagnostics along with it).
 #
 # Usage: scripts/run-e2e.sh [flow-dir]   (default: .maestro)
 # Writes per-flow logs, JUnit reports and debug output under $E2E_OUT_DIR
@@ -28,11 +32,13 @@ OUT_DIR="${E2E_OUT_DIR:-maestro-results}"
 mkdir -p "$OUT_DIR"
 
 # Driver/transport failures: the XCUITest server was unreachable or never came
-# up. These say nothing about the app under test.
-INFRA_RE='DeviceUnreachableException|IOSDriverTimeoutException|XCUITestServerError|Transport unreachable|Failed to connect to /127\.0\.0\.1'
+# up. These say nothing about the app under test. Kept to connection-level
+# signatures on purpose — a broader match (e.g. any XCUITestServerError) could
+# catch an app hang that stalls the driver and wrongly earn it a retry.
+INFRA_RE='DeviceUnreachableException|IOSDriverTimeoutException|Transport unreachable|Failed to connect to /127\.0\.0\.1'
 # App-level failures. If any of these appear, the failure is treated as real
 # even when a transport error shows up alongside it.
-APP_RE='Element not found|Assertion is false'
+APP_RE='Element not found|Assertion is false|App crashed|app crashed|stopped unexpectedly'
 
 shopt -s nullglob
 flows=("$FLOW_DIR"/[0-9]*.yaml)
@@ -43,11 +49,19 @@ fi
 
 failed=()
 retried=()
+driver_down=""
 
 for flow in "${flows[@]}"; do
   name="$(basename "$flow" .yaml)"
+  if [ -n "$driver_down" ]; then
+    echo "::error title=E2E flow not run::$name skipped — the driver was down (see $driver_down)."
+    failed+=("$name")
+    continue
+  fi
   for attempt in 1 2; do
     log="$OUT_DIR/$name.attempt$attempt.log"
+    # Never read a previous run's report as this attempt's evidence.
+    rm -f "$OUT_DIR/$name.xml"
     echo "::group::$name (attempt $attempt)"
     maestro test \
       --debug-output "$OUT_DIR/$name.attempt$attempt-debug" \
@@ -63,12 +77,17 @@ for flow in "${flows[@]}"; do
 
     evidence=("$log")
     [ -f "$OUT_DIR/$name.xml" ] && evidence+=("$OUT_DIR/$name.xml")
-    if [ "$attempt" -eq 1 ] \
-      && grep -Eq "$INFRA_RE" "${evidence[@]}" \
-      && ! grep -Eq "$APP_RE" "${evidence[@]}"; then
+    infra=""
+    if grep -Eq "$INFRA_RE" "${evidence[@]}" && ! grep -Eq "$APP_RE" "${evidence[@]}"; then
+      infra=1
+    fi
+    if [ "$attempt" -eq 1 ] && [ -n "$infra" ]; then
       echo "::warning title=E2E driver retry::$name failed with a driver/device transport error, not an app assertion — retrying once on a fresh driver. See $log."
       retried+=("$name")
       continue
+    fi
+    if [ -n "$infra" ]; then
+      driver_down="$log"
     fi
 
     echo "::error title=E2E flow failed::$name failed (attempt $attempt). See $log."
