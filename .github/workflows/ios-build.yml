@@ -58,9 +58,7 @@ jobs:
     # native-affecting path changed. Fail-safe: if change detection itself
     # errored, build anyway — a skipped job reads as a passing required check.
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.result == 'failure' || needs.changes.outputs.native == 'true') }}
-    # Pinned to the same image as the E2E job (ci.yml) so the compile gate and
-    # the E2E build see the same Xcode; bump both together.
-    runs-on: macos-26
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v7
 
