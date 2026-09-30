@@ -141,6 +141,22 @@ Makefile                Dev commands (test, lint, typecheck, check)
 - Security/quality gates run per PR and sweep weekly (Mon 06:00 UTC):
   `gitleaks.yml` (secret scanning), `semgrep.yml` (SAST, `--config auto`), and
   `mutation.yml` (Stryker), alongside the weekly Dependabot bumps.
+- **Required status checks.** The `main` branch rule requires these job names,
+  so renaming a job's `name:` silently un-gates it. Update the rule in the
+  same PR as any rename:
+  `Lint, Typecheck & Unit Test`, `E2E Tests (Maestro)`, `Secret scan`,
+  `SAST scan`, `Build iOS simulator app`, `Mutation Tests (Stryker)`.
+  Every one of these reports on every PR. Never add a trigger-level
+  `on.pull_request.paths` filter to a gating workflow: a filtered-out workflow
+  never reports, and the required check hangs at "Expected". Path-filter
+  inside the workflow instead (see the `changes` job in `ios-build.yml` and
+  `mutation.yml`). A job skipped by its `if:` counts as passing.
+- **E2E runner.** `scripts/run-e2e.sh` runs each Maestro flow in its own
+  `maestro test` invocation, each with a fresh XCUITest driver, in filename
+  order. Assertion failures are never retried. A pure driver/transport
+  failure gets one retry, flagged with a `::warning::` annotation. Fix flaky
+  flows at the root: wait for the element (`extendedWaitUntil`), never
+  assert right after an animated transition.
 
 ---
 
