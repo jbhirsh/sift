@@ -13,6 +13,39 @@ updates:
       day: "monday"
       time: "06:00"
       timezone: "Etc/UTC"
+    # The default limit is 5. From late July to late September 2026 five
+    # un-mergeable PRs held every slot, so no other version update could open.
+    # The ignore rules below keep known-blocked bumps from taking slots again.
+    open-pull-requests-limit: 10
+    # One weekly PR for routine dev-tooling bumps, not one PR per package.
+    groups:
+      dev-dependencies:
+        dependency-type: "development"
+        update-types: ["minor", "patch"]
+    ignore:
+      # Blocked upstream: typescript-eslint's peer range stops below 6.1, and
+      # TS 7 (the native port) ships no JS API, so eslint crashes and
+      # dependency-cruiser silently cruises 0 modules. Revisit once
+      # typescript-eslint supports it.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # Expo SDK owns these versions (see expo's bundledNativeModules.json).
+      # Bump them in an SDK upgrade via `npx expo install --fix`, never
+      # piecemeal: a lone major of a native module is untested against the
+      # SDK and can't be checked without a device build.
+      - dependency-name: "expo"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "expo-*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-native"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "@react-native-async-storage/async-storage"
+        update-types: ["version-update:semver-major"]
+      # react is pinned exactly to the SDK's version, and react-test-renderer
+      # must equal it exactly (RNTL checks at runtime). Both only move in an
+      # SDK upgrade.
+      - dependency-name: "react"
+      - dependency-name: "react-test-renderer"
 
   - package-ecosystem: "github-actions"
     directory: "/"
