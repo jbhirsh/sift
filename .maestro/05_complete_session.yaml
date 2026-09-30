@@ -6,6 +6,16 @@ name: "Complete All Tracks"
 - launchApp:
     clearState: true
 
+- waitForAnimationToEnd
+
+# Wait for the setup screen before tapping Start Sifting: on a cold,
+# clearState launch the button can render before the screen is ready, and
+# a tap landing then is lost (flow 05 hit this in CI: no card within 30s).
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
+
 - tapOn: "Start Sifting"
 
 - extendedWaitUntil:
