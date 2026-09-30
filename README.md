@@ -33,7 +33,7 @@ Sift is a production-quality React Native (Expo) app built in TypeScript, with a
 
 | Area | Choices |
 |------|---------|
-| Framework | Expo SDK 55, React Native 0.83, React 19 |
+| Framework | Expo SDK 57, React Native 0.86, React 19 |
 | Language | TypeScript (strict) |
 | Native | Swift + MusicKit (custom Expo module), Expo Modules API |
 | Animation | Reanimated 4 + Gesture Handler, worklets |
