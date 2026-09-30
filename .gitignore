@@ -57,3 +57,4 @@ fastlane/README.md
 
 # E2E build artifacts
 build/
+maestro-results/

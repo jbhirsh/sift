@@ -79,10 +79,12 @@ jobs:
     # Dependabot secrets.
     # Pinned (not macos-latest) so a runner-image migration can't silently
     # change simulator/Xcode behavior; bump deliberately. macos-26 is the
-    # image the working builds resolve to (Xcode 26; Expo SDK 55 requires
+    # image the working builds resolve to (Xcode 26; Expo SDK 57 requires
     # >=26 — macos-15's default Xcode 16.4 cannot compile expo-modules-core).
     runs-on: macos-26
-    timeout-minutes: 60
+    # Headroom for run-e2e.sh starting a fresh XCUITest driver per flow (and
+    # at most one driver retry per flow) on top of a cold ~30-min build.
+    timeout-minutes: 75
 
     steps:
       - uses: actions/checkout@v7
@@ -147,10 +149,13 @@ jobs:
           mkdir -p build/e2e
           tar -xzf build/Sift-e2e.tar.gz -C build/e2e
 
+      # Prints the resolved version so every run records which Maestro it
+      # tested with (previously never logged, so drift was undetectable).
       - name: Install Maestro
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" --version
 
       - name: Boot iOS Simulator
         run: |
@@ -172,10 +177,7 @@ jobs:
       - name: Install app on simulator
         run: xcrun simctl install booted build/e2e/*.app
 
-      # Warm the app before the suite runs. Maestro executes the suite's
-      # flows in a non-deterministic order (observed: a 00_-prefixed flow ran
-      # mid-suite, not first), so a warmup *flow* cannot guarantee it primes
-      # ahead of the first real flow. Do it here instead: a plain
+      # Warm the app before the suite runs. A plain
       # launch + settle + terminate loads the baked JS bundle and warms the
       # dyld/simulator caches, cutting the cold-start latency the flake
       # clusters on. Best effort — a warmup hiccup must never fail the job,
@@ -194,41 +196,34 @@ jobs:
           MAESTRO_DRIVER_STARTUP_TIMEOUT: "300000"
           # No analytics network call — one less nondeterministic dependency.
           MAESTRO_CLI_NO_ANALYTICS: "1"
+          E2E_OUT_DIR: maestro-results
+        # One `maestro test` per flow, in filename order, each on a fresh
+        # XCUITest driver — so one driver death can't cascade into every
+        # remaining flow (main run 34544916181: 1 driver crash -> 11/11
+        # failed). App-level failures (assertions, missing elements) are
+        # NEVER retried; only a pure driver/transport failure gets one retry,
+        # annotated as a warning. See scripts/run-e2e.sh for the policy.
         run: |
           export PATH="$HOME/.maestro/bin:$PATH"
-          # No automatic retry: a retry would mask residual nondeterminism as
-          # green runs. Every failure surfaces loudly with debug artifacts,
-          # and the fix goes to the root cause, not another attempt.
-          maestro test --debug-output maestro-debug --format junit --output maestro-report.xml .maestro/
+          scripts/run-e2e.sh .maestro
 
-      # Ground truth on where this Maestro version writes debug output —
-      # two artifact-capture attempts have come up empty against the
-      # documented paths. This step is also the guaranteed-evidence fallback:
-      # when the XCUITest driver times out at startup, Maestro dies before any
-      # flow runs and writes nothing (empty maestro-debug, no junit report, no
-      # ~/.maestro/tests), so the probes below land in the artifact
-      # (diagnostics.txt) alongside a simulator log tail. That guarantee of a
-      # non-empty, meaningful artifact is what lets the upload step keep
-      # `if-no-files-found: error` strict. Diagnostics must never themselves
-      # fail — every command here is guarded.
+      # Failure-only extras on top of run-e2e.sh's per-flow logs: where
+      # Maestro wrote its own output, a simulator log tail, and a screenshot
+      # of whatever screen was up. Diagnostics must never themselves fail —
+      # every command here is guarded.
       - name: Locate Maestro output (diagnostics)
         if: failure()
         run: |
-          mkdir -p maestro-debug
+          mkdir -p maestro-results
           {
             echo "=== CWD candidates ==="
             find . -maxdepth 2 \( -name 'maestro-*' -o -name '*.png' -o -name 'debug*' \) -not -path './node_modules/*' 2>/dev/null | head -20 || true
             echo "=== HOME/.maestro ==="
             find "$HOME/.maestro" -maxdepth 3 2>/dev/null | head -30 || true
-            echo "=== junit report ==="
-            if [ -f maestro-report.xml ]; then
-              ls -la maestro-report.xml || true
-              head -50 maestro-report.xml || true
-            else
-              echo "maestro-report.xml not written — likely driver startup failure"
-            fi
-          } 2>&1 | tee maestro-debug/diagnostics.txt || true
-          xcrun simctl spawn booted log show --style compact --last 10m 2>/dev/null | tail -300 > maestro-debug/simulator-log-tail.txt || true
+            echo "=== per-flow results ==="
+            ls -la maestro-results 2>/dev/null || true
+          } 2>&1 | tee maestro-results/diagnostics.txt || true
+          xcrun simctl spawn booted log show --style compact --last 10m 2>/dev/null | tail -300 > maestro-results/simulator-log-tail.txt || true
           # Which SCREEN was up when the wait timed out? Everything above proves
           # the app is alive but not WHERE it was — a 30s card-wait timeout
           # looks identical whether we stalled on Loading (a real stall) or were
@@ -236,25 +231,28 @@ jobs:
           # A screenshot disambiguates the two and is captured straight off the
           # simulator, so it works regardless of Maestro's debug-output quirks
           # and guarantees the artifact is non-empty on any in-flow failure.
-          xcrun simctl io booted screenshot maestro-debug/failure-screenshot.png || true
+          xcrun simctl io booted screenshot maestro-results/failure-screenshot.png || true
           # Maestro writes per-flow screenshots + view hierarchies (its XCUITest
           # accessibility snapshot) on failure, but the directory varies by
           # version; copy whatever landed under ~/.maestro/tests into the folder
           # so the UI hierarchy at the point of failure travels with the shot.
-          cp -R "$HOME/.maestro/tests" maestro-debug/maestro-tests 2>/dev/null || true
+          cp -R "$HOME/.maestro/tests" maestro-results/maestro-tests 2>/dev/null || true
 
-      - name: Upload Maestro debug artifacts
-        if: failure()
+      # Uploaded on success too: a run that passed only after a driver retry
+      # still carries the failed attempt's log, which is the evidence needed
+      # to chase the infra flake down instead of shrugging it off.
+      - name: Upload Maestro results
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: maestro-debug
-          # Maestro writes per-flow screenshots and view hierarchies under
-          # ~/.maestro/tests regardless of --debug-output on some versions;
-          # capture both, and fail loudly if neither exists — an empty debug
-          # artifact silently defeats the whole no-retry diagnosis doctrine.
+          name: maestro-results
+          # Per-flow logs + JUnit + debug output from scripts/run-e2e.sh, plus
+          # ~/.maestro/tests (where some Maestro versions write screenshots and
+          # view hierarchies regardless of --debug-output). run-e2e.sh always
+          # writes a log per flow, so an empty artifact means the job broke
+          # before the suite ran — fail loudly rather than upload nothing.
           path: |
-            maestro-debug
-            maestro-report.xml
+            maestro-results
             ~/.maestro/tests
             ~/.maestro/**/*.png
           if-no-files-found: error
@@ -294,7 +292,7 @@ jobs:
 
             Review this pull request for correctness, bugs, and adherence to
             the project conventions in CLAUDE.md (checked into the repo — read
-            it). This is a React Native (Expo SDK 55, RN 0.83, TypeScript
+            it). This is a React Native (Expo SDK 57, RN 0.86, TypeScript
             strict) app. Focus on:
               - Logic errors and edge cases
               - Type safety and null/undefined handling
