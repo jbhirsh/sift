@@ -37,13 +37,31 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "expo-*"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "jest-expo"
+        update-types: ["version-update:semver-major"]
       - dependency-name: "react-native"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "@react-native-async-storage/async-storage"
         update-types: ["version-update:semver-major"]
+      # Pinned exactly or with ~ by the SDK. For 0.x packages (worklets) a
+      # minor bump is breaking.
+      - dependency-name: "react-native-reanimated"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "react-native-worklets"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "react-native-gesture-handler"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "react-native-safe-area-context"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "@sentry/react-native"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       # react is pinned exactly to the SDK's version, and react-test-renderer
       # must equal it exactly (RNTL checks at runtime). Both only move in an
       # SDK upgrade.
+      # NOTE: ignore rules also suppress Dependabot *security* fix PRs. Alerts
+      # still appear under Security > Dependabot, but for these packages (and
+      # any fix that only ships in an ignored major) the fix is manual —
+      # usually via the next Expo SDK upgrade.
       - dependency-name: "react"
       - dependency-name: "react-test-renderer"
 
