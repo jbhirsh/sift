@@ -15,19 +15,16 @@ name: Mutation Testing
 # EVERY mutated file must score >= 80%. MockMusicProvider.ts is excluded from
 # the mutate scope (fixture-heavy scaffolding; its survivors are seed-data
 # strings), so it is neither mutated nor gated.
+#
+# The PR path filter lives in the `changes` job rather than an
+# `on.pull_request.paths` trigger filter, so this check reports on EVERY PR and
+# can be marked required in a branch rule (a trigger-filtered workflow never
+# reports on non-matching PRs, leaving a required check pending forever). On
+# PRs with no relevant change the `mutation` job is skipped by its `if:`, which
+# satisfies a required check.
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'src/**'
-      - '__tests__/**'
-      - '__mocks__/**'
-      - 'stryker.config.json'
-      - 'jest.config.js'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/mutation.yml'
-      - 'scripts/check-mutation-threshold.mjs'
   schedule:
     - cron: '0 6 * * 1'
   workflow_dispatch:
@@ -40,8 +37,38 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  changes:
+    name: Detect mutation-relevant changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+    steps:
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            relevant:
+              - 'src/**'
+              - '__tests__/**'
+              - '__mocks__/**'
+              - 'stryker.config.json'
+              - 'jest.config.js'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.github/workflows/mutation.yml'
+              - 'scripts/check-mutation-threshold.mjs'
+
   mutation:
     name: Mutation Tests (Stryker)
+    needs: changes
+    # Schedule/dispatch skip `changes`; `!cancelled()` keeps that skipped
+    # dependency from skipping the sweep. Fail-safe: a change-detection error
+    # runs the mutation job rather than skipping it (skipped reads as passing).
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.result == 'failure' || needs.changes.outputs.relevant == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
 

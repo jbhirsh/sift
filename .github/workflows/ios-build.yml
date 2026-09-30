@@ -3,18 +3,18 @@
 # proves it still compiles. GitHub-hosted macOS runners are free on public
 # repos, so it costs nothing; it's path-filtered to native-affecting files to
 # keep PR feedback fast everywhere else.
+#
+# The path filter lives in the `changes` job, NOT in an `on.pull_request.paths`
+# trigger filter: a trigger-filtered workflow never reports at all on PRs that
+# don't match, so marking its check as required in a branch rule would leave
+# every other PR stuck on "Expected — Waiting for status to be reported". Here
+# the workflow always runs; on non-native PRs the macOS `build` job is skipped
+# by its `if:`, and a job skipped by a condition satisfies a required check.
 name: iOS Build
 
 on:
   pull_request:
     branches: [main]
-    paths:
-      - 'modules/**'
-      - 'app.json'
-      - 'eas.json'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/ios-build.yml'
   workflow_dispatch:
 
 concurrency:
@@ -28,9 +28,39 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  changes:
+    name: Detect native changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      native: ${{ steps.filter.outputs.native }}
+    steps:
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            native:
+              - 'modules/**'
+              - 'app.json'
+              - 'eas.json'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.github/workflows/ios-build.yml'
+
   build:
     name: Build iOS simulator app
-    runs-on: macos-latest
+    needs: changes
+    # Manual dispatch skips `changes` (no PR to diff), so `!cancelled()` keeps
+    # a skipped dependency from skipping this job; on PRs it runs when a
+    # native-affecting path changed. Fail-safe: if change detection itself
+    # errored, build anyway — a skipped job reads as a passing required check.
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.result == 'failure' || needs.changes.outputs.native == 'true') }}
+    # Pinned to the same image as the E2E job (ci.yml) so the compile gate and
+    # the E2E build see the same Xcode; bump both together.
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
 
