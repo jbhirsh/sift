@@ -23,10 +23,11 @@ updates:
         dependency-type: "development"
         update-types: ["minor", "patch"]
     ignore:
-      # Blocked upstream: typescript-eslint's peer range stops below 6.1, and
-      # TS 7 (the native port) ships no JS API, so eslint crashes and
-      # dependency-cruiser silently cruises 0 modules. Revisit once
-      # typescript-eslint supports it.
+      # TS 7 (the native port) ships no JS API, which typescript-eslint and
+      # dependency-cruiser load via require('typescript'); bumping that name to
+      # 7 crashes eslint and makes dependency-cruiser cruise 0 modules. Adopt
+      # TS 7 side by side instead (per its release notes): typescript@7 as
+      # @typescript/native for type-checking, `typescript` kept on the 6.0 API.
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
       # Expo SDK owns these versions (see expo's bundledNativeModules.json).
