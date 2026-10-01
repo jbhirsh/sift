@@ -1093,9 +1093,9 @@ describe('useMusicProvider', () => {
     // First keep: creates the playlist with the track — it landed, so
     // nothing is buffered even though the follow-up lookup fails.
     await act(async () => {
-      // Not awaited: v14's fireEvent also awaits the handler's promise, which
-      // only settles once the fake timers are advanced below (v13 fired the
-      // press without waiting on it).
+      // Not awaited, as in v13: the handler waits on fake timers advanced
+      // below, so awaiting the press here never settles inside this act()
+      // and the test times out.
       void fireEvent.press(getByTestId('keep-track'));
     });
     await act(async () => {
@@ -1107,9 +1107,9 @@ describe('useMusicProvider', () => {
     // Second keep: the playlist id is still unresolved and the retry window
     // exhausts again — the track must be buffered, not silently dropped.
     await act(async () => {
-      // Not awaited: v14's fireEvent also awaits the handler's promise, which
-      // only settles once the fake timers are advanced below (v13 fired the
-      // press without waiting on it).
+      // Not awaited, as in v13: the handler waits on fake timers advanced
+      // below, so awaiting the press here never settles inside this act()
+      // and the test times out.
       void fireEvent.press(getByTestId('keep-track'));
     });
     await act(async () => {
@@ -1532,8 +1532,9 @@ describe('useMusicProvider', () => {
       await fireEvent.press(getByTestId('add-pending-1'));
     });
     await act(async () => {
-      // Not awaited: v14's fireEvent also awaits the handler's promise, which
-      // deliberately parks here (v13 fired the press without waiting on it).
+      // Not awaited, as in v13: the handler deliberately parks on a promise
+      // this test settles later, so awaiting the press here never settles
+      // inside this act() and the test times out.
       void fireEvent.press(getByTestId('save-sifted'));
     });
     expect(resolveAdd).toBeDefined();
@@ -1572,8 +1573,9 @@ describe('useMusicProvider', () => {
     });
     // The keep resolves the playlist and parks mid-add.
     await act(async () => {
-      // Not awaited: v14's fireEvent also awaits the handler's promise, which
-      // deliberately parks here (v13 fired the press without waiting on it).
+      // Not awaited, as in v13: the handler deliberately parks on a promise
+      // this test settles later, so awaiting the press here never settles
+      // inside this act() and the test times out.
       void fireEvent.press(getByTestId('keep-track'));
     });
     expect(resolveAdd).toBeDefined();
@@ -1581,8 +1583,9 @@ describe('useMusicProvider', () => {
     // The clear must wait for the keep chain — reading the playlist now
     // would miss the mid-flight track and leave it behind.
     await act(async () => {
-      // Not awaited: v14's fireEvent also awaits the handler's promise, which
-      // deliberately parks here (v13 fired the press without waiting on it).
+      // Not awaited, as in v13: the handler deliberately parks on a promise
+      // this test settles later, so awaiting the press here never settles
+      // inside this act() and the test times out.
       void fireEvent.press(getByTestId('clear-sifted'));
     });
     expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
@@ -1619,16 +1622,18 @@ describe('useMusicProvider', () => {
     });
     // The keep resolves the playlist and hangs on its native add.
     await act(async () => {
-      // Not awaited: v14's fireEvent also awaits the handler's promise, which
-      // deliberately parks here (v13 fired the press without waiting on it).
+      // Not awaited, as in v13: the handler deliberately parks on a promise
+      // this test settles later, so awaiting the press here never settles
+      // inside this act() and the test times out.
       void fireEvent.press(getByTestId('keep-track'));
     });
     expect(hangResolve).toBeDefined();
 
     // The clear parks on the keep queue…
     await act(async () => {
-      // Not awaited: v14's fireEvent also awaits the handler's promise, which
-      // deliberately parks here (v13 fired the press without waiting on it).
+      // Not awaited, as in v13: the handler deliberately parks on a promise
+      // this test settles later, so awaiting the press here never settles
+      // inside this act() and the test times out.
       void fireEvent.press(getByTestId('clear-sifted'));
     });
     expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();

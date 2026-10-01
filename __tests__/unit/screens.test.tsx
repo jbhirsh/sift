@@ -1176,8 +1176,9 @@ describe('DoneScreen', () => {
 
     // Kick off a restore; it parks on the playlist re-add.
     await act(async () => {
-      // Not awaited: v14's fireEvent also awaits the handler's promise, which
-      // deliberately parks here (v13 fired the press without waiting on it).
+      // Not awaited, as in v13: the handler deliberately parks on a promise
+      // this test settles later, so awaiting the press here never settles
+      // inside this act() and the test times out.
       void fireEvent.press(getByTestId(`restore-track-${mockTrackA.id}`));
     });
     expect(resolveRestore).toBeDefined();

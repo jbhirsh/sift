@@ -75,7 +75,7 @@ __tests__/
 
 ## Getting started
 
-**Requirements:** Node.js 22+, Xcode 26+ (for native iOS builds). Expo is bundled — no global CLI needed; use `npx expo`.
+**Requirements:** Node.js 22.13+ (or 24+), Xcode 26+ (for native iOS builds). Expo is bundled — no global CLI needed; use `npx expo`.
 
 ```bash
 npm install                    # install dependencies
