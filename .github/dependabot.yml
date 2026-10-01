@@ -63,15 +63,23 @@ updates:
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "@sentry/react-native"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
-      # react is pinned exactly to the SDK's version, and react-test-renderer
-      # must equal it exactly (RNTL checks at runtime). Both only move in an
-      # SDK upgrade.
+      # react is pinned exactly to the SDK's version, and test-renderer (the
+      # renderer under @testing-library/react-native 14) must stay on the
+      # line matching that React minor: test-renderer 1.2 <-> React 19.2;
+      # 1.3 bundles a React 19.3 reconciler. Both move in an SDK upgrade.
       # NOTE: ignore rules also suppress Dependabot *security* fix PRs. Alerts
       # still appear under Security > Dependabot, but for these packages (and
       # any fix that only ships in an ignored major) the fix is manual —
       # usually via the next Expo SDK upgrade.
       - dependency-name: "react"
-      - dependency-name: "react-test-renderer"
+      - dependency-name: "test-renderer"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # jest-expo 57 is built on Jest 29 (babel-jest, jest-snapshot and
+      # @jest/globals ^29); Jest 30 waits for the jest-expo that adopts it.
+      - dependency-name: "jest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/jest"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
