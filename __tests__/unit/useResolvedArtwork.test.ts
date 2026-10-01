@@ -32,9 +32,9 @@ beforeEach(() => {
 });
 
 describe('useResolvedArtwork', () => {
-  it('returns artworkURL directly when already defined', () => {
+  it('returns artworkURL directly when already defined', async () => {
     const httpURL = 'https://example.com/artwork.jpg';
-    const { result } = renderHook(() => useResolvedArtwork('track-1', httpURL));
+    const { result } = await renderHook(() => useResolvedArtwork('track-1', httpURL));
 
     expect(result.current).toBe(httpURL);
     expect(mockResolveArtworkURL).not.toHaveBeenCalled();
@@ -44,7 +44,7 @@ describe('useResolvedArtwork', () => {
     const fileURL = 'file:///caches/artwork-track-2.jpg';
     mockResolveArtworkURL.mockResolvedValue(fileURL);
 
-    const { result } = renderHook(() => useResolvedArtwork('track-2', undefined));
+    const { result } = await renderHook(() => useResolvedArtwork('track-2', undefined));
 
     await waitFor(() => {
       expect(result.current).toBe(fileURL);
@@ -56,7 +56,7 @@ describe('useResolvedArtwork', () => {
   it('returns undefined when native resolver returns null', async () => {
     mockResolveArtworkURL.mockResolvedValue(null);
 
-    const { result } = renderHook(() => useResolvedArtwork('track-3', undefined));
+    const { result } = await renderHook(() => useResolvedArtwork('track-3', undefined));
 
     await waitFor(() => {
       expect(mockResolveArtworkURL).toHaveBeenCalled();
@@ -69,18 +69,18 @@ describe('useResolvedArtwork', () => {
     const fileURL = 'file:///caches/artwork-track-4.jpg';
     mockResolveArtworkURL.mockResolvedValue(fileURL);
 
-    const { result, unmount } = renderHook(() => useResolvedArtwork('track-4', undefined));
+    const { result, unmount } = await renderHook(() => useResolvedArtwork('track-4', undefined));
 
     await waitFor(() => {
       expect(result.current).toBe(fileURL);
     });
 
     expect(mockResolveArtworkURL).toHaveBeenCalledTimes(1);
-    unmount();
+    await unmount();
 
     // Re-render with the same trackID — should use JS cache
     mockResolveArtworkURL.mockReset();
-    const { result: result2 } = renderHook(() => useResolvedArtwork('track-4', undefined));
+    const { result: result2 } = await renderHook(() => useResolvedArtwork('track-4', undefined));
 
     expect(result2.current).toBe(fileURL);
     expect(mockResolveArtworkURL).not.toHaveBeenCalled();
@@ -89,7 +89,7 @@ describe('useResolvedArtwork', () => {
   it('updates when artworkURL changes from undefined to a value', async () => {
     mockResolveArtworkURL.mockResolvedValue(null);
 
-    const { result, rerender } = renderHook(
+    const { result, rerender } = await renderHook(
       ({ url }: { url: string | undefined }) => useResolvedArtwork('track-5', url),
       { initialProps: { url: undefined as string | undefined } },
     );
@@ -99,7 +99,7 @@ describe('useResolvedArtwork', () => {
       expect(mockResolveArtworkURL).toHaveBeenCalled();
     });
 
-    rerender({ url: 'https://example.com/new-artwork.jpg' });
+    await rerender({ url: 'https://example.com/new-artwork.jpg' });
     expect(result.current).toBe('https://example.com/new-artwork.jpg');
   });
 
@@ -118,14 +118,14 @@ describe('useResolvedArtwork', () => {
       .mockReturnValueOnce(firstPromise)
       .mockReturnValueOnce(secondPromise);
 
-    const { result, rerender } = renderHook(
+    const { result, rerender } = await renderHook(
       ({ id }: { id: string }) => useResolvedArtwork(id, undefined),
       { initialProps: { id: 'track-stale-a' } },
     );
 
     // Switch to a different track: cleanup cancels track-a's in-flight resolve
     // and a fresh (pending) resolve starts for track-b.
-    rerender({ id: 'track-stale-b' });
+    await rerender({ id: 'track-stale-b' });
     expect(mockResolveArtworkURL).toHaveBeenCalledTimes(2);
     expect(mockResolveArtworkURL).toHaveBeenLastCalledWith('track-stale-b', 600, 600);
 
@@ -145,7 +145,7 @@ describe('useResolvedArtwork', () => {
     // string is a valid (non-nullish) resolved value and must pass through.
     mockResolveArtworkURL.mockResolvedValue('');
 
-    const { result } = renderHook(() => useResolvedArtwork('track-empty', undefined));
+    const { result } = await renderHook(() => useResolvedArtwork('track-empty', undefined));
 
     await waitFor(() => {
       expect(result.current).toBe('');

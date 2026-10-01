@@ -30,9 +30,9 @@ describe('ThemeContext', () => {
     mockUseColorScheme.mockReset();
   });
 
-  test('provides light theme when colorScheme is light', () => {
+  test('provides light theme when colorScheme is light', async () => {
     mockUseColorScheme.mockReturnValue('light');
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <ThemeProvider><TestConsumer /></ThemeProvider>
     );
     expect(getByTestId('isDark').props.children).toBe('false');
@@ -41,9 +41,9 @@ describe('ThemeContext', () => {
     expect(getByTestId('text').props.children).toBe(COLORS.light.text);
   });
 
-  test('provides dark theme when colorScheme is dark', () => {
+  test('provides dark theme when colorScheme is dark', async () => {
     mockUseColorScheme.mockReturnValue('dark');
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <ThemeProvider><TestConsumer /></ThemeProvider>
     );
     expect(getByTestId('isDark').props.children).toBe('true');
@@ -52,25 +52,25 @@ describe('ThemeContext', () => {
     expect(getByTestId('text').props.children).toBe(COLORS.dark.text);
   });
 
-  test('gradientColors returns correct gradient for setup phase', () => {
+  test('gradientColors returns correct gradient for setup phase', async () => {
     mockUseColorScheme.mockReturnValue('light');
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <ThemeProvider><TestConsumer /></ThemeProvider>
     );
     expect(JSON.parse(getByTestId('gradient-setup').props.children)).toEqual(GRADIENTS.setup.light);
   });
 
-  test('gradientColors returns dark gradient in dark mode', () => {
+  test('gradientColors returns dark gradient in dark mode', async () => {
     mockUseColorScheme.mockReturnValue('dark');
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <ThemeProvider><TestConsumer /></ThemeProvider>
     );
     expect(JSON.parse(getByTestId('gradient-sifting').props.children)).toEqual(GRADIENTS.sifting.dark);
   });
 
-  test('useTheme throws when used outside ThemeProvider', () => {
+  test('useTheme throws when used outside ThemeProvider', async () => {
     const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
-    expect(() => render(<TestConsumer />)).toThrow('useTheme must be used within a ThemeProvider');
+    await expect(render(<TestConsumer />)).rejects.toThrow('useTheme must be used within a ThemeProvider');
     consoleError.mockRestore();
   });
 });

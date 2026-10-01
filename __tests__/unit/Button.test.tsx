@@ -8,89 +8,89 @@ jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
 }));
 
 describe('Button', () => {
-  test('renders title text', () => {
-    const { getByText } = render(
+  test('renders title text', async () => {
+    const { getByText } = await render(
       <Button title="Press Me" onPress={jest.fn()} />
     );
     expect(getByText('Press Me')).toBeTruthy();
   });
 
-  test('calls onPress when pressed', () => {
+  test('calls onPress when pressed', async () => {
     const onPress = jest.fn();
-    const { getByText } = render(
+    const { getByText } = await render(
       <Button title="Press" onPress={onPress} />
     );
-    fireEvent.press(getByText('Press'));
+    await fireEvent.press(getByText('Press'));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  test('does not call onPress when disabled', () => {
+  test('does not call onPress when disabled', async () => {
     const onPress = jest.fn();
-    const { getByText } = render(
+    const { getByText } = await render(
       <Button title="Disabled" onPress={onPress} disabled />
     );
-    fireEvent.press(getByText('Disabled'));
+    await fireEvent.press(getByText('Disabled'));
     expect(onPress).not.toHaveBeenCalled();
   });
 
-  test('renders with icon prefix', () => {
-    const { getByText } = render(
+  test('renders with icon prefix', async () => {
+    const { getByText } = await render(
       <Button title="Save" onPress={jest.fn()} icon="💾" />
     );
     expect(getByText('💾 Save')).toBeTruthy();
   });
 
-  test('renders with secondary variant', () => {
-    const { getByText } = render(
+  test('renders with secondary variant', async () => {
+    const { getByText } = await render(
       <Button title="Secondary" onPress={jest.fn()} variant="secondary" />
     );
     expect(getByText('Secondary')).toBeTruthy();
   });
 
-  test('renders with plain variant', () => {
-    const { getByText } = render(
+  test('renders with plain variant', async () => {
+    const { getByText } = await render(
       <Button title="Plain" onPress={jest.fn()} variant="plain" />
     );
     expect(getByText('Plain')).toBeTruthy();
   });
 
-  test('renders with small size', () => {
-    const { getByText } = render(
+  test('renders with small size', async () => {
+    const { getByText } = await render(
       <Button title="Small" onPress={jest.fn()} size="small" />
     );
     expect(getByText('Small')).toBeTruthy();
   });
 
-  test('renders with large size', () => {
-    const { getByText } = render(
+  test('renders with large size', async () => {
+    const { getByText } = await render(
       <Button title="Large" onPress={jest.fn()} size="large" />
     );
     expect(getByText('Large')).toBeTruthy();
   });
 
-  test('renders with custom color', () => {
-    const { getByText } = render(
+  test('renders with custom color', async () => {
+    const { getByText } = await render(
       <Button title="Custom" onPress={jest.fn()} color="#FF0000" />
     );
     expect(getByText('Custom')).toBeTruthy();
   });
 
-  test('renders with testID', () => {
-    const { getByTestId } = render(
+  test('renders with testID', async () => {
+    const { getByTestId } = await render(
       <Button title="Test" onPress={jest.fn()} testID="my-button" />
     );
     expect(getByTestId('my-button')).toBeTruthy();
   });
 
-  test('secondary variant disabled shows default text color', () => {
-    const { getByText } = render(
+  test('secondary variant disabled shows default text color', async () => {
+    const { getByText } = await render(
       <Button title="SecDisabled" onPress={jest.fn()} variant="secondary" disabled />
     );
     expect(getByText('SecDisabled')).toBeTruthy();
   });
 
-  test('plain variant disabled shows default text color', () => {
-    const { getByText } = render(
+  test('plain variant disabled shows default text color', async () => {
+    const { getByText } = await render(
       <Button title="PlainDisabled" onPress={jest.fn()} variant="plain" disabled />
     );
     expect(getByText('PlainDisabled')).toBeTruthy();

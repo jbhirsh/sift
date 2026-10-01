@@ -66,77 +66,77 @@ const mockTrack: Track = {
   artworkURL: 'https://example.com/art.jpg',
 };
 
-function renderCard(track = mockTrack, onDecide = jest.fn()) {
+async function renderCard(track = mockTrack, onDecide = jest.fn()) {
   panOnUpdate = undefined;
   panOnEnd = undefined;
-  return { ...render(
+  return { ...(await render(
     <ThemeProvider>
       <InteractiveCard track={track} onDecide={onDecide} />
     </ThemeProvider>
-  ), onDecide };
+  )), onDecide };
 }
 
 describe('InteractiveCard', () => {
-  test('renders track name', () => {
-    const { getByTestId } = renderCard();
+  test('renders track name', async () => {
+    const { getByTestId } = await renderCard();
     expect(getByTestId('card-track-name').props.children).toBe('Test Track');
   });
 
-  test('renders artist name', () => {
-    const { getByTestId } = renderCard();
+  test('renders artist name', async () => {
+    const { getByTestId } = await renderCard();
     expect(getByTestId('card-artist-name').props.children).toBe('Test Artist');
   });
 
-  test('renders album name', () => {
-    const { getByTestId } = renderCard();
+  test('renders album name', async () => {
+    const { getByTestId } = await renderCard();
     expect(getByTestId('card-album-name').props.children).toBe('Test Album');
   });
 
-  test('renders play count', () => {
-    const { getByTestId } = renderCard();
+  test('renders play count', async () => {
+    const { getByTestId } = await renderCard();
     expect(getByTestId('card-play-count').props.children).toBe(42);
   });
 
-  test('renders placeholder when no artwork URL', () => {
+  test('renders placeholder when no artwork URL', async () => {
     jest.mocked(useResolvedArtwork).mockReturnValueOnce(undefined);
     const trackNoArt = { ...mockTrack, artworkURL: undefined };
-    const { toJSON } = renderCard(trackNoArt);
+    const { toJSON } = await renderCard(trackNoArt);
     expect(toJSON()).toBeTruthy();
   });
 
-  test('pan gesture onUpdate sets drag values', () => {
-    renderCard();
+  test('pan gesture onUpdate sets drag values', async () => {
+    await renderCard();
     expect(panOnUpdate).toBeDefined();
     // Should not throw when called
     panOnUpdate?.({ translationX: 50, translationY: 10 });
   });
 
-  test('pan gesture beyond threshold right triggers keep', () => {
+  test('pan gesture beyond threshold right triggers keep', async () => {
     const onDecide = jest.fn();
-    renderCard(mockTrack, onDecide);
+    await renderCard(mockTrack, onDecide);
     expect(panOnEnd).toBeDefined();
     panOnEnd?.({ translationX: 100 });
     expect(onDecide).toHaveBeenCalledWith('keep');
   });
 
-  test('pan gesture beyond threshold left triggers remove', () => {
+  test('pan gesture beyond threshold left triggers remove', async () => {
     const onDecide = jest.fn();
-    renderCard(mockTrack, onDecide);
+    await renderCard(mockTrack, onDecide);
     panOnEnd?.({ translationX: -100 });
     expect(onDecide).toHaveBeenCalledWith('remove');
   });
 
-  test('pan gesture below threshold does not trigger decision', () => {
+  test('pan gesture below threshold does not trigger decision', async () => {
     const onDecide = jest.fn();
-    renderCard(mockTrack, onDecide);
+    await renderCard(mockTrack, onDecide);
     panOnEnd?.({ translationX: 30 });
     expect(onDecide).not.toHaveBeenCalled();
   });
 
-  test('renders with programmaticOffset prop', () => {
+  test('renders with programmaticOffset prop', async () => {
     const onDecide = jest.fn();
     const programmaticOffset = { value: 100 };
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <ThemeProvider>
         <InteractiveCard
           track={mockTrack}

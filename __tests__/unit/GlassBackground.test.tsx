@@ -13,29 +13,29 @@ jest.mock('expo-linear-gradient', () => ({
 }));
 
 describe('GlassBackground', () => {
-  test('renders without crashing for setup phase', () => {
-    const { toJSON } = render(
+  test('renders without crashing for setup phase', async () => {
+    const { toJSON } = await render(
       <ThemeProvider><GlassBackground phase="setup" /></ThemeProvider>
     );
     expect(toJSON()).toBeTruthy();
   });
 
-  test('renders for loading phase', () => {
-    const { toJSON } = render(
+  test('renders for loading phase', async () => {
+    const { toJSON } = await render(
       <ThemeProvider><GlassBackground phase="loading" /></ThemeProvider>
     );
     expect(toJSON()).toBeTruthy();
   });
 
-  test('renders for sifting phase', () => {
-    const { toJSON } = render(
+  test('renders for sifting phase', async () => {
+    const { toJSON } = await render(
       <ThemeProvider><GlassBackground phase="sifting" /></ThemeProvider>
     );
     expect(toJSON()).toBeTruthy();
   });
 
-  test('renders for done phase', () => {
-    const { toJSON } = render(
+  test('renders for done phase', async () => {
+    const { toJSON } = await render(
       <ThemeProvider><GlassBackground phase="done" /></ThemeProvider>
     );
     expect(toJSON()).toBeTruthy();

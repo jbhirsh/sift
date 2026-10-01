@@ -88,16 +88,16 @@ describe('SiftProvider', () => {
     (SessionStore.loadSession as jest.Mock).mockResolvedValue(null);
   });
 
-  test('initializes with default state when no initialTracks', () => {
-    const { getByTestId } = renderWithProvider();
+  test('initializes with default state when no initialTracks', async () => {
+    const { getByTestId } = await renderWithProvider();
     expect(getByTestId('phase').props.children).toBe('setup');
     expect(getByTestId('total').props.children).toBe(0);
     expect(getByTestId('currentTrack').props.children).toBe('none');
   });
 
-  test('initializes with sifting phase when initialTracks provided', () => {
+  test('initializes with sifting phase when initialTracks provided', async () => {
     const tracks = [mockTrackA, mockTrackB, mockTrackC];
-    const { getByTestId } = renderWithProvider(tracks);
+    const { getByTestId } = await renderWithProvider(tracks);
     expect(getByTestId('phase').props.children).toBe('sifting');
     expect(getByTestId('total').props.children).toBe(3);
     expect(getByTestId('remaining').props.children).toBe(3);
@@ -106,29 +106,29 @@ describe('SiftProvider', () => {
     expect(getByTestId('nextNextTrack').props.children).toBe('Track C');
   });
 
-  test('decide keep advances cursor and adds to kept', () => {
-    const { getByTestId } = renderWithProvider([mockTrackA, mockTrackB]);
-    fireEvent.press(getByTestId('decide-keep'));
+  test('decide keep advances cursor and adds to kept', async () => {
+    const { getByTestId } = await renderWithProvider([mockTrackA, mockTrackB]);
+    await fireEvent.press(getByTestId('decide-keep'));
     expect(getByTestId('keptCount').props.children).toBe(1);
     expect(getByTestId('currentTrack').props.children).toBe('Track B');
   });
 
-  test('decide remove advances cursor and adds to removed', () => {
-    const { getByTestId } = renderWithProvider([mockTrackA, mockTrackB]);
-    fireEvent.press(getByTestId('decide-remove'));
+  test('decide remove advances cursor and adds to removed', async () => {
+    const { getByTestId } = await renderWithProvider([mockTrackA, mockTrackB]);
+    await fireEvent.press(getByTestId('decide-remove'));
     expect(getByTestId('removedCount').props.children).toBe(1);
   });
 
-  test('decide skip advances cursor and adds to skipped', () => {
-    const { getByTestId } = renderWithProvider([mockTrackA, mockTrackB]);
-    fireEvent.press(getByTestId('decide-skip'));
+  test('decide skip advances cursor and adds to skipped', async () => {
+    const { getByTestId } = await renderWithProvider([mockTrackA, mockTrackB]);
+    await fireEvent.press(getByTestId('decide-skip'));
     expect(getByTestId('skippedCount').props.children).toBe(1);
   });
 
   test('startFresh clears session and resets state', async () => {
-    const { getByTestId } = renderWithProvider([mockTrackA]);
+    const { getByTestId } = await renderWithProvider([mockTrackA]);
     await act(async () => {
-      fireEvent.press(getByTestId('start-fresh'));
+      await fireEvent.press(getByTestId('start-fresh'));
     });
     await waitFor(() => {
       expect(SessionStore.clearSession).toHaveBeenCalled();
@@ -147,65 +147,65 @@ describe('SiftProvider', () => {
       savedAt: '2024-01-01T00:00:00.000Z',
       provider: 'spotify',
     });
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     // Should stay in setup — SiftProvider no longer auto-resumes
     await waitFor(() => {
       expect(getByTestId('phase').props.children).toBe('setup');
     });
   });
 
-  test('togglePlayPause toggles isPlaying', () => {
-    const { getByTestId } = renderWithProvider([mockTrackA]);
+  test('togglePlayPause toggles isPlaying', async () => {
+    const { getByTestId } = await renderWithProvider([mockTrackA]);
     expect(getByTestId('isPlaying').props.children).toBe('false');
-    fireEvent.press(getByTestId('toggle-play'));
+    await fireEvent.press(getByTestId('toggle-play'));
     expect(getByTestId('isPlaying').props.children).toBe('true');
-    fireEvent.press(getByTestId('toggle-play'));
+    await fireEvent.press(getByTestId('toggle-play'));
     expect(getByTestId('isPlaying').props.children).toBe('false');
   });
 
-  test('seek updates playback position', () => {
-    const { getByTestId } = renderWithProvider([mockTrackA]);
-    fireEvent.press(getByTestId('seek'));
+  test('seek updates playback position', async () => {
+    const { getByTestId } = await renderWithProvider([mockTrackA]);
+    await fireEvent.press(getByTestId('seek'));
     expect(getByTestId('playbackPosition').props.children).toBe(42);
   });
 
-  test('skipBackward reduces position by 15', () => {
-    const { getByTestId } = renderWithProvider([mockTrackA]);
+  test('skipBackward reduces position by 15', async () => {
+    const { getByTestId } = await renderWithProvider([mockTrackA]);
     // Set position to 30 first
-    fireEvent.press(getByTestId('seek')); // sets to 42
-    fireEvent.press(getByTestId('skip-backward'));
+    await fireEvent.press(getByTestId('seek')); // sets to 42
+    await fireEvent.press(getByTestId('skip-backward'));
     expect(getByTestId('playbackPosition').props.children).toBe(27);
   });
 
-  test('skipBackward clamps to 0', () => {
-    const { getByTestId } = renderWithProvider([mockTrackA]);
-    fireEvent.press(getByTestId('skip-backward'));
+  test('skipBackward clamps to 0', async () => {
+    const { getByTestId } = await renderWithProvider([mockTrackA]);
+    await fireEvent.press(getByTestId('skip-backward'));
     expect(getByTestId('playbackPosition').props.children).toBe(0);
   });
 
-  test('skipForward increases position by 15, clamped to duration', () => {
-    const { getByTestId } = renderWithProvider([mockTrackA]);
-    fireEvent.press(getByTestId('skip-forward'));
+  test('skipForward increases position by 15, clamped to duration', async () => {
+    const { getByTestId } = await renderWithProvider([mockTrackA]);
+    await fireEvent.press(getByTestId('skip-forward'));
     expect(getByTestId('playbackPosition').props.children).toBe(15);
   });
 
-  test('useSift throws when used outside SiftProvider', () => {
+  test('useSift throws when used outside SiftProvider', async () => {
     const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
-    expect(() => render(<TestConsumer />)).toThrow('useSift must be used within a SiftProvider');
+    await expect(render(<TestConsumer />)).rejects.toThrow('useSift must be used within a SiftProvider');
     consoleError.mockRestore();
   });
 
-  test('does not load session on mount (handled by SetupScreen)', () => {
-    renderWithProvider();
+  test('does not load session on mount (handled by SetupScreen)', async () => {
+    await renderWithProvider();
     expect(SessionStore.loadSession).not.toHaveBeenCalled();
   });
 
   test('resetToSetup clears the saved session and resets state to setup', async () => {
-    const { getByTestId } = renderWithProvider([mockTrackA, mockTrackB]);
+    const { getByTestId } = await renderWithProvider([mockTrackA, mockTrackB]);
     expect(getByTestId('phase').props.children).toBe('sifting');
-    fireEvent.press(getByTestId('decide-keep'));
+    await fireEvent.press(getByTestId('decide-keep'));
     await act(async () => {
-      fireEvent.press(getByTestId('reset-to-setup'));
+      await fireEvent.press(getByTestId('reset-to-setup'));
     });
     await waitFor(() => {
       expect(SessionStore.clearSession).toHaveBeenCalled();
@@ -217,14 +217,14 @@ describe('SiftProvider', () => {
     expect(getByTestId('isPlaying').props.children).toBe('false');
   });
 
-  test('autosave persists pendingKeeps and removalErrors in the session', () => {
+  test('autosave persists pendingKeeps and removalErrors in the session', async () => {
     jest.useFakeTimers();
     try {
-      const { getByTestId } = renderWithProvider([mockTrackA, mockTrackB]);
-      fireEvent.press(getByTestId('decide-keep'));
-      fireEvent.press(getByTestId('add-pending-keep'));
-      fireEvent.press(getByTestId('add-removal-error'));
-      act(() => {
+      const { getByTestId } = await renderWithProvider([mockTrackA, mockTrackB]);
+      await fireEvent.press(getByTestId('decide-keep'));
+      await fireEvent.press(getByTestId('add-pending-keep'));
+      await fireEvent.press(getByTestId('add-removal-error'));
+      await act(() => {
         jest.advanceTimersByTime(600);
       });
       // The on-disk session must carry the repair signal, or a kill/relaunch
@@ -240,22 +240,22 @@ describe('SiftProvider', () => {
     }
   });
 
-  test('RESUME_SESSION restores persisted pendingKeeps and removalErrors', () => {
-    const { getByTestId } = renderWithProvider([mockTrackA, mockTrackB]);
-    fireEvent.press(getByTestId('resume-with-pending'));
+  test('RESUME_SESSION restores persisted pendingKeeps and removalErrors', async () => {
+    const { getByTestId } = await renderWithProvider([mockTrackA, mockTrackB]);
+    await fireEvent.press(getByTestId('resume-with-pending'));
     expect(getByTestId('pendingKeepsCount').props.children).toBe(1);
     expect(getByTestId('phase').props.children).toBe('sifting');
   });
 
-  test('flushPendingSave writes the debounced session synchronously', () => {
+  test('flushPendingSave writes the debounced session synchronously', async () => {
     jest.useFakeTimers();
     try {
-      const { getByTestId } = renderWithProvider([mockTrackA, mockTrackB]);
-      fireEvent.press(getByTestId('decide-keep'));
+      const { getByTestId } = await renderWithProvider([mockTrackA, mockTrackB]);
+      await fireEvent.press(getByTestId('decide-keep'));
       // The autosave is debounced — nothing has been written yet.
       expect(SessionStore.saveSession).not.toHaveBeenCalled();
 
-      fireEvent.press(getByTestId('flush-pending-save'));
+      await fireEvent.press(getByTestId('flush-pending-save'));
       // The pending session is persisted immediately, with the last decision.
       expect(SessionStore.saveSession).toHaveBeenCalledTimes(1);
       expect(SessionStore.saveSession).toHaveBeenCalledWith(
@@ -263,7 +263,7 @@ describe('SiftProvider', () => {
       );
 
       // The cancelled debounce timer must not fire a duplicate write.
-      act(() => {
+      await act(() => {
         jest.advanceTimersByTime(1000);
       });
       expect(SessionStore.saveSession).toHaveBeenCalledTimes(1);
@@ -272,18 +272,18 @@ describe('SiftProvider', () => {
     }
   });
 
-  test('flushPendingSave before leaving sifting preserves the last decision', () => {
+  test('flushPendingSave before leaving sifting preserves the last decision', async () => {
     jest.useFakeTimers();
     try {
-      const { getByTestId } = renderWithProvider([mockTrackA, mockTrackB]);
-      fireEvent.press(getByTestId('decide-keep'));
+      const { getByTestId } = await renderWithProvider([mockTrackA, mockTrackB]);
+      await fireEvent.press(getByTestId('decide-keep'));
       expect(SessionStore.saveSession).not.toHaveBeenCalled();
 
       // Mirrors the SiftScreen back button: flush, then flip phase to setup.
       // Without the flush, the autosave effect's cleanup would cancel the
       // debounced write and the keep decision would be lost.
-      fireEvent.press(getByTestId('flush-pending-save'));
-      fireEvent.press(getByTestId('set-phase-setup'));
+      await fireEvent.press(getByTestId('flush-pending-save'));
+      await fireEvent.press(getByTestId('set-phase-setup'));
 
       expect(getByTestId('phase').props.children).toBe('setup');
       expect(SessionStore.saveSession).toHaveBeenCalledTimes(1);
@@ -291,7 +291,7 @@ describe('SiftProvider', () => {
         expect.objectContaining({ cursor: 1, kept: [mockTrackA] }),
       );
 
-      act(() => {
+      await act(() => {
         jest.advanceTimersByTime(1000);
       });
       expect(SessionStore.saveSession).toHaveBeenCalledTimes(1);
@@ -300,17 +300,17 @@ describe('SiftProvider', () => {
     }
   });
 
-  test('flushPendingSave is a no-op when the debounced write already fired', () => {
+  test('flushPendingSave is a no-op when the debounced write already fired', async () => {
     jest.useFakeTimers();
     try {
-      const { getByTestId } = renderWithProvider([mockTrackA, mockTrackB]);
-      fireEvent.press(getByTestId('decide-keep'));
-      act(() => {
+      const { getByTestId } = await renderWithProvider([mockTrackA, mockTrackB]);
+      await fireEvent.press(getByTestId('decide-keep'));
+      await act(() => {
         jest.advanceTimersByTime(600);
       });
       expect(SessionStore.saveSession).toHaveBeenCalledTimes(1);
 
-      fireEvent.press(getByTestId('flush-pending-save'));
+      await fireEvent.press(getByTestId('flush-pending-save'));
       expect(SessionStore.saveSession).toHaveBeenCalledTimes(1);
     } finally {
       jest.useRealTimers();

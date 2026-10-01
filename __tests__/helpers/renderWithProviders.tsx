@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render, type RenderResult } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from '../../src/theme/ThemeContext';
 import { SiftProvider } from '../../src/context/SiftContext';
@@ -25,10 +25,10 @@ const mockSafeAreaInsets = {
   top: 0, bottom: 0, left: 0, right: 0,
 };
 
-export function renderWithProviders(
+export async function renderWithProviders(
   ui: React.ReactElement,
   { initialTracks }: { initialTracks?: Track[] } = {},
-) {
+): Promise<RenderResult> {
   return render(
     <SafeAreaProvider initialMetrics={{ insets: mockSafeAreaInsets, frame: { x: 0, y: 0, width: 390, height: 844 } }}>
       <ThemeProvider>
