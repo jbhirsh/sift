@@ -151,14 +151,15 @@ Makefile                Dev commands (test, lint, typecheck, check)
   never reports, and the required check hangs at "Expected". Path-filter
   inside the workflow instead (see the `changes` job in `ios-build.yml` and
   `mutation.yml`). A job skipped by its `if:` counts as passing.
-- **E2E runner.** `scripts/run-e2e.sh` runs each Maestro flow in its own
-  `maestro test` invocation, each with a fresh XCUITest driver, in filename
-  order. Assertion failures and app crashes are never retried. A pure
-  driver/transport failure gets one retry, flagged with a `::warning::`
-  annotation. If the retry also hits a driver error, the runner stops and
-  marks the remaining flows "not run". Fix flaky flows at the root: wait
-  for the element (`extendedWaitUntil`), never assert right after an
-  animated transition.
+- **E2E runner.** `scripts/run-e2e.sh` runs the whole Maestro suite in one
+  session, then re-runs alone, on a fresh XCUITest driver, only the flows
+  whose failure was a driver/transport error (so one driver death can't
+  fail every flow). Assertion failures and app crashes are never retried.
+  Each re-run is flagged with a `::warning::` annotation, and if a re-run
+  also hits a driver error the runner stops. Don't switch to one
+  invocation per flow: restarting the driver per flow caused lost taps
+  right after launch. Fix flaky flows at the root: wait for the element
+  (`extendedWaitUntil`), never assert right after an animated transition.
 
 ---
 
