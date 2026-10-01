@@ -17,11 +17,18 @@ updates:
     # un-mergeable PRs held every slot, so no other version update could open.
     # The ignore rules below keep known-blocked bumps from taking slots again.
     open-pull-requests-limit: 10
-    # One weekly PR for routine dev-tooling bumps, not one PR per package.
+    # One PR per run for every version update, majors included, and one for
+    # every security fix found at once, instead of a PR per package. Packages
+    # that must move in lockstep land together as a side effect. The cost: a
+    # major that needs code changes holds the whole bundle until it's fixed,
+    # which is why the known-blocked bumps below stay ignored. Security
+    # updates don't wait for Monday: they open as soon as an alert does.
     groups:
-      dev-dependencies:
-        dependency-type: "development"
-        update-types: ["minor", "patch"]
+      all-updates:
+        patterns: ["*"]
+      security-updates:
+        applies-to: "security-updates"
+        patterns: ["*"]
     ignore:
       # TS 7 (the native port) ships no JS API, which typescript-eslint and
       # dependency-cruiser load via require('typescript'); bumping that name to
@@ -75,3 +82,9 @@ updates:
       day: "monday"
       time: "06:00"
       timezone: "Etc/UTC"
+    groups:
+      all-updates:
+        patterns: ["*"]
+      security-updates:
+        applies-to: "security-updates"
+        patterns: ["*"]
