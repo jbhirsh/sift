@@ -148,8 +148,13 @@ Makefile                Dev commands (test, lint, typecheck, check)
   `workflow_dispatch` available for manual runs.
 - The Claude Code PR review runs as the `review` job inside `ci.yml`
   (dependent on the `check` job, pull requests only); the auto-fix workflow
-  lives alongside it in `.github/workflows/claude-autofix.yml` and works only
-  Dependabot's PRs (a person's PR is left to its author).
+  lives alongside it in `.github/workflows/claude-autofix.yml`. It acts only on
+  bots' PRs (Dependabot's): it fixes review threads opened by Claude Review or
+  the owner (two rounds per PR at most) and, when an npm bump fails a check
+  (CI, iOS Build, Mutation Testing), mechanical breakage from the bump, one
+  attempt per head and two per PR. When every fix would change behavior it
+  comments and leaves the decision to the owner. A person's PR is left to its
+  author.
 - **Dependabot's npm PRs merge themselves.** `dependabot-merge.yml` turns on
   auto-merge as each one opens, and the `main` rule does the gating: GitHub
   merges only once every required check is green. So the rule must list every
@@ -161,8 +166,9 @@ Makefile                Dev commands (test, lint, typecheck, check)
 - **Required status checks.** The `main` branch rule requires these job names,
   so renaming a job's `name:` silently un-gates it. Update the rule in the
   same PR as any rename:
-  `Lint, Typecheck & Unit Test`, `E2E Tests (Maestro)`, `Secret scan`,
-  `SAST scan`, `Build iOS simulator app`, `Mutation Tests (Stryker)`.
+  `Lint, Typecheck & Unit Test`, `E2E Tests (Maestro)`, `Claude Review`,
+  `Secret scan`, `SAST scan`, `Build iOS simulator app`,
+  `Mutation Tests (Stryker)`.
   Every one of these reports on every PR. Never add a trigger-level
   `on.pull_request.paths` filter to a gating workflow: a filtered-out workflow
   never reports, and the required check hangs at "Expected". Path-filter
