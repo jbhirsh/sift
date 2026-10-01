@@ -71,8 +71,19 @@ amend, rebase, or force-push `main`. Never use `--no-verify`.**
 
 ## Code Style
 - **TypeScript**: strict mode enabled. All new code must be typed.
+  Type-checking runs on **TypeScript 7** (the native compiler), installed as
+  `@typescript/native` (an npm alias of `typescript@7`). TS 7 ships no
+  JavaScript API, and typescript-eslint and dependency-cruiser load that API
+  via `require('typescript')`, so the `typescript` name is an alias of
+  `@typescript/typescript6` (the 6.0 API). Both install a `tsc` binary, so
+  never call bare `tsc`/`npx tsc`: use `npm run typecheck` / `make typecheck`,
+  which invoke TS 7 by path. Swap the alias back once typescript-eslint
+  supports TS 7.
 - **ESLint**: flat config in `eslint.config.mjs`. Fix all violations before committing.
-- **Testing**: Jest + React Native Testing Library.
+- **Testing**: Jest + React Native Testing Library 14. In RNTL 14, `render`,
+  `renderHook`, `rerender`, `unmount`, `fireEvent.*` and `act` are async:
+  always `await` them (and any helper that wraps them, like
+  `renderWithProviders`). A missed `await` is a silently wrong test.
 - **Architecture layering**: `npm run depcruise` enforces the import rules in
   `.dependency-cruiser.cjs` (pure `utils`, `types` a leaf, `services`/`context`
   below the UI). Runs in CI and the pre-commit hook.
