@@ -36,7 +36,7 @@ lint:
 
 # Type check
 typecheck:
-	npx tsc --noEmit
+	npm run -s typecheck
 
 # Build iOS dev client
 build-ios:

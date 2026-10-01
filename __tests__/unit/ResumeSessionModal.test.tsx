@@ -55,8 +55,8 @@ describe('ResumeSessionModal', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
-  test('renders session stats correctly', () => {
-    const { getByTestId } = render(
+  test('renders session stats correctly', async () => {
+    const { getByTestId } = await render(
       <ResumeSessionModal
         session={session}
         onResume={onResume}
@@ -71,11 +71,11 @@ describe('ResumeSessionModal', () => {
     expect(getByTestId('resume-stat-remaining')).toBeTruthy();
   });
 
-  test('clamps a corrupted cursor: remaining never goes negative', () => {
+  test('clamps a corrupted cursor: remaining never goes negative', async () => {
     // cursor beyond tracks.length (corrupted/legacy session) must show 0,
     // mirroring the reducer's own Math.max(0, ...) clamp.
     const corrupted = { ...session, cursor: 7 };
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <ResumeSessionModal
         session={corrupted}
         onResume={onResume}
@@ -87,11 +87,11 @@ describe('ResumeSessionModal', () => {
     expect(getByText('0')).toBeTruthy();
   });
 
-  test('a finished session reads as unsaved changes, not an unfinished sift', () => {
+  test('a finished session reads as unsaved changes, not an unfinished sift', async () => {
     // Finished sessions reach this modal only when buffered keeps still
     // need saving (see SetupScreen) — the copy must not claim otherwise.
     const finished = { ...session, cursor: session.tracks.length };
-    const { getByText, queryByText } = render(
+    const { getByText, queryByText } = await render(
       <ResumeSessionModal
         session={finished}
         onResume={onResume}
@@ -103,8 +103,8 @@ describe('ResumeSessionModal', () => {
     expect(queryByText(/unfinished sift/)).toBeNull();
   });
 
-  test('an unfinished session keeps the unfinished-sift copy', () => {
-    const { getByText } = render(
+  test('an unfinished session keeps the unfinished-sift copy', async () => {
+    const { getByText } = await render(
       <ResumeSessionModal
         session={session}
         onResume={onResume}
@@ -115,8 +115,8 @@ describe('ResumeSessionModal', () => {
     expect(getByText(/You have an unfinished sift for/)).toBeTruthy();
   });
 
-  test('displays playlist name in description', () => {
-    const { getByText } = render(
+  test('displays playlist name in description', async () => {
+    const { getByText } = await render(
       <ResumeSessionModal
         session={session}
         onResume={onResume}
@@ -128,9 +128,9 @@ describe('ResumeSessionModal', () => {
     expect(getByText(/My Playlist/)).toBeTruthy();
   });
 
-  test('displays Library for library source', () => {
+  test('displays Library for library source', async () => {
     const librarySession = { ...session, source: { type: 'library' as const } };
-    const { getByText } = render(
+    const { getByText } = await render(
       <ResumeSessionModal
         session={librarySession}
         onResume={onResume}
@@ -142,8 +142,8 @@ describe('ResumeSessionModal', () => {
     expect(getByText(/Library/)).toBeTruthy();
   });
 
-  test('calls onResume when Resume is pressed', () => {
-    const { getByTestId } = render(
+  test('calls onResume when Resume is pressed', async () => {
+    const { getByTestId } = await render(
       <ResumeSessionModal
         session={session}
         onResume={onResume}
@@ -152,12 +152,12 @@ describe('ResumeSessionModal', () => {
       />,
     );
 
-    fireEvent.press(getByTestId('resume-modal-resume'));
+    await fireEvent.press(getByTestId('resume-modal-resume'));
     expect(onResume).toHaveBeenCalledTimes(1);
   });
 
-  test('calls onStartOver when Start Over is pressed', () => {
-    const { getByTestId } = render(
+  test('calls onStartOver when Start Over is pressed', async () => {
+    const { getByTestId } = await render(
       <ResumeSessionModal
         session={session}
         onResume={onResume}
@@ -166,12 +166,12 @@ describe('ResumeSessionModal', () => {
       />,
     );
 
-    fireEvent.press(getByTestId('resume-modal-start-over'));
+    await fireEvent.press(getByTestId('resume-modal-start-over'));
     expect(onStartOver).toHaveBeenCalledTimes(1);
   });
 
-  test('calls onCancel when Cancel is pressed', () => {
-    const { getByTestId } = render(
+  test('calls onCancel when Cancel is pressed', async () => {
+    const { getByTestId } = await render(
       <ResumeSessionModal
         session={session}
         onResume={onResume}
@@ -180,7 +180,7 @@ describe('ResumeSessionModal', () => {
       />,
     );
 
-    fireEvent.press(getByTestId('resume-modal-cancel'));
+    await fireEvent.press(getByTestId('resume-modal-cancel'));
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 });

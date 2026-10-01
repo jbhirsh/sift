@@ -194,7 +194,7 @@ describe('useMusicProvider — observable state', () => {
     mockProvider.requestAuthorization.mockImplementationOnce(
       () => new Promise<boolean>((res) => { resolveAuth = res; }),
     );
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     let pending!: Promise<boolean>;
     await act(async () => {
@@ -214,7 +214,7 @@ describe('useMusicProvider — observable state', () => {
 
   test('authorize denial reports disconnected and returns false', async () => {
     mockProvider.requestAuthorization.mockResolvedValueOnce(false);
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     let granted = true;
     await act(async () => {
@@ -227,7 +227,7 @@ describe('useMusicProvider — observable state', () => {
   test('authorize failure reports disconnected, returns false, and captures the error', async () => {
     const boom = new Error('auth boom');
     mockProvider.requestAuthorization.mockRejectedValueOnce(boom);
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     let granted = true;
     await act(async () => {
@@ -239,7 +239,7 @@ describe('useMusicProvider — observable state', () => {
   });
 
   test('isAuthorized passes the provider answer through', async () => {
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     mockProvider.isAuthorized.mockResolvedValueOnce(false);
     let authorized = true;
@@ -258,7 +258,7 @@ describe('useMusicProvider — observable state', () => {
   // ── Playback state ───────────────────────────────────
 
   test('play marks playing and restarts the position (or starts at the given one)', async () => {
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     // Move the position first so the reset to 0 is observable.
     await act(async () => {
@@ -281,7 +281,7 @@ describe('useMusicProvider — observable state', () => {
 
   test('a failed play never claims to be playing', async () => {
     mockProvider.play.mockRejectedValueOnce(new Error('no session'));
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       await api.play('1');
@@ -291,7 +291,7 @@ describe('useMusicProvider — observable state', () => {
   });
 
   test('pause and resume flip isPlaying only when the provider call succeeds', async () => {
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
     await act(async () => {
       await api.play('1');
     });
@@ -315,45 +315,45 @@ describe('useMusicProvider — observable state', () => {
     expect(sift.state.isPlaying).toBe(true);
   });
 
-  test('skipForward jumps 15s ahead and clamps at the track duration', () => {
-    renderHarness([mockTrack]); // duration 200
+  test('skipForward jumps 15s ahead and clamps at the track duration', async () => {
+    await renderHarness([mockTrack]); // duration 200
 
     mockProvider.getPlaybackState.mockReturnValue({ position: 30, isPlaying: true });
-    act(() => {
+    await act(() => {
       api.skipForward();
     });
     expect(mockProvider.seek).toHaveBeenCalledWith(45);
     expect(sift.state.playbackPosition).toBe(45);
 
     mockProvider.getPlaybackState.mockReturnValue({ position: 195, isPlaying: true });
-    act(() => {
+    await act(() => {
       api.skipForward();
     });
     expect(mockProvider.seek).toHaveBeenLastCalledWith(200);
     expect(sift.state.playbackPosition).toBe(200);
   });
 
-  test('skipForward without a current track is a no-op', () => {
-    renderHarness(); // no tracks loaded
-    act(() => {
+  test('skipForward without a current track is a no-op', async () => {
+    await renderHarness(); // no tracks loaded
+    await act(() => {
       api.skipForward();
     });
     expect(mockProvider.seek).not.toHaveBeenCalled();
     expect(sift.state.playbackPosition).toBe(0);
   });
 
-  test('skipBackward rewinds 15s and clamps at zero', () => {
-    renderHarness([mockTrack]);
+  test('skipBackward rewinds 15s and clamps at zero', async () => {
+    await renderHarness([mockTrack]);
 
     mockProvider.getPlaybackState.mockReturnValue({ position: 30, isPlaying: true });
-    act(() => {
+    await act(() => {
       api.skipBackward();
     });
     expect(mockProvider.seek).toHaveBeenCalledWith(15);
     expect(sift.state.playbackPosition).toBe(15);
 
     mockProvider.getPlaybackState.mockReturnValue({ position: 5, isPlaying: true });
-    act(() => {
+    await act(() => {
       api.skipBackward();
     });
     expect(mockProvider.seek).toHaveBeenLastCalledWith(0);
@@ -361,7 +361,7 @@ describe('useMusicProvider — observable state', () => {
   });
 
   test('polling mirrors the provider position every 500ms and stops on pause', async () => {
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
     await act(async () => {
       await api.play('1');
     });
@@ -397,7 +397,7 @@ describe('useMusicProvider — observable state', () => {
     mockProvider.loadLibrary.mockImplementationOnce(
       () => new Promise<Track[]>((res) => { resolveLibrary = res; }),
     );
-    renderHarness();
+    await renderHarness();
 
     let pending!: Promise<void>;
     await act(async () => {
@@ -426,7 +426,7 @@ describe('useMusicProvider — observable state', () => {
 
   test('loadLibrary failure surfaces the reason and returns to setup', async () => {
     mockProvider.loadLibrary.mockRejectedValueOnce(new Error('load fail'));
-    renderHarness();
+    await renderHarness();
 
     await act(async () => {
       await api.loadLibrary();
@@ -449,7 +449,7 @@ describe('useMusicProvider — observable state', () => {
   test('loadLibrary denial explains the requirement and offers Open Settings', async () => {
     mockProvider.isAuthorized.mockResolvedValue(false);
     mockProvider.requestAuthorization.mockResolvedValue(false);
-    renderHarness();
+    await renderHarness();
 
     await act(async () => {
       await api.loadLibrary();
@@ -479,7 +479,7 @@ describe('useMusicProvider — observable state', () => {
   test('loadTracks denial raises the same settings alert for a playlist source', async () => {
     mockProvider.isAuthorized.mockResolvedValue(false);
     mockProvider.requestAuthorization.mockResolvedValue(false);
-    renderHarness([]);
+    await renderHarness([]);
     await setPlaylistSource();
 
     await act(async () => {
@@ -512,7 +512,7 @@ describe('useMusicProvider — observable state', () => {
     mockProvider.loadPlaylistTracks.mockImplementationOnce(
       () => new Promise<Track[]>((res) => { resolveTracks = res; }),
     );
-    renderHarness([]);
+    await renderHarness([]);
     await setPlaylistSource();
 
     let pending!: Promise<void>;
@@ -544,7 +544,7 @@ describe('useMusicProvider — observable state', () => {
     mockProvider.isAuthorized.mockImplementationOnce(
       () => new Promise<boolean>((res) => { resolveAuthCheck = res; }),
     );
-    renderHarness();
+    await renderHarness();
 
     let first!: Promise<void>;
     await act(async () => {
@@ -578,7 +578,7 @@ describe('useMusicProvider — observable state', () => {
   test('loadTracks proceeds when authorization is granted at the prompt', async () => {
     mockProvider.isAuthorized.mockResolvedValueOnce(false);
     mockProvider.requestAuthorization.mockResolvedValueOnce(true);
-    renderHarness([]);
+    await renderHarness([]);
     await setPlaylistSource();
 
     await act(async () => {
@@ -593,7 +593,7 @@ describe('useMusicProvider — observable state', () => {
 
   test('loadTracks surfaces a clear error when the provider cannot load playlists', async () => {
     mockProvider.loadPlaylistTracks.mockResolvedValueOnce(undefined);
-    renderHarness([]);
+    await renderHarness([]);
     await setPlaylistSource();
 
     await act(async () => {
@@ -605,7 +605,7 @@ describe('useMusicProvider — observable state', () => {
 
   test('loadTracks failure surfaces the reason, generic for non-Errors', async () => {
     mockProvider.loadLibrary.mockRejectedValueOnce(new Error('load fail'));
-    renderHarness();
+    await renderHarness();
 
     await act(async () => {
       await api.loadTracks();
@@ -625,7 +625,7 @@ describe('useMusicProvider — observable state', () => {
   });
 
   test('loadPlaylists returns [] on denial without querying, and the list once granted', async () => {
-    renderHarness();
+    await renderHarness();
 
     mockProvider.isAuthorized.mockResolvedValueOnce(false);
     mockProvider.requestAuthorization.mockResolvedValueOnce(false);
@@ -661,7 +661,7 @@ describe('useMusicProvider — observable state', () => {
   // ── Remove / restore ─────────────────────────────────
 
   test('removeTrack logs full removal context and deletes from the library', async () => {
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       await api.removeTrack(mockTrack);
@@ -679,7 +679,7 @@ describe('useMusicProvider — observable state', () => {
 
   test('removeTrack failure records the track name but still logs the intent', async () => {
     mockProvider.removeFromLibrary.mockRejectedValueOnce(new Error('network'));
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       await api.removeTrack(mockTrack);
@@ -694,7 +694,7 @@ describe('useMusicProvider — observable state', () => {
   });
 
   test('restoreTrack moves the track from removed back to kept', async () => {
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       sift.dispatch({ type: 'DECIDE', decision: 'remove' });
@@ -711,7 +711,7 @@ describe('useMusicProvider — observable state', () => {
 
   test('restoreTrack failure surfaces "name: reason" and keeps the history record', async () => {
     mockProvider.addToLibrary.mockRejectedValueOnce(new Error('network down'));
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       await api.restoreTrack(mockTrack);
@@ -741,7 +741,7 @@ describe('useMusicProvider — observable state', () => {
     mockProvider.createPlaylist.mockImplementationOnce(
       () => new Promise<void>((res) => { resolveCreate = () => res(); }),
     );
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     // Seed a stale error from a previous attempt to prove a retry clears it.
     await act(async () => {
@@ -767,7 +767,7 @@ describe('useMusicProvider — observable state', () => {
 
   test('createPlaylist failure surfaces the message and always clears busy', async () => {
     mockProvider.createPlaylist.mockRejectedValueOnce(new Error('quota exceeded'));
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       await api.createPlaylist('Removed by Sift', ['1']);
@@ -796,7 +796,7 @@ describe('useMusicProvider — observable state', () => {
     // Readback: same song, but under the library-instance id Apple Music
     // assigned when it landed.
     mockProvider.loadPlaylistTracks.mockResolvedValue([{ ...mockTrack, id: 'lib-99' }]);
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
@@ -830,7 +830,7 @@ describe('useMusicProvider — observable state', () => {
     mockProvider.addToPlaylist.mockRejectedValueOnce(
       new Error('1 of 2 tracks could not be added'),
     );
-    renderHarness([mockTrack, mockTrackB]);
+    await renderHarness([mockTrack, mockTrackB]);
 
     await act(async () => {
       sift.dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: 'sifted-renamed' });
@@ -862,7 +862,7 @@ describe('useMusicProvider — observable state', () => {
       .mockRejectedValueOnce(new Error('offline'));
     mockProvider.loadPlaylistTracks.mockResolvedValueOnce([]); // pre-add diff
     mockProvider.addToPlaylist.mockRejectedValueOnce(new Error('add failed'));
-    renderHarness([mockTrack, mockTrackB]);
+    await renderHarness([mockTrack, mockTrackB]);
 
     await act(async () => {
       sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
@@ -894,7 +894,7 @@ describe('useMusicProvider — observable state', () => {
       .mockResolvedValueOnce([]); // repair lookup: the companion is gone
     mockProvider.loadPlaylistTracks.mockResolvedValueOnce([]); // pre-add diff
     mockProvider.addToPlaylist.mockRejectedValueOnce(new Error('add failed'));
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
@@ -916,7 +916,7 @@ describe('useMusicProvider — observable state', () => {
   // ── keepTrack id resolution ──────────────────────────
 
   test('keepTrack on the library source does nothing', async () => {
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       await api.keepTrack(mockTrack);
@@ -928,7 +928,7 @@ describe('useMusicProvider — observable state', () => {
   });
 
   test('keepTrack reuses the session-known sifted playlist id without a name lookup', async () => {
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
     await setPlaylistSource();
     await act(async () => {
       sift.dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: 'known-id' });
@@ -948,7 +948,7 @@ describe('useMusicProvider — observable state', () => {
   });
 
   test('keepTrack records the playlist id once a later keep resolves it', async () => {
-    renderHarness([mockTrack, mockTrackB]);
+    await renderHarness([mockTrack, mockTrackB]);
     await setPlaylistSource();
 
     // First keep: creates the playlist, but it never becomes queryable
@@ -980,7 +980,7 @@ describe('useMusicProvider — observable state', () => {
   });
 
   test('the sifted-playlist lookup retries on the 0/250/750ms schedule', async () => {
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
     await setPlaylistSource();
     mockProvider.loadPlaylists.mockResolvedValue([]);
 
@@ -1010,7 +1010,7 @@ describe('useMusicProvider — observable state', () => {
 
   test('warmCache reports exactly how many ids failed to resolve', async () => {
     mockProvider.warmSongCache.mockResolvedValueOnce(1);
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       await api.warmCache(['1', '2']);
@@ -1023,7 +1023,7 @@ describe('useMusicProvider — observable state', () => {
   });
 
   test('warmCache stays silent on full resolution or an unsupported provider', async () => {
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     mockProvider.warmSongCache.mockResolvedValueOnce(2);
     await act(async () => {
@@ -1050,7 +1050,7 @@ describe('useMusicProvider — observable state', () => {
       { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 2 },
     ]);
     mockProvider.loadPlaylistTracks.mockResolvedValue([mockTrack, mockTrackB]);
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     let cleared = false;
     await act(async () => {
@@ -1065,7 +1065,7 @@ describe('useMusicProvider — observable state', () => {
       { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 0 },
     ]);
     mockProvider.loadPlaylistTracks.mockResolvedValue([]);
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     let cleared = false;
     await act(async () => {
@@ -1079,7 +1079,7 @@ describe('useMusicProvider — observable state', () => {
     // Callers wipe local session state only on success — "nothing to clear"
     // must read as success, or Start Over would refuse to proceed forever.
     mockProvider.loadPlaylists.mockResolvedValue([]);
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     let cleared = false;
     await act(async () => {
@@ -1091,7 +1091,7 @@ describe('useMusicProvider — observable state', () => {
   });
 
   test('clearSiftedPlaylist reports failure so callers keep their local state', async () => {
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     mockProvider.loadPlaylists.mockRejectedValueOnce(new Error('offline'));
     let cleared = true;
@@ -1119,7 +1119,7 @@ describe('useMusicProvider — observable state', () => {
   // ── Authorization is checked, not re-prompted ────────
 
   test('already-authorized flows never re-open the consent prompt', async () => {
-    renderHarness([]);
+    await renderHarness([]);
 
     await act(async () => {
       await api.loadLibrary();
@@ -1142,7 +1142,7 @@ describe('useMusicProvider — observable state', () => {
 
   test('switching the provider routes subsequent calls to the new provider', async () => {
     const spotifyProvider = makeMinimalProvider();
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       mockActiveProvider = spotifyProvider;
@@ -1164,7 +1164,7 @@ describe('useMusicProvider — observable state', () => {
     mockProvider.loadPlaylists.mockResolvedValue([
       { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
     ]);
-    renderHarness([]);
+    await renderHarness([]);
     await setPlaylistSource();
 
     await act(async () => {
@@ -1196,7 +1196,7 @@ describe('useMusicProvider — observable state', () => {
         removedAt: '2026-01-02T00:00:00.000Z',
       },
     ]);
-    renderHarness([]);
+    await renderHarness([]);
     await setPlaylistSource();
 
     await act(async () => {
@@ -1210,7 +1210,7 @@ describe('useMusicProvider — observable state', () => {
   test('a genuinely empty playlist reports "no tracks" even with filtering on', async () => {
     mockProvider.loadPlaylistTracks.mockResolvedValueOnce([]);
     mockProvider.loadPlaylists.mockResolvedValue([]);
-    renderHarness([]);
+    await renderHarness([]);
     await setPlaylistSource();
 
     await act(async () => {
@@ -1240,7 +1240,7 @@ describe('useMusicProvider — observable state', () => {
         removedAt: '2026-01-01T00:00:00.000Z',
       },
     ]);
-    renderHarness([]);
+    await renderHarness([]);
     await setPlaylistSource();
 
     await act(async () => {
@@ -1259,7 +1259,7 @@ describe('useMusicProvider — observable state', () => {
     mockProvider.loadPlaylists.mockResolvedValue([
       { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
     ]);
-    renderHarness([]);
+    await renderHarness([]);
     await setPlaylistSource();
 
     await act(async () => {
@@ -1278,7 +1278,7 @@ describe('useMusicProvider — observable state', () => {
     ];
     mockProvider.loadPlaylists.mockResolvedValue(decoyFirst);
     mockProvider.loadPlaylistTracks.mockResolvedValue([]);
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       await api.saveSiftedPlaylist('My Playlist', [mockTrack]);
@@ -1301,7 +1301,7 @@ describe('useMusicProvider — observable state', () => {
     ];
     mockProvider.loadPlaylists.mockResolvedValue(decoyFirst);
     mockProvider.loadPlaylistTracks.mockResolvedValue([]);
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
     await act(async () => {
       sift.dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: 'sifted-renamed' });
     });
@@ -1327,7 +1327,7 @@ describe('useMusicProvider — observable state', () => {
     mockProvider.loadPlaylistTracks
       .mockResolvedValueOnce([mockTrack, mockTrackB])
       .mockResolvedValueOnce([mockTrack]);
-    renderHarness([]);
+    await renderHarness([]);
     await setPlaylistSource();
     await act(async () => {
       await api.loadTracks();
@@ -1361,7 +1361,7 @@ describe('useMusicProvider — observable state', () => {
       { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 0 },
     ]);
     mockProvider.loadPlaylistTracks.mockResolvedValueOnce([]);
-    renderHarness([mockTrack, mockTrackB]);
+    await renderHarness([mockTrack, mockTrackB]);
     await setPlaylistSource();
 
     await act(async () => {
@@ -1387,7 +1387,7 @@ describe('useMusicProvider — observable state', () => {
         { id: 'decoy', name: 'Another Playlist', trackCount: 9 },
         { id: 'new-sifted', name: 'My Playlist - Sifted', trackCount: 1 },
       ]);
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
     await setPlaylistSource();
 
     await act(async () => {
@@ -1400,7 +1400,7 @@ describe('useMusicProvider — observable state', () => {
 
   test('a failing keep is buffered for the Done fallback and reported', async () => {
     mockProvider.loadPlaylists.mockRejectedValueOnce(new Error('offline'));
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
     await setPlaylistSource();
 
     await act(async () => {
@@ -1423,7 +1423,7 @@ describe('useMusicProvider — observable state', () => {
     mockProvider.loadPlaylistTracks.mockResolvedValue([
       { ...mockTrack, name: 'Track A (Remastered)' },
     ]);
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       await api.saveSiftedPlaylist('My Playlist', [mockTrack]);
@@ -1440,7 +1440,7 @@ describe('useMusicProvider — observable state', () => {
       .mockResolvedValueOnce([]) // pre-add diff
       .mockResolvedValueOnce([{ ...mockTrack, name: 'Track A (Live)' }]); // landed: same id, new name
     mockProvider.addToPlaylist.mockRejectedValueOnce(new Error('partial failure'));
-    renderHarness([mockTrack, mockTrackB]);
+    await renderHarness([mockTrack, mockTrackB]);
 
     await act(async () => {
       sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
@@ -1458,7 +1458,7 @@ describe('useMusicProvider — observable state', () => {
 
   test('warmCache failures are captured, never thrown', async () => {
     mockProvider.warmSongCache.mockRejectedValueOnce(new Error('cache fail'));
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       await api.warmCache(['1', '2']);
@@ -1481,7 +1481,7 @@ describe('useMusicProvider — observable state', () => {
   test('keepTrack on a minimal provider creates the companion and loses nothing', async () => {
     const minimal = makeMinimalProvider();
     mockActiveProvider = minimal;
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
     await setPlaylistSource();
 
     await act(async () => {
@@ -1498,7 +1498,7 @@ describe('useMusicProvider — observable state', () => {
   test('saveSiftedPlaylist on a minimal provider creates the companion outright', async () => {
     const minimal = makeMinimalProvider();
     mockActiveProvider = minimal;
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       await api.saveSiftedPlaylist('My Playlist', [mockTrack]);
@@ -1513,7 +1513,7 @@ describe('useMusicProvider — observable state', () => {
       createPlaylist: jest.fn().mockRejectedValue('boom'), // non-Error rejection
     });
     mockActiveProvider = minimal;
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
@@ -1539,7 +1539,7 @@ describe('useMusicProvider — observable state', () => {
       addToPlaylist,
     });
     mockActiveProvider = minimal;
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
@@ -1566,7 +1566,7 @@ describe('useMusicProvider — observable state', () => {
     const addToPlaylist = jest.fn().mockResolvedValue(undefined);
     const minimal = makeMinimalProvider({ addToPlaylist });
     mockActiveProvider = minimal;
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
     await setPlaylistSource();
     await act(async () => {
       sift.dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: 'known-id' });
@@ -1583,7 +1583,7 @@ describe('useMusicProvider — observable state', () => {
 
   test('loadTracks reports missing playlist support on a minimal provider', async () => {
     mockActiveProvider = makeMinimalProvider();
-    renderHarness([]);
+    await renderHarness([]);
     await setPlaylistSource();
 
     await act(async () => {
@@ -1598,7 +1598,7 @@ describe('useMusicProvider — observable state', () => {
       loadPlaylistTracks: jest.fn().mockResolvedValue([mockTrack]),
     });
     mockActiveProvider = minimal;
-    renderHarness([]);
+    await renderHarness([]);
     await setPlaylistSource();
 
     await act(async () => {
@@ -1616,7 +1616,7 @@ describe('useMusicProvider — observable state', () => {
     mockProvider.loadPlaylists.mockResolvedValue([
       { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
     ]);
-    renderHarness([]);
+    await renderHarness([]);
     await setPlaylistSource();
 
     await act(async () => {
@@ -1629,7 +1629,7 @@ describe('useMusicProvider — observable state', () => {
   test('remove and restore degrade gracefully without provider removal APIs', async () => {
     const minimal = makeMinimalProvider();
     mockActiveProvider = minimal;
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     // Library source: removal is a logged no-op, not an error.
     await act(async () => {
@@ -1662,7 +1662,7 @@ describe('useMusicProvider — observable state', () => {
 
   test('warmCache no-ops silently on a provider without cache warming', async () => {
     mockActiveProvider = makeMinimalProvider();
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       await api.warmCache(['1', '2']);
@@ -1675,7 +1675,7 @@ describe('useMusicProvider — observable state', () => {
 
   test('clearSiftedPlaylist trivially succeeds on a provider without playlists', async () => {
     mockActiveProvider = makeMinimalProvider();
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     let cleared = false;
     await act(async () => {
@@ -1693,7 +1693,7 @@ describe('useMusicProvider — observable state', () => {
       removeFromPlaylist,
     });
     mockActiveProvider = minimal;
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     let cleared = false;
     await act(async () => {
@@ -1714,7 +1714,7 @@ describe('useMusicProvider — observable state', () => {
       ]),
     });
     mockActiveProvider = minimal;
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
@@ -1744,7 +1744,7 @@ describe('useMusicProvider — observable state', () => {
       loadPlaylistTracks: jest.fn().mockResolvedValue([mockTrack]),
     });
     mockActiveProvider = minimal;
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     await act(async () => {
       sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
@@ -1765,7 +1765,7 @@ describe('useMusicProvider — observable state', () => {
     // in the contents cache, which would silently drop it forever.
     const minimal = makeMinimalProvider();
     mockActiveProvider = minimal;
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
     await setPlaylistSource();
     await act(async () => {
       sift.dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: 'known-id' });
@@ -1788,7 +1788,7 @@ describe('useMusicProvider — observable state', () => {
       loadPlaylistTracks: jest.fn().mockResolvedValue([mockTrack]),
     });
     mockActiveProvider = minimal;
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
     await setPlaylistSource();
     await act(async () => {
       sift.dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: 'known-id' });
@@ -1811,7 +1811,7 @@ describe('useMusicProvider — observable state', () => {
       loadPlaylistTracks: jest.fn().mockResolvedValue([mockTrack]),
     });
     mockActiveProvider = minimal;
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     let cleared = true;
     await act(async () => {
@@ -1832,7 +1832,7 @@ describe('useMusicProvider — observable state', () => {
       loadPlaylistTracks: jest.fn().mockResolvedValue([]),
     });
     mockActiveProvider = minimal;
-    renderHarness([mockTrack]);
+    await renderHarness([mockTrack]);
 
     let cleared = false;
     await act(async () => {

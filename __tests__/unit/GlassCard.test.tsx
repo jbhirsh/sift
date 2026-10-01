@@ -25,34 +25,34 @@ function renderCard(props: { intensity?: 'thin' | 'regular' | 'thick'; radius?: 
 }
 
 describe('GlassCard', () => {
-  test('renders children', () => {
-    const { getByTestId } = renderCard();
+  test('renders children', async () => {
+    const { getByTestId } = await renderCard();
     expect(getByTestId('child')).toBeTruthy();
   });
 
-  test('renders with thin intensity', () => {
-    const { toJSON } = renderCard({ intensity: 'thin' });
+  test('renders with thin intensity', async () => {
+    const { toJSON } = await renderCard({ intensity: 'thin' });
     expect(toJSON()).toBeTruthy();
   });
 
-  test('renders with thick intensity', () => {
-    const { toJSON } = renderCard({ intensity: 'thick' });
+  test('renders with thick intensity', async () => {
+    const { toJSON } = await renderCard({ intensity: 'thick' });
     expect(toJSON()).toBeTruthy();
   });
 
-  test('renders with custom radius', () => {
-    const { toJSON } = renderCard({ radius: 24 });
+  test('renders with custom radius', async () => {
+    const { toJSON } = await renderCard({ radius: 24 });
     expect(toJSON()).toBeTruthy();
   });
 
-  test('renders with default intensity (regular)', () => {
-    const { toJSON } = renderCard();
+  test('renders with default intensity (regular)', async () => {
+    const { toJSON } = await renderCard();
     expect(toJSON()).toBeTruthy();
   });
 
-  test('renders with dark color scheme', () => {
+  test('renders with dark color scheme', async () => {
     mockUseColorScheme.mockReturnValue('dark');
-    const { toJSON } = renderCard();
+    const { toJSON } = await renderCard();
     expect(toJSON()).toBeTruthy();
     mockUseColorScheme.mockReturnValue('light');
   });

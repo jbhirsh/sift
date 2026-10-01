@@ -16,7 +16,11 @@ jest.mock('react-native-reanimated', () => ({
     View: 'View',
     createAnimatedComponent: (comp: unknown) => comp,
   },
-  useSharedValue: (val: number) => ({ value: val }),
+  useSharedValue: (val: number) => {
+    // Mirrors Reanimated's SharedValue surface: .value plus get()/set().
+    const sv = { value: val, get: () => sv.value, set: (v: number) => { sv.value = v; } };
+    return sv;
+  },
   useAnimatedStyle: (fn: () => unknown) => fn(),
   runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
 }));
@@ -118,78 +122,77 @@ describe('PlayerControls', () => {
     mockState.playbackPosition = 30;
   });
 
-  test('renders elapsed and duration time', () => {
-    const { getByTestId } = render(<PlayerControls />);
+  test('renders elapsed and duration time', async () => {
+    const { getByTestId } = await render(<PlayerControls />);
     expect(getByTestId('elapsed-time')).toBeTruthy();
     expect(getByTestId('duration-time')).toBeTruthy();
   });
 
-  test('renders play/pause button', () => {
-    const { getByTestId } = render(<PlayerControls />);
+  test('renders play/pause button', async () => {
+    const { getByTestId } = await render(<PlayerControls />);
     expect(getByTestId('play-pause-button')).toBeTruthy();
   });
 
-  test('pressing play/pause calls play when not playing and position is 0', () => {
+  test('pressing play/pause calls play when not playing and position is 0', async () => {
     mockState.playbackPosition = 0;
     mockState.isPlaying = false;
-    const { getByTestId } = render(<PlayerControls />);
-    fireEvent.press(getByTestId('play-pause-button'));
+    const { getByTestId } = await render(<PlayerControls />);
+    await fireEvent.press(getByTestId('play-pause-button'));
     expect(mockPlay).toHaveBeenCalledWith('1');
   });
 
-  test('pressing play/pause calls togglePlayPause when already started', () => {
+  test('pressing play/pause calls togglePlayPause when already started', async () => {
     mockState.playbackPosition = 30;
     mockState.isPlaying = false;
-    const { getByTestId } = render(<PlayerControls />);
-    fireEvent.press(getByTestId('play-pause-button'));
+    const { getByTestId } = await render(<PlayerControls />);
+    await fireEvent.press(getByTestId('play-pause-button'));
     expect(mockToggle).toHaveBeenCalled();
   });
 
-  test('pressing play/pause calls togglePlayPause when isPlaying is true', () => {
+  test('pressing play/pause calls togglePlayPause when isPlaying is true', async () => {
     mockState.playbackPosition = 30;
     mockState.isPlaying = true;
-    const { getByTestId } = render(<PlayerControls />);
-    fireEvent.press(getByTestId('play-pause-button'));
+    const { getByTestId } = await render(<PlayerControls />);
+    await fireEvent.press(getByTestId('play-pause-button'));
     expect(mockToggle).toHaveBeenCalled();
   });
 
-  test('auto-plays track on mount', () => {
+  test('auto-plays track on mount', async () => {
     mockState.playbackPosition = 0;
-    render(<PlayerControls />);
+    await render(<PlayerControls />);
     expect(mockPlay).toHaveBeenCalledWith('1');
   });
 
-  test('pauses playback on unmount', () => {
-    const { unmount } = render(<PlayerControls />);
-    unmount();
+  test('pauses playback on unmount', async () => {
+    const { unmount } = await render(<PlayerControls />);
+    await unmount();
     expect(mockPause).toHaveBeenCalled();
   });
 
-  test('tap gesture with zero slider width does not seek', () => {
-    render(<PlayerControls />);
+  test('tap gesture with zero slider width does not seek', async () => {
+    await render(<PlayerControls />);
     expect(tapOnEnd).toBeDefined();
     tapOnEnd?.({ x: 100 });
     expect(mockSeek).not.toHaveBeenCalled();
   });
 
-  test('pan gesture with zero slider width does not seek', () => {
-    render(<PlayerControls />);
+  test('pan gesture with zero slider width does not seek', async () => {
+    await render(<PlayerControls />);
     expect(panOnUpdate).toBeDefined();
     panOnUpdate?.({ x: 50 });
     expect(mockSeek).not.toHaveBeenCalled();
   });
 
-  test('tap gesture seeks to position after layout', () => {
-    const { UNSAFE_getAllByType } = render(<PlayerControls />);
+  test('tap gesture seeks to position after layout', async () => {
+    const { container } = await render(<PlayerControls />);
     // Find slider container and trigger layout to set sliderWidth > 0
-    const { View } = require('react-native');
-    const views = UNSAFE_getAllByType(View);
+    const views = container.queryAll((v) => v.type === 'View');
     // The slider container is the View with onLayout prop
     const sliderContainer = views.find(
       (v: { props: { onLayout?: unknown } }) => v.props.onLayout,
     );
     if (sliderContainer) {
-      fireEvent(sliderContainer, 'layout', {
+      await fireEvent(sliderContainer, 'layout', {
         nativeEvent: { layout: { width: 300, height: 30, x: 0, y: 0 } },
       });
     }
@@ -198,15 +201,14 @@ describe('PlayerControls', () => {
     expect(mockSeek).toHaveBeenCalled();
   });
 
-  test('pan gesture seeks to position after layout', () => {
-    const { UNSAFE_getAllByType } = render(<PlayerControls />);
-    const { View } = require('react-native');
-    const views = UNSAFE_getAllByType(View);
+  test('pan gesture seeks to position after layout', async () => {
+    const { container } = await render(<PlayerControls />);
+    const views = container.queryAll((v) => v.type === 'View');
     const sliderContainer = views.find(
       (v: { props: { onLayout?: unknown } }) => v.props.onLayout,
     );
     if (sliderContainer) {
-      fireEvent(sliderContainer, 'layout', {
+      await fireEvent(sliderContainer, 'layout', {
         nativeEvent: { layout: { width: 300, height: 30, x: 0, y: 0 } },
       });
     }

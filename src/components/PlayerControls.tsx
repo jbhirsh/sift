@@ -45,7 +45,9 @@ export default function PlayerControls() {
 
   const onSliderLayout = useCallback(
     (e: LayoutChangeEvent) => {
-      sliderWidth.value = e.nativeEvent.layout.width;
+      // .set() rather than a .value write: the React Compiler rules treat a
+      // hook's return value as immutable outside worklets.
+      sliderWidth.set(e.nativeEvent.layout.width);
     },
     [sliderWidth],
   );
