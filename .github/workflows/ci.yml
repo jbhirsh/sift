@@ -51,7 +51,7 @@ jobs:
         run: npx eslint .
 
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: Dependency graph
         run: npx depcruise src

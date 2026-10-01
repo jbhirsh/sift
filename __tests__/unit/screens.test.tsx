@@ -72,37 +72,37 @@ import SettingsScreen from '../../src/screens/SettingsScreen';
 import PlaylistPicker from '../../src/components/PlaylistPicker';
 
 describe('SetupScreen', () => {
-  test('renders brand text', () => {
-    const { getByTestId } = renderWithProviders(<SetupScreen />);
+  test('renders brand text', async () => {
+    const { getByTestId } = await renderWithProviders(<SetupScreen />);
     expect(getByTestId('setup-brand').props.children).toBe('sift.');
   });
 
-  test('renders Start Sifting button when no saved session', () => {
-    const { getByText } = renderWithProviders(<SetupScreen />);
+  test('renders Start Sifting button when no saved session', async () => {
+    const { getByText } = await renderWithProviders(<SetupScreen />);
     expect(getByText('Start Sifting')).toBeTruthy();
   });
 
-  test('renders error when loadError exists', () => {
-    const { queryByTestId } = renderWithProviders(<SetupScreen />);
+  test('renders error when loadError exists', async () => {
+    const { queryByTestId } = await renderWithProviders(<SetupScreen />);
     expect(queryByTestId('setup-error')).toBeNull();
   });
 
-  test('renders music service picker with Apple Music and Spotify', () => {
-    const { getByText } = renderWithProviders(<SetupScreen />);
+  test('renders music service picker with Apple Music and Spotify', async () => {
+    const { getByText } = await renderWithProviders(<SetupScreen />);
     expect(getByText('Apple Music')).toBeTruthy();
     expect(getByText('Spotify')).toBeTruthy();
   });
 
-  test('renders sort by section', () => {
-    const { getByText } = renderWithProviders(<SetupScreen />);
+  test('renders sort by section', async () => {
+    const { getByText } = await renderWithProviders(<SetupScreen />);
     expect(getByText('Sort by')).toBeTruthy();
     expect(getByText('Least Played')).toBeTruthy();
   });
 
-  test('pressing sort button opens action sheet', () => {
+  test('pressing sort button opens action sheet', async () => {
     const spy = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => {});
-    const { getByText } = renderWithProviders(<SetupScreen />);
-    fireEvent.press(getByText('Least Played'));
+    const { getByText } = await renderWithProviders(<SetupScreen />);
+    await fireEvent.press(getByText('Least Played'));
     expect(spy).toHaveBeenCalledWith(
       expect.objectContaining({
         options: ['Least Played', 'Most Played', 'Oldest Added', 'Newest Added', 'Random', 'Cancel'],
@@ -113,32 +113,32 @@ describe('SetupScreen', () => {
     spy.mockRestore();
   });
 
-  test('selecting a sort option from action sheet dispatches sort order', () => {
+  test('selecting a sort option from action sheet dispatches sort order', async () => {
     const spy = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation((_opts, cb) => { cb(1); });
-    const { getByText } = renderWithProviders(<SetupScreen />);
+    const { getByText } = await renderWithProviders(<SetupScreen />);
     // Mock calls callback with index 1 ("Most Played") immediately
-    fireEvent.press(getByText('Least Played'));
+    await fireEvent.press(getByText('Least Played'));
     expect(getByText('Most Played')).toBeTruthy();
     spy.mockRestore();
   });
 
-  test('pressing provider segment switches provider', () => {
-    const { getByText } = renderWithProviders(<SetupScreen />);
-    fireEvent.press(getByText('Spotify'));
+  test('pressing provider segment switches provider', async () => {
+    const { getByText } = await renderWithProviders(<SetupScreen />);
+    await fireEvent.press(getByText('Spotify'));
     // Component should still render without error
     expect(getByText('Spotify')).toBeTruthy();
   });
 
-  test('renders source picker with Library and Playlist options', () => {
-    const { getByText } = renderWithProviders(<SetupScreen />);
+  test('renders source picker with Library and Playlist options', async () => {
+    const { getByText } = await renderWithProviders(<SetupScreen />);
     expect(getByText('Sift source')).toBeTruthy();
     expect(getByText('Library')).toBeTruthy();
     expect(getByText('Playlist')).toBeTruthy();
   });
 
-  test('tapping Library dispatches SET_SOURCE with library type', () => {
-    const { getByTestId } = renderWithProviders(<SetupScreen />);
-    fireEvent.press(getByTestId('source-library'));
+  test('tapping Library dispatches SET_SOURCE with library type', async () => {
+    const { getByTestId } = await renderWithProviders(<SetupScreen />);
+    await fireEvent.press(getByTestId('source-library'));
     // Should not throw — Library is the default
     expect(getByTestId('source-library')).toBeTruthy();
   });
@@ -147,9 +147,9 @@ describe('SetupScreen', () => {
     mockProvider.loadPlaylists.mockResolvedValue([
       { id: 'p1', name: 'Test Playlist', trackCount: 5 },
     ]);
-    const { getByTestId } = renderWithProviders(<SetupScreen />);
+    const { getByTestId } = await renderWithProviders(<SetupScreen />);
     await act(async () => {
-      fireEvent.press(getByTestId('source-playlist'));
+      await fireEvent.press(getByTestId('source-playlist'));
     });
     expect(getByTestId('playlist-picker-modal')).toBeTruthy();
   });
@@ -158,12 +158,12 @@ describe('SetupScreen', () => {
     mockProvider.loadPlaylists.mockResolvedValue([
       { id: 'p1', name: 'My Playlist', trackCount: 8 },
     ]);
-    const { getByTestId, getByText } = renderWithProviders(<SetupScreen />);
+    const { getByTestId, getByText } = await renderWithProviders(<SetupScreen />);
     await act(async () => {
-      fireEvent.press(getByTestId('source-playlist'));
+      await fireEvent.press(getByTestId('source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('playlist-row-p1'));
+      await fireEvent.press(getByTestId('playlist-row-p1'));
     });
     expect(getByText('My Playlist')).toBeTruthy();
     expect(getByText('Change')).toBeTruthy();
@@ -173,13 +173,13 @@ describe('SetupScreen', () => {
     mockProvider.loadPlaylists.mockResolvedValue([
       { id: 'p1', name: 'Test', trackCount: 3 },
     ]);
-    const { getByTestId, queryByTestId } = renderWithProviders(<SetupScreen />);
+    const { getByTestId, queryByTestId } = await renderWithProviders(<SetupScreen />);
     await act(async () => {
-      fireEvent.press(getByTestId('source-playlist'));
+      await fireEvent.press(getByTestId('source-playlist'));
     });
     expect(getByTestId('playlist-picker-modal')).toBeTruthy();
     await act(async () => {
-      fireEvent.press(getByTestId('playlist-picker-cancel'));
+      await fireEvent.press(getByTestId('playlist-picker-cancel'));
     });
     expect(queryByTestId('playlist-picker-modal')).toBeNull();
   });
@@ -188,25 +188,25 @@ describe('SetupScreen', () => {
     mockProvider.loadPlaylists.mockResolvedValue([
       { id: 'p1', name: 'My Playlist', trackCount: 8 },
     ]);
-    const { getByTestId, getByText } = renderWithProviders(<SetupScreen />);
+    const { getByTestId, getByText } = await renderWithProviders(<SetupScreen />);
     // Select a playlist
     await act(async () => {
-      fireEvent.press(getByTestId('source-playlist'));
+      await fireEvent.press(getByTestId('source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('playlist-row-p1'));
+      await fireEvent.press(getByTestId('playlist-row-p1'));
     });
     // Reopen via Change button
     await act(async () => {
-      fireEvent.press(getByText('Change'));
+      await fireEvent.press(getByText('Change'));
     });
     expect(getByTestId('playlist-picker-modal')).toBeTruthy();
   });
 
   test('pressing Start Sifting triggers startFresh', async () => {
-    const { getByText } = renderWithProviders(<SetupScreen />);
+    const { getByText } = await renderWithProviders(<SetupScreen />);
     await act(async () => {
-      fireEvent.press(getByText('Start Sifting'));
+      await fireEvent.press(getByText('Start Sifting'));
     });
     // Should not throw
   });
@@ -225,7 +225,7 @@ describe('SetupScreen', () => {
       source: { type: 'library' },
     });
 
-    const { queryByText } = renderWithProviders(<SetupScreen />);
+    const { queryByText } = await renderWithProviders(<SetupScreen />);
     await act(async () => {});
     expect(queryByText('Resume Sifting')).toBeTruthy();
     expect(queryByText('Start Sifting')).toBeNull();
@@ -251,10 +251,10 @@ describe('SetupScreen', () => {
       removalErrors: ['Could not remove Track B'],
     });
 
-    const { getByTestId } = renderWithProviders(<><SetupScreen /><PendingProbe /></>);
+    const { getByTestId } = await renderWithProviders(<><SetupScreen /><PendingProbe /></>);
     await act(async () => {});
     await act(async () => {
-      fireEvent.press(getByTestId('resume-modal-resume'));
+      await fireEvent.press(getByTestId('resume-modal-resume'));
     });
     // The repair signal survives the kill/relaunch: Done's fallback save can
     // still fire for the buffered keep.
@@ -280,10 +280,10 @@ describe('SetupScreen', () => {
       siftedPlaylistId: 'sifted-9',
     });
 
-    const { getByTestId } = renderWithProviders(<><SetupScreen /><SiftedIdProbe /></>);
+    const { getByTestId } = await renderWithProviders(<><SetupScreen /><SiftedIdProbe /></>);
     await act(async () => {});
     await act(async () => {
-      fireEvent.press(getByTestId('resume-modal-resume'));
+      await fireEvent.press(getByTestId('resume-modal-resume'));
     });
     // Sifted-playlist lookups keep resolving by id (rename-proof) after a
     // kill/relaunch instead of degrading to the name match.
@@ -308,10 +308,10 @@ describe('SetupScreen', () => {
       source: { type: 'library' },
     });
 
-    const { getByTestId } = renderWithProviders(<><SetupScreen /><SiftedIdProbe /></>);
+    const { getByTestId } = await renderWithProviders(<><SetupScreen /><SiftedIdProbe /></>);
     await act(async () => {});
     await act(async () => {
-      fireEvent.press(getByTestId('resume-modal-resume'));
+      await fireEvent.press(getByTestId('resume-modal-resume'));
     });
     expect(getByTestId('probe-sifted-id').props.children).toBe('null');
   });
@@ -334,10 +334,10 @@ describe('SetupScreen', () => {
       source: { type: 'library' },
     });
 
-    const { getByTestId } = renderWithProviders(<><SetupScreen /><PendingProbe /></>);
+    const { getByTestId } = await renderWithProviders(<><SetupScreen /><PendingProbe /></>);
     await act(async () => {});
     await act(async () => {
-      fireEvent.press(getByTestId('resume-modal-resume'));
+      await fireEvent.press(getByTestId('resume-modal-resume'));
     });
     expect(getByTestId('probe-pending').props.children).toBe(0);
   });
@@ -356,21 +356,21 @@ describe('SetupScreen', () => {
       source: { type: 'library' },
     });
 
-    const { getByTestId, queryByTestId } = renderWithProviders(<SetupScreen />);
+    const { getByTestId, queryByTestId } = await renderWithProviders(<SetupScreen />);
     await act(async () => {});
 
     expect(queryByTestId('resume-session-modal')).toBeTruthy();
 
     await act(async () => {
-      fireEvent.press(getByTestId('resume-modal-cancel'));
+      await fireEvent.press(getByTestId('resume-modal-cancel'));
     });
     expect(queryByTestId('resume-session-modal')).toBeNull();
 
     await act(async () => {
-      fireEvent.press(getByTestId('source-playlist'));
+      await fireEvent.press(getByTestId('source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('source-library'));
+      await fireEvent.press(getByTestId('source-library'));
     });
 
     expect(queryByTestId('resume-session-modal')).toBeNull();
@@ -381,9 +381,9 @@ describe('SetupScreen', () => {
       { id: 'p1', name: 'My Playlist', trackCount: 8 },
       { id: 's1', name: 'My Playlist - Sifted', trackCount: 8 },
     ]);
-    const { getByTestId, queryByTestId } = renderWithProviders(<SetupScreen />);
+    const { getByTestId, queryByTestId } = await renderWithProviders(<SetupScreen />);
     await act(async () => {
-      fireEvent.press(getByTestId('source-playlist'));
+      await fireEvent.press(getByTestId('source-playlist'));
     });
     expect(getByTestId('playlist-row-p1')).toBeTruthy();
     // Companion playlists are sift outputs, not sources — offering one
@@ -404,12 +404,12 @@ describe('SetupScreen', () => {
       { id: 'p1', name: 'My Playlist', trackCount: 8 },
       { id: 's1', name: 'My Playlist - Sifted', trackCount: 8 },
     ]);
-    const { getByTestId } = renderWithProviders(<WithCreating />);
+    const { getByTestId } = await renderWithProviders(<WithCreating />);
     await act(async () => {
-      fireEvent.press(getByTestId('source-playlist'));
+      await fireEvent.press(getByTestId('source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('playlist-row-p1'));
+      await fireEvent.press(getByTestId('playlist-row-p1'));
     });
 
     // The Re-sift (start-over) button is disabled, and pressing it must not
@@ -417,7 +417,7 @@ describe('SetupScreen', () => {
     // save on the same remote playlist.
     expect(getByTestId('setup-resift').props.accessibilityState?.disabled).toBe(true);
     await act(async () => {
-      fireEvent.press(getByTestId('setup-resift'));
+      await fireEvent.press(getByTestId('setup-resift'));
     });
     expect(alertSpy).not.toHaveBeenCalled();
     alertSpy.mockRestore();
@@ -428,12 +428,12 @@ describe('SetupScreen', () => {
       { id: 'p1', name: 'My Playlist', trackCount: 8 },
       { id: 's1', name: 'My Playlist - Sifted', trackCount: 8 },
     ]);
-    const { getByTestId, queryByText } = renderWithProviders(<SetupScreen />);
+    const { getByTestId, queryByText } = await renderWithProviders(<SetupScreen />);
     await act(async () => {
-      fireEvent.press(getByTestId('source-playlist'));
+      await fireEvent.press(getByTestId('source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('playlist-row-p1'));
+      await fireEvent.press(getByTestId('playlist-row-p1'));
     });
     expect(queryByText('Re-sift Playlist')).toBeTruthy();
     expect(queryByText('Start Sifting')).toBeNull();
@@ -443,12 +443,12 @@ describe('SetupScreen', () => {
     mockProvider.loadPlaylists.mockResolvedValue([
       { id: 'p1', name: 'My Playlist', trackCount: 8 },
     ]);
-    const { getByTestId, queryByText } = renderWithProviders(<SetupScreen />);
+    const { getByTestId, queryByText } = await renderWithProviders(<SetupScreen />);
     await act(async () => {
-      fireEvent.press(getByTestId('source-playlist'));
+      await fireEvent.press(getByTestId('source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('playlist-row-p1'));
+      await fireEvent.press(getByTestId('playlist-row-p1'));
     });
     expect(queryByText('Start Sifting')).toBeTruthy();
     expect(queryByText('Re-sift Playlist')).toBeNull();
@@ -463,16 +463,16 @@ describe('SetupScreen', () => {
       { id: 'p1', name: 'My Playlist', trackCount: 8 },
       { id: 's1', name: 'My Playlist - Sifted', trackCount: 8 },
     ]);
-    const { getByTestId, getByText } = renderWithProviders(<SetupScreen />);
+    const { getByTestId, getByText } = await renderWithProviders(<SetupScreen />);
     await act(async () => {
-      fireEvent.press(getByTestId('source-playlist'));
+      await fireEvent.press(getByTestId('source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('playlist-row-p1'));
+      await fireEvent.press(getByTestId('playlist-row-p1'));
     });
 
     await act(async () => {
-      fireEvent.press(getByText('Re-sift Playlist'));
+      await fireEvent.press(getByText('Re-sift Playlist'));
     });
 
     // Destructive — must be gated behind the same confirmation as DoneScreen.
@@ -511,15 +511,15 @@ describe('SetupScreen', () => {
       { id: 'p1', name: 'My Playlist', trackCount: 8 },
       { id: 's1', name: 'My Playlist - Sifted', trackCount: 8 },
     ]);
-    const { getByTestId, getByText, queryByText } = renderWithProviders(<SetupScreen />);
+    const { getByTestId, getByText, queryByText } = await renderWithProviders(<SetupScreen />);
     await act(async () => {
-      fireEvent.press(getByTestId('source-playlist'));
+      await fireEvent.press(getByTestId('source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('playlist-row-p1'));
+      await fireEvent.press(getByTestId('playlist-row-p1'));
     });
     await act(async () => {
-      fireEvent.press(getByText('Re-sift Playlist'));
+      await fireEvent.press(getByText('Re-sift Playlist'));
     });
     // The cancel button has no onPress — dismissing must change nothing.
     expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
@@ -538,15 +538,15 @@ describe('SetupScreen', () => {
       { id: 'p1', name: 'My Playlist', trackCount: 8 },
       { id: 's1', name: 'My Playlist - Sifted', trackCount: 8 },
     ]);
-    const { getByTestId, getByText, queryByText } = renderWithProviders(<SetupScreen />);
+    const { getByTestId, getByText, queryByText } = await renderWithProviders(<SetupScreen />);
     await act(async () => {
-      fireEvent.press(getByTestId('source-playlist'));
+      await fireEvent.press(getByTestId('source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('playlist-row-p1'));
+      await fireEvent.press(getByTestId('playlist-row-p1'));
     });
     await act(async () => {
-      fireEvent.press(getByText('Re-sift Playlist'));
+      await fireEvent.press(getByText('Re-sift Playlist'));
     });
 
     // clearSiftedPlaylist fails (its loadPlaylists lookup rejects)…
@@ -594,12 +594,12 @@ describe('SetupScreen', () => {
     ]);
     mockProvider.loadPlaylistTracks.mockResolvedValue([mockTrackA]);
 
-    const { getByTestId } = renderWithProviders(<SetupScreen />);
+    const { getByTestId } = await renderWithProviders(<SetupScreen />);
     await act(async () => {});
 
     // Start Over straight from the resume modal, without resuming.
     await act(async () => {
-      fireEvent.press(getByTestId('resume-modal-start-over'));
+      await fireEvent.press(getByTestId('resume-modal-start-over'));
     });
     const buttons = (alertSpy.mock.calls[0][2] ?? []) as { style?: string; onPress?: () => void }[];
     await act(async () => {
@@ -641,7 +641,7 @@ describe('SetupScreen', () => {
       return <SetupScreen />;
     };
 
-    const { queryByTestId, queryByText } = renderWithProviders(<BackedOut />);
+    const { queryByTestId, queryByText } = await renderWithProviders(<BackedOut />);
     await act(async () => {});
 
     expect(queryByTestId('resume-session-modal')).toBeNull();
@@ -664,12 +664,12 @@ describe('SetupScreen', () => {
       );
     };
 
-    const { getByText, getByTestId, queryByTestId } = renderWithProviders(
+    const { getByText, getByTestId, queryByTestId } = await renderWithProviders(
       <><SetupScreen /><ProviderProbe /></>,
     );
     // The user picks Spotify while loadSession is still pending…
     await act(async () => {
-      fireEvent.press(getByText('Spotify'));
+      await fireEvent.press(getByText('Spotify'));
     });
     expect(getByTestId('probe-provider').props.children).toBe('spotify');
 
@@ -723,7 +723,7 @@ describe('SetupScreen', () => {
       );
     };
 
-    const { getByTestId, getByText, queryByTestId } = renderWithProviders(
+    const { getByTestId, getByText, queryByTestId } = await renderWithProviders(
       <><SetupScreen /><PhaseProbe /></>,
     );
     await act(async () => {});
@@ -733,7 +733,7 @@ describe('SetupScreen', () => {
     expect(getByText(/unsaved changes from a finished sift/)).toBeTruthy();
 
     await act(async () => {
-      fireEvent.press(getByTestId('resume-modal-resume'));
+      await fireEvent.press(getByTestId('resume-modal-resume'));
     });
     expect(getByTestId('probe-phase').props.children).toBe('done');
     expect(getByTestId('probe-pending').props.children).toBe(1);
@@ -754,7 +754,7 @@ describe('SetupScreen', () => {
       pendingKeeps: [],
     });
 
-    const { queryByTestId, queryByText } = renderWithProviders(<SetupScreen />);
+    const { queryByTestId, queryByText } = await renderWithProviders(<SetupScreen />);
     await act(async () => {});
 
     expect(queryByTestId('resume-session-modal')).toBeNull();
@@ -775,12 +775,12 @@ describe('SetupScreen', () => {
       source: { type: 'playlist', playlist: { id: 'p1', name: 'Saved Playlist', trackCount: 2 } },
     });
 
-    const { getByTestId, queryByText } = renderWithProviders(<SetupScreen />);
+    const { getByTestId, queryByText } = await renderWithProviders(<SetupScreen />);
     // Wait for session to load (source gets pre-populated to playlist)
     await act(async () => {});
     // Switch source back to library — no longer matches saved session
     await act(async () => {
-      fireEvent.press(getByTestId('source-library'));
+      await fireEvent.press(getByTestId('source-library'));
     });
     expect(queryByText('Start Sifting')).toBeTruthy();
     expect(queryByText('Resume Sifting')).toBeNull();
@@ -788,18 +788,18 @@ describe('SetupScreen', () => {
 });
 
 describe('LoadingScreen', () => {
-  test('renders brand text', () => {
-    const { getByTestId } = renderWithProviders(<LoadingScreen />);
+  test('renders brand text', async () => {
+    const { getByTestId } = await renderWithProviders(<LoadingScreen />);
     expect(getByTestId('loading-brand').props.children).toBe('sift.');
   });
 
-  test('renders loading message', () => {
-    const { getByTestId } = renderWithProviders(<LoadingScreen />);
+  test('renders loading message', async () => {
+    const { getByTestId } = await renderWithProviders(<LoadingScreen />);
     expect(getByTestId('loading-message')).toBeTruthy();
   });
 
-  test('calls loadLibrary on mount', () => {
-    renderWithProviders(<LoadingScreen />);
+  test('calls loadLibrary on mount', async () => {
+    await renderWithProviders(<LoadingScreen />);
     // loadLibrary triggers isAuthorized → loadLibrary chain
     expect(mockProvider.isAuthorized).toHaveBeenCalled();
   });
@@ -813,36 +813,36 @@ Clipboard.setString = mockClipboardSetString;
 describe('DoneScreen', () => {
   const tracks = [mockTrackA, mockTrackB, mockTrackC];
 
-  test('renders done title when all tracks sifted', () => {
-    const { getByTestId } = renderWithProviders(<DoneScreen />, { initialTracks: tracks });
+  test('renders done title when all tracks sifted', async () => {
+    const { getByTestId } = await renderWithProviders(<DoneScreen />, { initialTracks: tracks });
     expect(getByTestId('done-title')).toBeTruthy();
   });
 
-  test('renders summary counts', () => {
-    const { getByTestId } = renderWithProviders(<DoneScreen />, { initialTracks: tracks });
+  test('renders summary counts', async () => {
+    const { getByTestId } = await renderWithProviders(<DoneScreen />, { initialTracks: tracks });
     expect(getByTestId('summary-count-kept')).toBeTruthy();
     expect(getByTestId('summary-count-removed')).toBeTruthy();
     expect(getByTestId('summary-count-skipped')).toBeTruthy();
   });
 
-  test('renders Start Over button when done', () => {
-    const { getByText } = renderWithProviders(<DoneScreen />, { initialTracks: tracks });
+  test('renders Start Over button when done', async () => {
+    const { getByText } = await renderWithProviders(<DoneScreen />, { initialTracks: tracks });
     expect(getByText('Start Over')).toBeTruthy();
   });
 
   test('pressing Start Over calls startFresh', async () => {
-    const { getByText } = renderWithProviders(<DoneScreen />, { initialTracks: tracks });
+    const { getByText } = await renderWithProviders(<DoneScreen />, { initialTracks: tracks });
     await act(async () => {
-      fireEvent.press(getByText('Start Over'));
+      await fireEvent.press(getByText('Start Over'));
     });
     // Should not throw
   });
 
   test('Start Over on a library source does not ask for confirmation', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const { getByText } = renderWithProviders(<DoneScreen />, { initialTracks: tracks });
+    const { getByText } = await renderWithProviders(<DoneScreen />, { initialTracks: tracks });
     await act(async () => {
-      fireEvent.press(getByText('Start Over'));
+      await fireEvent.press(getByText('Start Over'));
     });
     expect(alertSpy).not.toHaveBeenCalled();
     alertSpy.mockRestore();
@@ -860,9 +860,9 @@ describe('DoneScreen', () => {
       }, [dispatch]);
       return <DoneScreen />;
     };
-    const { getByText } = renderWithProviders(<WithPlaylistSource />, { initialTracks: tracks });
+    const { getByText } = await renderWithProviders(<WithPlaylistSource />, { initialTracks: tracks });
     await act(async () => {
-      fireEvent.press(getByText('Start Over'));
+      await fireEvent.press(getByText('Start Over'));
     });
     // The destructive clear must be gated behind a confirmation alert.
     expect(alertSpy).toHaveBeenCalledWith(
@@ -896,9 +896,9 @@ describe('DoneScreen', () => {
     ]);
     mockProvider.loadPlaylistTracks.mockResolvedValueOnce([mockTrackA]);
 
-    const { getByText } = renderWithProviders(<WithPlaylistSource />, { initialTracks: tracks });
+    const { getByText } = await renderWithProviders(<WithPlaylistSource />, { initialTracks: tracks });
     await act(async () => {
-      fireEvent.press(getByText('Start Over'));
+      await fireEvent.press(getByText('Start Over'));
     });
     const buttons = (alertSpy.mock.calls[0][2] ?? []) as { style?: string; onPress?: () => void }[];
     await act(async () => {
@@ -930,9 +930,9 @@ describe('DoneScreen', () => {
     // clearSiftedPlaylist fails outright (its loadPlaylists lookup rejects).
     mockProvider.loadPlaylists.mockRejectedValueOnce(new Error('network'));
 
-    const { getByText, getByTestId } = renderWithProviders(<WithPlaylistSource />, { initialTracks: tracks });
+    const { getByText, getByTestId } = await renderWithProviders(<WithPlaylistSource />, { initialTracks: tracks });
     await act(async () => {
-      fireEvent.press(getByText('Start Over'));
+      await fireEvent.press(getByText('Start Over'));
     });
     const buttons = (alertSpy.mock.calls[0][2] ?? []) as { style?: string; onPress?: () => void }[];
     await act(async () => {
@@ -949,32 +949,32 @@ describe('DoneScreen', () => {
     alertSpy.mockRestore();
   });
 
-  test('shows removed tracks section after removing tracks', () => {
+  test('shows removed tracks section after removing tracks', async () => {
     const DecideThenDone = () => {
       const { decide, state } = useSift();
       React.useEffect(() => { decide('remove'); }, [decide]);
       if (state.removed.length === 0) return null;
       return <DoneScreen />;
     };
-    const { getByText } = renderWithProviders(<DecideThenDone />, { initialTracks: tracks });
+    const { getByText } = await renderWithProviders(<DecideThenDone />, { initialTracks: tracks });
     expect(getByText('Tracks Removed')).toBeTruthy();
     expect(getByText('Copy List')).toBeTruthy();
   });
 
-  test('copy list button copies removed tracks', () => {
+  test('copy list button copies removed tracks', async () => {
     const DecideThenDone = () => {
       const { decide, state } = useSift();
       React.useEffect(() => { decide('remove'); }, [decide]);
       if (state.removed.length === 0) return null;
       return <DoneScreen />;
     };
-    const { getByText } = renderWithProviders(<DecideThenDone />, { initialTracks: tracks });
-    fireEvent.press(getByText('Copy List'));
+    const { getByText } = await renderWithProviders(<DecideThenDone />, { initialTracks: tracks });
+    await fireEvent.press(getByText('Copy List'));
     expect(mockClipboardSetString).toHaveBeenCalled();
     expect(getByText('Copied!')).toBeTruthy();
   });
 
-  test('copy toast reset timer is cleared on unmount', () => {
+  test('copy toast reset timer is cleared on unmount', async () => {
     // Regression: the 2s "Copied!" reset timeout leaked past unmount,
     // firing setState on an unmounted screen and holding the process open
     // (Jest's "did not exit one second after the test run" warning).
@@ -986,7 +986,7 @@ describe('DoneScreen', () => {
         if (state.removed.length === 0) return null;
         return <DoneScreen />;
       };
-      const { getByText, unmount } = renderWithProviders(<DecideThenDone />, { initialTracks: tracks });
+      const { getByText, unmount } = await renderWithProviders(<DecideThenDone />, { initialTracks: tracks });
       // Spy on the timer pair rather than counting pending timers — the
       // press also schedules framework-internal timers, so identify the
       // toast timer by its unique 2000ms delay and assert that exact
@@ -994,11 +994,11 @@ describe('DoneScreen', () => {
       const setSpy = jest.spyOn(globalThis, 'setTimeout');
       const clearSpy = jest.spyOn(globalThis, 'clearTimeout');
       try {
-        fireEvent.press(getByText('Copy List'));
+        await fireEvent.press(getByText('Copy List'));
         const toastCallIndex = setSpy.mock.calls.findIndex((call) => call[1] === 2000);
         expect(toastCallIndex).toBeGreaterThanOrEqual(0);
         const toastHandle = setSpy.mock.results[toastCallIndex].value;
-        unmount();
+        await unmount();
         expect(clearSpy).toHaveBeenCalledWith(toastHandle);
       } finally {
         setSpy.mockRestore();
@@ -1033,7 +1033,7 @@ describe('DoneScreen', () => {
       }, [dispatch]);
       return <DoneScreen />;
     };
-    renderWithProviders(<WithLandedAndPending />, { initialTracks: [mockTrackA, mockTrackB, mockTrackC] });
+    await renderWithProviders(<WithLandedAndPending />, { initialTracks: [mockTrackA, mockTrackB, mockTrackC] });
 
     await waitFor(() => {
       expect(mockProvider.addToPlaylist).toHaveBeenCalledWith('s1', [mockTrackC.id]);
@@ -1070,7 +1070,7 @@ describe('DoneScreen', () => {
         </>
       );
     };
-    const { getByTestId } = renderWithProviders(<WithRelabeledPending />, { initialTracks: [mockTrackC] });
+    const { getByTestId } = await renderWithProviders(<WithRelabeledPending />, { initialTracks: [mockTrackC] });
 
     // The save completes as a no-op add and clears the buffer.
     await waitFor(() => {
@@ -1107,7 +1107,7 @@ describe('DoneScreen', () => {
     mockProvider.loadPlaylists.mockResolvedValue([]);
     mockProvider.createPlaylist.mockResolvedValue(undefined);
 
-    const { getByTestId, getByText, queryByText, queryByTestId } = renderWithProviders(
+    const { getByTestId, getByText, queryByText, queryByTestId } = await renderWithProviders(
       <WithSaveError />,
       { initialTracks: tracks },
     );
@@ -1119,7 +1119,7 @@ describe('DoneScreen', () => {
     expect(mockProvider.createPlaylist).not.toHaveBeenCalled();
 
     await act(async () => {
-      fireEvent.press(getByTestId('retry-save-button'));
+      await fireEvent.press(getByTestId('retry-save-button'));
     });
 
     // Retry re-triggered the save with the kept list…
@@ -1161,14 +1161,14 @@ describe('DoneScreen', () => {
       }, [decide, dispatch]);
       return <DoneScreen />;
     };
-    const { getByTestId } = renderWithProviders(
+    const { getByTestId } = await renderWithProviders(
       <WithRemoved />,
       { initialTracks: tracks },
     );
     await act(async () => {});
 
     await act(async () => {
-      fireEvent.press(getByTestId('done-start-over'));
+      await fireEvent.press(getByTestId('done-start-over'));
     });
     // Sanity: with nothing in flight the confirmation opens normally.
     expect(alertSpy).toHaveBeenCalledTimes(1);
@@ -1176,7 +1176,10 @@ describe('DoneScreen', () => {
 
     // Kick off a restore; it parks on the playlist re-add.
     await act(async () => {
-      fireEvent.press(getByTestId(`restore-track-${mockTrackA.id}`));
+      // Not awaited, as in v13: the handler deliberately parks on a promise
+      // this test settles later, so awaiting the press here never settles
+      // inside this act() and the test times out.
+      void fireEvent.press(getByTestId(`restore-track-${mockTrackA.id}`));
     });
     expect(resolveRestore).toBeDefined();
 
@@ -1184,7 +1187,7 @@ describe('DoneScreen', () => {
     // it must not even open the destructive confirmation.
     expect(getByTestId('done-start-over').props.accessibilityState?.disabled).toBe(true);
     await act(async () => {
-      fireEvent.press(getByTestId('done-start-over'));
+      await fireEvent.press(getByTestId('done-start-over'));
     });
     expect(alertSpy).not.toHaveBeenCalled();
 
@@ -1209,14 +1212,14 @@ describe('DoneScreen', () => {
       }, [dispatch]);
       return <DoneScreen />;
     };
-    const { getByTestId } = renderWithProviders(<WithSaveInFlight />, { initialTracks: tracks });
+    const { getByTestId } = await renderWithProviders(<WithSaveInFlight />, { initialTracks: tracks });
     await act(async () => {});
 
     // Disabled: a concurrent clearSiftedPlaylist would race the in-flight
     // save on the same remote playlist.
     expect(getByTestId('done-start-over').props.accessibilityState?.disabled).toBe(true);
     await act(async () => {
-      fireEvent.press(getByTestId('done-start-over'));
+      await fireEvent.press(getByTestId('done-start-over'));
     });
     expect(alertSpy).not.toHaveBeenCalled();
     alertSpy.mockRestore();
@@ -1260,12 +1263,12 @@ describe('DoneScreen', () => {
         </>
       );
     };
-    const { getByTestId } = renderWithProviders(<WithLateKeep />, { initialTracks: tracks });
+    const { getByTestId } = await renderWithProviders(<WithLateKeep />, { initialTracks: tracks });
     await act(async () => {});
 
     // Confirm Start Over; the clear runs until it parks on the remove.
     await act(async () => {
-      fireEvent.press(getByTestId('done-start-over'));
+      await fireEvent.press(getByTestId('done-start-over'));
     });
     const buttons = (alertSpy.mock.calls[0][2] ?? []) as { style?: string; onPress?: () => void }[];
     await act(async () => {
@@ -1275,7 +1278,7 @@ describe('DoneScreen', () => {
 
     // A keep buffers while the clear is in flight…
     await act(async () => {
-      fireEvent.press(getByTestId('late-keep'));
+      await fireEvent.press(getByTestId('late-keep'));
     });
     // …and the fallback save must NOT start: no add, no create, and the
     // local session is still untouched (the clear has not settled).
@@ -1321,13 +1324,13 @@ describe('DoneScreen', () => {
       }, [dispatch]);
       return <DoneScreen />;
     };
-    const { getByTestId, getByText } = renderWithProviders(<WithSaveError />, { initialTracks: tracks });
+    const { getByTestId, getByText } = await renderWithProviders(<WithSaveError />, { initialTracks: tracks });
     await act(async () => {});
     expect(getByTestId('retry-save-button').props.accessibilityState?.disabled).not.toBe(true);
 
     // Confirm Start Over; the clear parks on its remove call.
     await act(async () => {
-      fireEvent.press(getByTestId('done-start-over'));
+      await fireEvent.press(getByTestId('done-start-over'));
     });
     const buttons = (alertSpy.mock.calls[0][2] ?? []) as { style?: string; onPress?: () => void }[];
     await act(async () => {
@@ -1339,7 +1342,7 @@ describe('DoneScreen', () => {
     // not start a save: no error reset, no playlist calls racing the clear.
     expect(getByTestId('retry-save-button').props.accessibilityState?.disabled).toBe(true);
     await act(async () => {
-      fireEvent.press(getByTestId('retry-save-button'));
+      await fireEvent.press(getByTestId('retry-save-button'));
     });
     expect(getByText('Failed to save sifted playlist')).toBeTruthy();
     expect(mockProvider.addToPlaylist).not.toHaveBeenCalled();
@@ -1361,7 +1364,7 @@ describe('DoneScreen', () => {
       if (state.removed.length === 0) return null;
       return <DoneScreen />;
     };
-    const { getByTestId, getByText, queryByText } = renderWithProviders(
+    const { getByTestId, getByText, queryByText } = await renderWithProviders(
       <WithRemovalErrors />,
       { initialTracks: tracks },
     );
@@ -1410,7 +1413,7 @@ describe('DoneScreen', () => {
       );
     };
 
-    const { getByTestId } = renderWithProviders(
+    const { getByTestId } = await renderWithProviders(
       <MidSaveKeep />,
       { initialTracks: [mockTrackA, mockTrackC] },
     );
@@ -1420,7 +1423,7 @@ describe('DoneScreen', () => {
 
     // A late keep is buffered mid-save…
     await act(async () => {
-      fireEvent.press(getByTestId('late-keep'));
+      await fireEvent.press(getByTestId('late-keep'));
     });
     await act(async () => {
       resolveFirstAdd?.();
@@ -1442,22 +1445,22 @@ describe('PlaylistPicker', () => {
     { id: 'p2', name: 'Workout Mix', trackCount: 25 },
   ];
 
-  test('renders loading state', () => {
-    const { getByTestId } = renderWithProviders(
+  test('renders loading state', async () => {
+    const { getByTestId } = await renderWithProviders(
       <PlaylistPicker playlists={[]} loading={true} onSelect={jest.fn()} onCancel={jest.fn()} />,
     );
     expect(getByTestId('playlist-picker-loading')).toBeTruthy();
   });
 
-  test('renders empty state when no playlists', () => {
-    const { getByTestId } = renderWithProviders(
+  test('renders empty state when no playlists', async () => {
+    const { getByTestId } = await renderWithProviders(
       <PlaylistPicker playlists={[]} loading={false} onSelect={jest.fn()} onCancel={jest.fn()} />,
     );
     expect(getByTestId('playlist-picker-empty')).toBeTruthy();
   });
 
-  test('renders playlist rows', () => {
-    const { getByTestId, getByText } = renderWithProviders(
+  test('renders playlist rows', async () => {
+    const { getByTestId, getByText } = await renderWithProviders(
       <PlaylistPicker playlists={mockPlaylists} loading={false} onSelect={jest.fn()} onCancel={jest.fn()} />,
     );
     expect(getByTestId('playlist-picker-list')).toBeTruthy();
@@ -1467,27 +1470,27 @@ describe('PlaylistPicker', () => {
     expect(getByText('25 tracks')).toBeTruthy();
   });
 
-  test('tapping a row calls onSelect with the playlist', () => {
+  test('tapping a row calls onSelect with the playlist', async () => {
     const onSelect = jest.fn();
-    const { getByTestId } = renderWithProviders(
+    const { getByTestId } = await renderWithProviders(
       <PlaylistPicker playlists={mockPlaylists} loading={false} onSelect={onSelect} onCancel={jest.fn()} />,
     );
-    fireEvent.press(getByTestId('playlist-row-p1'));
+    await fireEvent.press(getByTestId('playlist-row-p1'));
     expect(onSelect).toHaveBeenCalledWith(mockPlaylists[0]);
   });
 
-  test('tapping cancel calls onCancel', () => {
+  test('tapping cancel calls onCancel', async () => {
     const onCancel = jest.fn();
-    const { getByTestId } = renderWithProviders(
+    const { getByTestId } = await renderWithProviders(
       <PlaylistPicker playlists={mockPlaylists} loading={false} onSelect={jest.fn()} onCancel={onCancel} />,
     );
-    fireEvent.press(getByTestId('playlist-picker-cancel'));
+    await fireEvent.press(getByTestId('playlist-picker-cancel'));
     expect(onCancel).toHaveBeenCalled();
   });
 
-  test('renders singular "track" for count of 1', () => {
+  test('renders singular "track" for count of 1', async () => {
     const single = [{ id: 'p1', name: 'Solo', trackCount: 1 }];
-    const { getByText } = renderWithProviders(
+    const { getByText } = await renderWithProviders(
       <PlaylistPicker playlists={single} loading={false} onSelect={jest.fn()} onCancel={jest.fn()} />,
     );
     expect(getByText('1 track')).toBeTruthy();
@@ -1495,18 +1498,18 @@ describe('PlaylistPicker', () => {
 });
 
 describe('SettingsScreen', () => {
-  test('renders Settings header', () => {
-    const { getByText } = renderWithProviders(<SettingsScreen />);
+  test('renders Settings header', async () => {
+    const { getByText } = await renderWithProviders(<SettingsScreen />);
     expect(getByText('Settings')).toBeTruthy();
   });
 
-  test('renders version text', () => {
-    const { getByText } = renderWithProviders(<SettingsScreen />);
+  test('renders version text', async () => {
+    const { getByText } = await renderWithProviders(<SettingsScreen />);
     expect(getByText('Version 1.0.0')).toBeTruthy();
   });
 
-  test('renders connection status', () => {
-    const { getByTestId } = renderWithProviders(<SettingsScreen />);
+  test('renders connection status', async () => {
+    const { getByTestId } = await renderWithProviders(<SettingsScreen />);
     expect(getByTestId('connection-status-label')).toBeTruthy();
     expect(getByTestId('connection-status-indicator')).toBeTruthy();
   });
@@ -1514,10 +1517,10 @@ describe('SettingsScreen', () => {
   test('check connection reports Connected without prompting when already authorized', async () => {
     mockProvider.isAuthorized.mockResolvedValueOnce(true);
     mockProvider.requestAuthorization.mockClear();
-    const { getByTestId } = renderWithProviders(<SettingsScreen />);
+    const { getByTestId } = await renderWithProviders(<SettingsScreen />);
 
     await act(async () => {
-      fireEvent.press(getByTestId('check-connection-button'));
+      await fireEvent.press(getByTestId('check-connection-button'));
     });
 
     await waitFor(() => {
@@ -1530,10 +1533,10 @@ describe('SettingsScreen', () => {
   test('check connection prompts and reports Connected when authorization is granted', async () => {
     mockProvider.isAuthorized.mockResolvedValueOnce(false);
     mockProvider.requestAuthorization.mockResolvedValueOnce(true);
-    const { getByTestId } = renderWithProviders(<SettingsScreen />);
+    const { getByTestId } = await renderWithProviders(<SettingsScreen />);
 
     await act(async () => {
-      fireEvent.press(getByTestId('check-connection-button'));
+      await fireEvent.press(getByTestId('check-connection-button'));
     });
 
     await waitFor(() => {
@@ -1545,10 +1548,10 @@ describe('SettingsScreen', () => {
   test('check connection prompts and reports Not connected when authorization is denied', async () => {
     mockProvider.isAuthorized.mockResolvedValueOnce(false);
     mockProvider.requestAuthorization.mockResolvedValueOnce(false);
-    const { getByTestId } = renderWithProviders(<SettingsScreen />);
+    const { getByTestId } = await renderWithProviders(<SettingsScreen />);
 
     await act(async () => {
-      fireEvent.press(getByTestId('check-connection-button'));
+      await fireEvent.press(getByTestId('check-connection-button'));
     });
 
     await waitFor(() => {
@@ -1556,8 +1559,8 @@ describe('SettingsScreen', () => {
     });
   });
 
-  test('renders provider display name', () => {
-    const { getByText } = renderWithProviders(<SettingsScreen />);
+  test('renders provider display name', async () => {
+    const { getByText } = await renderWithProviders(<SettingsScreen />);
     expect(getByText('Apple Music')).toBeTruthy();
   });
 });

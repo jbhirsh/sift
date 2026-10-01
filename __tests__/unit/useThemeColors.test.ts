@@ -13,21 +13,21 @@ describe('useThemeColors', () => {
     mockUseColorScheme.mockReset();
   });
 
-  test('returns light colors when colorScheme is light', () => {
+  test('returns light colors when colorScheme is light', async () => {
     mockUseColorScheme.mockReturnValue('light');
-    const { result } = renderHook(() => useThemeColors());
+    const { result } = await renderHook(() => useThemeColors());
     expect(result.current).toBe(COLORS.light);
   });
 
-  test('returns dark colors when colorScheme is dark', () => {
+  test('returns dark colors when colorScheme is dark', async () => {
     mockUseColorScheme.mockReturnValue('dark');
-    const { result } = renderHook(() => useThemeColors());
+    const { result } = await renderHook(() => useThemeColors());
     expect(result.current).toBe(COLORS.dark);
   });
 
-  test('returns light colors when colorScheme is null', () => {
+  test('returns light colors when colorScheme is null', async () => {
     mockUseColorScheme.mockReturnValue(null);
-    const { result } = renderHook(() => useThemeColors());
+    const { result } = await renderHook(() => useThemeColors());
     expect(result.current).toBe(COLORS.light);
   });
 });

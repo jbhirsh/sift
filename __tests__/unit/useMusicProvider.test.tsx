@@ -234,122 +234,122 @@ describe('useMusicProvider', () => {
   });
 
   test('authorize calls provider.requestAuthorization', async () => {
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('authorize'));
+      await fireEvent.press(getByTestId('authorize'));
     });
     expect(mockProvider.requestAuthorization).toHaveBeenCalled();
   });
 
   test('authorize returns false on error', async () => {
     mockProvider.requestAuthorization.mockRejectedValue(new Error('fail'));
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('authorize'));
+      await fireEvent.press(getByTestId('authorize'));
     });
     expect(mockProvider.requestAuthorization).toHaveBeenCalled();
   });
 
   test('play calls provider.play', async () => {
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('play'));
+      await fireEvent.press(getByTestId('play'));
     });
     expect(mockProvider.play).toHaveBeenCalledWith('1', undefined);
   });
 
   test('play with position', async () => {
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('play-pos'));
+      await fireEvent.press(getByTestId('play-pos'));
     });
     expect(mockProvider.play).toHaveBeenCalledWith('1', 30);
   });
 
   test('play handles error gracefully', async () => {
     mockProvider.play.mockRejectedValue(new Error('play error'));
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('play'));
+      await fireEvent.press(getByTestId('play'));
     });
     // Should not throw
   });
 
   test('pause calls provider.pause', async () => {
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('pause'));
+      await fireEvent.press(getByTestId('pause'));
     });
     expect(mockProvider.pause).toHaveBeenCalled();
   });
 
   test('pause handles error gracefully', async () => {
     mockProvider.pause.mockRejectedValue(new Error('pause error'));
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('pause'));
+      await fireEvent.press(getByTestId('pause'));
     });
     // Should not throw
   });
 
   test('resume calls provider.resume', async () => {
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('resume'));
+      await fireEvent.press(getByTestId('resume'));
     });
     expect(mockProvider.resume).toHaveBeenCalled();
   });
 
   test('resume handles error gracefully', async () => {
     mockProvider.resume.mockRejectedValue(new Error('resume error'));
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('resume'));
+      await fireEvent.press(getByTestId('resume'));
     });
     // Should not throw
   });
 
-  test('seek calls provider.seek', () => {
-    const { getByTestId } = renderWithProvider();
-    fireEvent.press(getByTestId('seek'));
+  test('seek calls provider.seek', async () => {
+    const { getByTestId } = await renderWithProvider();
+    await fireEvent.press(getByTestId('seek'));
     expect(mockProvider.seek).toHaveBeenCalledWith(42);
   });
 
-  test('skipForward calls provider.seek and getPlaybackState', () => {
-    const { getByTestId } = renderWithProvider();
-    fireEvent.press(getByTestId('skip-fwd'));
+  test('skipForward calls provider.seek and getPlaybackState', async () => {
+    const { getByTestId } = await renderWithProvider();
+    await fireEvent.press(getByTestId('skip-fwd'));
     expect(mockProvider.getPlaybackState).toHaveBeenCalled();
     expect(mockProvider.seek).toHaveBeenCalled();
   });
 
-  test('skipBackward calls provider.seek', () => {
-    const { getByTestId } = renderWithProvider();
-    fireEvent.press(getByTestId('skip-bwd'));
+  test('skipBackward calls provider.seek', async () => {
+    const { getByTestId } = await renderWithProvider();
+    await fireEvent.press(getByTestId('skip-bwd'));
     expect(mockProvider.getPlaybackState).toHaveBeenCalled();
     expect(mockProvider.seek).toHaveBeenCalled();
   });
 
   test('createPlaylist calls provider.createPlaylist', async () => {
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('create-playlist'));
+      await fireEvent.press(getByTestId('create-playlist'));
     });
     expect(mockProvider.createPlaylist).toHaveBeenCalledWith('Test', ['1']);
   });
 
   test('createPlaylist handles error', async () => {
     mockProvider.createPlaylist.mockRejectedValue(new Error('playlist fail'));
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('create-playlist'));
+      await fireEvent.press(getByTestId('create-playlist'));
     });
     // Should not throw
   });
 
   test('loadLibrary calls provider and dispatches tracks', async () => {
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('load-library'));
+      await fireEvent.press(getByTestId('load-library'));
     });
     expect(mockProvider.isAuthorized).toHaveBeenCalled();
     expect(mockProvider.loadLibrary).toHaveBeenCalled();
@@ -358,49 +358,49 @@ describe('useMusicProvider', () => {
   test('loadLibrary handles auth denial', async () => {
     mockProvider.isAuthorized.mockResolvedValue(false);
     mockProvider.requestAuthorization.mockResolvedValue(false);
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('load-library'));
+      await fireEvent.press(getByTestId('load-library'));
     });
     expect(mockProvider.requestAuthorization).toHaveBeenCalled();
   });
 
   test('loadLibrary handles load error', async () => {
     mockProvider.loadLibrary.mockRejectedValue(new Error('load fail'));
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('load-library'));
+      await fireEvent.press(getByTestId('load-library'));
     });
     // Should not throw, error dispatched to state
   });
 
   test('togglePlayPause pauses when playing, resumes when not', async () => {
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     // First play to set isPlaying
     await act(async () => {
-      fireEvent.press(getByTestId('play'));
+      await fireEvent.press(getByTestId('play'));
     });
     // Now toggle to pause
     await act(async () => {
-      fireEvent.press(getByTestId('toggle'));
+      await fireEvent.press(getByTestId('toggle'));
     });
     expect(mockProvider.pause).toHaveBeenCalled();
   });
 
   test('togglePlayPause resumes when not playing', async () => {
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     // Toggle without playing first — state.isPlaying is false, so it resumes
     await act(async () => {
-      fireEvent.press(getByTestId('toggle'));
+      await fireEvent.press(getByTestId('toggle'));
     });
     expect(mockProvider.resume).toHaveBeenCalled();
   });
 
   test('polling dispatches playback position while playing', async () => {
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     // Start playback to trigger polling
     await act(async () => {
-      fireEvent.press(getByTestId('play'));
+      await fireEvent.press(getByTestId('play'));
     });
     // Advance timers to trigger polling interval
     await act(async () => {
@@ -412,9 +412,9 @@ describe('useMusicProvider', () => {
   test('loadLibrary succeeds when initially unauthorized but grants access', async () => {
     mockProvider.isAuthorized.mockResolvedValue(false);
     mockProvider.requestAuthorization.mockResolvedValue(true);
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('load-library'));
+      await fireEvent.press(getByTestId('load-library'));
     });
     expect(mockProvider.requestAuthorization).toHaveBeenCalled();
     expect(mockProvider.loadLibrary).toHaveBeenCalled();
@@ -422,9 +422,9 @@ describe('useMusicProvider', () => {
 
   test('loadLibrary handles non-Error exception', async () => {
     mockProvider.loadLibrary.mockRejectedValue('string error');
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('load-library'));
+      await fireEvent.press(getByTestId('load-library'));
     });
     // Should dispatch generic error message for non-Error objects
   });
@@ -432,9 +432,9 @@ describe('useMusicProvider', () => {
   test('loadPlaylists returns playlists from provider', async () => {
     const playlists = [{ id: 'p1', name: 'My Playlist', trackCount: 5 }];
     mockProvider.loadPlaylists.mockResolvedValue(playlists);
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('load-playlists'));
+      await fireEvent.press(getByTestId('load-playlists'));
     });
     expect(mockProvider.loadPlaylists).toHaveBeenCalled();
     expect(lastLoadPlaylistsResult).toEqual(playlists);
@@ -443,9 +443,9 @@ describe('useMusicProvider', () => {
   test('loadPlaylists returns empty array when provider does not support it', async () => {
     const originalLoadPlaylists = mockProvider.loadPlaylists;
     mockProvider.loadPlaylists = undefined as unknown as jest.Mock;
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('load-playlists'));
+      await fireEvent.press(getByTestId('load-playlists'));
     });
     expect(lastLoadPlaylistsResult).toEqual([]);
     mockProvider.loadPlaylists = originalLoadPlaylists;
@@ -454,26 +454,26 @@ describe('useMusicProvider', () => {
   test('loadPlaylists returns empty array when not authorized', async () => {
     mockProvider.isAuthorized.mockResolvedValue(false);
     mockProvider.requestAuthorization.mockResolvedValue(false);
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('load-playlists'));
+      await fireEvent.press(getByTestId('load-playlists'));
     });
     expect(mockProvider.requestAuthorization).toHaveBeenCalled();
   });
 
   test('loadPlaylists returns empty array on error', async () => {
     mockProvider.loadPlaylists.mockRejectedValue(new Error('fail'));
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('load-playlists'));
+      await fireEvent.press(getByTestId('load-playlists'));
     });
     // Should not throw
   });
 
   test('loadTracks loads library when source is library', async () => {
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('load-tracks'));
+      await fireEvent.press(getByTestId('load-tracks'));
     });
     expect(mockProvider.loadLibrary).toHaveBeenCalled();
   });
@@ -483,7 +483,7 @@ describe('useMusicProvider', () => {
 
     // We need to render with a provider that has a playlist source set.
     // The simplest approach is to use the SiftProvider and dispatch SET_SOURCE.
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
@@ -491,12 +491,12 @@ describe('useMusicProvider', () => {
 
     // Set source to playlist
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
 
     // Now load tracks
     await act(async () => {
-      fireEvent.press(getByTestId('load-tracks'));
+      await fireEvent.press(getByTestId('load-tracks'));
     });
 
     expect(mockProvider.loadPlaylistTracks).toHaveBeenCalledWith('p1');
@@ -505,57 +505,57 @@ describe('useMusicProvider', () => {
   test('loadTracks handles auth denial', async () => {
     mockProvider.isAuthorized.mockResolvedValue(false);
     mockProvider.requestAuthorization.mockResolvedValue(false);
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('load-tracks'));
+      await fireEvent.press(getByTestId('load-tracks'));
     });
     expect(mockProvider.requestAuthorization).toHaveBeenCalled();
   });
 
   test('loadTracks handles load error', async () => {
     mockProvider.loadLibrary.mockRejectedValue(new Error('load fail'));
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('load-tracks'));
+      await fireEvent.press(getByTestId('load-tracks'));
     });
     // Should not throw
   });
 
   test('loadTracks handles non-Error exception', async () => {
     mockProvider.loadLibrary.mockRejectedValue('string error');
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('load-tracks'));
+      await fireEvent.press(getByTestId('load-tracks'));
     });
     // Should dispatch generic error message
   });
 
   test('loadLibrary sorts tracks by state.sortOrder (least-played default)', async () => {
     mockProvider.loadLibrary.mockResolvedValue(unsortedTracks);
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <SortConsumer />
       </SiftProvider>
     );
     // Default sortOrder is 'least-played' → ascending by playCount.
     await act(async () => {
-      fireEvent.press(getByTestId('sort-load-library'));
+      await fireEvent.press(getByTestId('sort-load-library'));
     });
     expect(getByTestId('track-order').props.children).toBe('3,5,10');
   });
 
   test('loadLibrary re-sorts when state.sortOrder changes to most-played', async () => {
     mockProvider.loadLibrary.mockResolvedValue(unsortedTracks);
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <SortConsumer />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-most-played'));
+      await fireEvent.press(getByTestId('set-most-played'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('sort-load-library'));
+      await fireEvent.press(getByTestId('sort-load-library'));
     });
     // 'most-played' → descending by playCount.
     expect(getByTestId('track-order').props.children).toBe('10,5,3');
@@ -563,22 +563,22 @@ describe('useMusicProvider', () => {
 
   test('loadTracks sorts library tracks by state.sortOrder', async () => {
     mockProvider.loadLibrary.mockResolvedValue(unsortedTracks);
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <SortConsumer />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('sort-load-tracks'));
+      await fireEvent.press(getByTestId('sort-load-tracks'));
     });
     // Default sortOrder is 'least-played' → ascending by playCount.
     expect(getByTestId('track-order').props.children).toBe('3,5,10');
   });
 
   test('restoreTrack re-adds to the library and purges its history record', async () => {
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('restore'));
+      await fireEvent.press(getByTestId('restore'));
     });
     // Default source is library, so it re-adds to the library…
     expect(mockProvider.addToLibrary).toHaveBeenCalledWith(['1']);
@@ -591,16 +591,16 @@ describe('useMusicProvider', () => {
     // This is the user-facing fix: the playlist load path filters out tracks in
     // removal history, so restoring must clear that record or the track stays
     // hidden on the next sift of the playlist.
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('restore-pl'));
+      await fireEvent.press(getByTestId('restore-pl'));
     });
     expect(mockProvider.addToPlaylist).toHaveBeenCalledWith('p1', ['1']);
     expect(removeFromHistory).toHaveBeenCalledWith('1', {
@@ -611,9 +611,9 @@ describe('useMusicProvider', () => {
 
   test('restoreTrack does not purge history when the re-add fails', async () => {
     mockProvider.addToLibrary.mockRejectedValueOnce(new Error('network'));
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('restore'));
+      await fireEvent.press(getByTestId('restore'));
     });
     // The re-add was attempted…
     expect(mockProvider.addToLibrary).toHaveBeenCalledWith(['1']);
@@ -633,92 +633,92 @@ describe('useMusicProvider', () => {
     const { loadHistory } = require('../../src/services/RemovalHistoryStore');
     (loadHistory as jest.Mock).mockResolvedValueOnce([]);
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('load-tracks'));
+      await fireEvent.press(getByTestId('load-tracks'));
     });
     // loadPlaylistTracks called twice: once for source, once for sifted
     expect(mockProvider.loadPlaylistTracks).toHaveBeenCalledTimes(2);
   });
 
   test('removeTrack calls removeFromPlaylist for playlist source', async () => {
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('remove-track'));
+      await fireEvent.press(getByTestId('remove-track'));
     });
     expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('p1', ['1']);
   });
 
   test('removeTrack handles error gracefully', async () => {
     mockProvider.removeFromPlaylist.mockRejectedValueOnce(new Error('fail'));
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('remove-track'));
+      await fireEvent.press(getByTestId('remove-track'));
     });
     // Should not throw
   });
 
   test('restoreTrack calls addToPlaylist for playlist source', async () => {
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('restore-track'));
+      await fireEvent.press(getByTestId('restore-track'));
     });
     expect(mockProvider.addToPlaylist).toHaveBeenCalledWith('p1', ['1']);
   });
 
   test('restoreTrack handles error gracefully', async () => {
     mockProvider.addToPlaylist.mockRejectedValueOnce(new Error('fail'));
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('restore-track'));
+      await fireEvent.press(getByTestId('restore-track'));
     });
     // Should not throw
   });
 
   test('saveSiftedPlaylist creates new playlist when none exists', async () => {
     mockProvider.loadPlaylists.mockResolvedValue([]);
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('save-sifted'));
+      await fireEvent.press(getByTestId('save-sifted'));
     });
     expect(mockProvider.createPlaylist).toHaveBeenCalledWith('My Playlist - Sifted', ['1']);
   });
@@ -728,13 +728,13 @@ describe('useMusicProvider', () => {
       { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 0 },
     ]);
     mockProvider.loadPlaylistTracks.mockResolvedValue([]);
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('save-sifted'));
+      await fireEvent.press(getByTestId('save-sifted'));
     });
     expect(mockProvider.addToPlaylist).toHaveBeenCalledWith('sifted-1', ['1']);
   });
@@ -744,39 +744,39 @@ describe('useMusicProvider', () => {
       { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
     ]);
     mockProvider.loadPlaylistTracks.mockResolvedValue([mockTrack]);
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('save-sifted'));
+      await fireEvent.press(getByTestId('save-sifted'));
     });
     // All tracks already exist, addToPlaylist should not be called
     expect(mockProvider.addToPlaylist).not.toHaveBeenCalled();
   });
 
   test('saveSiftedPlaylist does nothing for empty kept tracks', async () => {
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('save-sifted-empty'));
+      await fireEvent.press(getByTestId('save-sifted-empty'));
     });
     expect(mockProvider.createPlaylist).not.toHaveBeenCalled();
   });
 
   test('saveSiftedPlaylist handles error gracefully', async () => {
     mockProvider.loadPlaylists.mockRejectedValueOnce(new Error('fail'));
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('save-sifted'));
+      await fireEvent.press(getByTestId('save-sifted'));
     });
     // Should not throw
   });
@@ -785,16 +785,16 @@ describe('useMusicProvider', () => {
     mockProvider.loadPlaylists
       .mockResolvedValueOnce([]) // no existing sifted playlist
       .mockResolvedValueOnce([{ id: 'new-sifted', name: 'My Playlist - Sifted', trackCount: 1 }]); // after creation
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('keep-track'));
+      await fireEvent.press(getByTestId('keep-track'));
     });
     expect(mockProvider.createPlaylist).toHaveBeenCalledWith('My Playlist - Sifted', ['1']);
   });
@@ -803,17 +803,17 @@ describe('useMusicProvider', () => {
     mockProvider.loadPlaylists.mockResolvedValue([
       { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
     ]);
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     // Reset the module-level sifted playlist cache
     await act(async () => {
-      fireEvent.press(getByTestId('clear-sifted'));
+      await fireEvent.press(getByTestId('clear-sifted'));
     });
     mockProvider.loadPlaylists.mockResolvedValue([
       { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
@@ -822,7 +822,7 @@ describe('useMusicProvider', () => {
     // add goes through.
     mockProvider.loadPlaylistTracks.mockResolvedValue([]);
     await act(async () => {
-      fireEvent.press(getByTestId('keep-track'));
+      await fireEvent.press(getByTestId('keep-track'));
     });
     expect(mockProvider.addToPlaylist).toHaveBeenCalledWith('sifted-1', ['1']);
   });
@@ -835,21 +835,21 @@ describe('useMusicProvider', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValue([{ id: 'new-sifted', name: 'My Playlist - Sifted', trackCount: 1 }]);
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     // Fire two keep-track calls before yielding to the queue. Both are for
     // the SAME track: the first creates the playlist with it, and the
     // duplicate guard must recognize the second as already present instead
     // of double-adding it.
     await act(async () => {
-      fireEvent.press(getByTestId('keep-track'));
-      fireEvent.press(getByTestId('keep-track'));
+      await fireEvent.press(getByTestId('keep-track'));
+      await fireEvent.press(getByTestId('keep-track'));
     });
 
     expect(mockProvider.createPlaylist).toHaveBeenCalledTimes(1);
@@ -864,20 +864,20 @@ describe('useMusicProvider', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValue([{ id: 'new-sifted', name: 'My Playlist - Sifted', trackCount: 1 }]);
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack, mockTrackB]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     // Queue both keeps before yielding. T1 creates the playlist WITH itself;
     // T2 dequeues into a single direct add. The creation-seeded contents
     // cache stands in for the readback, so loadPlaylistTracks never runs.
     await act(async () => {
-      fireEvent.press(getByTestId('keep-track'));
-      fireEvent.press(getByTestId('keep-track-b'));
+      await fireEvent.press(getByTestId('keep-track'));
+      await fireEvent.press(getByTestId('keep-track-b'));
     });
 
     expect(mockProvider.createPlaylist).toHaveBeenCalledTimes(1);
@@ -898,19 +898,19 @@ describe('useMusicProvider', () => {
     mockProvider.loadPlaylistTracks.mockResolvedValue([]);
     mockProvider.addToPlaylist.mockRejectedValueOnce(new Error('network'));
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
 
     // First keep: the direct add throws — the track is buffered, and it
     // must NOT be recorded as present in the contents cache.
     await act(async () => {
-      fireEvent.press(getByTestId('keep-track'));
+      await fireEvent.press(getByTestId('keep-track'));
     });
     expect(getByTestId('pending-keeps').props.children).toBe('1');
     expect(mockProvider.addToPlaylist).toHaveBeenCalledTimes(1);
@@ -918,7 +918,7 @@ describe('useMusicProvider', () => {
     // Second keep of the same track: the cache still reports it absent, so
     // the add is retried (and succeeds this time).
     await act(async () => {
-      fireEvent.press(getByTestId('keep-track'));
+      await fireEvent.press(getByTestId('keep-track'));
     });
     expect(mockProvider.addToPlaylist).toHaveBeenCalledTimes(2);
     expect(mockProvider.addToPlaylist).toHaveBeenLastCalledWith('sifted-1', ['1']);
@@ -933,40 +933,40 @@ describe('useMusicProvider', () => {
     ]);
     mockProvider.loadPlaylistTracks.mockResolvedValue([]);
 
-    const first = render(
+    const first = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(first.getByTestId('set-source-playlist'));
+      await fireEvent.press(first.getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(first.getByTestId('keep-track'));
+      await fireEvent.press(first.getByTestId('keep-track'));
     });
     expect(mockProvider.addToPlaylist).toHaveBeenCalledTimes(1);
 
     // Start Over: the clear empties the playlist and invalidates the
     // calling instance's caches.
     await act(async () => {
-      fireEvent.press(first.getByTestId('clear-sifted'));
+      await fireEvent.press(first.getByTestId('clear-sifted'));
     });
-    first.unmount();
+    await first.unmount();
 
     // Fresh consumer (START_FRESH remounts the sifting screen, discarding
     // the per-instance caches): keeping the same track again must
     // re-resolve the playlist, read back the now-empty contents, and fire
     // the add a second time — never trust a stale "already present" cache.
-    const second = render(
+    const second = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(second.getByTestId('set-source-playlist'));
+      await fireEvent.press(second.getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(second.getByTestId('keep-track'));
+      await fireEvent.press(second.getByTestId('keep-track'));
     });
 
     expect(mockProvider.addToPlaylist).toHaveBeenCalledTimes(2);
@@ -976,25 +976,25 @@ describe('useMusicProvider', () => {
 
   test('keepTrack handles error gracefully', async () => {
     mockProvider.loadPlaylists.mockRejectedValueOnce(new Error('fail'));
-    const { getByTestId, unmount } = render(
+    const { getByTestId, unmount } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('keep-track'));
+      await fireEvent.press(getByTestId('keep-track'));
     });
     // Unmount to prevent leaked async work from affecting the next test
-    unmount();
+    await unmount();
   });
 
   test('warmCache calls provider.warmSongCache', async () => {
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('warm-cache'));
+      await fireEvent.press(getByTestId('warm-cache'));
     });
     expect(mockProvider.warmSongCache).toHaveBeenCalledWith(['1', '2']);
   });
@@ -1002,9 +1002,9 @@ describe('useMusicProvider', () => {
   test('warmCache requests authorization if needed', async () => {
     mockProvider.isAuthorized.mockResolvedValueOnce(false);
     mockProvider.requestAuthorization.mockResolvedValueOnce(true);
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('warm-cache'));
+      await fireEvent.press(getByTestId('warm-cache'));
     });
     expect(mockProvider.requestAuthorization).toHaveBeenCalled();
     expect(mockProvider.warmSongCache).toHaveBeenCalled();
@@ -1013,18 +1013,18 @@ describe('useMusicProvider', () => {
   test('warmCache skips when auth denied', async () => {
     mockProvider.isAuthorized.mockResolvedValueOnce(false);
     mockProvider.requestAuthorization.mockResolvedValueOnce(false);
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('warm-cache'));
+      await fireEvent.press(getByTestId('warm-cache'));
     });
     expect(mockProvider.warmSongCache).not.toHaveBeenCalled();
   });
 
   test('warmCache handles error gracefully', async () => {
     mockProvider.warmSongCache.mockRejectedValueOnce(new Error('fail'));
-    const { getByTestId } = renderWithProvider();
+    const { getByTestId } = await renderWithProvider();
     await act(async () => {
-      fireEvent.press(getByTestId('warm-cache'));
+      await fireEvent.press(getByTestId('warm-cache'));
     });
     // Should not throw
   });
@@ -1037,13 +1037,13 @@ describe('useMusicProvider', () => {
     ]);
     mockProvider.loadPlaylistTracks.mockResolvedValue([mockTrack]);
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('clear-sifted'));
+      await fireEvent.press(getByTestId('clear-sifted'));
     });
     expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('sifted-1', ['1']);
     jest.useFakeTimers();
@@ -1051,26 +1051,26 @@ describe('useMusicProvider', () => {
 
   test('clearSiftedPlaylist does nothing when no sifted playlist exists', async () => {
     mockProvider.loadPlaylists.mockResolvedValue([]);
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('clear-sifted'));
+      await fireEvent.press(getByTestId('clear-sifted'));
     });
     expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
   });
 
   test('clearSiftedPlaylist handles error gracefully', async () => {
     mockProvider.loadPlaylists.mockRejectedValueOnce(new Error('fail'));
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('clear-sifted'));
+      await fireEvent.press(getByTestId('clear-sifted'));
     });
     // Should not throw
   });
@@ -1081,19 +1081,22 @@ describe('useMusicProvider', () => {
     mockProvider.loadPlaylists.mockReset();
     mockProvider.loadPlaylists.mockResolvedValue([]);
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
 
     // First keep: creates the playlist with the track — it landed, so
     // nothing is buffered even though the follow-up lookup fails.
     await act(async () => {
-      fireEvent.press(getByTestId('keep-track'));
+      // Not awaited, as in v13: the handler waits on fake timers advanced
+      // below, so awaiting the press here never settles inside this act()
+      // and the test times out.
+      void fireEvent.press(getByTestId('keep-track'));
     });
     await act(async () => {
       await jest.advanceTimersByTimeAsync(1100);
@@ -1104,7 +1107,10 @@ describe('useMusicProvider', () => {
     // Second keep: the playlist id is still unresolved and the retry window
     // exhausts again — the track must be buffered, not silently dropped.
     await act(async () => {
-      fireEvent.press(getByTestId('keep-track'));
+      // Not awaited, as in v13: the handler waits on fake timers advanced
+      // below, so awaiting the press here never settles inside this act()
+      // and the test times out.
+      void fireEvent.press(getByTestId('keep-track'));
     });
     await act(async () => {
       await jest.advanceTimersByTimeAsync(1100);
@@ -1119,7 +1125,7 @@ describe('useMusicProvider', () => {
     ]);
     mockProvider.loadPlaylistTracks.mockResolvedValue([]);
     await act(async () => {
-      fireEvent.press(getByTestId('save-sifted'));
+      await fireEvent.press(getByTestId('save-sifted'));
     });
     expect(mockProvider.addToPlaylist).toHaveBeenCalledWith('sifted-1', ['1']);
     expect(getByTestId('pending-keeps').props.children).toBe('');
@@ -1132,21 +1138,21 @@ describe('useMusicProvider', () => {
     mockProvider.loadPlaylists.mockReset();
     mockProvider.loadPlaylists.mockResolvedValue([]);
 
-    const { getByTestId, rerender } = render(
+    const { getByTestId, rerender } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <PendingKeepsProbe />
         <KeepPromiseConsumer />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('kp-set-source'));
+      await fireEvent.press(getByTestId('kp-set-source'));
     });
 
     // Two keeps: the first creates the playlist and enters the retry delay;
     // the second queues behind it and can only proceed once the first settles.
     await act(async () => {
-      fireEvent.press(getByTestId('kp-keep'));
-      fireEvent.press(getByTestId('kp-keep'));
+      await fireEvent.press(getByTestId('kp-keep'));
+      await fireEvent.press(getByTestId('kp-keep'));
     });
     expect(mockProvider.createPlaylist).toHaveBeenCalledTimes(1);
     expect(capturedKeepPromises).toHaveLength(2);
@@ -1154,7 +1160,7 @@ describe('useMusicProvider', () => {
     // Unmount the hook consumer (SiftScreen leaving the sifting phase) while
     // the retry timer is pending. The unmount cleanup clears the timer — it
     // must also resolve the awaited promise or both keeps hang forever.
-    rerender(
+    await rerender(
       <SiftProvider initialTracks={[mockTrack]}>
         <PendingKeepsProbe />
       </SiftProvider>
@@ -1186,32 +1192,32 @@ describe('useMusicProvider', () => {
     mockProvider.loadPlaylistTracks.mockResolvedValue([]);
     mockProvider.addToPlaylist.mockRejectedValueOnce(new Error('network'));
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('keep-track'));
+      await fireEvent.press(getByTestId('keep-track'));
     });
     expect(getByTestId('pending-keeps').props.children).toBe('1');
   });
 
   test('loadTracks with skipFiltering on an empty playlist returns to setup with an empty-playlist error', async () => {
     mockProvider.loadPlaylistTracks.mockResolvedValue([]);
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('load-tracks-skip'));
+      await fireEvent.press(getByTestId('load-tracks-skip'));
     });
     // Must not enter sifting with zero tracks (no card, no exit)…
     expect(getByTestId('phase').props.children).toBe('setup');
@@ -1226,16 +1232,16 @@ describe('useMusicProvider', () => {
     mockProvider.loadPlaylists.mockResolvedValue([
       { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
     ]);
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('load-tracks'));
+      await fireEvent.press(getByTestId('load-tracks'));
     });
     expect(getByTestId('phase').props.children).toBe('setup');
     expect(getByTestId('load-error').props.children).toBe('All tracks in this playlist have already been sifted.');
@@ -1257,16 +1263,16 @@ describe('useMusicProvider', () => {
       },
     ]);
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('load-tracks'));
+      await fireEvent.press(getByTestId('load-tracks'));
     });
     expect(getByTestId('phase').props.children).toBe('setup');
     expect(getByTestId('load-error').props.children).toBe(
@@ -1291,16 +1297,16 @@ describe('useMusicProvider', () => {
       },
     ]);
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('load-tracks'));
+      await fireEvent.press(getByTestId('load-tracks'));
     });
     expect(getByTestId('phase').props.children).toBe('setup');
     expect(getByTestId('load-error').props.children).toBe(
@@ -1310,13 +1316,13 @@ describe('useMusicProvider', () => {
 
   test('loadTracks on an empty library returns to setup instead of a dead-end sift', async () => {
     mockProvider.loadLibrary.mockResolvedValue([]);
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('load-tracks'));
+      await fireEvent.press(getByTestId('load-tracks'));
     });
     expect(getByTestId('phase').props.children).toBe('setup');
     expect(getByTestId('load-error').props.children).toBe('Your library has no tracks to sift.');
@@ -1334,16 +1340,16 @@ describe('useMusicProvider', () => {
       { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
     ]);
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('load-tracks'));
+      await fireEvent.press(getByTestId('load-tracks'));
     });
 
     // The only source track is already sifted (under its new id) — nothing
@@ -1364,16 +1370,16 @@ describe('useMusicProvider', () => {
       { ...mockTrack, id: 'library-instance-42' },
     ]);
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('keep-track'));
+      await fireEvent.press(getByTestId('keep-track'));
     });
 
     // Already present: neither re-added nor buffered.
@@ -1389,16 +1395,16 @@ describe('useMusicProvider', () => {
     ]);
     mockProvider.loadPlaylistTracks.mockResolvedValue([]);
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-sifted-id'));
+      await fireEvent.press(getByTestId('set-sifted-id'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('save-sifted'));
+      await fireEvent.press(getByTestId('save-sifted'));
     });
 
     expect(mockProvider.addToPlaylist).toHaveBeenCalledWith('sifted-renamed', ['1']);
@@ -1413,16 +1419,16 @@ describe('useMusicProvider', () => {
     ]);
     mockProvider.loadPlaylistTracks.mockResolvedValue([mockTrack]);
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-sifted-id'));
+      await fireEvent.press(getByTestId('set-sifted-id'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('clear-sifted'));
+      await fireEvent.press(getByTestId('clear-sifted'));
     });
 
     expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('sifted-renamed', ['1']);
@@ -1436,19 +1442,19 @@ describe('useMusicProvider', () => {
       .mockResolvedValueOnce([mockTrack, mockTrackB]) // source playlist
       .mockResolvedValueOnce([mockTrack]); // renamed companion, found by id
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('set-sifted-id'));
+      await fireEvent.press(getByTestId('set-sifted-id'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('load-tracks'));
+      await fireEvent.press(getByTestId('load-tracks'));
     });
 
     // The companion was read (by id) and its track filtered from the sift.
@@ -1472,24 +1478,24 @@ describe('useMusicProvider', () => {
       new Error('1 of 2 tracks could not be added to the playlist'),
     );
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack, mockTrackB]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('add-pending-1'));
+      await fireEvent.press(getByTestId('add-pending-1'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('add-pending-2'));
+      await fireEvent.press(getByTestId('add-pending-2'));
     });
     expect(getByTestId('pending-keeps').props.children).toBe('1,2');
 
     await act(async () => {
-      fireEvent.press(getByTestId('save-sifted-two'));
+      await fireEvent.press(getByTestId('save-sifted-two'));
     });
 
     // The add was attempted with both tracks and failed…
@@ -1512,27 +1518,30 @@ describe('useMusicProvider', () => {
       () => new Promise<void>((res) => { resolveAdd = () => res(); }),
     );
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     // Track 1 is buffered; the save starts persisting exactly that snapshot
     // and parks on its playlist add.
     await act(async () => {
-      fireEvent.press(getByTestId('add-pending-1'));
+      await fireEvent.press(getByTestId('add-pending-1'));
     });
     await act(async () => {
-      fireEvent.press(getByTestId('save-sifted'));
+      // Not awaited, as in v13: the handler deliberately parks on a promise
+      // this test settles later, so awaiting the press here never settles
+      // inside this act() and the test times out.
+      void fireEvent.press(getByTestId('save-sifted'));
     });
     expect(resolveAdd).toBeDefined();
 
     // A late keep fails and gets buffered while the save is still in flight.
     await act(async () => {
-      fireEvent.press(getByTestId('add-pending-2'));
+      await fireEvent.press(getByTestId('add-pending-2'));
     });
     expect(getByTestId('pending-keeps').props.children).toBe('1,2');
 
@@ -1554,24 +1563,30 @@ describe('useMusicProvider', () => {
       () => new Promise<void>((res) => { resolveAdd = () => res(); }),
     );
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     // The keep resolves the playlist and parks mid-add.
     await act(async () => {
-      fireEvent.press(getByTestId('keep-track'));
+      // Not awaited, as in v13: the handler deliberately parks on a promise
+      // this test settles later, so awaiting the press here never settles
+      // inside this act() and the test times out.
+      void fireEvent.press(getByTestId('keep-track'));
     });
     expect(resolveAdd).toBeDefined();
 
     // The clear must wait for the keep chain — reading the playlist now
     // would miss the mid-flight track and leave it behind.
     await act(async () => {
-      fireEvent.press(getByTestId('clear-sifted'));
+      // Not awaited, as in v13: the handler deliberately parks on a promise
+      // this test settles later, so awaiting the press here never settles
+      // inside this act() and the test times out.
+      void fireEvent.press(getByTestId('clear-sifted'));
     });
     expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
 
@@ -1597,23 +1612,29 @@ describe('useMusicProvider', () => {
       () => new Promise<void>((res) => { hangResolve = () => res(); }),
     );
 
-    const { getByTestId } = render(
+    const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
       </SiftProvider>
     );
     await act(async () => {
-      fireEvent.press(getByTestId('set-source-playlist'));
+      await fireEvent.press(getByTestId('set-source-playlist'));
     });
     // The keep resolves the playlist and hangs on its native add.
     await act(async () => {
-      fireEvent.press(getByTestId('keep-track'));
+      // Not awaited, as in v13: the handler deliberately parks on a promise
+      // this test settles later, so awaiting the press here never settles
+      // inside this act() and the test times out.
+      void fireEvent.press(getByTestId('keep-track'));
     });
     expect(hangResolve).toBeDefined();
 
     // The clear parks on the keep queue…
     await act(async () => {
-      fireEvent.press(getByTestId('clear-sifted'));
+      // Not awaited, as in v13: the handler deliberately parks on a promise
+      // this test settles later, so awaiting the press here never settles
+      // inside this act() and the test times out.
+      void fireEvent.press(getByTestId('clear-sifted'));
     });
     expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
 

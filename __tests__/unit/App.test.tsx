@@ -104,27 +104,27 @@ describe('App', () => {
     ]);
   });
 
-  test('renders SetupScreen initially', () => {
-    const { getByTestId } = renderApp();
+  test('renders SetupScreen initially', async () => {
+    const { getByTestId } = await renderApp();
     expect(getByTestId('setup-brand')).toBeTruthy();
   });
 
-  test('does not show settings button on setup phase', () => {
-    const { queryByTestId } = renderApp();
+  test('does not show settings button on setup phase', async () => {
+    const { queryByTestId } = await renderApp();
     expect(queryByTestId('settings-button')).toBeNull();
   });
 
-  test('renders without crashing', () => {
-    const { toJSON } = renderApp();
+  test('renders without crashing', async () => {
+    const { toJSON } = await renderApp();
     expect(toJSON()).toBeTruthy();
   });
 
   test('shows settings button after leaving setup phase', async () => {
-    const { getByText, getByTestId, queryByTestId } = renderApp();
+    const { getByText, getByTestId, queryByTestId } = await renderApp();
     expect(queryByTestId('settings-button')).toBeNull();
 
     await act(async () => {
-      fireEvent.press(getByText('Start Sifting'));
+      await fireEvent.press(getByText('Start Sifting'));
     });
     await act(async () => {});
 
@@ -133,10 +133,10 @@ describe('App', () => {
   });
 
   test('transitions to sifting phase after loading', async () => {
-    const { getByText, getByTestId } = renderApp();
+    const { getByText, getByTestId } = await renderApp();
 
     await act(async () => {
-      fireEvent.press(getByText('Start Sifting'));
+      await fireEvent.press(getByText('Start Sifting'));
     });
     await act(async () => {});
 
@@ -145,28 +145,28 @@ describe('App', () => {
   });
 
   test('settings button opens modal', async () => {
-    const { getByText, getByTestId } = renderApp();
+    const { getByText, getByTestId } = await renderApp();
 
     await act(async () => {
-      fireEvent.press(getByText('Start Sifting'));
+      await fireEvent.press(getByText('Start Sifting'));
     });
     await act(async () => {});
 
-    fireEvent.press(getByTestId('settings-button'));
+    await fireEvent.press(getByTestId('settings-button'));
     expect(getByTestId('settings-modal').props.visible).toBe(true);
   });
 
   test('modal onRequestClose closes the modal', async () => {
-    const { getByText, getByTestId, queryByTestId } = renderApp();
+    const { getByText, getByTestId, queryByTestId } = await renderApp();
 
     await act(async () => {
-      fireEvent.press(getByText('Start Sifting'));
+      await fireEvent.press(getByText('Start Sifting'));
     });
     await act(async () => {});
 
     // Open modal
     await act(async () => {
-      fireEvent.press(getByTestId('settings-button'));
+      await fireEvent.press(getByTestId('settings-button'));
     });
     const modal = getByTestId('settings-modal');
     expect(modal.props.visible).toBe(true);
@@ -181,20 +181,20 @@ describe('App', () => {
   test('transitions to done phase when all tracks sifted', async () => {
     jest.useFakeTimers();
     try {
-      const { getByText, getByLabelText } = renderApp();
+      const { getByText, getByLabelText } = await renderApp();
 
       await act(async () => {
-        fireEvent.press(getByText('Start Sifting'));
+        await fireEvent.press(getByText('Start Sifting'));
       });
       await act(async () => {});
 
       // Skip decisions hold the double-decide guard for a 300ms settle
       // window, so advance past it between presses.
-      fireEvent.press(getByLabelText('Skip'));
-      act(() => {
+      await fireEvent.press(getByLabelText('Skip'));
+      await act(() => {
         jest.advanceTimersByTime(400);
       });
-      fireEvent.press(getByLabelText('Skip'));
+      await fireEvent.press(getByLabelText('Skip'));
 
       expect(getByText('Start Over')).toBeTruthy();
     } finally {
@@ -203,14 +203,14 @@ describe('App', () => {
   });
 
   test('back button returns to setup', async () => {
-    const { getByText, getByTestId } = renderApp();
+    const { getByText, getByTestId } = await renderApp();
 
     await act(async () => {
-      fireEvent.press(getByText('Start Sifting'));
+      await fireEvent.press(getByText('Start Sifting'));
     });
     await act(async () => {});
 
-    fireEvent.press(getByTestId('back-button'));
+    await fireEvent.press(getByTestId('back-button'));
 
     expect(getByText('Resume Sifting')).toBeTruthy();
   });

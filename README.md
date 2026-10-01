@@ -75,7 +75,7 @@ __tests__/
 
 ## Getting started
 
-**Requirements:** Node.js 22+, Xcode 26+ (for native iOS builds). Expo is bundled — no global CLI needed; use `npx expo`.
+**Requirements:** Node.js 22.13+ (or 24+), Xcode 26+ (for native iOS builds). Expo is bundled — no global CLI needed; use `npx expo`.
 
 ```bash
 npm install                    # install dependencies
@@ -98,7 +98,7 @@ Configuration lives in environment variables — see [`.env.example`](.env.examp
 | `npm test` | Unit tests (Jest) |
 | `npm run test:coverage` | Unit tests with coverage (80% threshold) |
 | `npm run lint` | ESLint |
-| `npm run typecheck` | TypeScript type check (`tsc --noEmit`) |
+| `npm run typecheck` | TypeScript 7 type check (`@typescript/native`, `--noEmit`) |
 | `npm run check` | Lint + typecheck + tests |
 
 A `Makefile` mirrors these (`make test`, `make lint`, `make typecheck`, `make check`) and adds native E2E targets (`make build-e2e`, `make test-e2e`).
