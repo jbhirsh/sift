@@ -203,11 +203,11 @@ jobs:
           # No analytics network call — one less nondeterministic dependency.
           MAESTRO_CLI_NO_ANALYTICS: "1"
           E2E_OUT_DIR: maestro-results
-        # One `maestro test` per flow, in filename order, each on a fresh
-        # XCUITest driver — so one driver death can't cascade into every
-        # remaining flow (main run 34544916181: 1 driver crash -> 11/11
-        # failed). App-level failures (assertions, missing elements) are
-        # NEVER retried; only a pure driver/transport failure gets one retry,
+        # The whole suite runs in one session; then only the flows that died
+        # of a driver/transport error are re-run alone on a fresh driver, so
+        # one driver death can't cascade into every remaining flow (main run
+        # 34544916181: 1 driver crash -> 11/11 failed). App-level failures
+        # (assertions, missing elements) are NEVER retried; each re-run is
         # annotated as a warning. See scripts/run-e2e.sh for the policy.
         run: |
           export PATH="$HOME/.maestro/bin:$PATH"
