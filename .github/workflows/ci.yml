@@ -290,8 +290,10 @@ jobs:
           # Let the AI review run on Dependabot's dependency-bump PRs. Without
           # this, claude-code-action refuses to run for the bot actor and fails
           # with "Workflow initiated by non-human actor: dependabot (type: Bot)".
-          # Allow-list only this one trusted bot rather than "*".
-          allowed_bots: "dependabot[bot]"
+          # claude[bot] pushes autofix's commits; without it the review fails
+          # on them and, being required, blocks the PR. Allow-list just these
+          # two trusted bots rather than "*".
+          allowed_bots: "dependabot[bot],claude[bot]"
           prompt: |
             REPO_DIR: ${{ github.workspace }}
             PR: ${{ github.event.pull_request.number }}
