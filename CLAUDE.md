@@ -148,7 +148,13 @@ Makefile                Dev commands (test, lint, typecheck, check)
   `workflow_dispatch` available for manual runs.
 - The Claude Code PR review runs as the `review` job inside `ci.yml`
   (dependent on the `check` job, pull requests only); the auto-fix workflow
-  lives alongside it in `.github/workflows/claude-autofix.yml`.
+  lives alongside it in `.github/workflows/claude-autofix.yml` and works only
+  Dependabot's PRs (a person's PR is left to its author).
+- **Dependabot's npm PRs merge themselves.** `dependabot-merge.yml` turns on
+  auto-merge as each one opens, and the `main` rule does the gating: GitHub
+  merges only once every required check is green. So the rule must list every
+  check a PR runs, Claude Review included, and require review threads to be
+  resolved, or a bot PR merges past a failing or unreported gate.
 - Security/quality gates run per PR and sweep weekly (Mon 06:00 UTC):
   `gitleaks.yml` (secret scanning), `semgrep.yml` (SAST, `--config auto`), and
   `mutation.yml` (Stryker), alongside the weekly Dependabot bumps.
