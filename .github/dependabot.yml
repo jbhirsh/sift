@@ -49,6 +49,9 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-native"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # async-storage runs a major ahead of the SDK's pin (3.x vs Expo's
+      # 2.2.0), declared in package.json `expo.install.exclude`. Its 3.x
+      # minors/patches still flow; hold the next major for a deliberate bump.
       - dependency-name: "@react-native-async-storage/async-storage"
         update-types: ["version-update:semver-major"]
       # Pinned exactly or with ~ by the SDK. For 0.x packages (worklets) a
