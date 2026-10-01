@@ -22,6 +22,10 @@ jobs:
       pull-requests: write
       issues: write
       actions: read
+      # claude-code-action exchanges a GitHub OIDC token for its app token
+      # before it starts; without this every run that has work to do fails
+      # with "Unable to get ACTIONS_ID_TOKEN_REQUEST_URL".
+      id-token: write
 
     steps:
       - name: Resolve PR info
@@ -30,13 +34,23 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           SHA="${{ github.event.workflow_run.head_sha }}"
-          PR_JSON=$(gh api "repos/${{ github.repository }}/commits/$SHA/pulls" --jq '.[0]')
+          # A commit can belong to several PRs, in no set order; pick the open
+          # one. None open (e.g. CI finished after the merge deleted the
+          # branch) means nothing is left to fix, and checkout would fail.
+          PR_JSON=$(gh api "repos/${{ github.repository }}/commits/$SHA/pulls" --jq 'map(select(.state == "open"))[0]')
           if [ -z "$PR_JSON" ] || [ "$PR_JSON" = "null" ]; then
-            echo "No PR associated with $SHA — skipping"
+            echo "No open PR associated with $SHA — skipping"
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           NUMBER=$(echo "$PR_JSON" | jq -r '.number')
+          # Dependabot's PRs only. Dependabot can't answer a review, so
+          # autofix does it for it; a person's PR is theirs to fix.
+          if [ "$(echo "$PR_JSON" | jq -r '.user.login')" != "dependabot[bot]" ]; then
+            echo "PR #$NUMBER is not Dependabot's — leaving its review threads to its author"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           BRANCH=$(echo "$PR_JSON" | jq -r '.head.ref')
           LABELS=$(echo "$PR_JSON" | jq -r '[.labels[].name] | join(",")')
           echo "PR #$NUMBER on branch $BRANCH (labels: $LABELS)"
