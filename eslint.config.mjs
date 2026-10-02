@@ -32,6 +32,55 @@ export default tseslint.config(
     },
   },
   {
+    // CLAUDE.md: icons come from expo-symbols (SF Symbols) with
+    // @expo/vector-icons as the fallback; don't add other icon packages.
+    // Rejects any package import whose name mentions "icon", plus the common
+    // icon libraries whose names don't. Local files (./, ../) are exempt, so
+    // an IconButton component or the app icon asset stays importable.
+    files: ['**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                '*icon*',
+                'lucide-react-native',
+                '@fortawesome/*',
+                'phosphor-react-native',
+                'react-native-feather',
+                '!@expo/vector-icons',
+                '!@expo/vector-icons/**',
+                '!./**',
+                '!../**',
+              ],
+              caseSensitive: false,
+              message:
+                'Use expo-symbols (SymbolView), or @expo/vector-icons as the fallback; CLAUDE.md rules out other icon packages.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // RNTL 14 made render, renderHook, rerender, unmount, fireEvent.* and act
+    // async, and a missed `await` leaves a test that passes without checking
+    // anything (CLAUDE.md). no-floating-promises catches every un-awaited
+    // promise, those included, so it needs type information for the tests.
+    files: ['__tests__/**/*.{ts,tsx}'],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'error',
+    },
+  },
+  {
     // `require()` for lazy/conditional native-module loading. These files pull
     // in the iOS-only MusicKit native module (and the AppleMusicProvider that
     // wraps it) at call time, inside try/catch, so the app falls back to the

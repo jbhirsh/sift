@@ -88,7 +88,8 @@ amend, rebase, or force-push `main`. Never use `--no-verify`.**
 - **Testing**: Jest + React Native Testing Library 14. In RNTL 14, `render`,
   `renderHook`, `rerender`, `unmount`, `fireEvent.*` and `act` are async:
   always `await` them (and any helper that wraps them, like
-  `renderWithProviders`). A missed `await` is a silently wrong test.
+  `renderWithProviders`). A missed `await` is a silently wrong test, so lint
+  fails on one (`@typescript-eslint/no-floating-promises` in `__tests__/`).
 - **Architecture layering**: `npm run depcruise` enforces the import rules in
   `.dependency-cruiser.cjs` (pure `utils`, `types` a leaf, `services`/`context`
   below the UI). Runs in CI and the pre-commit hook.
@@ -317,4 +318,6 @@ Semantic colors are defined in `COLORS.light` and `COLORS.dark`, accessed via `u
 
 - Use `expo-symbols` (`SymbolView`) for SF Symbols on iOS
 - Use `@expo/vector-icons` as fallback for cross-platform icons
-- Do not install additional icon packages
+- Do not install additional icon packages (lint rejects importing a package
+  whose name mentions "icon", other than `@expo/vector-icons`, and the common
+  icon libraries that don't: lucide, Font Awesome, Phosphor, Feather)
