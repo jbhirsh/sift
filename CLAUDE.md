@@ -54,6 +54,11 @@ Every commit message must:
 - Have a blank line then a body explaining *why*
 - End with the Co-Authored-By trailer
 
+CI's commit-message step (`.github/scripts/check-commits.sh`, in the
+`Lint, Typecheck & Unit Test` job) fails a PR on a subject over 72 chars,
+a missing body, a fixup/"oops" commit or a merge commit (history is
+linear: rebase, not merge).
+
 ```
 Fix artwork fetch crashing on missing cache entry
 
