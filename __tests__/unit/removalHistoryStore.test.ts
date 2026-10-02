@@ -3,11 +3,13 @@ import type { RemovalRecord } from '../../src/types';
 const mockExists = jest.fn();
 const mockText = jest.fn();
 const mockWrite = jest.fn();
+const mockCopy = jest.fn();
 
 const mockFileInstance = {
   get exists() { return mockExists(); },
   text: () => mockText(),
   write: mockWrite,
+  copy: (destination: unknown) => mockCopy(destination),
 };
 
 jest.mock('expo-file-system', () => ({
@@ -17,11 +19,13 @@ jest.mock('expo-file-system', () => ({
 
 jest.mock('@sentry/react-native', () => ({
   captureException: jest.fn(),
+  addBreadcrumb: jest.fn(),
 }));
 
 // Import after mocks are set up
 const { logRemoval, loadHistory, removeFromHistory, clearHistoryForSource } = require('../../src/services/RemovalHistoryStore');
 const Sentry = require('@sentry/react-native');
+const { File } = require('expo-file-system');
 
 const record: RemovalRecord = {
   track: {
@@ -357,5 +361,193 @@ describe('mutation serialization', () => {
     await expect(second).resolves.toBeUndefined();
     // The second append landed even though the first op rejected.
     expect(mockWrite).toHaveBeenLastCalledWith(JSON.stringify([recordB]));
+  });
+});
+
+describe('malformed history on disk', () => {
+  const validRecord: RemovalRecord = { ...record, track: { ...record.track, id: 'valid' } };
+
+  test('loadHistory keeps valid records and drops malformed ones without reporting', async () => {
+    // The read path runs on every playlist load; the backup on the next
+    // mutation is what reports, once.
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(
+      JSON.stringify([validRecord, { track: { id: 'x' } }, null, { ...record, source: undefined }]),
+    );
+
+    const result = await loadHistory();
+
+    expect(result).toEqual([validRecord]);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(mockWrite).not.toHaveBeenCalled();
+  });
+
+  test('clearHistoryForSource backs up wrong-shaped records before rewriting without them', async () => {
+    // A parseable file whose entries lack `source` used to make the filter
+    // throw on every call, so Start Over / Re-sift could never proceed. The
+    // rewrite drops them, so the original is copied aside first.
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([{ track: record.track }, validRecord]));
+    mockCopy.mockResolvedValue(undefined);
+
+    const result = await clearHistoryForSource('p1');
+
+    expect(result).toBe(true);
+    expect(mockCopy).toHaveBeenCalledTimes(1);
+    expect(mockCopy.mock.invocationCallOrder[0]).toBeLessThan(mockWrite.mock.invocationCallOrder[0]);
+    expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([validRecord]));
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('Dropped 1 malformed') }),
+      {
+        tags: { flow: 'removal-history-backup' },
+        extra: { backup: expect.stringMatching(/^removal-history\.corrupt-\d+\.json$/), legacy: 0 },
+      },
+    );
+  });
+
+  test('legacy local-file records (null id) are backed up and dropped without an error event', async () => {
+    const legacyRecord = { ...record, track: { ...record.track, id: null } };
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([legacyRecord, validRecord]));
+    mockCopy.mockResolvedValue(undefined);
+
+    await logRemoval(record);
+
+    expect(mockCopy).toHaveBeenCalledTimes(1);
+    expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([validRecord, record]));
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'removal-history',
+        message: expect.stringContaining('Dropped 1 legacy local-file record'),
+      }),
+    );
+  });
+
+  test('never rewrites without dropped records when their backup fails', async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([{ track: record.track }, validRecord]));
+    mockCopy.mockRejectedValue(new Error('disk full'));
+
+    expect(await clearHistoryForSource('p1')).toBe(false);
+    expect(mockWrite).not.toHaveBeenCalled();
+  });
+
+  test('a record with drift in unread fields is kept with no backup', async () => {
+    const drifted = { track: { id: 'drift' }, source: { type: 'library' } };
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([drifted]));
+
+    await logRemoval(record);
+
+    expect(mockCopy).not.toHaveBeenCalled();
+    expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([drifted, record]));
+  });
+
+  test('a Restore after a reset rewrites the file, so it is backed up only once', async () => {
+    // removeFromHistory skips the write when nothing matched; after a reset
+    // that would leave the corrupt file in place and back it up again on
+    // every later Restore.
+    let fileContent = 'not json';
+    mockExists.mockReturnValue(true);
+    mockText.mockImplementation(() => Promise.resolve(fileContent));
+    mockWrite.mockImplementation((content: string) => {
+      fileContent = content;
+    });
+    mockCopy.mockResolvedValue(undefined);
+
+    await removeFromHistory('track-1', { type: 'library' });
+    await removeFromHistory('track-1', { type: 'library' });
+
+    expect(mockCopy).toHaveBeenCalledTimes(1);
+    expect(mockWrite).toHaveBeenCalledTimes(1);
+    expect(fileContent).toBe(JSON.stringify([]));
+  });
+
+  test('a parseable non-array file is treated as unreadable', async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify({ records: [record] }));
+
+    expect(await loadHistory()).toEqual([]);
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      { tags: { flow: 'removal-history-load' } },
+    );
+  });
+
+  test('logRemoval backs up an unparseable file before starting fresh', async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue('[{"track":{"id":"tru');
+    mockCopy.mockResolvedValue(undefined);
+
+    await logRemoval(record);
+
+    // The corrupt file is copied aside under a distinct name…
+    expect(mockCopy).toHaveBeenCalledTimes(1);
+    const backupName = File.mock.calls.at(-1)?.[1];
+    expect(backupName).toMatch(/^removal-history\.corrupt-\d+\.json$/);
+    // …the copy lands before the original is overwritten…
+    expect(mockCopy.mock.invocationCallOrder[0]).toBeLessThan(mockWrite.mock.invocationCallOrder[0]);
+    // …and the reset is reported once, under its own flow.
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      { tags: { flow: 'removal-history-backup' }, extra: { backup: backupName } },
+    );
+    expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([record]));
+  });
+
+  test('a non-array file is backed up too before clearHistoryForSource rewrites it', async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue('{}');
+    mockCopy.mockResolvedValue(undefined);
+
+    const result = await clearHistoryForSource('p1');
+
+    expect(result).toBe(true);
+    expect(mockCopy).toHaveBeenCalledTimes(1);
+    expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([]));
+  });
+
+  test('never overwrites an unparseable file when the backup fails', async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue('not json');
+    mockCopy.mockRejectedValue(new Error('disk full'));
+
+    await expect(logRemoval(record)).resolves.toBeUndefined();
+
+    expect(mockWrite).not.toHaveBeenCalled();
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'disk full' }),
+      { tags: { flow: 'removal-history-log' } },
+    );
+  });
+
+  test('a read failure aborts the mutation instead of writing over the history', async () => {
+    // A transient I/O error is not an empty history: appending to [] would
+    // replace every stored record with just the new one.
+    mockExists.mockReturnValue(true);
+    mockText.mockRejectedValue(new Error('read failed'));
+
+    await logRemoval(record);
+
+    expect(mockWrite).not.toHaveBeenCalled();
+    expect(mockCopy).not.toHaveBeenCalled();
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      { tags: { flow: 'removal-history-log' } },
+    );
+  });
+
+  test('a valid history is appended to without a backup or a report', async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([validRecord]));
+
+    await logRemoval(record);
+
+    expect(mockCopy).not.toHaveBeenCalled();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([validRecord, record]));
   });
 });
