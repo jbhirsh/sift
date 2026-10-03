@@ -57,12 +57,39 @@ export async function generateCodeChallenge(verifier: string): Promise<string> {
 // Token management
 // ---------------------------------------------------------------------------
 
-/** Persist tokens returned from the Spotify token endpoint. */
-async function storeTokens(data: {
+interface TokenResponse {
   access_token: string;
   refresh_token?: string;
   expires_in: number;
-}): Promise<void> {
+}
+
+/**
+ * Validate a token-endpoint body before anything is stored. A missing
+ * `expires_in` used to store "NaN" (forcing a refresh on every call) and a
+ * missing `access_token` made SecureStore throw; both now fail here with
+ * one clear error that the callers' existing auth error handling surfaces.
+ */
+function parseTokenResponse(data: unknown): TokenResponse {
+  if (
+    typeof data === 'object' &&
+    data !== null &&
+    'access_token' in data &&
+    typeof data.access_token === 'string' &&
+    data.access_token !== '' &&
+    'expires_in' in data &&
+    typeof data.expires_in === 'number' &&
+    Number.isFinite(data.expires_in)
+  ) {
+    const refresh = 'refresh_token' in data ? data.refresh_token : undefined;
+    if (refresh === undefined || typeof refresh === 'string') {
+      return { access_token: data.access_token, refresh_token: refresh, expires_in: data.expires_in };
+    }
+  }
+  throw new Error('Spotify returned an invalid token response');
+}
+
+/** Persist tokens returned from the Spotify token endpoint. */
+async function storeTokens(data: TokenResponse): Promise<void> {
   const expiration = Date.now() + data.expires_in * 1000;
   await SecureStore.setItemAsync(STORAGE_KEY_ACCESS_TOKEN, data.access_token);
   await SecureStore.setItemAsync(STORAGE_KEY_TOKEN_EXPIRATION, String(expiration));
@@ -142,8 +169,8 @@ export async function refreshTokenIfNeeded(): Promise<void> {
     return;
   }
 
-  const data = await response.json();
-  await storeTokens(data);
+  const data: unknown = await response.json();
+  await storeTokens(parseTokenResponse(data));
 }
 
 // ---------------------------------------------------------------------------
@@ -204,8 +231,8 @@ export async function authorize(): Promise<boolean> {
 
     if (!response.ok) return false;
 
-    const data = await response.json();
-    await storeTokens(data);
+    const data: unknown = await response.json();
+    await storeTokens(parseTokenResponse(data));
     return true;
   } catch (err) {
     Sentry.captureException(err, { tags: { flow: 'spotify-authorize' } });

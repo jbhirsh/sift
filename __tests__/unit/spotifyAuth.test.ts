@@ -544,3 +544,66 @@ describe('logout', () => {
     expect(mockRemoveItem).toHaveBeenCalledTimes(3);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Malformed token responses
+// ---------------------------------------------------------------------------
+
+describe('token response validation', () => {
+  const malformed: [string, Record<string, unknown>][] = [
+    ['no access_token', { expires_in: 3600 }],
+    ['a numeric access_token', { access_token: 42, expires_in: 3600 }],
+    ['an empty access_token', { access_token: '', expires_in: 3600 }],
+    ['no expires_in', { access_token: 'new-token' }],
+    ['a string expires_in', { access_token: 'new-token', expires_in: '3600' }],
+    ['a null expires_in', { access_token: 'new-token', expires_in: null }],
+    ['a non-string refresh_token', { access_token: 'new-token', expires_in: 3600, refresh_token: 7 }],
+  ];
+
+  function stubExpiredSession() {
+    mockGetItem.mockResolvedValueOnce('old-token');
+    mockGetItem.mockResolvedValueOnce(String(Date.now() - 1_000));
+    mockGetItem.mockResolvedValueOnce('refresh-token');
+  }
+
+  test.each(malformed)(
+    'refreshTokenIfNeeded throws a clear error and stores nothing for %s',
+    async (_label, body) => {
+      stubExpiredSession();
+      mockFetch.mockResolvedValue(tokenResponse(true, body));
+
+      // Rejects with a readable message the callers' load/remove error
+      // handling shows, instead of storing "NaN" or a TypeError from
+      // SecureStore.
+      await expect(refreshTokenIfNeeded()).rejects.toThrow(
+        'Spotify returned an invalid token response',
+      );
+      expect(mockSetItem).not.toHaveBeenCalled();
+    },
+  );
+
+  test.each(malformed)(
+    'authorize returns false, reports, and stores nothing for %s',
+    async (_label, body) => {
+      const promptAsync = jest.fn().mockResolvedValue({ type: 'success', params: { code: 'c' } });
+      MockAuthRequest.mockImplementation(() => ({ promptAsync }));
+      mockFetch.mockResolvedValue(tokenResponse(true, body));
+
+      expect(await authorize()).toBe(false);
+      expect(mockSetItem).not.toHaveBeenCalled();
+      expect(mockCaptureException).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Spotify returned an invalid token response' }),
+        { tags: { flow: 'spotify-authorize' } },
+      );
+    },
+  );
+
+  test('a non-object body is rejected too', async () => {
+    stubExpiredSession();
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: jest.fn().mockResolvedValue(null) });
+
+    await expect(refreshTokenIfNeeded()).rejects.toThrow(
+      'Spotify returned an invalid token response',
+    );
+  });
+});
