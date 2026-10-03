@@ -149,7 +149,9 @@ Makefile                Dev commands (test, lint, typecheck, check)
 
 ## CI/CD
 - CI runs in `.github/workflows/ci.yml` on GitHub-hosted runners: lint,
-  typecheck, dependency-cruiser, and Jest with coverage on Ubuntu on every PR.
+  typecheck, dependency-cruiser, Jest with coverage and a production
+  dependency audit on Ubuntu on every PR. The audit gates at critical, not
+  high: Expo's build tooling carries high advisories only Expo can fix.
   The Maestro iOS E2E job (macOS) also runs on every PR and push to main, with
   `workflow_dispatch` available for manual runs.
 - The Claude Code PR review runs in its own workflow,
