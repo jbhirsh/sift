@@ -152,11 +152,16 @@ Makefile                Dev commands (test, lint, typecheck, check)
   typecheck, dependency-cruiser, and Jest with coverage on Ubuntu on every PR.
   The Maestro iOS E2E job (macOS) also runs on every PR and push to main, with
   `workflow_dispatch` available for manual runs.
-- The Claude Code PR review runs as the `review` job inside `ci.yml`
-  (dependent on the `check` job, pull requests only); the auto-fix workflow
-  lives alongside it in `.github/workflows/claude-autofix.yml`. It acts only on
+- The Claude Code PR review runs in its own workflow,
+  `.github/workflows/claude-review.yml` (job `Claude Review`, pull requests
+  only), in parallel with CI rather than after it, so a red PR is reviewed
+  too. It is kept out of `ci.yml` because claude-code-action skips (while
+  reporting success) any PR that edits the workflow file it runs from; in
+  its own file, CI changes still get reviewed. The auto-fix workflow lives
+  alongside it in `.github/workflows/claude-autofix.yml`. It acts only on
   bots' PRs (Dependabot's): it fixes review threads opened by Claude Review or
-  the owner (two rounds per PR at most) and, when an npm bump fails a check
+  the owner (two rounds per PR at most, once CI and Claude Review are both
+  green on the head) and, when an npm bump fails a check
   (CI, iOS Build, Mutation Testing), mechanical breakage from the bump, one
   attempt per head and two per PR. When every fix would change behavior it
   comments and leaves the decision to the owner. A person's PR is left to its
@@ -169,9 +174,10 @@ Makefile                Dev commands (test, lint, typecheck, check)
 - Security/quality gates run per PR and sweep weekly (Mon 06:00 UTC):
   `gitleaks.yml` (secret scanning), `semgrep.yml` (SAST, `--config auto`), and
   `mutation.yml` (Stryker), alongside the weekly Dependabot bumps.
-- **Required status checks.** The `main` branch rule requires these job names,
-  so renaming a job's `name:` silently un-gates it. Update the rule in the
-  same PR as any rename:
+- **Required status checks.** The `main` branch rule requires these job names
+  (from GitHub Actions, whichever workflow file they live in), so renaming a
+  job's `name:` silently un-gates it. Update the rule in the same PR as any
+  rename:
   `Lint, Typecheck & Unit Test`, `E2E Tests (Maestro)`, `Claude Review`,
   `Secret scan`, `SAST scan`, `Build iOS simulator app`,
   `Mutation Tests (Stryker)`.
