@@ -75,6 +75,15 @@ jobs:
         run: npx expo-doctor@latest
         continue-on-error: true
 
+      # Fail the PR on known critical vulnerabilities in production deps.
+      # Critical, not high like the web repos: Expo's own build tooling
+      # (@expo/cli, node-forge, image-size) carries high advisories whose
+      # only npm "fix" is a downgrade to an ancient Expo, so a high gate
+      # would be permanently red over code that doesn't ship in the app.
+      # Dependabot picks up Expo's fixes on its weekly run.
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=critical
+
   e2e:
     name: E2E Tests (Maestro)
     needs: check
