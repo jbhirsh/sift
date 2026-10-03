@@ -186,3 +186,133 @@ describe('hasSession error handling', () => {
     );
   });
 });
+
+describe('loadSession with a session saved by a different build', () => {
+  const Sentry = jest.requireMock('@sentry/react-native');
+
+  beforeEach(() => {
+    // An earlier suite leaves setItem rejecting; these tests need it to work.
+    mockSetItem.mockResolvedValue(undefined);
+  });
+
+  it.each([
+    ['tracks', { ...sampleSession, tracks: undefined }],
+    ['kept', { ...sampleSession, kept: undefined }],
+    ['removed', { ...sampleSession, removed: undefined }],
+    ['skipped', { ...sampleSession, skipped: undefined }],
+    ['cursor', { ...sampleSession, cursor: undefined }],
+    ['sortOrder', { ...sampleSession, sortOrder: undefined }],
+  ])('treats a session missing %s as no session, reports it and sets it aside', async (_field, stored) => {
+    mockGetItem.mockResolvedValue(JSON.stringify(stored));
+    mockRemoveItem.mockResolvedValue(undefined);
+
+    const result = await loadSession();
+
+    expect(result).toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'session-load' },
+    });
+    // Moved aside, never destroyed: the raw JSON is kept under another key
+    // before the live key is cleared, so a validator bug is recoverable.
+    expect(mockSetItem).toHaveBeenCalledWith('sift_session.invalid', JSON.stringify(stored));
+    expect(mockSetItem.mock.invocationCallOrder[0]).toBeLessThan(mockRemoveItem.mock.invocationCallOrder[0]);
+    expect(mockRemoveItem).toHaveBeenCalledWith('sift_session');
+  });
+
+  it('rejects a session whose tracks are malformed', async () => {
+    mockGetItem.mockResolvedValue(JSON.stringify({ ...sampleSession, tracks: [{ id: '1' }] }));
+
+    expect(await loadSession()).toBeNull();
+    expect(mockRemoveItem).toHaveBeenCalledWith('sift_session');
+  });
+
+  it('rejects a stored value that is valid JSON but not an object', async () => {
+    mockGetItem.mockResolvedValue('null');
+
+    expect(await loadSession()).toBeNull();
+    expect(mockRemoveItem).toHaveBeenCalledWith('sift_session');
+  });
+
+  it('sets unparseable JSON aside so it is not offered again', async () => {
+    mockGetItem.mockResolvedValue('not valid json {{{');
+
+    expect(await loadSession()).toBeNull();
+    expect(mockSetItem).toHaveBeenCalledWith('sift_session.invalid', 'not valid json {{{');
+    expect(mockRemoveItem).toHaveBeenCalledWith('sift_session');
+  });
+
+  it('leaves an invalid session in place when it cannot be set aside', async () => {
+    mockGetItem.mockResolvedValue(JSON.stringify({ ...sampleSession, tracks: undefined }));
+    mockSetItem.mockRejectedValue(new Error('storage full'));
+
+    expect(await loadSession()).toBeNull();
+    expect(mockRemoveItem).not.toHaveBeenCalled();
+    // One event for the invalid session, carrying the failure as a breadcrumb.
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'session', message: expect.stringContaining('left in place') }),
+    );
+  });
+
+  it('resumes a legacy Spotify session with its local files (null ids) removed', async () => {
+    // Builds before local files were skipped saved them with id null.
+    const local = (n: number) => ({ ...sampleSession.tracks[0], id: null, name: `Local ${n}` });
+    const t = (id: string) => ({ ...sampleSession.tracks[0], id });
+    const legacy = {
+      ...sampleSession,
+      provider: 'spotify',
+      // Decided: a, local1, b, local2 (cursor 4); next up: c, local3, d.
+      tracks: [t('a'), local(1), t('b'), local(2), t('c'), local(3), t('d')],
+      cursor: 4,
+      kept: [t('a'), local(1)],
+      removed: [t('b')],
+      skipped: [local(2)],
+      pendingKeeps: [local(1)],
+    };
+    mockGetItem.mockResolvedValue(JSON.stringify(legacy));
+
+    const result = await loadSession();
+
+    expect(result).toEqual({
+      ...legacy,
+      tracks: [t('a'), t('b'), t('c'), t('d')],
+      // Two id-less tracks sat before the cursor, so it still points at c.
+      cursor: 2,
+      kept: [t('a')],
+      removed: [t('b')],
+      skipped: [],
+      pendingKeeps: [],
+    });
+    expect(result?.tracks[result.cursor].id).toBe('c');
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(mockRemoveItem).not.toHaveBeenCalled();
+  });
+
+  it('keeps the stored session when the read itself fails', async () => {
+    // A storage error says nothing about the session's validity.
+    mockGetItem.mockRejectedValue(new Error('storage error'));
+
+    expect(await loadSession()).toBeNull();
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'session-load' },
+    });
+    expect(mockRemoveItem).not.toHaveBeenCalled();
+  });
+
+  it('returns a valid session untouched, without reporting or clearing', async () => {
+    const full: SiftSession = {
+      ...sampleSession,
+      cursor: 1,
+      source: { type: 'playlist', playlist: { id: 'p1', name: 'Mix', trackCount: 1 } },
+      pendingKeeps: [],
+      removalErrors: [],
+      siftedPlaylistId: null,
+    };
+    mockGetItem.mockResolvedValue(JSON.stringify(full));
+
+    expect(await loadSession()).toEqual(full);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(mockRemoveItem).not.toHaveBeenCalled();
+  });
+});
