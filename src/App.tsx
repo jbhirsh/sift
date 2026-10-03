@@ -13,6 +13,7 @@ import { ThemeProvider, useTheme } from './theme/ThemeContext';
 import { StatusBar } from 'expo-status-bar';
 import { SiftProvider, useSift } from './context/SiftContext';
 import GlassCard from './components/GlassCard';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import SetupScreen from './screens/SetupScreen';
 import LoadingScreen from './screens/LoadingScreen';
 import SiftScreen from './screens/SiftScreen';
@@ -94,9 +95,13 @@ function App() {
     <GestureHandlerRootView style={styles.container}>
       <SafeAreaProvider>
         <ThemeProvider>
-          <SiftProvider>
-            <PhaseRouter />
-          </SiftProvider>
+          {/* Inside ThemeProvider so the fallback can use theme colors;
+              around SiftProvider so Restart remounts it into setup. */}
+          <ErrorBoundary>
+            <SiftProvider>
+              <PhaseRouter />
+            </SiftProvider>
+          </ErrorBoundary>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
