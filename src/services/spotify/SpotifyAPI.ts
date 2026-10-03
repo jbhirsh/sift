@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react-native';
 import { Playlist, Track } from '../../types';
 
 // ---------------------------------------------------------------------------
@@ -20,7 +21,8 @@ interface SpotifyAlbum {
 }
 
 interface SpotifyTrackObject {
-  id: string;
+  /** null for local files, which the Web API can't save, remove or play. */
+  id: string | null;
   name: string;
   artists: SpotifyArtist[];
   album: SpotifyAlbum;
@@ -30,7 +32,7 @@ interface SpotifyTrackObject {
 
 interface SpotifySavedTrack {
   added_at: string;
-  track: SpotifyTrackObject;
+  track: SpotifyTrackObject | null;
 }
 
 interface SpotifyPlaylistItem {
@@ -56,6 +58,10 @@ interface SpotifyPage<T> {
 // ---------------------------------------------------------------------------
 
 const BASE_URL = 'https://api.spotify.com';
+
+// Pagination URLs must stay on the Web API: the bearer token goes with them.
+// The trailing slash ends the authority, so look-alike hosts don't match.
+const API_URL_PREFIX = `${BASE_URL}/`;
 
 // Maximum number of track URIs per "add tracks to playlist" request
 const ADD_TRACKS_BATCH_SIZE = 100;
@@ -101,8 +107,57 @@ function largestImageURL(images: SpotifyImage[]): string | undefined {
   return sorted[0].url;
 }
 
+/**
+ * The page's `next` URL, or null on the last page. Throws rather than
+ * following a URL off the Spotify API origin with the user's token.
+ */
+function nextPageURL(next: string | null): string | null {
+  if (next === null) return null;
+  if (!next.startsWith(API_URL_PREFIX)) {
+    throw new Error('spotify_unexpected_next_url');
+  }
+  return next;
+}
+
+type IdentifiedTrackObject = SpotifyTrackObject & { id: string };
+
+/** A track object the app can use: present, with a non-empty id. */
+function hasId(t: SpotifyTrackObject | null): t is IdentifiedTrackObject {
+  return t !== null && typeof t.id === 'string' && t.id !== '';
+}
+
+/**
+ * Map a page of track items to Tracks, skipping null tracks and tracks with
+ * no id (local files). A null id would collide as a React key, send
+ * `spotify:track:null` on removal and key the removal history by null —
+ * and local files can't be removed through the API anyway.
+ */
+function mapTrackItems(
+  items: { added_at: string; track: SpotifyTrackObject | null }[],
+  into: Track[],
+): number {
+  let skipped = 0;
+  for (const item of items) {
+    if (hasId(item.track)) {
+      into.push(mapTrackObject(item.track, item.added_at));
+    } else if (item.track !== null) {
+      skipped += 1;
+    }
+  }
+  return skipped;
+}
+
+function logSkippedTracks(skipped: number, from: string): void {
+  if (skipped === 0) return;
+  Sentry.addBreadcrumb({
+    category: 'spotify-api',
+    message: `Skipped ${skipped} ${skipped === 1 ? 'track' : 'tracks'} without an id (local files) from ${from}`,
+    level: 'info',
+  });
+}
+
 /** Map a Spotify track object and added_at date to the app's Track type. */
-function mapTrackObject(t: SpotifyTrackObject, addedAt: string): Track {
+function mapTrackObject(t: IdentifiedTrackObject, addedAt: string): Track {
   return {
     id: t.id,
     name: t.name,
@@ -114,11 +169,6 @@ function mapTrackObject(t: SpotifyTrackObject, addedAt: string): Track {
     artworkURL: largestImageURL(t.album.images),
     previewURL: t.preview_url ?? undefined,
   };
-}
-
-/** Map a Spotify saved-track object to the app's Track type. */
-function mapTrack(saved: SpotifySavedTrack): Track {
-  return mapTrackObject(saved.track, saved.added_at);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,16 +183,16 @@ function mapTrack(saved: SpotifySavedTrack): Track {
  */
 export async function loadLibrary(token: string): Promise<Track[]> {
   const tracks: Track[] = [];
+  let skipped = 0;
   let url: string | null = `${BASE_URL}/v1/me/tracks?limit=50`;
 
   while (url) {
     const page: SpotifyPage<SpotifySavedTrack> = await apiGet(url, token);
-    for (const item of page.items) {
-      tracks.push(mapTrack(item));
-    }
-    url = page.next;
+    skipped += mapTrackItems(page.items, tracks);
+    url = nextPageURL(page.next);
   }
 
+  logSkippedTracks(skipped, 'the library');
   return tracks;
 }
 
@@ -192,7 +242,12 @@ export async function createPlaylist(
     throw new Error(`Failed to create playlist: ${createResponse.status}`);
   }
 
-  const playlist = (await createResponse.json()) as { id: string };
+  const created: unknown = await createResponse.json();
+  const playlistID =
+    typeof created === 'object' && created !== null && 'id' in created ? created.id : undefined;
+  if (typeof playlistID !== 'string' || playlistID === '') {
+    throw new Error('Failed to create playlist: response had no playlist id');
+  }
 
   // 3. Add tracks in batches of 100
   const uris = trackIDs.map((id) => `spotify:track:${id}`);
@@ -201,7 +256,7 @@ export async function createPlaylist(
     const batch = uris.slice(i, i + ADD_TRACKS_BATCH_SIZE);
 
     const addResponse = await fetch(
-      `${BASE_URL}/v1/playlists/${playlist.id}/tracks`,
+      `${BASE_URL}/v1/playlists/${playlistID}/tracks`,
       {
         method: 'POST',
         headers: authHeaders(token),
@@ -235,7 +290,7 @@ export async function loadPlaylists(token: string): Promise<Playlist[]> {
         artworkURL: largestImageURL(item.images),
       });
     }
-    url = page.next;
+    url = nextPageURL(page.next);
   }
 
   return playlists;
@@ -245,26 +300,24 @@ export async function loadPlaylists(token: string): Promise<Playlist[]> {
  * Load all tracks from a specific playlist.
  *
  * Paginates through `GET /v1/playlists/{id}/tracks` (50 items per page).
- * Filters out null tracks (local or unavailable items).
+ * Filters out null tracks (unavailable items) and local files (no id).
  */
 export async function loadPlaylistTracks(
   token: string,
   playlistID: string,
 ): Promise<Track[]> {
   const tracks: Track[] = [];
+  let skipped = 0;
   let url: string | null =
     `${BASE_URL}/v1/playlists/${playlistID}/tracks?limit=50`;
 
   while (url) {
     const page: SpotifyPage<SpotifyPlaylistTrackItem> = await apiGet(url, token);
-    for (const item of page.items) {
-      if (item.track) {
-        tracks.push(mapTrackObject(item.track, item.added_at));
-      }
-    }
-    url = page.next;
+    skipped += mapTrackItems(page.items, tracks);
+    url = nextPageURL(page.next);
   }
 
+  logSkippedTracks(skipped, 'a playlist');
   return tracks;
 }
 

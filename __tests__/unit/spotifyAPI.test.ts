@@ -10,6 +10,12 @@ import {
   addToPlaylist,
 } from '../../src/services/spotify/SpotifyAPI';
 
+jest.mock('@sentry/react-native', () => ({
+  addBreadcrumb: jest.fn(),
+}));
+
+const Sentry = jest.requireMock('@sentry/react-native');
+
 // ---------------------------------------------------------------------------
 // Mock fetch globally
 // ---------------------------------------------------------------------------
@@ -515,5 +521,114 @@ describe('addToPlaylist', () => {
     await expect(
       addToPlaylist('fake-token', 'pl1', ['t1']),
     ).rejects.toThrow('Failed to add tracks to playlist: 502');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Malformed or unexpected API data
+// ---------------------------------------------------------------------------
+
+describe('tracks without an id (local files)', () => {
+  // Spotify returns a playlist's local files as non-null track objects with
+  // id null: they can't be removed through the API, and a null id collides
+  // as a React key and keys the removal history by null.
+  function localFile(name: string) {
+    const item = makeSpotifySavedTrack({ name });
+    return { added_at: item.added_at, track: { ...item.track, id: null, is_local: true } };
+  }
+
+  beforeEach(() => {
+    Sentry.addBreadcrumb.mockClear();
+  });
+
+  test('loadPlaylistTracks skips them and logs how many', async () => {
+    const valid = makeSpotifySavedTrack({ id: 'real' });
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({
+        items: [localFile('Local A'), valid, localFile('Local B'), { ...valid, track: { ...valid.track, id: '' } }],
+        next: null,
+        total: 4,
+      }),
+    );
+
+    const tracks = await loadPlaylistTracks('fake-token', 'pl');
+
+    expect(tracks.map((t) => t.id)).toEqual(['real']);
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledTimes(1);
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'spotify-api',
+        message: expect.stringContaining('Skipped 3 tracks without an id'),
+      }),
+    );
+  });
+
+  test('loadLibrary skips them too', async () => {
+    const valid = makeSpotifySavedTrack({ id: 'real' });
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ items: [valid, localFile('Local')], next: null, total: 2 }),
+    );
+
+    const tracks = await loadLibrary('fake-token');
+
+    expect(tracks.map((t) => t.id)).toEqual(['real']);
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('Skipped 1 track without an id') }),
+    );
+  });
+
+  test('logs nothing when every track has an id', async () => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ items: [makeSpotifySavedTrack({ id: 'a' })], next: null, total: 1 }),
+    );
+
+    await loadPlaylistTracks('fake-token', 'pl');
+
+    expect(Sentry.addBreadcrumb).not.toHaveBeenCalled();
+  });
+});
+
+describe('pagination origin check', () => {
+  test.each([
+    ['another host', 'https://evil.example.com/v1/me/tracks?offset=50'],
+    ['a look-alike host', 'https://api.spotify.com.evil.example.com/v1/me/tracks'],
+    ['plain http', 'http://api.spotify.com/v1/me/tracks?offset=50'],
+    ['userinfo tricks', 'https://api.spotify.com@evil.example.com/v1/me/tracks'],
+  ])('never sends the token to %s', async (_label, next) => {
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ items: [makeSpotifySavedTrack()], next, total: 2 }),
+    );
+
+    await expect(loadLibrary('fake-token')).rejects.toThrow('spotify_unexpected_next_url');
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  test('applies to playlists and playlist tracks as well', async () => {
+    const next = 'https://evil.example.com/next';
+    mockFetch.mockResolvedValueOnce(jsonResponse({ items: [], next, total: 1 }));
+    await expect(loadPlaylists('fake-token')).rejects.toThrow('spotify_unexpected_next_url');
+
+    mockFetch.mockResolvedValueOnce(jsonResponse({ items: [], next, total: 1 }));
+    await expect(loadPlaylistTracks('fake-token', 'pl')).rejects.toThrow('spotify_unexpected_next_url');
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('createPlaylist response id', () => {
+  test.each([
+    ['missing', {}],
+    ['numeric', { id: 42 }],
+    ['empty', { id: '' }],
+  ])('throws a clear error when the id is %s and adds nothing', async (_label, body) => {
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse({ id: 'user1', display_name: 'User' }))
+      .mockResolvedValueOnce(jsonResponse(body, 201));
+
+    await expect(createPlaylist('fake-token', 'Mix', ['t1'])).rejects.toThrow(
+      'Failed to create playlist: response had no playlist id',
+    );
+    // No add-tracks request to /v1/playlists/undefined/tracks.
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });
