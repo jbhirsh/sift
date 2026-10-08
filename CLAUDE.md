@@ -182,7 +182,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
   rename:
   `Lint, Typecheck & Unit Test`, `E2E Tests (Maestro)`, `Claude Review`,
   `Secret scan`, `SAST scan`, `Build iOS simulator app`,
-  `Mutation Tests (Stryker)`.
+  `Mutation Tests (Stryker)`, `PR visuals`.
   Every one of these reports on every PR. Never add a trigger-level
   `on.pull_request.paths` filter to a gating workflow: a filtered-out workflow
   never reports, and the required check hangs at "Expected". Path-filter
@@ -207,6 +207,22 @@ Makefile                Dev commands (test, lint, typecheck, check)
 - **Review before raising a PR.** Review the full diff (e.g. a review subagent
   reading it) before opening the PR — review gates PR creation, rather than
   opening first and reviewing after.
+- **Show UI changes in the PR.** A PR that changes a screen, a component,
+  `src/App.tsx`, the theme or an image asset puts before/after visuals in its
+  description (`.github/pull_request_template.md`): simulator screenshots for
+  how things look, GIFs for how things move or respond (card swipes,
+  animations, sheets and modals opening and closing, scrolling, multi-step
+  flows). The `PR visuals` check (`scripts/pr-visuals.mjs`, rules in
+  `scripts/prVisuals.ts`) fails a UI change with no picture unless "No
+  visible UI change" is ticked, and re-runs when the description is edited;
+  Claude Review asks for a GIF when motion changes.
+  - Screenshot: `xcrun simctl io booted screenshot after.png`.
+  - GIF: `xcrun simctl io booted recordVideo --codec=h264 swipe.mov` (Ctrl-C
+    stops it), then
+    `ffmpeg -i swipe.mov -vf "fps=12,scale=320:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse" swipe.gif`.
+  - Host them by dragging them into the PR description, or commit them to a
+    `pr-screenshots/<topic>` branch (no workflow runs on it) and link their
+    `raw.githubusercontent.com` URLs.
 
 ---
 
