@@ -122,6 +122,18 @@ describe('PlayerControls with "Start at chorus"', () => {
     expect(mockPlay).toHaveBeenLastCalledWith('b', 30);
   });
 
+  it('plays only after the previous song has stopped', async () => {
+    const stopped = deferred<undefined>();
+    mockStop.mockReturnValueOnce(stopped.promise);
+    mockChorus.startPositionFor.mockResolvedValue(42);
+    await render(<PlayerControls />);
+    await act(async () => {});
+    // The chorus is known, but the stop hasn't landed yet.
+    expect(mockPlay).not.toHaveBeenCalled();
+    await act(async () => stopped.resolve(undefined));
+    expect(mockPlay).toHaveBeenCalledWith('a', 42);
+  });
+
   it('starts at 0:00 if the setting was turned off while the chorus resolved', async () => {
     const slow = deferred<number>();
     mockChorus.startPositionFor.mockReturnValue(slow.promise);
