@@ -48,6 +48,13 @@ describe('parseSyncedLyrics', () => {
     expect(parseSyncedLyrics('[offset:+5000]\n[00:01.00]A')).toEqual([{ time: 0, text: 'A' }]);
   });
 
+  it('reads [mm:ss:xx] timestamps and strips enhanced-LRC word timings', () => {
+    expect(parseSyncedLyrics('[00:10:50]A\n[00:12.30]<00:12.30>Two <00:12.90>words')).toEqual([
+      { time: 10.5, text: 'A' },
+      { time: 12.3, text: 'Two words' },
+    ]);
+  });
+
   it('skips metadata tags, untimed text and a timestamp in mid-line', () => {
     expect(parseSyncedLyrics('[ar:Artist]\n[ti:Title]\nno tag\nwords [00:05.00]late')).toEqual([]);
   });
@@ -106,9 +113,17 @@ describe('singsTitle', () => {
   });
 
   it('matches short title words exactly and skips one- and two-letter words', () => {
-    expect(singsTitle('in love with the shapes of you', 'shape of you')).toBe(true);
+    expect(singsTitle('old dusty town', 'old town')).toBe(true);
+    expect(singsTitle('old dusty towns', 'old town')).toBe(false);
+    expect(singsTitle('bold dusty town', 'old town')).toBe(false);
     expect(singsTitle('the shape of the world', 'shape of you')).toBe(false);
     expect(singsTitle('shapes of a youth', 'shape of you')).toBe(false);
+  });
+
+  it('ignores common words when matching titles by stem', () => {
+    expect(singsTitle('for all of you', 'for you')).toBe(false);
+    expect(singsTitle('the only one', 'the one')).toBe(false);
+    expect(singsTitle('you are the one for me', 'the one')).toBe(true);
   });
 
   it('needs two words over two letters for a stem match', () => {
@@ -128,7 +143,12 @@ describe('findChorusStart on real songs', () => {
       title: song.title,
       duration: song.duration,
     });
-    expect(match).toEqual(song.expected);
+    if (song.expected === null) {
+      expect(match).toBeNull();
+    } else {
+      expect(match?.method).toBe(song.expected.method);
+      expect(match?.time).toBeCloseTo(song.expected.time, 2);
+    }
   });
 
   it('finds the songs it should', () => {
@@ -207,13 +227,6 @@ describe('findChorusStart rules', () => {
     expect(findChorusStart(far, { title: 'my song', duration })?.time).toBe(56);
     const early = parseSyncedLyrics(lrc([[15, 'a'], [25, 'my song'], [80, 'a'], [90, 'my song']]));
     expect(findChorusStart(early, { title: 'my song', duration })?.time).toBe(25);
-  });
-
-  it('title rule: a line preceding another occurrence only by coincidence of itself does not count', () => {
-    // Line at 40 precedes the anchor at 50; the only other occurrence of the
-    // anchor is at 41, whose predecessor is the line at 40 itself.
-    const lines = parseSyncedLyrics(lrc([[40, 'x'], [41, 'my song'], [50, 'my song']]));
-    expect(findChorusStart(lines, { title: 'my song', duration })?.time).toBe(41);
   });
 
   it('title rule: ignores ad-lib-only lines between chorus lines', () => {

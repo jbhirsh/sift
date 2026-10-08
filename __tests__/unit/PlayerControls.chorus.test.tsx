@@ -28,11 +28,13 @@ jest.mock('react-native-gesture-handler', () => ({
 }));
 
 const mockPlay = jest.fn().mockResolvedValue(undefined);
+const mockStop = jest.fn().mockResolvedValue(undefined);
 const mockPreviewOffset = jest.fn();
 jest.mock('../../src/hooks/useMusicProvider', () => ({
   useMusicProvider: () => ({
     play: mockPlay,
     pause: jest.fn().mockResolvedValue(undefined),
+    stop: mockStop,
     togglePlayPause: jest.fn(),
     seek: jest.fn(),
     skipBackward: jest.fn(),
@@ -102,6 +104,32 @@ describe('PlayerControls with "Start at chorus"', () => {
     mockChorus.enabled = false;
     await render(<PlayerControls />);
     expect(mockChorus.startPositionFor).not.toHaveBeenCalled();
+    expect(mockStop).not.toHaveBeenCalled();
+    expect(mockPlay).toHaveBeenCalledWith('a');
+  });
+
+  it("stops the previous card's song while the next chorus resolves", async () => {
+    const slow = deferred<number>();
+    mockChorus.startPositionFor.mockResolvedValueOnce(10).mockReturnValueOnce(slow.promise);
+    const { rerender } = await render(<PlayerControls />);
+    await act(async () => {});
+    expect(mockStop).toHaveBeenCalledTimes(1);
+    mockSift.currentTrack = trackB;
+    await rerender(<PlayerControls />);
+    expect(mockStop).toHaveBeenCalledTimes(2);
+    expect(mockPlay).toHaveBeenCalledTimes(1);
+    await act(async () => slow.resolve(30));
+    expect(mockPlay).toHaveBeenLastCalledWith('b', 30);
+  });
+
+  it('starts at 0:00 if the setting was turned off while the chorus resolved', async () => {
+    const slow = deferred<number>();
+    mockChorus.startPositionFor.mockReturnValue(slow.promise);
+    const { rerender } = await render(<PlayerControls />);
+    mockChorus.enabled = false;
+    await rerender(<PlayerControls />);
+    await act(async () => slow.resolve(55));
+    expect(mockPlay).toHaveBeenCalledTimes(1);
     expect(mockPlay).toHaveBeenCalledWith('a');
   });
 
@@ -126,12 +154,42 @@ describe('PlayerControls with "Start at chorus"', () => {
     expect(mockPlay).not.toHaveBeenCalled();
   });
 
-  it('play on a track that never started starts it at its chorus', async () => {
-    const never = deferred<number>();
-    mockChorus.startPositionFor.mockReturnValueOnce(never.promise).mockResolvedValueOnce(42);
+  it('ignores play taps while the chorus start is pending', async () => {
+    const slow = deferred<number>();
+    mockChorus.startPositionFor.mockReturnValue(slow.promise);
     const { getByTestId } = await render(<PlayerControls />);
     await fireEvent.press(getByTestId('play-pause-button'));
-    await act(async () => {});
+    expect(mockChorus.startPositionFor).toHaveBeenCalledTimes(1);
+    await act(async () => slow.resolve(42));
+    expect(mockPlay).toHaveBeenCalledTimes(1);
     expect(mockPlay).toHaveBeenCalledWith('a', 42);
+  });
+
+  it('play on a track whose start failed starts it at its chorus again', async () => {
+    mockChorus.startPositionFor.mockResolvedValue(42);
+    const { getByTestId } = await render(<PlayerControls />);
+    await act(async () => {});
+    // Auto-play's play() failed: still stopped at 0.
+    await fireEvent.press(getByTestId('play-pause-button'));
+    await act(async () => {});
+    expect(mockChorus.startPositionFor).toHaveBeenCalledTimes(2);
+    expect(mockPlay).toHaveBeenCalledTimes(2);
+    expect(mockPlay).toHaveBeenLastCalledWith('a', 42);
+  });
+
+  it('keeps a newer pending start when an older one lands', async () => {
+    const first = deferred<number>();
+    const second = deferred<number>();
+    mockChorus.startPositionFor.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    const { rerender, getByTestId } = await render(<PlayerControls />);
+    mockSift.currentTrack = trackB;
+    await rerender(<PlayerControls />);
+    await act(async () => first.resolve(10));
+    // B is still pending, so a tap must not start it a second time.
+    await fireEvent.press(getByTestId('play-pause-button'));
+    expect(mockChorus.startPositionFor).toHaveBeenCalledTimes(2);
+    await act(async () => second.resolve(20));
+    expect(mockPlay).toHaveBeenCalledTimes(1);
+    expect(mockPlay).toHaveBeenCalledWith('b', 20);
   });
 });

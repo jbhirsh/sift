@@ -237,8 +237,9 @@ public class ExpoMusicKitModule: Module {
       if position > 0 {
         // Seek before playing so a start mid-track ("Start at chorus")
         // doesn't blip the first instant of the song. Once prepared, the
-        // queue entry accepts a playback time.
-        try await player.prepareToPlay()
+        // queue entry accepts a playback time. Best effort: if preparing
+        // fails, play() below still starts and the late seek covers it.
+        try? await player.prepareToPlay()
         player.playbackTime = position
       }
       try await player.play()
@@ -437,11 +438,14 @@ public class ExpoMusicKitModule: Module {
     /// "Start at chorus" uses this when lyrics can't locate the chorus. The
     /// preview (a DRM-free 30-second clip) is downloaded, fingerprinted with
     /// ShazamKit and matched against Shazam's catalog: the match's offset is
-    /// where the clip sits in the recording. Every failure (no preview, no
-    /// match, offline, ShazamKit unavailable for this app ID) is just nil.
+    /// where the clip sits in the recording. Returns nil when there is no
+    /// answer to find (no preview, no match); throws when the lookup failed
+    /// for now (track not loaded yet, offline, a ShazamKit error such as the
+    /// ShazamKit App Service not being enabled for this app ID), so the JS
+    /// side retries another time instead of remembering "no answer".
     AsyncFunction("previewOffset") { (trackID: String) -> Double? in
-      guard let previewURL = await self.previewURL(for: trackID) else { return nil }
-      return await shazamOffset(ofPreviewAt: previewURL)
+      guard let previewURL = try await self.previewURL(for: trackID) else { return nil }
+      return try await shazamOffset(ofPreviewAt: previewURL)
     }
 
     AsyncFunction("resolveArtworkURL") { (trackID: String, width: Int, height: Int) -> String? in
@@ -647,29 +651,29 @@ public class ExpoMusicKitModule: Module {
   /// previews, so fall back to the same song in the Apple Music catalog: by
   /// ISRC when known, otherwise the closest-duration search hit for the same
   /// title and artist.
-  private func previewURL(for trackID: String) async -> URL? {
-    let song: Song?
+  private func previewURL(for trackID: String) async throws -> URL? {
+    let song: Song
     if let cached = self.songCache[trackID] {
       song = cached
-    } else if let track = self.trackCache[trackID], case .song(let trackSong) = track {
+    } else if let track = self.trackCache[trackID] {
+      guard case .song(let trackSong) = track else { return nil }
       song = trackSong
     } else {
-      song = nil
+      // Not loaded yet (e.g. a resumed session still warming the cache).
+      throw MusicKitError.trackNotFound(trackID)
     }
-    guard let song else { return nil }
     if let url = song.previewAssets?.first?.url { return url }
 
     if let isrc = song.isrc {
       let request = MusicCatalogResourceRequest<Song>(matching: \.isrc, equalTo: isrc)
-      if let match = try? await request.response().items.first,
-         let url = match.previewAssets?.first?.url {
+      if let url = try await request.response().items.first?.previewAssets?.first?.url {
         return url
       }
     }
 
     var search = MusicCatalogSearchRequest(term: "\(song.title) \(song.artistName)", types: [Song.self])
     search.limit = 10
-    guard let results = try? await search.response().songs else { return nil }
+    let results = try await search.response().songs
     let candidates = results.filter {
       $0.title.lowercased() == song.title.lowercased()
         && $0.artistName.lowercased() == song.artistName.lowercased()
@@ -744,26 +748,29 @@ public class ExpoMusicKitModule: Module {
 
 // MARK: - ShazamKit
 
-/// Download a preview clip and find where it sits in the full recording.
-private func shazamOffset(ofPreviewAt url: URL) async -> Double? {
-  do {
-    let (download, _) = try await URLSession.shared.download(from: url)
-    // AVURLAsset needs the file extension to recognize the audio format.
-    let file = FileManager.default.temporaryDirectory
-      .appendingPathComponent(UUID().uuidString)
-      .appendingPathExtension(url.pathExtension.isEmpty ? "m4a" : url.pathExtension)
-    try FileManager.default.moveItem(at: download, to: file)
-    defer { try? FileManager.default.removeItem(at: file) }
+/// Download a preview clip and find where it sits in the full recording:
+/// nil for no match, throws when the download or ShazamKit failed.
+private func shazamOffset(ofPreviewAt url: URL) async throws -> Double? {
+  let (download, response) = try await URLSession.shared.download(from: url)
+  defer { try? FileManager.default.removeItem(at: download) }
+  let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+  guard status == 200 else { throw MusicKitError.previewDownloadFailed(status) }
 
-    let signature = try await SHSignatureGenerator.signature(from: AVURLAsset(url: file))
-    switch await SHSession().result(from: signature) {
-    case .match(let match):
-      return match.mediaItems.first?.matchOffset
-    case .noMatch, .error:
-      return nil
-    }
-  } catch {
+  // AVURLAsset needs the file extension to recognize the audio format.
+  let file = FileManager.default.temporaryDirectory
+    .appendingPathComponent(UUID().uuidString)
+    .appendingPathExtension(url.pathExtension.isEmpty ? "m4a" : url.pathExtension)
+  try FileManager.default.moveItem(at: download, to: file)
+  defer { try? FileManager.default.removeItem(at: file) }
+
+  let signature = try await SHSignatureGenerator.signature(from: AVURLAsset(url: file))
+  switch await SHSession().result(from: signature) {
+  case .match(let match):
+    return match.mediaItems.first?.matchOffset
+  case .noMatch:
     return nil
+  case .error(let error, _):
+    throw error
   }
 }
 
@@ -773,6 +780,7 @@ enum MusicKitError: Error, LocalizedError {
   case notAuthorized
   case trackNotFound(String)
   case noTracksFound
+  case previewDownloadFailed(Int)
 
   var errorDescription: String? {
     switch self {
@@ -782,6 +790,8 @@ enum MusicKitError: Error, LocalizedError {
       return "Track \(id) not found in cache. Load the library first."
     case .noTracksFound:
       return "No tracks found for the given IDs."
+    case .previewDownloadFailed(let status):
+      return "Preview download failed (HTTP \(status))."
     }
   }
 }

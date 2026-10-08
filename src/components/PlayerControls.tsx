@@ -25,11 +25,21 @@ import { Track } from '../types';
 export default function PlayerControls() {
   const { state, currentTrack } = useSift();
   const { colors } = useTheme();
-  const { play, pause, togglePlayPause, seek, skipBackward, skipForward, previewOffset } = useMusicProvider();
+  const { play, pause, stop, togglePlayPause, seek, skipBackward, skipForward, previewOffset } =
+    useMusicProvider();
   const { enabled: chorusEnabled, startPositionFor } = useChorusStart(previewOffset);
 
   const prevTrackIdRef = useRef<string | undefined>(undefined);
+  // The track whose chorus start is being resolved, so a play tap meanwhile
+  // doesn't start it a second time.
+  const pendingStartRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
+  // Read when a pending start lands: the setting may have been turned off
+  // while the chorus was resolving.
+  const chorusEnabledRef = useRef(chorusEnabled);
+  useEffect(() => {
+    chorusEnabledRef.current = chorusEnabled;
+  }, [chorusEnabled]);
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -44,14 +54,20 @@ export default function PlayerControls() {
         play(track.id);
         return;
       }
+      // Silence the previous card's song while this one's chorus resolves
+      // (instant when prefetched, at most CHORUS_WAIT_MS otherwise).
+      void stop();
+      pendingStartRef.current = track.id;
       void startPositionFor(track).then((position) => {
+        if (pendingStartRef.current === track.id) pendingStartRef.current = null;
         // The card may have been swiped away, or the player closed, while
         // the chorus was resolving.
         if (!mountedRef.current || prevTrackIdRef.current !== track.id) return;
-        play(track.id, position);
+        if (chorusEnabledRef.current) play(track.id, position);
+        else play(track.id);
       });
     },
-    [chorusEnabled, play, startPositionFor],
+    [chorusEnabled, play, stop, startPositionFor],
   );
 
   // Auto-play current track on mount and when cursor advances
@@ -84,6 +100,8 @@ export default function PlayerControls() {
     // Position 0 while stopped: this track never started (auto-play
     // failed), so start it, rather than resume nothing.
     if (!state.isPlaying && currentTrack && state.playbackPosition === 0) {
+      // Already starting (its chorus is resolving): don't start it twice.
+      if (pendingStartRef.current === currentTrack.id) return;
       playFromStart(currentTrack);
     } else {
       togglePlayPause();

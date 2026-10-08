@@ -30,13 +30,23 @@ export interface LrclibClient {
    * caller can tell "no lyrics" (worth remembering) from "try again later".
    */
   lookup(track: Track): Promise<LyricsLookup>;
+  /**
+   * Move a track's queued lookup to the front: the card on screen must not
+   * wait behind prefetches for cards the user has already swiped past.
+   */
+  prioritize(trackID: string): void;
 }
 
 export interface LrclibClientOptions {
   fetch?: typeof fetch;
   timeoutMs?: number;
-  /** Minimum gap between the start of one request and the next. */
+  /** Pause after each request before the next one starts. */
   gapMs?: number;
+}
+
+interface Job {
+  key: string;
+  run: () => Promise<void>;
 }
 
 /** The track title as LRCLIB's search expects it: no "(feat. …)" or " - Remastered" suffixes. */
@@ -67,20 +77,37 @@ export function createLrclibClient(options: LrclibClientOptions = {}): LrclibCli
   const doFetch = options.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args));
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const gapMs = options.gapMs ?? DEFAULT_GAP_MS;
-  // Requests run one at a time, gapMs apart (LRCLIB's request etiquette).
-  let queue: Promise<void> = Promise.resolve();
+  // Requests run one at a time with a pause after each (LRCLIB's request
+  // etiquette), in queue order except that a prioritized track's requests,
+  // including the search a lookup may follow up with, go first.
+  const jobs: Job[] = [];
+  const urgent = new Set<string>();
+  let running = false;
 
-  function enqueue<T>(task: () => Promise<T>): Promise<T> {
-    const run = queue.then(task);
-    queue = run.then(
-      () => new Promise((resolve) => setTimeout(resolve, gapMs)),
-      () => new Promise((resolve) => setTimeout(resolve, gapMs)),
+  function pump(): void {
+    if (running) return;
+    const job = jobs.shift();
+    if (!job) return;
+    running = true;
+    void job.run().then(() =>
+      setTimeout(() => {
+        running = false;
+        pump();
+      }, gapMs),
     );
-    return run;
   }
 
-  async function get(path: string): Promise<{ status: number; body: unknown }> {
-    return enqueue(async () => {
+  function enqueue<T>(key: string, task: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const job: Job = { key, run: () => task().then(resolve, reject) };
+      if (urgent.has(key)) jobs.unshift(job);
+      else jobs.push(job);
+      pump();
+    });
+  }
+
+  async function get(key: string, path: string): Promise<{ status: number; body: unknown }> {
+    return enqueue(key, async () => {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
@@ -108,6 +135,7 @@ export function createLrclibClient(options: LrclibClientOptions = {}): LrclibCli
 
   async function search(track: Track): Promise<LyricsLookup> {
     const { body } = await get(
+      track.id,
       `/search?${query({ track_name: searchTitle(track.name), artist_name: track.artist })}`,
     );
     const candidates = (Array.isArray(body) ? body : [])
@@ -120,22 +148,34 @@ export function createLrclibClient(options: LrclibClientOptions = {}): LrclibCli
     return { status: 'not-found' };
   }
 
+  async function lookup(track: Track): Promise<LyricsLookup> {
+    const params: Record<string, string> = {
+      track_name: track.name,
+      artist_name: track.artist,
+      duration: String(Math.round(track.duration)),
+    };
+    if (track.album) params.album_name = track.album;
+    const { body } = await get(track.id, `/get?${query(params)}`);
+    // A 404's body is null, which isn't a record either.
+    if (isRecord(body)) {
+      const exact = fromRecord(body);
+      if (exact) return exact;
+    }
+    // Not found, or found with plain lyrics only: a search may turn up
+    // another release of the same recording that has synced lyrics.
+    return search(track);
+  }
+
   return {
-    async lookup(track) {
-      const params: Record<string, string> = {
-        track_name: track.name,
-        artist_name: track.artist,
-        duration: String(Math.round(track.duration)),
-      };
-      if (track.album) params.album_name = track.album;
-      const { status, body } = await get(`/get?${query(params)}`);
-      if (status !== 404 && isRecord(body)) {
-        const exact = fromRecord(body);
-        if (exact) return exact;
-      }
-      // Not found, or found with plain lyrics only: a search may turn up
-      // another release of the same recording that has synced lyrics.
-      return search(track);
+    lookup(track) {
+      return lookup(track).finally(() => urgent.delete(track.id));
+    },
+    prioritize(trackID) {
+      urgent.add(trackID);
+      const mine = jobs.filter((j) => j.key === trackID);
+      if (mine.length === 0) return;
+      const rest = jobs.filter((j) => j.key !== trackID);
+      jobs.splice(0, jobs.length, ...mine, ...rest);
     },
   };
 }

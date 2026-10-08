@@ -168,6 +168,47 @@ describe('LrclibClient.lookup', () => {
     }
   });
 
+  it('runs a prioritized track next, including its follow-up search', async () => {
+    jest.useFakeTimers();
+    try {
+      const fetch = jest.fn((url: string) =>
+        Promise.resolve(url.includes('track_name=urgent&') && url.includes('/get?') ? response(404) : response(200, record())),
+      );
+      const client = createLrclibClient({ fetch: fetch as unknown as typeof globalThis.fetch, gapMs: 100, timeoutMs: 1000 });
+      const lookups = ['first', 'second', 'urgent', 'third'].map((name) =>
+        client.lookup({ ...track, id: name, name, album: '' }),
+      );
+      client.prioritize('urgent');
+      client.prioritize('not-queued');
+      await jest.advanceTimersByTimeAsync(1000);
+      await Promise.all(lookups);
+      const order = fetch.mock.calls.map(([url]) => {
+        const name = /track_name=([^&]+)/.exec(url)?.[1];
+        return `${url.includes('/search?') ? 'search' : 'get'}:${name}`;
+      });
+      expect(order).toEqual(['get:first', 'get:urgent', 'search:urgent', 'get:second', 'get:third']);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('stops prioritizing a track once its lookup is done', async () => {
+    jest.useFakeTimers();
+    try {
+      const fetch = jest.fn().mockResolvedValue(response(200, record()));
+      const client = createLrclibClient({ fetch, gapMs: 100, timeoutMs: 1000 });
+      client.prioritize('a');
+      await client.lookup({ ...track, id: 'a', name: 'a', album: '' }).then(() => undefined, () => undefined);
+      const later = ['b', 'a'].map((name) => client.lookup({ ...track, id: name, name, album: '' }));
+      await jest.advanceTimersByTimeAsync(1000);
+      await Promise.all(later);
+      const names = fetch.mock.calls.map(([url]) => /track_name=([^&]+)/.exec(url)?.[1]);
+      expect(names).toEqual(['a', 'b', 'a']);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('keeps the queue moving after a failed request', async () => {
     const { client } = setup(new Error('offline'), response(200, record()));
     await expect(client.lookup(track)).rejects.toThrow('offline');

@@ -63,7 +63,9 @@ describe('useChorusStart', () => {
   it('resolves the chorus position', async () => {
     const { result } = await renderHook(() => useChorusStart(previewOffset));
     await expect(result.current.startPositionFor(t2)).resolves.toBe(47);
-    expect(mockFind).toHaveBeenLastCalledWith(t2, previewOffset);
+    // The card on screen jumps the lyrics queue; prefetches don't.
+    expect(mockFind).toHaveBeenLastCalledWith(t2, previewOffset, { urgent: true });
+    expect(mockFind.mock.calls[0]).toEqual([t1, previewOffset]);
   });
 
   it('falls back to the estimate when the chorus takes too long', async () => {

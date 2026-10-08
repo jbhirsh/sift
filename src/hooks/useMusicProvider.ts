@@ -196,6 +196,12 @@ export function useMusicProvider() {
     }
   }, [dispatch]);
 
+  /** Pause and reset the position: the current track is being replaced. */
+  const stop = useCallback(async () => {
+    await pause();
+    dispatch({ type: 'SET_PLAYBACK_POSITION', position: 0 });
+  }, [pause, dispatch]);
+
   const resume = useCallback(async () => {
     try {
       await providerRef.current.resume();
@@ -754,6 +760,7 @@ export function useMusicProvider() {
     loadTracks,
     play,
     pause,
+    stop,
     resume,
     seek,
     togglePlayPause,
