@@ -21,6 +21,7 @@ describe('PreferencesStore', () => {
     mockGetItem.mockResolvedValue(null);
     await expect(loadPreferences()).resolves.toEqual({ startAtChorus: false });
     expect(mockGetItem).toHaveBeenCalledWith('sift_preferences');
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
   it('loads a saved setting', async () => {
@@ -35,6 +36,8 @@ describe('PreferencesStore', () => {
     await expect(loadPreferences()).resolves.toEqual({ startAtChorus: false });
     mockGetItem.mockResolvedValue('42');
     await expect(loadPreferences()).resolves.toEqual({ startAtChorus: false });
+    // Odd but parseable values are handled, not errors.
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
   it('defaults and reports when the read or parse fails', async () => {
@@ -43,6 +46,7 @@ describe('PreferencesStore', () => {
     mockGetItem.mockRejectedValue(new Error('io'));
     await expect(loadPreferences()).resolves.toEqual({ startAtChorus: false });
     expect(Sentry.captureException).toHaveBeenCalledTimes(2);
+    expect(Sentry.captureException).toHaveBeenLastCalledWith(expect.any(Error), { tags: { flow: 'preferences-load' } });
   });
 
   it('saves preferences as JSON', async () => {

@@ -55,7 +55,11 @@ export const CHORUS_CACHE_KEY = 'sift_chorus_starts.v1';
 export const MAX_CACHE_ENTRIES = 2000;
 
 const SOURCE_CODES: Record<ChorusSource, string> = { lyrics: 'l', preview: 'p', estimate: 'e' };
-const CODE_SOURCES: Record<string, ChorusSource> = { l: 'lyrics', p: 'preview', e: 'estimate' };
+const CODE_SOURCES = new Map<string, ChorusSource>([
+  ['l', 'lyrics'],
+  ['p', 'preview'],
+  ['e', 'estimate'],
+]);
 
 /** [trackID, position, source code, track duration] — compact for storage. */
 type CacheRow = [string, number, string, number];
@@ -64,17 +68,14 @@ interface CacheEntry extends ChorusStart {
   duration: number;
 }
 
-function isCacheRow(row: unknown): row is CacheRow {
-  return (
-    Array.isArray(row) &&
-    row.length === 4 &&
-    typeof row[0] === 'string' &&
-    typeof row[1] === 'number' &&
-    Number.isFinite(row[1]) &&
-    typeof row[2] === 'string' &&
-    row[2] in CODE_SOURCES &&
-    typeof row[3] === 'number'
-  );
+/** A stored row as [trackID, entry], or null when the row is malformed. */
+function toEntry(row: unknown): [string, CacheEntry] | null {
+  if (!Array.isArray(row) || row.length !== 4) return null;
+  const [id, position, code, duration] = row as unknown[];
+  const source = CODE_SOURCES.get(String(code));
+  if (typeof position !== 'number' || !Number.isFinite(position)) return null;
+  if (!source || typeof duration !== 'number') return null;
+  return [String(id), { position, source, duration }];
 }
 
 export class ChorusFinder {
@@ -162,13 +163,11 @@ export class ChorusFinder {
     const cache = new Map<string, CacheEntry>();
     try {
       const json = await this.deps.storage.getItem(CHORUS_CACHE_KEY);
-      const rows: unknown = json ? JSON.parse(json) : [];
-      if (Array.isArray(rows)) {
-        for (const row of rows) {
-          if (isCacheRow(row)) {
-            cache.set(row[0], { position: row[1], source: CODE_SOURCES[row[2]], duration: row[3] });
-          }
-        }
+      if (!json) return cache;
+      // Anything but an array of rows throws here or yields no entries.
+      for (const row of JSON.parse(json) as Iterable<unknown>) {
+        const entry = toEntry(row);
+        if (entry) cache.set(...entry);
       }
     } catch (err) {
       Sentry.addBreadcrumb({ category: 'chorus', message: `Chorus cache unreadable: ${err}`, level: 'warning' });

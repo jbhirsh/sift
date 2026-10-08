@@ -53,6 +53,14 @@ describe('ChorusFinder', () => {
     await expect(finder.find(track)).resolves.toEqual({ position: 49.5, source: 'lyrics' });
   });
 
+  it('remembers the estimate when the lyrics have no chorus and there is no preview', async () => {
+    const { finder, storage } = makeFinder(() => Promise.resolve({ status: 'synced', lyrics: '[00:30.00]once' }));
+    await expect(finder.find(track)).resolves.toEqual({ position: 40, source: 'estimate' });
+    await flush();
+    expect(JSON.parse(storage.data.get(CHORUS_CACHE_KEY) ?? 'null')).toEqual([['t1', 40, 'e', 200]]);
+    expect(Sentry.addBreadcrumb).not.toHaveBeenCalled();
+  });
+
   it('falls back to the preview offset when the lyrics have no chorus', async () => {
     const { finder } = makeFinder(() => Promise.resolve({ status: 'synced', lyrics: '[00:30.00]once' }));
     const previewOffset = jest.fn().mockResolvedValue(61.25);
@@ -89,7 +97,11 @@ describe('ChorusFinder', () => {
     const { finder, storage, lookupLyrics, deps } = makeFinder(() => Promise.resolve({ status: 'not-found' }));
     const failing = jest.fn().mockRejectedValue(new Error('shazam down'));
     await expect(finder.find(track, failing)).resolves.toEqual({ position: 40, source: 'estimate' });
-    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(expect.objectContaining({ category: 'chorus' }));
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
+      category: 'chorus',
+      message: 'Preview match failed: Error: shazam down',
+      level: 'info',
+    });
     await finder.find(track, failing);
     expect(failing).toHaveBeenCalledTimes(1);
     await flush();
@@ -125,6 +137,11 @@ describe('ChorusFinder', () => {
   it('keeps an estimate reached because LRCLIB was unreachable for this session only', async () => {
     const { finder, lookupLyrics, storage, deps } = makeFinder(() => Promise.reject(new Error('offline')));
     await expect(finder.find(track)).resolves.toEqual({ position: 40, source: 'estimate' });
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
+      category: 'chorus',
+      message: 'Lyrics lookup failed: Error: offline',
+      level: 'info',
+    });
     await finder.find(track);
     expect(lookupLyrics).toHaveBeenCalledTimes(1);
     await flush();
@@ -166,7 +183,9 @@ describe('ChorusFinder', () => {
     const storage = makeStorage({ [CHORUS_CACHE_KEY]: JSON.stringify([['t1', 33, 'p', 200]]) });
     const { finder, lookupLyrics } = makeFinder(() => Promise.resolve({ status: 'not-found' }), storage);
     await expect(finder.find(track)).resolves.toEqual({ position: 33, source: 'preview' });
-    expect(lookupLyrics).not.toHaveBeenCalled();
+    await finder.find({ ...track, id: 't2' });
+    expect(lookupLyrics).toHaveBeenCalledTimes(1);
+    // The stored cache is read once per launch, not per lookup.
     expect(storage.getItem).toHaveBeenCalledTimes(1);
   });
 
@@ -183,19 +202,66 @@ describe('ChorusFinder', () => {
     await expect(finder.find(track)).resolves.toEqual({ position: 33, source: 'lyrics' });
   });
 
-  it('skips malformed cache rows and survives unreadable caches', async () => {
-    const rows = [['ok', 10, 'e', 200], ['bad-source', 10, 'x', 200], ['nan', null, 'l', 200], 'junk', ['short', 1]];
-    const storage = makeStorage({ [CHORUS_CACHE_KEY]: JSON.stringify(rows) });
+  it('re-resolves a cached result whose duration differs by a full second', async () => {
+    const storage = makeStorage({ [CHORUS_CACHE_KEY]: JSON.stringify([['t1', 33, 'l', 201]]) });
+    const { finder } = makeFinder(() => Promise.resolve({ status: 'not-found' }), storage);
+    await expect(finder.find(track)).resolves.toEqual({ position: 40, source: 'estimate' });
+  });
+
+  it.each<[string, unknown]>([
+    ['five fields', ['bad', 10, 'e', 200, 'x']],
+    ['a string position', ['bad', '10', 'e', 200]],
+    ['an infinite position', ['bad', 'INF', 'e', 200]],
+    ['an unknown source code', ['bad', 10, 'x', 200]],
+    ['a prototype key as source code', ['bad', 10, 'toString', 200]],
+    ['a string duration', ['bad', 10, 'e', '200']],
+    ['an array-like object', { 0: 'bad', 1: 10, 2: 'e', 3: 200, length: 4 }],
+  ])('ignores a stored row with %s, keeping the valid ones', async (_, badRow) => {
+    // JSON can't hold Infinity, so build that row's text by hand.
+    const rows = JSON.stringify([badRow, ['ok', 10, 'e', 200]]).replace('"INF"', '1e999');
+    const storage = makeStorage({ [CHORUS_CACHE_KEY]: rows });
     const { finder, lookupLyrics } = makeFinder(() => Promise.resolve({ status: 'not-found' }), storage);
     await expect(finder.find({ ...track, id: 'ok' })).resolves.toEqual({ position: 10, source: 'estimate' });
-    await finder.find({ ...track, id: 'bad-source' });
+    expect(lookupLyrics).not.toHaveBeenCalled();
+    await expect(finder.find({ ...track, id: 'bad' })).resolves.toEqual({ position: 40, source: 'estimate' });
     expect(lookupLyrics).toHaveBeenCalledTimes(1);
+    expect(Sentry.addBreadcrumb).not.toHaveBeenCalled();
+  });
 
-    const corrupt = makeFinder(() => Promise.resolve({ status: 'not-found' }), makeStorage({ [CHORUS_CACHE_KEY]: '{oops' }));
-    await expect(corrupt.finder.find(track)).resolves.toEqual({ position: 40, source: 'estimate' });
+  it('reads a numeric stored id as the string id it was saved for', async () => {
+    const storage = makeStorage({ [CHORUS_CACHE_KEY]: JSON.stringify([[7, 12, 'l', 200]]) });
+    const { finder, lookupLyrics } = makeFinder(() => Promise.resolve({ status: 'not-found' }), storage);
+    await expect(finder.find({ ...track, id: '7' })).resolves.toEqual({ position: 12, source: 'lyrics' });
+    expect(lookupLyrics).not.toHaveBeenCalled();
+  });
 
-    const notArray = makeFinder(() => Promise.resolve({ status: 'not-found' }), makeStorage({ [CHORUS_CACHE_KEY]: '{}' }));
-    await expect(notArray.finder.find(track)).resolves.toEqual({ position: 40, source: 'estimate' });
+  it.each([
+    ['corrupt JSON', '{oops'],
+    ['a non-array', '{}'],
+  ])('starts from an empty cache when the stored cache is %s', async (_, json) => {
+    const { finder } = makeFinder(() => Promise.resolve({ status: 'not-found' }), makeStorage({ [CHORUS_CACHE_KEY]: json }));
+    await expect(finder.find(track)).resolves.toEqual({ position: 40, source: 'estimate' });
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'chorus', level: 'warning', message: expect.stringMatching(/^Chorus cache unreadable: /) }),
+    );
+  });
+
+  it('reads nothing, quietly, on a first launch', async () => {
+    const { finder } = makeFinder(() => Promise.resolve({ status: 'not-found' }));
+    await finder.find(track);
+    expect(Sentry.addBreadcrumb).not.toHaveBeenCalled();
+  });
+
+  it('moves a re-resolved track to the newest end, so others are trimmed first', async () => {
+    const rows = [['t1', 1, 'e', 150], ...Array.from({ length: MAX_CACHE_ENTRIES - 1 }, (_, i) => [`old${i}`, 1, 'e', 200])];
+    const storage = makeStorage({ [CHORUS_CACHE_KEY]: JSON.stringify(rows) });
+    const { finder } = makeFinder(() => Promise.resolve({ status: 'not-found' }), storage);
+    await finder.find(track); // duration 200 ≠ 150: re-resolved
+    await flush();
+    const saved = JSON.parse(storage.data.get(CHORUS_CACHE_KEY) ?? 'null');
+    expect(saved).toHaveLength(MAX_CACHE_ENTRIES);
+    expect(saved[0][0]).toBe('old0');
+    expect(saved[saved.length - 1]).toEqual(['t1', 40, 'e', 200]);
   });
 
   it('trims the oldest entries beyond the cap', async () => {
@@ -216,9 +282,11 @@ describe('ChorusFinder', () => {
     const { finder } = makeFinder(() => Promise.resolve({ status: 'not-found' }), storage);
     await expect(finder.find(track)).resolves.toEqual({ position: 40, source: 'estimate' });
     await flush();
-    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('Chorus cache write failed') }),
-    );
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
+      category: 'chorus',
+      message: 'Chorus cache write failed: Error: disk full',
+      level: 'warning',
+    });
   });
 
   it('defaults to LRCLIB and AsyncStorage', async () => {
