@@ -72,3 +72,13 @@ export const PROVIDER_DISPLAY: Record<MusicProvider, string> = {
   'apple-music': 'Apple Music',
   spotify: 'Spotify',
 };
+
+/** User settings that outlive any one sift session. */
+export interface Preferences {
+  /** Start each Apple Music track at its chorus instead of 0:00. */
+  startAtChorus: boolean;
+}
+
+export const DEFAULT_PREFERENCES: Preferences = {
+  startAtChorus: false,
+};

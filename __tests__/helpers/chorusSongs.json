@@ -1,0 +1,158 @@
+[
+  {
+    "title": "Mr. Brightside",
+    "duration": 222,
+    "expected": {
+      "time": 58.44,
+      "method": "title"
+    },
+    "lrc": "[00:06.54]line 1\n[00:10.09]line 2\n[00:13.30]line 3\n[00:16.45]line 4\n[00:19.97]line 5\n[00:23.22]line 6\n[00:26.42]line 7\n[00:29.62]line 8\n\n[00:32.53]line 9\n[00:33.93]line 10\n[00:37.25]line 11\n[00:45.88]line 12\n[00:51.68]line 13\n\n[00:58.44]line 14\n[01:00.12]line 15\n[01:03.08]line 16\n[01:06.64]line 17\n[01:09.84]line 18\n[01:13.08]line 19\n[01:16.24]line 20\n[01:21.44]line 21 mr brightside\n\n[01:37.64]line 22\n[01:40.99]line 2\n[01:44.27]line 3\n[01:47.50]line 23\n[01:50.90]line 5\n[01:53.90]line 24\n[01:57.22]line 7\n[02:00.42]line 8\n\n[02:03.34]line 9\n[02:04.93]line 10\n[02:08.08]line 11\n[02:16.74]line 25\n[02:22.42]line 13\n\n[02:29.17]line 14\n[02:30.70]line 15\n[02:34.10]line 16\n[02:37.21]line 17\n[02:40.67]line 18\n[02:43.78]line 19\n[02:47.15]line 20\n[02:52.35]line 21 mr brightside\n\n[03:08.18]line 26\n[03:14.30]line 26\n[03:20.78]line 26\n[03:27.26]line 26"
+  },
+  {
+    "title": "Blinding Lights",
+    "duration": 200,
+    "expected": {
+      "time": 53.53,
+      "method": "title"
+    },
+    "lrc": "[00:13.13]line 1\n\n[00:27.16]line 2\n[00:29.96]line 3\n[00:32.71]line 4\n[00:38.29]line 5\n[00:41.23]line 6\n[00:44.12]line 7\n[00:49.57]line 8\n[00:50.62]line 9\n[00:53.53]line 10\n[00:56.24]line 11\n[01:00.73]line 12 blinded lights\n[01:06.69]line 13\n[01:11.79]line 14\n[01:17.89]line 15\n[01:22.16](ad-lib)\n\n[01:34.36]line 16\n[01:37.03]line 17\n[01:40.04]line 18\n[01:46.64]line 19\n[01:49.52]line 10\n[01:52.47]line 11\n[01:56.98]line 12 blinded lights\n[02:02.70]line 13\n[02:07.94]line 14\n[02:14.00]line 15\n[02:19.17]line 20\n[02:22.16]line 21\n[02:25.37]line 22\n[02:30.27]line 12 blinded lights\n[02:36.33]line 13\n[02:40.50](ad-lib)\n\n[02:51.73](ad-lib)\n\n[03:03.90]line 12 blinded lights\n[03:10.12]line 13"
+  },
+  {
+    "title": "Shape of You",
+    "duration": 234,
+    "expected": {
+      "time": 50.75,
+      "method": "title"
+    },
+    "lrc": "[00:09.65]line 1\n[00:12.10]line 2\n[00:14.81]line 3\n[00:17.04]line 4\n[00:19.70]line 5\n[00:22.24]line 6\n[00:24.42]line 7\n[00:27.27]line 8\n[00:28.91]line 9\n[00:29.83]line 10\n[00:32.22]line 11\n[00:35.23]line 12\n[00:37.31]line 13\n[00:39.64]line 14\n[00:42.28]line 15\n[00:45.30]line 12\n[00:47.28]line 16\n\n[00:50.75]line 17 shape of you\n[00:53.14]line 18\n[00:55.69]line 19\n[00:58.14]line 20\n[01:00.61]line 21\n[01:03.19]line 22\n[01:05.35]line 23\n[01:08.02]line 24\n[01:10.02]line 25\n[01:13.14]line 24\n[01:14.89]line 25\n[01:18.04]line 24\n[01:19.98]line 25\n[01:23.04]line 24\n[01:25.04]line 23\n[01:28.39]line 17 shape of you\n[01:29.89]line 26\n[01:31.95]line 27\n[01:34.34]line 28\n[01:36.91]line 29\n[01:39.53]line 30\n[01:41.96]line 31\n[01:44.55]line 32\n[01:47.15]line 33\n[01:48.70]line 34\n[01:50.16]line 10\n[01:52.20]line 11\n[01:55.39]line 12\n[01:57.26]line 13\n[01:59.58]line 14\n[02:02.27]line 15\n[02:05.32]line 12\n[02:07.12]line 16\n\n[02:10.56]line 17 shape of you\n[02:13.04]line 18\n[02:15.66]line 19\n[02:18.11]line 20\n[02:20.56]line 21\n[02:23.19]line 22\n[02:25.26]line 23\n[02:28.15]line 24\n[02:30.03]line 25\n[02:33.04]line 24\n[02:34.90]line 25\n[02:38.08]line 24\n[02:40.04]line 25\n[02:43.09]line 24\n[02:45.03]line 23\n[02:48.28]line 17 shape of you\n[02:50.11]line 35\n[02:52.66]line 35\n[02:55.05]line 35\n[02:57.66]line 35\n[03:00.02]line 35\n[03:02.45]line 35\n[03:05.03]line 35\n[03:07.52]line 35\n[03:10.54]line 17 shape of you\n[03:13.10]line 18\n[03:15.60]line 19\n[03:18.11]line 20\n[03:20.52]line 21\n[03:23.13]line 22\n[03:25.39]line 23\n[03:28.18]line 24\n[03:30.27]line 35\n[03:32.65]line 35\n[03:35.20]line 35\n[03:37.53]line 35\n[03:40.24]line 35\n[03:42.66]line 35\n[03:45.19]line 23\n[03:48.18]line 17 shape of you"
+  },
+  {
+    "title": "bad guy",
+    "duration": 194,
+    "expected": {
+      "time": 41.97,
+      "method": "title"
+    },
+    "lrc": "[00:14.09]line 1\n[00:17.68]line 2\n[00:21.23]line 3\n[00:24.86]line 4\n[00:28.30]line 5\n[00:31.97]line 6\n[00:34.88]line 7\n[00:39.01]line 8\n[00:41.97]line 9\n[00:43.50]line 10\n[00:45.25]line 11\n[00:47.04]line 12\n[00:49.35]line 13\n[00:50.67]line 14\n[00:52.37]line 15\n[00:54.14]line 16\n[00:56.37]line 17 bad guy\n[00:59.87]line 18\n[01:07.08]line 17 bad guy\n\n[01:14.53]line 19\n[01:18.04]line 20\n[01:21.68]line 21\n[01:25.26]line 22\n[01:28.92]line 23\n[01:33.57]line 24\n[01:35.83]line 25\n[01:38.96]line 26\n[01:42.30]line 9\n[01:43.97]line 10\n[01:45.63]line 11\n[01:47.46]line 12\n[01:49.66]line 13\n[01:51.01]line 14\n[01:52.79]line 15\n[01:54.53]line 16\n[01:56.82]line 17 bad guy\n[02:00.37]line 18\n\n[02:07.42]line 17 bad guy\n\n[02:14.44]line 18\n[02:20.64]line 27\n\n[02:39.44]line 28\n[02:43.49]line 29\n[02:47.49]line 30\n[02:49.69]line 31\n[02:51.86]line 32\n\n[02:57.56]line 33 bad guy\n[03:05.33]line 34 bad guy\n[03:07.75](ad-lib)\n[03:09.44]line 35"
+  },
+  {
+    "title": "Smells Like Teen Spirit",
+    "duration": 302,
+    "expected": {
+      "time": 51.19,
+      "method": "block"
+    },
+    "lrc": "[00:00.00]line 1 smells like teen spirit\n[00:34.55]line 2\n[00:38.85]line 3\n[00:42.79]line 4\n[00:46.86]line 5\n[00:51.19]line 6\n[00:55.18]line 6\n[00:59.23]line 6\n[01:03.42]line 7\n[01:06.31]line 8\n[01:10.06]line 9\n[01:14.38]line 10\n[01:18.45]line 9\n\n[01:22.44]line 11\n[01:26.48]line 12\n[01:30.80]line 13\n[01:32.84]line 14\n[01:37.12]line 15\n\n[01:48.40]line 16\n[01:52.48]line 17\n[01:56.56]line 18\n[02:00.96]line 19\n\n[02:04.96]line 6\n[02:08.00]line 6\n[02:13.12]line 6\n[02:17.12]line 7\n\n[02:19.88]line 8\n[02:23.92]line 9\n[02:27.00]line 10\n[02:32.24]line 9\n\n[02:36.24]line 11\n[02:40.28]line 12\n[02:44.60]line 13\n[02:46.56]line 14\n[02:50.64]line 15\n\n[03:34.36]line 20\n[03:38.44]line 21\n[03:42.52]line 22\n[03:46.69]line 23\n\n[03:50.85]line 6\n[03:54.83]line 6\n[03:58.87]line 6\n[04:02.91]line 7\n\n[04:05.80]line 8\n[04:09.75]line 9\n[04:13.71]line 10\n[04:17.76]line 9\n\n[04:21.99]line 11\n[04:25.79]line 12\n[04:29.85]line 24\n[04:31.77]line 24\n[04:33.85]line 24\n[04:35.85]line 24\n\n[04:38.02]line 24\n[04:39.97]line 24\n[04:42.13]line 24\n[04:44.18]line 24\n[04:46.17]line 24"
+  },
+  {
+    "title": "Seven Nation Army",
+    "duration": 232,
+    "expected": null,
+    "lrc": "[00:16.22]line 1\n[00:19.65]line 2 seven nation army\n[00:23.96]line 3\n[00:27.50]line 4\n[00:31.76]line 5\n[00:34.47]line 6\n[00:40.01]line 7\n[00:42.18]line 8\n\n[00:47.16]line 9\n[00:50.22]line 10\n\n[01:26.77]line 11\n[01:30.49]line 12\n[01:34.54]line 13\n[01:38.08]line 14\n[01:42.46]line 15\n[01:45.28]line 16\n[01:50.65]line 17\n[01:53.00]line 18\n\n[01:58.05]line 19\n[02:00.83]line 20\n\n[02:53.23]line 21\n[02:56.86]line 22\n[03:01.05]line 23\n[03:04.55]line 24\n[03:09.07]line 25\n[03:12.10]line 26\n[03:16.78]line 27\n[03:19.37]line 28\n\n[03:24.47]line 29\n[03:27.35]line 30"
+  },
+  {
+    "title": "HUMBLE.",
+    "duration": 177,
+    "expected": {
+      "time": 57.68,
+      "method": "title"
+    },
+    "lrc": "[00:01.63]line 1\n[00:03.38]line 2\n[00:05.05]line 3\n[00:07.74]line 4\n[00:11.10]line 5\n[00:14.49]line 6\n[00:17.72]line 7\n[00:20.98]line 8\n[00:24.15]line 9\n[00:27.32]line 10\n[00:30.51]line 11\n[00:33.72]line 12\n[00:36.79]line 13\n[00:40.07]line 14\n[00:43.35]line 15\n[00:46.24]line 16\n[00:49.31]line 17\n[00:52.05]line 18\n[00:55.60]line 19\n[00:57.68]line 20 humble\n[00:59.96]line 21\n[01:01.68]line 22 humble\n[01:03.04]line 21\n[01:04.58]line 22 humble\n[01:05.72]line 23\n[01:07.96]line 22 humble\n[01:09.56]line 21\n[01:11.21]line 22 humble\n[01:12.75]line 21\n[01:14.35]line 22 humble\n[01:15.93]line 21\n[01:17.58]line 22 humble\n[01:18.55]line 23\n[01:20.69]line 22 humble\n[01:22.32]line 21\n[01:24.14]line 24\n[01:27.48]line 25\n[01:30.65]line 26\n[01:33.63]line 27\n[01:36.83]line 28\n[01:40.18]line 29\n[01:43.25]line 30\n[01:46.65]line 31\n[01:49.77]line 32\n[01:53.32]line 33\n[01:56.61]line 34\n[01:59.71]line 35\n[02:02.94]line 36\n[02:06.16]line 37\n[02:09.32]line 38\n[02:12.52]line 39\n[02:14.84]line 20 humble\n[02:16.61]line 21\n[02:18.37]line 22 humble\n[02:19.93]line 21\n[02:21.53]line 22 humble\n[02:22.94]line 23\n[02:24.68]line 22 humble\n[02:26.35]line 21\n[02:28.09]line 22 humble\n[02:29.54]line 21\n[02:31.20]line 22 humble\n[02:32.87]line 21\n[02:34.48]line 22 humble\n[02:35.78]line 23\n[02:37.50]line 22 humble\n[02:39.14]line 21"
+  },
+  {
+    "title": "Rolling in the Deep",
+    "duration": 228,
+    "expected": {
+      "time": 58.76,
+      "method": "title"
+    },
+    "lrc": "[00:05.15]line 1\n[00:09.74]line 2\n[00:14.24]line 3\n[00:19.05]line 4\n[00:23.44]line 5\n[00:27.88]line 6\n[00:32.55]line 1\n[00:37.21]line 7\n[00:42.77]line 8\n[00:47.22]line 9\n[00:51.82]line 10\n[00:56.34]line 11\n[00:58.76]line 12\n[01:02.27](ad-lib)\n[01:03.59]line 13 rolling in the deep\n[01:06.99](ad-lib)\n[01:07.92]line 14\n[01:10.72]line 15\n[01:12.88]line 16\n[01:15.28]line 17\n[01:18.30]line 18\n[01:22.70]line 19\n[01:27.56]line 20\n[01:32.03]line 21\n[01:36.56](ad-lib)\n[01:37.62]line 22\n[01:39.95]line 23\n[01:42.15]line 24\n[01:44.28]line 25\n[01:46.97]line 22\n[01:49.06]line 26\n[01:51.37]line 11\n[01:53.46]line 12\n[01:57.22](ad-lib)\n[01:58.61]line 13 rolling in the deep\n[02:02.05](ad-lib)\n[02:02.84]line 14\n[02:05.68]line 15\n[02:07.75]line 16\n[02:10.09]line 17\n[02:12.02]line 12\n[02:16.48]line 13 rolling in the deep\n[02:21.13]line 27\n[02:26.18]line 28\n[02:31.75]line 29\n[02:36.23]line 30\n[02:40.67]line 31\n[02:45.07]line 32\n[02:49.95](ad-lib)\n[02:53.26]line 12\n[02:57.66]line 12\n[03:03.25]line 33\n[03:06.96]line 12\n[03:10.42](ad-lib)\n[03:11.59]line 13 rolling in the deep\n[03:14.83](ad-lib)\n[03:15.95]line 14\n[03:18.84]line 15\n[03:21.18]line 16\n[03:23.13]line 17\n[03:25.22]line 34\n[03:28.64](ad-lib)\n[03:29.90]line 13 rolling in the deep\n[03:33.38](ad-lib)\n[03:34.17]line 14\n[03:36.92]line 15\n[03:39.53]line 35\n[03:42.92]line 36"
+  },
+  {
+    "title": "Someone Like You",
+    "duration": 285,
+    "expected": {
+      "time": 73.82,
+      "method": "title"
+    },
+    "lrc": "[00:14.08]line 1\n[00:21.05]line 2\n[00:29.53]line 3\n[00:35.57]line 4\n[00:43.07]line 5\n[00:49.45]line 6\n[00:57.26]line 7\n[01:00.66]line 8\n[01:04.25]line 9\n[01:07.76]line 10\n\n[01:13.82]line 11 someone like you\n[01:19.89]line 12\n[01:26.93]line 13\n[01:33.95]line 14\n[01:41.04]line 14\n\n[01:51.68]line 15\n[01:57.23]line 16\n[02:04.12]line 17\n[02:11.34]line 18\n[02:19.10]line 7\n[02:22.58]line 8\n[02:26.07]line 9\n[02:29.42]line 10\n\n[02:37.33]line 11 someone like you\n[02:43.32]line 12\n[02:50.41]line 13\n[02:57.49]line 14\n[03:05.51]line 19\n[03:08.93]line 20\n[03:12.67]line 21\n[03:24.25]line 11 someone like you\n[03:30.12]line 22\n[03:37.22]line 13\n[03:44.38]line 14\n\n[03:52.49]line 11 someone like you\n[03:58.60]line 12\n[04:05.83]line 13\n[04:12.76]line 14\n[04:19.96]line 14"
+  },
+  {
+    "title": "Levitating",
+    "duration": 204,
+    "expected": {
+      "time": 28.38,
+      "method": "title"
+    },
+    "lrc": "[00:09.52]line 1\n[00:11.77]line 2\n[00:14.02]line 3\n[00:16.33]line 4\n[00:18.74]line 5\n[00:21.06]line 6\n[00:23.47]line 7\n[00:25.79]line 8\n[00:28.38]line 9\n[00:30.82]line 10 levitating\n[00:33.12]line 11\n[00:35.08]line 12\n[00:36.88]line 13\n[00:41.60]line 14\n[00:46.00]line 15 levitating\n[00:46.86]line 16\n[00:50.93]line 14\n[00:55.16]line 15 levitating\n\n[01:00.62]line 17\n[01:02.85]line 18\n[01:05.46]line 19\n[01:07.88]line 20\n[01:09.97]line 21\n[01:12.46]line 22\n[01:14.37]line 23\n[01:16.76]line 24\n[01:19.82]line 9\n[01:22.01]line 10 levitating\n[01:24.55]line 11\n[01:26.34]line 12\n[01:28.08]line 13\n[01:32.95]line 14\n[01:37.29]line 15 levitating\n[01:37.92]line 16\n[01:42.28]line 14\n[01:46.63]line 15 levitating\n[01:47.88]line 25\n[01:50.25]line 25\n[01:52.63]line 26\n[01:54.27]line 12\n[01:55.97]line 15 levitating\n[01:57.25]line 25\n[01:59.56]line 25\n[02:01.96]line 26\n[02:03.55]line 12\n[02:05.86]line 27\n[02:07.92]line 28\n[02:10.49]line 29\n[02:12.93]line 12\n[02:15.16]line 27\n[02:17.35]line 28\n[02:19.78]line 29\n[02:22.13]line 12\n[02:25.12]line 9\n[02:27.34]line 10 levitating\n[02:29.70]line 11\n[02:33.48]line 13\n[02:38.27]line 14\n[02:42.52]line 15 levitating\n[02:43.73]line 25\n[02:46.02]line 25\n[02:48.51]line 26\n[02:50.29]line 12\n[02:51.71]line 15 levitating\n[02:53.23]line 25\n[02:55.67]line 25\n[02:57.85]line 26\n[02:59.42]line 12\n[03:01.52]line 13\n[03:06.18]line 14\n[03:10.49]line 15 levitating\n[03:11.10]line 16\n[03:15.43]line 14\n[03:19.76]line 15 levitating"
+  },
+  {
+    "title": "Hey Ya!",
+    "duration": 237,
+    "expected": {
+      "time": 34.37,
+      "method": "title"
+    },
+    "lrc": "[00:00.04]line 1\n[00:01.43]line 2\n[00:03.58]line 3\n[00:05.10]line 4\n[00:09.60]line 5\n[00:12.32]line 6\n[00:17.72]line 7\n[00:20.12]line 8\n[00:26.10]line 9\n[00:28.40]line 10\n[00:30.16]line 11\n[00:34.37]line 12 hey ya\n[00:42.74]line 12 hey ya\n[00:47.22]line 12 hey ya\n[00:51.08]line 12 hey ya\n[01:07.52]line 13\n[01:08.73]line 14\n[01:10.35]line 15\n[01:15.95]line 16\n[01:17.22]line 17\n[01:18.75]line 18\n[01:24.19]line 19\n[01:26.94]line 20\n[01:28.36]line 20\n[01:29.96]line 21\n[01:32.40]line 22\n[01:35.03]line 23\n[01:39.87]line 24\n[01:42.88]line 12 hey ya\n[01:48.25]line 25\n[01:50.37]line 26 hey ya\n[01:51.20]line 27\n[01:53.67]line 26 hey ya\n[01:56.33]line 28\n[01:57.40]line 26 hey ya\n[01:59.27]line 29\n[02:00.86]line 26 hey ya\n[02:02.62]line 30\n[02:08.90]line 31\n[02:09.96]line 32\n[02:13.52](ad-lib)\n[02:15.68]line 33\n[02:18.01](ad-lib)\n[02:19.57]line 34\n[02:20.79]line 35\n[02:22.89](ad-lib)\n[02:24.08]line 36\n[02:26.81]line 37\n[02:29.83]line 38\n[02:31.31](ad-lib)\n[02:32.72]line 39\n[02:36.68]line 40\n[02:39.51]line 41\n[02:43.15]line 42\n[02:46.16]line 43\n[02:47.35]line 44\n[02:50.36]line 45\n[02:53.68]line 46 hey ya\n[02:56.03]line 44\n[03:00.22]line 47\n[03:02.54]line 48\n[03:03.38]line 49\n[03:08.13]line 50\n[03:10.81]line 51\n[03:14.12]line 51\n[03:17.34]line 51\n[03:20.38]line 12 hey ya\n[03:28.17]line 12 hey ya\n[03:36.25]line 12 hey ya\n[03:44.99]line 12 hey ya\n[03:53.04]line 26 hey ya"
+  },
+  {
+    "title": "Hotel California",
+    "duration": 391,
+    "expected": {
+      "time": 104.78999999999999,
+      "method": "title"
+    },
+    "lrc": "[00:52.58]line 1\n[00:55.66]line 2\n[00:58.82]line 3\n[01:01.97]line 4\n\n[01:05.42]line 5\n[01:08.56]line 6\n[01:11.80]line 7\n[01:14.87]line 8\n\n[01:18.43]line 9\n[01:21.82]line 10\n[01:25.12]line 11\n[01:27.34]line 12\n\n[01:31.49]line 13\n[01:35.08]line 14\n[01:38.30]line 15\n[01:41.47]line 16\n\n[01:44.79]line 17 hotel california\n[01:50.56]line 18\n[01:53.81]line 19\n[01:57.39]line 20 hotel california\n[02:03.64]line 21\n[02:06.82]line 22\n\n[02:10.66]line 23\n[02:13.77]line 24\n[02:16.96]line 25\n[02:20.82]line 26\n\n[02:23.92]line 27\n[02:26.77]line 28\n[02:30.49]line 29\n[02:33.57]line 30\n\n[02:37.01]line 31\n[02:39.92]line 32\n[02:42.44]line 33\n[02:50.01]line 34\n[02:56.57]line 35\n[02:59.85]line 36\n\n[03:03.05]line 17 hotel california\n[03:08.82]line 18\n[03:12.08]line 19\n[03:15.48]line 37 hotel california\n[03:21.74]line 38\n[03:25.17]line 39\n\n[03:29.20]line 40\n[03:32.34]line 41\n[03:34.49]line 42\n[03:38.97]line 43\n[03:42.08]line 44\n[03:45.13]line 45\n[03:48.53]line 46\n[03:51.21]line 47\n\n[03:55.20]line 48\n[03:58.45]line 49\n[04:01.66]line 50\n[04:04.17]line 51\n[04:08.22]line 52\n[04:10.54]line 53\n[04:14.73]line 54\n[04:17.68]line 55"
+  },
+  {
+    "title": "Uptown Funk",
+    "duration": 270,
+    "expected": {
+      "time": 45.72,
+      "method": "title"
+    },
+    "lrc": "[00:16.94]line 1\n[00:18.61]line 2\n[00:21.06]line 3\n[00:22.87]line 4\n[00:25.12]line 5\n[00:27.39]line 6\n[00:29.15]line 7\n[00:31.11]line 8\n[00:33.13]line 9\n[00:35.41]line 10\n[00:37.38]line 11\n[00:39.69]line 12\n[00:41.60]line 11\n[00:43.89]line 13\n[00:45.72]line 11\n[00:47.93]line 14\n[00:50.18]line 15\n[00:52.46]line 15\n[00:54.44]line 15\n[00:56.30]line 16 uptown funk\n[00:58.50](ad-lib)\n[01:00.43]line 16 uptown funk\n[01:02.79]line 17\n[01:04.86]line 18\n\n[01:13.13]line 19\n\n[01:21.62]line 19\n[01:23.72]line 19\n[01:25.70]line 20\n[01:27.78]line 20\n[01:29.65]line 21\n[01:31.94]line 22\n[01:34.01]line 23\n[01:36.25]line 24\n[01:38.10]line 25\n[01:39.68]line 26\n[01:42.37]line 27\n[01:44.18]line 28\n[01:46.45]line 29\n[01:48.38]line 11\n[01:50.52]line 10\n[01:52.36]line 11\n[01:54.76]line 12\n[01:56.62]line 11\n[01:58.95]line 30\n[02:00.96]line 11\n[02:03.03]line 14\n[02:05.49]line 15\n[02:07.44]line 15\n[02:09.59]line 15\n[02:11.52]line 16 uptown funk\n[02:13.75](ad-lib)\n[02:15.78]line 16 uptown funk\n[02:17.75]line 17\n[02:20.04]line 18\n\n[02:28.43]line 19\n\n[02:36.68]line 19\n[02:38.76]line 19\n[02:40.96]line 20\n[02:42.97]line 20\n[02:44.82]line 21\n[02:50.81]line 31\n[02:53.61]line 32\n[02:55.45]line 33 uptown funk\n[02:59.66]line 34 uptown funk\n[03:03.42]line 35 uptown funk\n[03:08.02]line 33 uptown funk\n[03:11.63]line 36\n[03:13.91]line 37\n[03:15.97]line 38\n[03:18.13]line 39\n[03:20.03]line 36\n[03:22.33]line 37\n[03:24.39]line 40\n[03:26.76]line 18\n\n[03:35.20]line 19\n\n[03:43.35]line 19\n[03:45.59]line 19\n[03:47.67]line 20\n[03:49.78]line 20\n[03:51.58]line 21\n[03:54.00]line 33 uptown funk\n[03:58.14]line 33 uptown funk\n[04:02.27]line 33 uptown funk\n[04:06.46]line 33 uptown funk\n[04:10.66]line 33 uptown funk\n[04:14.82]line 33 uptown funk\n[04:19.05]line 33 uptown funk\n[04:23.23]line 41 uptown funk"
+  },
+  {
+    "title": "Shake It Off",
+    "duration": 219,
+    "expected": {
+      "time": 41.93,
+      "method": "title"
+    },
+    "lrc": "[00:05.61]line 1\n[00:08.40]line 2\n[00:11.60]line 3\n[00:14.60]line 3\n[00:17.20]line 4\n[00:20.40]line 5\n[00:23.01]line 6\n[00:26.57]line 3\n[00:29.23]line 7\n[00:31.84]line 8\n[00:34.65]line 9\n[00:37.82]line 10\n[00:41.93]line 11\n[00:44.99]line 12\n[00:47.94]line 13\n[00:51.17]line 14 shake it off\n[00:53.95]line 15\n[00:56.97]line 16\n[00:59.95]line 13\n[01:03.16]line 14 shake it off\n[01:05.42]line 17\n[01:08.40]line 18\n[01:11.41]line 19\n[01:14.62]line 20\n[01:17.42]line 21\n[01:20.06]line 22\n[01:23.41]line 23\n[01:26.62]line 24\n[01:29.19]line 7\n[01:31.84]line 25\n[01:34.65]line 9\n[01:37.84]line 10\n[01:41.95]line 11\n[01:45.00]line 12\n[01:47.98]line 13\n[01:51.20]line 14 shake it off\n[01:53.93]line 15\n[01:56.96]line 16\n[01:59.97]line 13\n[02:03.16]line 14 shake it off\n[02:06.32]line 26 shake it off\n[02:08.43]line 27 shake it off\n[02:11.43]line 27 shake it off\n[02:14.40]line 27 shake it off\n[02:19.10]line 28\n[02:20.58]line 29\n[02:22.67]line 30\n[02:25.63]line 31\n[02:30.33]line 32\n[02:32.95]line 33\n[02:35.79]line 34\n[02:38.95]line 35\n[02:43.68]line 36\n[02:45.00]line 11\n[02:47.95]line 12\n[02:50.94]line 13\n[02:54.18]line 14 shake it off\n[02:56.93]line 15\n[03:00.00]line 16\n[03:02.98]line 13\n[03:06.17]line 14 shake it off\n[03:09.33]line 26 shake it off\n[03:11.46]line 27 shake it off\n[03:14.43]line 27 shake it off\n[03:17.43]line 27 shake it off\n[03:21.32]line 26 shake it off\n[03:23.42]line 27 shake it off\n[03:26.16]line 26 shake it off\n[03:29.42]line 27 shake it off"
+  },
+  {
+    "title": "Don't Stop Believin'",
+    "duration": 251,
+    "expected": {
+      "time": 76.83,
+      "method": "block"
+    },
+    "lrc": "[00:17.90]line 1\n[00:21.57]line 2\n[00:25.61]line 3\n[00:34.06]line 4\n[00:37.82]line 5\n[00:41.96]line 6\n\n[01:06.32]line 7\n[01:09.84]line 8\n[01:14.01]line 9\n[01:16.83]line 10\n[01:21.52]line 11\n[01:26.64]line 12\n[01:29.35]line 13\n[01:37.29]line 14\n[01:42.68]line 15\n[01:45.47]line 16\n\n[02:02.08]line 17\n[02:06.54]line 18\n[02:09.96]line 19\n[02:13.36]line 20\n[02:17.73]line 21\n[02:22.50]line 22\n[02:25.58]line 23\n[02:28.59]line 10\n[02:33.26]line 11\n[02:38.38]line 12\n[02:40.53]line 13\n[02:48.78]line 14\n[02:54.22]line 15\n[02:57.02]line 16\n\n[03:21.26]line 24 dont stop believin\n[03:25.81]line 25\n[03:29.13]line 14\n[03:36.89]line 24 dont stop believin\n[03:41.25]line 26\n[03:44.68]line 14\n[03:52.88]line 24 dont stop believin\n[03:57.04]line 25\n[04:00.88]line 14"
+  },
+  {
+    "title": "Lose Yourself",
+    "duration": 327,
+    "expected": {
+      "time": 98.68,
+      "method": "title"
+    },
+    "lrc": "[00:34.32]line 1\n[00:37.04]line 2\n[00:39.35]line 3\n[00:41.50]line 4\n[00:43.91]line 5\n[00:46.84]line 6\n[00:48.90]line 7\n[00:51.04]line 8\n[00:52.72]line 9\n[00:53.87]line 10\n[00:55.11]line 11\n[00:56.63]line 12\n[00:59.32]line 13\n[01:02.53]line 14\n[01:03.71]line 15\n[01:06.14]line 16\n[01:07.68]line 17\n[01:10.60]line 18\n[01:13.48]line 19\n[01:16.38]line 20\n[01:17.95]line 21\n[01:19.44]line 22\n[01:21.29]line 23\n[01:23.84]line 24\n[01:25.41]line 25\n[01:26.99]line 26\n[01:28.35]line 27\n[01:29.72]line 28\n[01:31.12]line 29\n[01:33.54]line 30\n[01:35.38]line 31\n[01:36.44]line 32\n[01:38.68]line 33\n[01:39.34]line 34 lose yourself\n[01:42.14]line 35\n[01:43.89]line 36\n[01:45.39]line 37\n[01:47.15]line 38\n[01:49.74]line 33\n[01:50.61]line 34 lose yourself\n[01:53.33]line 35\n[01:55.06]line 36\n[01:56.55]line 37\n[01:58.35]line 38\n[02:01.40]line 39\n[02:02.66]line 40\n[02:04.40]line 41\n[02:06.39]line 42\n[02:09.86]line 43\n[02:11.69]line 44\n[02:13.97]line 45\n[02:16.72]line 46\n[02:19.62]line 47\n[02:22.57]line 48\n[02:25.06]line 49\n[02:26.74]line 50\n[02:29.36]line 51\n[02:32.21]line 52\n[02:35.16]line 53\n[02:37.68]line 54\n[02:39.27]line 55\n[02:41.75]line 56\n[02:44.63]line 57\n[02:45.94]line 33\n[02:46.50]line 34 lose yourself\n[02:49.48]line 35\n[02:51.24]line 36\n[02:52.79]line 37\n[02:54.33]line 58\n[02:56.88]line 33\n[02:57.51]line 34 lose yourself\n[03:00.66]line 35\n[03:02.45]line 36\n[03:03.86]line 37\n[03:05.52]line 38\n[03:08.65]line 59\n[03:11.13]line 60\n[03:14.12]line 61\n[03:16.84]line 62\n[03:19.70]line 63\n[03:22.70]line 64\n[03:25.51]line 65\n[03:28.32]line 66\n[03:31.13]line 67\n[03:33.99]line 68\n[03:35.28]line 69\n[03:38.07]line 70\n[03:42.05]line 71\n[03:43.70]line 72\n[03:46.83]line 73\n[03:50.44]line 74\n[03:52.96]line 75\n[03:54.79]line 76\n[03:57.08]line 77\n[03:59.90]line 78\n[04:01.79]line 79\n[04:04.06]line 80\n[04:05.14]line 81\n[04:07.69]line 82\n[04:09.99]line 83\n[04:11.53]line 84\n[04:12.80]line 85\n[04:15.16]line 33\n[04:16.10]line 34 lose yourself\n[04:19.17]line 35\n[04:20.90]line 36\n[04:22.24]line 37\n[04:23.90]line 58\n[04:26.41]line 33\n[04:27.30]line 34 lose yourself\n[04:30.31]line 35\n[04:32.02]line 36\n[04:33.50]line 37\n[04:35.13]line 38\n[04:40.16]line 86"
+  },
+  {
+    "title": "Bohemian Rhapsody",
+    "duration": 355,
+    "expected": null,
+    "lrc": "[00:00.15]line 1\n[00:07.13]line 2\n[00:14.77]line 3\n[00:25.37]line 4\n[00:30.75]line 5\n[00:38.77]line 6\n[00:55.36]line 7\n[01:01.95]line 8\n[01:08.56]line 9\n[01:15.42]line 10\n[01:22.49]line 11\n[01:32.53]line 12\n[01:36.95]line 13\n[01:54.94]line 14\n[02:01.18]line 15\n[02:08.33]line 16\n[02:14.73]line 17\n[02:21.95]line 18\n[02:28.80]line 19\n[02:31.98]line 20\n\n[03:05.97]line 21\n[03:08.63]line 22\n[03:12.43]line 23\n[03:16.02]line 24\n[03:22.21]line 25\n[03:25.69]line 26\n[03:28.62]line 27\n[03:33.93]line 28\n[03:36.78]line 29\n[03:37.85]line 30\n[03:40.52]line 29\n[03:41.63]line 31\n[03:43.58]line 29\n[03:44.90]line 31\n[03:46.91]line 32\n[03:47.83]line 33\n[03:51.47]line 34\n[03:53.97]line 35\n[03:55.89]line 36\n[03:57.42]line 37\n[04:14.98]line 38\n[04:20.98]line 39\n[04:25.86]line 40\n[04:32.84]line 41\n\n[04:55.03]line 42\n[05:00.05]line 43\n\n[05:11.78]line 44\n[05:18.66]line 45\n[05:22.39]line 46\n\n[05:42.78](ad-lib)"
+  },
+  {
+    "title": "As It Was",
+    "duration": 167,
+    "expected": {
+      "time": 37.45,
+      "method": "title"
+    },
+    "lrc": "[00:00.00]line 1\n\n[00:14.13]line 2\n[00:16.11]line 3\n[00:18.71]line 4\n[00:21.88]line 5\n[00:25.10]line 6\n[00:27.15]line 7\n[00:29.75]line 8\n[00:32.86]line 9\n[00:37.45]line 10\n[00:44.18]line 11 as it was\n[00:48.72]line 10\n[00:55.22]line 11 as it was\n[01:00.13]line 12 as it was\n[01:06.28]line 13\n[01:09.33]line 14\n[01:11.50]line 15\n[01:14.02]line 16\n[01:17.03]line 17\n[01:20.08]line 18\n[01:22.07]line 19\n[01:25.15]line 20\n[01:27.89]line 21\n[01:32.83]line 10\n[01:39.27]line 11 as it was\n[01:43.96]line 10\n[01:50.35]line 11 as it was\n[01:55.43]line 12 as it was\n[02:01.15]line 13\n[02:04.44]line 22\n[02:07.20]line 23\n[02:10.26]line 24\n[02:12.77]line 25\n[02:18.11]line 26\n[02:22.98]line 27 as it was\n[02:26.15]line 11 as it was\n[02:31.12]line 12 as it was"
+  }
+]

@@ -1,0 +1,61 @@
+appId: com.jessicahirsh.sift
+name: "Start at Chorus Setting"
+---
+
+# Turning on "Start at chorus" makes the next card start mid-song instead of
+# at 0:00. The E2E build runs the mock provider, whose tracks are all over a
+# minute long, so whichever source answers (LRCLIB lyrics, or the estimate
+# when the simulator can't reach LRCLIB) the start is at least 0:10.
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
+
+- tapOn: "Start Sifting"
+
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000
+
+- tapOn:
+    id: "settings-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "start-at-chorus-switch"
+    timeout: 30000
+
+- tapOn:
+    id: "start-at-chorus-switch"
+
+# Close the modal by swiping down, and wait for the deck again rather than
+# asserting mid-transition.
+- swipe:
+    start: "50%,30%"
+    end: "50%,90%"
+
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000
+
+# The next card should start at its chorus, not 0:00.
+- tapOn: "Skip"
+
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "elapsed-time"
+      text: "(0:[1-5][0-9]|[1-9]:[0-9][0-9])"
+    timeout: 30000

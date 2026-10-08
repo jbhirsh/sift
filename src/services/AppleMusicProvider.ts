@@ -79,6 +79,8 @@ function getNativeModule() {
     // Optional: development builds made before the cache-warming native
     // function shipped don't expose it.
     warmSongCache?(trackIDs: string[]): Promise<number>;
+    // Optional for the same reason (added with "Start at chorus").
+    previewOffset?(trackID: string): Promise<number | null>;
   };
 }
 
@@ -187,5 +189,10 @@ export class AppleMusicProvider implements MusicProviderService {
     // Tolerate a native module that predates warmSongCache (stale dev
     // build): resume then simply skips cache warming instead of throwing.
     return (await this.native.warmSongCache?.(trackIDs)) ?? 0;
+  }
+
+  async previewOffset(trackID: string): Promise<number | null> {
+    // A native module that predates previewOffset just has no hint to give.
+    return (await this.native.previewOffset?.(trackID)) ?? null;
   }
 }

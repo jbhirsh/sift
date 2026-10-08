@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   StyleSheet,
+  Switch,
 } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import type { SFSymbol } from 'sf-symbols-typescript';
@@ -25,7 +26,7 @@ interface SettingsScreenProps {
 }
 
 export default function SettingsScreen({ onClose: _onClose }: SettingsScreenProps) {
-  const { state, dispatch } = useSift();
+  const { state, dispatch, setStartAtChorus } = useSift();
   const { colors } = useTheme();
   const { authorize, isAuthorized } = useMusicProvider();
 
@@ -154,6 +155,37 @@ export default function SettingsScreen({ onClose: _onClose }: SettingsScreenProp
         </View>
       </GlassCard>
 
+      {/* Playback settings. Apple Music only: Spotify plays fixed
+          30-second previews, which can't start at a song's chorus. */}
+      {state.provider === 'apple-music' && (
+        <View style={styles.section}>
+          <GlassCard intensity="regular" radius={RADIUS.md}>
+            <View style={styles.settingRow}>
+              <SymbolView
+                name="music.mic"
+                size={22}
+                tintColor={colors.text}
+              />
+              <View style={styles.settingText}>
+                <Text style={[styles.settingTitle, { color: colors.text }]}>
+                  Start at chorus
+                </Text>
+                <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
+                  Begin each song at its chorus instead of the start.
+                </Text>
+              </View>
+              <Switch
+                testID="start-at-chorus-switch"
+                accessibilityLabel="Start at chorus"
+                value={state.startAtChorus}
+                onValueChange={setStartAtChorus}
+                trackColor={{ true: colors.accent, false: colors.quaternary }}
+              />
+            </View>
+          </GlassCard>
+        </View>
+      )}
+
       <View style={{ flex: 1 }} />
     </View>
   );
@@ -205,5 +237,25 @@ const styles = StyleSheet.create({
   checkButtonText: {
     fontSize: 15,
     fontWeight: '500',
+  },
+  section: {
+    marginTop: SPACING.xl,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: SPACING.lg,
+  },
+  settingText: {
+    flex: 1,
+    gap: 2,
+  },
+  settingTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  settingDescription: {
+    fontSize: 12,
   },
 });

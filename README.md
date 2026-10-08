@@ -23,6 +23,7 @@ Sift is a production-quality React Native (Expo) app built in TypeScript, with a
 - **Two music backends behind one interface** — Apple Music (native) and Spotify (OAuth via `expo-auth-session` + 30s preview playback) both implement a single `MusicProviderService`. A factory swaps them at runtime and falls back to an in-memory mock when no native module is present (Expo Go, web, CI).
 - **Gesture-driven swipe deck** — the card stack is built on `react-native-gesture-handler` + `react-native-reanimated` worklets, with drag rotation, spring-back, and threshold-based Keep/Remove overlays.
 - **"Liquid glass" UI** — a reusable blur/material design system (`GlassCard`, `GlassBackground`) with centralized design tokens and automatic light/dark theming.
+- **Start at chorus** — an optional setting that starts each song at its most recognizable part. The chorus is found from timed lyrics ([LRCLIB](https://lrclib.net)): the block of lines a song repeats. When that fails, ShazamKit locates Apple Music's preview clip (which labels start at "the good part") inside the full track. Results are cached per song, and the next cards are resolved ahead of time so swiping stays instant.
 - **Crash-safe sessions** — all state lives in a single typed `useReducer`; sessions auto-save (debounced) to `AsyncStorage` after every decision and resume exactly where you left off.
 - **Observability** — Sentry is wired for errors, tracing, and session replay, with breadcrumbs on every user action and provider call.
 - **Tested & CI-gated** — 28 Jest unit suites (80% coverage threshold) run on every PR via GitHub Actions, plus 7 Maestro E2E flows runnable on demand.
@@ -83,6 +84,8 @@ cp .env.example .env.local     # add your Sentry DSN (optional; app runs without
 npx expo run:ios               # first build — compiles the native MusicKit module
 npx expo start                 # subsequent launches
 ```
+
+"Start at chorus" uses ShazamKit as a fallback, which needs the **ShazamKit** App Service enabled on the App ID (Apple Developer → Identifiers → `com.jessicahirsh.sift` → App Services). Without it the setting still works from lyrics and the estimate.
 
 Configuration lives in environment variables — see [`.env.example`](.env.example). `EXPO_PUBLIC_*` values are inlined by Expo at build time; real secrets go in the gitignored `.env.local`.
 

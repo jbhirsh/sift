@@ -1,5 +1,7 @@
+import AVFoundation
 import ExpoModulesCore
 import MusicKit
+import ShazamKit
 
 // Pure decision logic (batch slicing, catalog pairing, createPlaylist
 // accounting, cache keying) lives in ../logic/Sources/MusicKitLogic — the
@@ -232,8 +234,16 @@ public class ExpoMusicKitModule: Module {
       } else {
         throw MusicKitError.trackNotFound(trackID)
       }
-      try await player.play()
       if position > 0 {
+        // Seek before playing so a start mid-track ("Start at chorus")
+        // doesn't blip the first instant of the song. Once prepared, the
+        // queue entry accepts a playback time.
+        try await player.prepareToPlay()
+        player.playbackTime = position
+      }
+      try await player.play()
+      // If the pre-play seek didn't stick, seek now, late rather than never.
+      if position > 0 && abs(player.playbackTime - position) > 1 {
         player.playbackTime = position
       }
     }
@@ -419,6 +429,20 @@ public class ExpoMusicKitModule: Module {
     }
 
     // MARK: - Artwork Resolution
+
+    // MARK: - Chorus hint
+
+    /// Where the track's Apple Music preview starts within the full track, in
+    /// seconds, or nil. Labels pick previews to start at "the good part", so
+    /// "Start at chorus" uses this when lyrics can't locate the chorus. The
+    /// preview (a DRM-free 30-second clip) is downloaded, fingerprinted with
+    /// ShazamKit and matched against Shazam's catalog: the match's offset is
+    /// where the clip sits in the recording. Every failure (no preview, no
+    /// match, offline, ShazamKit unavailable for this app ID) is just nil.
+    AsyncFunction("previewOffset") { (trackID: String) -> Double? in
+      guard let previewURL = await self.previewURL(for: trackID) else { return nil }
+      return await shazamOffset(ofPreviewAt: previewURL)
+    }
 
     AsyncFunction("resolveArtworkURL") { (trackID: String, width: Int, height: Int) -> String? in
       // Return cached result immediately
@@ -619,6 +643,45 @@ public class ExpoMusicKitModule: Module {
     return resolved
   }
 
+  /// The preview clip URL for a track. Library songs usually carry no
+  /// previews, so fall back to the same song in the Apple Music catalog: by
+  /// ISRC when known, otherwise the closest-duration search hit for the same
+  /// title and artist.
+  private func previewURL(for trackID: String) async -> URL? {
+    let song: Song?
+    if let cached = self.songCache[trackID] {
+      song = cached
+    } else if let track = self.trackCache[trackID], case .song(let trackSong) = track {
+      song = trackSong
+    } else {
+      song = nil
+    }
+    guard let song else { return nil }
+    if let url = song.previewAssets?.first?.url { return url }
+
+    if let isrc = song.isrc {
+      let request = MusicCatalogResourceRequest<Song>(matching: \.isrc, equalTo: isrc)
+      if let match = try? await request.response().items.first,
+         let url = match.previewAssets?.first?.url {
+        return url
+      }
+    }
+
+    var search = MusicCatalogSearchRequest(term: "\(song.title) \(song.artistName)", types: [Song.self])
+    search.limit = 10
+    guard let results = try? await search.response().songs else { return nil }
+    let candidates = results.filter {
+      $0.title.lowercased() == song.title.lowercased()
+        && $0.artistName.lowercased() == song.artistName.lowercased()
+    }
+    let target = song.duration ?? 0
+    let best = candidates.min {
+      abs(($0.duration ?? 0) - target) < abs(($1.duration ?? 0) - target)
+    }
+    guard let best, abs((best.duration ?? 0) - target) <= 3 else { return nil }
+    return best.previewAssets?.first?.url
+  }
+
   /// Metadata this module already knows for a track id, if any — used to
   /// validate a canonicalized catalog pairing (see canonicalPairing).
   private func knownMetadata(for id: String) -> CandidateSong? {
@@ -676,6 +739,31 @@ public class ExpoMusicKitModule: Module {
     }
 
     return dict
+  }
+}
+
+// MARK: - ShazamKit
+
+/// Download a preview clip and find where it sits in the full recording.
+private func shazamOffset(ofPreviewAt url: URL) async -> Double? {
+  do {
+    let (download, _) = try await URLSession.shared.download(from: url)
+    // AVURLAsset needs the file extension to recognize the audio format.
+    let file = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString)
+      .appendingPathExtension(url.pathExtension.isEmpty ? "m4a" : url.pathExtension)
+    try FileManager.default.moveItem(at: download, to: file)
+    defer { try? FileManager.default.removeItem(at: file) }
+
+    let signature = try await SHSignatureGenerator.signature(from: AVURLAsset(url: file))
+    switch await SHSession().result(from: signature) {
+    case .match(let match):
+      return match.mediaItems.first?.matchOffset
+    case .noMatch, .error:
+      return nil
+    }
+  } catch {
+    return nil
   }
 }
 

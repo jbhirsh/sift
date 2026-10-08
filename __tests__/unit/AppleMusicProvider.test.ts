@@ -51,6 +51,7 @@ const mockNativeModule = {
   removeFromLibrary: jest.fn().mockResolvedValue(undefined),
   removeFromPlaylist: jest.fn().mockResolvedValue(undefined),
   addToLibrary: jest.fn().mockResolvedValue(undefined),
+  previewOffset: jest.fn().mockResolvedValue(null),
 };
 
 jest.mock('../../modules/expo-musickit/src/index', () => mockNativeModule);
@@ -258,6 +259,24 @@ describe('AppleMusicProvider', () => {
     const warmed = await provider.warmSongCache(['1', '2', '3']);
     expect(mockNativeModule.warmSongCache).toHaveBeenCalledWith(['1', '2', '3']);
     expect(warmed).toBe(2);
+  });
+
+  test('previewOffset delegates to the native module', async () => {
+    mockNativeModule.previewOffset.mockResolvedValueOnce(47.5);
+    await expect(provider.previewOffset('1')).resolves.toBe(47.5);
+    expect(mockNativeModule.previewOffset).toHaveBeenCalledWith('1');
+    mockNativeModule.previewOffset.mockResolvedValueOnce(null);
+    await expect(provider.previewOffset('2')).resolves.toBeNull();
+  });
+
+  test('previewOffset is null for a native module without the method', async () => {
+    const original = mockNativeModule.previewOffset;
+    mockNativeModule.previewOffset = undefined as unknown as jest.Mock;
+    try {
+      await expect(provider.previewOffset('1')).resolves.toBeNull();
+    } finally {
+      mockNativeModule.previewOffset = original;
+    }
   });
 
   test('warmSongCache tolerates a native module without the method', async () => {

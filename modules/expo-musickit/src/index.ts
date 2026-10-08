@@ -73,6 +73,14 @@ export async function warmSongCache(trackIDs: string[]): Promise<number> {
   return ExpoMusicKit.warmSongCache(trackIDs);
 }
 
+/**
+ * Where the track's Apple Music preview starts within the full track, in
+ * seconds, found with ShazamKit; null when there is no preview or no match.
+ */
+export async function previewOffset(trackID: string): Promise<number | null> {
+  return ExpoMusicKit.previewOffset(trackID);
+}
+
 export async function resolveArtworkURL(trackID: string, width: number, height: number): Promise<string | null> {
   return ExpoMusicKit.resolveArtworkURL(trackID, width, height);
 }

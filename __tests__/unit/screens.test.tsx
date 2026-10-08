@@ -1563,4 +1563,45 @@ describe('SettingsScreen', () => {
     const { getByText } = await renderWithProviders(<SettingsScreen />);
     expect(getByText('Apple Music')).toBeTruthy();
   });
+
+  test('"Start at chorus" switch starts off and turns the setting on and off', async () => {
+    function Probe() {
+      const { state } = useSift();
+      return <Text testID="start-at-chorus-value">{String(state.startAtChorus)}</Text>;
+    }
+    const { getByTestId, getByText } = await renderWithProviders(
+      <>
+        <SettingsScreen />
+        <Probe />
+      </>,
+    );
+    expect(getByText('Start at chorus')).toBeTruthy();
+    const toggle = getByTestId('start-at-chorus-switch');
+    expect(toggle.props.value).toBe(false);
+
+    await fireEvent(toggle, 'valueChange', true);
+    expect(getByTestId('start-at-chorus-value').props.children).toBe('true');
+    expect(getByTestId('start-at-chorus-switch').props.value).toBe(true);
+
+    await fireEvent(getByTestId('start-at-chorus-switch'), 'valueChange', false);
+    expect(getByTestId('start-at-chorus-value').props.children).toBe('false');
+  });
+
+  test('"Start at chorus" is hidden for Spotify, whose previews are fixed clips', async () => {
+    function UseSpotify() {
+      const { dispatch } = useSift();
+      React.useEffect(() => {
+        dispatch({ type: 'SET_PROVIDER', provider: 'spotify' });
+      }, [dispatch]);
+      return null;
+    }
+    const { queryByTestId, getByText } = await renderWithProviders(
+      <>
+        <UseSpotify />
+        <SettingsScreen />
+      </>,
+    );
+    expect(getByText('Spotify')).toBeTruthy();
+    expect(queryByTestId('start-at-chorus-switch')).toBeNull();
+  });
 });

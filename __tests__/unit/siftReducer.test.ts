@@ -26,6 +26,7 @@ function makeState(overrides: Partial<SiftState> = {}): SiftState {
     pendingKeeps: [],
     skipFiltering: false,
     siftedPlaylistId: null,
+    startAtChorus: false,
     ...overrides,
   };
 }
@@ -253,6 +254,22 @@ describe('siftReducer', () => {
     delete (session as Partial<typeof session>).phase;
     const next = siftReducer(state, { type: 'RESUME_SESSION', session: session as typeof session });
     expect(next.phase).toBe('sifting');
+  });
+
+  test('SET_START_AT_CHORUS sets the preference, returning the same state when unchanged', () => {
+    const state = makeState();
+    const on = siftReducer(state, { type: 'SET_START_AT_CHORUS', enabled: true });
+    expect(on.startAtChorus).toBe(true);
+    expect(siftReducer(on, { type: 'SET_START_AT_CHORUS', enabled: true })).toBe(on);
+    expect(siftReducer(on, { type: 'SET_START_AT_CHORUS', enabled: false }).startAtChorus).toBe(false);
+  });
+
+  test('RESUME_SESSION never changes the start-at-chorus preference', () => {
+    const state = makeState({ startAtChorus: true });
+    const session = { ...makeState({ startAtChorus: false }), tracks: [trackA] };
+    const next = siftReducer(state, { type: 'RESUME_SESSION', session });
+    expect(next.tracks).toEqual([trackA]);
+    expect(next.startAtChorus).toBe(true);
   });
 
   test('unknown action returns same state', () => {
