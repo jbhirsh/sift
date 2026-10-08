@@ -12,8 +12,8 @@ const PREFERENCES_KEY = 'sift_preferences';
 export async function loadPreferences(): Promise<Preferences> {
   try {
     const json = await AsyncStorage.getItem(PREFERENCES_KEY);
-    if (json === null) return { ...DEFAULT_PREFERENCES };
-    const parsed: unknown = JSON.parse(json);
+    // Nothing saved reads as JSON null, which falls through to the defaults.
+    const parsed: unknown = JSON.parse(json ?? 'null');
     const saved = typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {};
     return {
       startAtChorus:
