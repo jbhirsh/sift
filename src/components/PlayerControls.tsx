@@ -55,10 +55,11 @@ export default function PlayerControls() {
         return;
       }
       // Silence the previous card's song while this one's chorus resolves
-      // (instant when prefetched, at most CHORUS_WAIT_MS otherwise).
-      void stop();
+      // (instant when prefetched, at most CHORUS_WAIT_MS otherwise). Play
+      // only once the stop has landed too: a pause or position reset that
+      // finished after play() would pause or rewind the new song.
       pendingStartRef.current = track.id;
-      void startPositionFor(track).then((position) => {
+      void Promise.all([stop(), startPositionFor(track)]).then(([, position]) => {
         if (pendingStartRef.current === track.id) pendingStartRef.current = null;
         // The card may have been swiped away, or the player closed, while
         // the chorus was resolving.
