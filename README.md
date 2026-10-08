@@ -13,6 +13,10 @@ Sift is a production-quality React Native (Expo) app built in TypeScript, with a
 | ![Setup screen](docs/screenshots/setup.png) | ![Swipe/sift screen](docs/screenshots/sift.png) | ![Summary screen](docs/screenshots/done.png) |
 | Pick a source & sort order | The card-swipe deck — the core loop | Session summary with restore & export |
 
+<img src="docs/screenshots/settings.png" width="390" alt="Settings with the Start at chorus switch on">
+
+Settings: the optional **Start at chorus** switch (Apple Music).
+
 > Rendered from the real app running on Expo Web with a local mock music provider (native Apple Music / Spotify auth is device-only).
 
 ---
