@@ -14,6 +14,7 @@ describe('uiFiles', () => {
         'src/App.tsx',
         'src/theme/index.ts',
         'src/theme/ThemeContext.tsx',
+        'src/components/Card/styles.ts',
         'assets/icon.png',
       ]),
     ).toEqual([
@@ -22,6 +23,7 @@ describe('uiFiles', () => {
       'src/App.tsx',
       'src/theme/index.ts',
       'src/theme/ThemeContext.tsx',
+      'src/components/Card/styles.ts',
       'assets/icon.png',
     ]);
   });
@@ -89,6 +91,11 @@ describe('checkPrVisuals', () => {
     // Text after a closed comment still counts.
     expect(checkPrVisuals({ files: ui, body: `<!-- note -->\n${img}` }).ok).toBe(true);
     expect(checkPrVisuals({ files: ui, body: `<!-- a --><!-- b -->${img}` }).ok).toBe(true);
+  });
+
+  it('treats a comment opener quoted in code as text, not a comment', () => {
+    const body = 'Fills in the template\'s `<!--` block.\n<img src="after.png">';
+    expect(checkPrVisuals({ files: ui, body }).ok).toBe(true);
   });
 
   it('ignores pictures quoted in code', () => {
