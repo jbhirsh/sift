@@ -5,11 +5,17 @@
 //
 // ESM (.mjs) with explicit node: imports, like check-mutation-threshold.mjs,
 // so it lints and runs without Node types in the app's tsconfig.
-import { readFileSync } from 'node:fs';
 import process from 'node:process';
 import { checkPrVisuals, failureMessage } from './prVisuals.ts';
 
-const files = readFileSync(0, 'utf8')
+// Stream stdin rather than readFileSync(0): when stdin is a non-blocking pipe
+// whose writer (`gh api` in the workflow) hasn't produced output yet, the
+// synchronous read throws EAGAIN instead of waiting. Seen on the first CI run.
+let input = '';
+process.stdin.setEncoding('utf8');
+for await (const chunk of process.stdin) input += chunk;
+
+const files = input
   .split('\n')
   .map((line) => line.trim())
   .filter(Boolean);
