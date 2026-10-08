@@ -16,23 +16,51 @@ import Animated, {
 import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
 import { useMusicProvider } from '../hooks/useMusicProvider';
+import { useChorusStart } from '../hooks/useChorusStart';
 import GlassCard from './GlassCard';
 import { formatTime } from '../utils/formatTime';
 import { RADIUS } from '../theme';
+import { Track } from '../types';
 
 export default function PlayerControls() {
   const { state, currentTrack } = useSift();
   const { colors } = useTheme();
-  const { play, pause, togglePlayPause, seek, skipBackward, skipForward } = useMusicProvider();
+  const { play, pause, togglePlayPause, seek, skipBackward, skipForward, previewOffset } = useMusicProvider();
+  const { enabled: chorusEnabled, startPositionFor } = useChorusStart(previewOffset);
+
+  const prevTrackIdRef = useRef<string | undefined>(undefined);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Play a track from its start: 0:00, or its chorus with "Start at chorus".
+  const playFromStart = useCallback(
+    (track: Track) => {
+      if (!chorusEnabled) {
+        play(track.id);
+        return;
+      }
+      void startPositionFor(track).then((position) => {
+        // The card may have been swiped away, or the player closed, while
+        // the chorus was resolving.
+        if (!mountedRef.current || prevTrackIdRef.current !== track.id) return;
+        play(track.id, position);
+      });
+    },
+    [chorusEnabled, play, startPositionFor],
+  );
 
   // Auto-play current track on mount and when cursor advances
-  const prevTrackIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (currentTrack && currentTrack.id !== prevTrackIdRef.current) {
       prevTrackIdRef.current = currentTrack.id;
-      play(currentTrack.id);
+      playFromStart(currentTrack);
     }
-  }, [currentTrack, play]);
+  }, [currentTrack, playFromStart]);
 
   // Pause music when PlayerControls unmounts (session paused/done)
   useEffect(() => {
@@ -53,12 +81,14 @@ export default function PlayerControls() {
   );
 
   const handlePlayPause = useCallback(() => {
+    // Position 0 while stopped: this track never started (auto-play
+    // failed), so start it, rather than resume nothing.
     if (!state.isPlaying && currentTrack && state.playbackPosition === 0) {
-      play(currentTrack.id);
+      playFromStart(currentTrack);
     } else {
       togglePlayPause();
     }
-  }, [state.isPlaying, state.playbackPosition, currentTrack, play, togglePlayPause]);
+  }, [state.isPlaying, state.playbackPosition, currentTrack, playFromStart, togglePlayPause]);
 
   const seekTo = useCallback(
     (value: number) => {

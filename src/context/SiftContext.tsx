@@ -9,8 +9,10 @@ import {
   ConnectionStatus,
   SiftSession,
   SiftSource,
+  DEFAULT_PREFERENCES,
 } from '../types';
 import { saveSession, clearSession } from '../services/SessionStore';
+import { loadPreferences, savePreferences } from '../services/PreferencesStore';
 import { sortTracks } from '../utils/sorting';
 
 // ── State ──────────────────────────────────────────────
@@ -55,6 +57,12 @@ export interface SiftState {
    * name; null until known (and for legacy sessions that predate the field).
    */
   siftedPlaylistId: string | null;
+  /**
+   * "Start at chorus" setting: Apple Music tracks start at their chorus
+   * instead of 0:00. A preference, not session state: persisted by
+   * PreferencesStore, never saved with or restored from a session.
+   */
+  startAtChorus: boolean;
 }
 
 const initialState: SiftState = {
@@ -81,6 +89,7 @@ const initialState: SiftState = {
   pendingKeeps: [],
   skipFiltering: false,
   siftedPlaylistId: null,
+  startAtChorus: DEFAULT_PREFERENCES.startAtChorus,
 };
 
 // ── Actions ────────────────────────────────────────────
@@ -106,7 +115,8 @@ type SiftAction =
   | { type: 'SET_SIFTED_PLAYLIST_ID'; id: string | null }
   | { type: 'RESTORE_TRACK'; trackId: string }
   | { type: 'SET_SOURCE'; source: SiftSource }
-  | { type: 'RESUME_SESSION'; session: Omit<SiftState, 'phase'> & { phase?: AppPhase } }
+  | { type: 'SET_START_AT_CHORUS'; enabled: boolean }
+  | { type: 'RESUME_SESSION'; session: Omit<SiftState, 'phase' | 'startAtChorus'> & { phase?: AppPhase } }
   | { type: 'START_FRESH'; skipFiltering?: boolean }
   | { type: 'RESET_TO_SETUP' };
 
@@ -256,12 +266,17 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
       };
     }
 
+    case 'SET_START_AT_CHORUS':
+      return state.startAtChorus === action.enabled ? state : { ...state, startAtChorus: action.enabled };
+
     case 'RESUME_SESSION':
       return {
         ...state,
         ...action.session,
         phase: action.session.phase ?? 'sifting',
         activeSource: action.session.source ?? state.source,
+        // A preference, not part of the session being resumed.
+        startAtChorus: state.startAtChorus,
       };
 
     case 'START_FRESH':
@@ -341,6 +356,8 @@ interface SiftContextValue {
    */
   flushPendingSave: () => void;
   togglePlayPause: () => void;
+  /** Change and persist the "Start at chorus" setting. */
+  setStartAtChorus: (enabled: boolean) => void;
   seek: (position: number) => void;
   skipBackward: () => void;
   skipForward: () => void;
@@ -356,6 +373,21 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
   const [state, dispatch] = useReducer(siftReducer, init);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSessionRef = useRef<SiftSession | null>(null);
+  // Set once the user changes a preference, so a slow initial load can't
+  // overwrite their choice with the stored value.
+  const preferencesChangedRef = useRef(false);
+
+  // Load saved preferences once.
+  useEffect(() => {
+    let cancelled = false;
+    loadPreferences().then((preferences) => {
+      if (cancelled || preferencesChangedRef.current) return;
+      dispatch({ type: 'SET_START_AT_CHORUS', enabled: preferences.startAtChorus });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Keep Sentry context in sync with app state
   useEffect(() => {
@@ -459,6 +491,16 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     [dispatch]
   );
 
+  const setStartAtChorus = useCallback(
+    (enabled: boolean) => {
+      preferencesChangedRef.current = true;
+      Sentry.addBreadcrumb({ category: 'user-action', message: `Start at chorus: ${enabled}`, level: 'info' });
+      dispatch({ type: 'SET_START_AT_CHORUS', enabled });
+      savePreferences({ startAtChorus: enabled });
+    },
+    [dispatch]
+  );
+
   const seek = useCallback(
     (position: number) => dispatch({ type: 'SET_PLAYBACK_POSITION', position }),
     [dispatch]
@@ -490,11 +532,12 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
       resetToSetup,
       flushPendingSave,
       togglePlayPause,
+      setStartAtChorus,
       seek,
       skipBackward,
       skipForward,
     }),
-    [state, dispatch, currentTrack, nextTrack, nextNextTrack, remaining, total, decide, startFresh, resetToSetup, flushPendingSave, togglePlayPause, seek, skipBackward, skipForward]
+    [state, dispatch, currentTrack, nextTrack, nextNextTrack, remaining, total, decide, startFresh, resetToSetup, flushPendingSave, togglePlayPause, setStartAtChorus, seek, skipBackward, skipForward]
   );
 
   return <SiftContext.Provider value={value}>{children}</SiftContext.Provider>;

@@ -16,7 +16,7 @@ Pod::Spec.new do |s|
   s.static_framework = true
 
   s.dependency 'ExpoModulesCore'
-  s.frameworks     = 'MusicKit'
+  s.frameworks     = ['MusicKit', 'ShazamKit', 'AVFoundation']
 
   # This podspec lives at the module root (see podspecPath in
   # expo-module.config.json) so the pure decision logic in logic/Sources can

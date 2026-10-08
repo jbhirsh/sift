@@ -55,4 +55,11 @@ export interface MusicProviderService {
 
   /** Warm the native song cache for a list of track IDs (used on session resume). */
   warmSongCache?(trackIDs: string[]): Promise<number>;
+
+  /**
+   * Where the track's 30-second preview starts within the full track, in
+   * seconds, or null when unknown (no preview, no match). Used as a chorus
+   * hint by "Start at chorus"; Apple Music only.
+   */
+  previewOffset?(trackID: string): Promise<number | null>;
 }

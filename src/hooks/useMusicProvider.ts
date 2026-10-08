@@ -213,6 +213,13 @@ export function useMusicProvider() {
     [dispatch]
   );
 
+  /** Where a track's preview sits in the full track (a chorus hint); null when unknown. */
+  const previewOffset = useCallback(
+    async (trackID: string): Promise<number | null> =>
+      (await providerRef.current.previewOffset?.(trackID)) ?? null,
+    []
+  );
+
   const togglePlayPause = useCallback(async () => {
     if (state.isPlaying) {
       await pause();
@@ -759,5 +766,6 @@ export function useMusicProvider() {
     restoreTrack,
     warmCache,
     clearSiftedPlaylist,
+    previewOffset,
   };
 }

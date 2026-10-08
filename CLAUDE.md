@@ -107,13 +107,15 @@ src/
     context/            SiftContext (useReducer state management)
     services/           MusicProviderInterface, AppleMusicProvider,
                         SpotifyProvider (+ spotify/ API & auth), MockMusicProvider,
-                        SessionStore, RemovalHistoryStore
-    hooks/              useKeyboardShortcuts, useMusicProvider, useResolvedArtwork
+                        SessionStore, RemovalHistoryStore, PreferencesStore,
+                        ChorusFinder + LrclibClient ("Start at chorus")
+    hooks/              useKeyboardShortcuts, useMusicProvider, useResolvedArtwork,
+                        useChorusStart
     theme/              Design tokens (SPACING, RADIUS, COLORS, SHADOWS,
                         FONTS, GLASS, GRADIENTS), ThemeContext
     types/              Track, Decision, AppPhase, SortOrder, MusicProvider,
                         SiftSession
-    utils/              formatTime, mockData, sorting
+    utils/              formatTime, mockData, sorting, chorus
 modules/
   expo-musickit/        Custom Expo native module for MusicKit
 __tests__/
@@ -139,7 +141,15 @@ Makefile                Dev commands (test, lint, typecheck, check)
   `AppleMusicProvider` and `SpotifyProvider` are concrete implementations;
   `MockMusicProvider` is used for testing/development.
 - **Session persistence**: `SessionStore` saves/loads session state via AsyncStorage.
-  Sessions auto-save after every decision.
+  Sessions auto-save after every decision. User settings (`startAtChorus`) are
+  preferences, not session state: `PreferencesStore` persists them and
+  `RESUME_SESSION` never touches them.
+- **Start at chorus** (Apple Music only): `ChorusFinder` picks each track's start
+  from LRCLIB synced lyrics (the repeated block, `utils/chorus`), then from where
+  ShazamKit places Apple's preview clip in the track (native `previewOffset`), then
+  a ~20% estimate; results are cached per track. ShazamKit matching needs the
+  ShazamKit App Service enabled on the App ID; without it that step just yields
+  nothing.
 - **Theme system**: Centralized design tokens in `src/theme/index.ts`.
   `ThemeContext` provides light/dark mode colors, glass material settings,
   and phase-specific gradients.
