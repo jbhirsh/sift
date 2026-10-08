@@ -22,8 +22,9 @@ import { lrclib, LyricsLookup } from './LrclibClient';
 // 3. estimate: about a fifth of the way in (utils/chorus).
 //
 // Results are cached per track id in AsyncStorage, so each track is looked up
-// once. An estimate reached only because LRCLIB was unreachable isn't cached,
-// so it is retried next time.
+// once. An estimate reached only because a step failed for now (LRCLIB
+// unreachable, the preview match erroring) is kept for this app session only,
+// so it is retried on the next launch rather than remembered forever.
 
 export type ChorusSource = 'lyrics' | 'preview' | 'estimate';
 
@@ -33,13 +34,19 @@ export interface ChorusStart {
   source: ChorusSource;
 }
 
-/** Where ShazamKit places the track's preview, in seconds; null when unknown. */
+/**
+ * Where ShazamKit places the track's preview, in seconds. Resolves null when
+ * there is no answer to find (no preview, no match); rejects when the lookup
+ * failed for now and is worth retrying another time.
+ */
 export type PreviewOffsetLookup = (trackID: string) => Promise<number | null>;
 
 type Storage = Pick<typeof AsyncStorage, 'getItem' | 'setItem'>;
 
 export interface ChorusFinderDeps {
   lookupLyrics: (track: Track) => Promise<LyricsLookup>;
+  /** Move a track's pending lyrics lookup to the front of the queue. */
+  prioritize: (trackID: string) => void;
   storage: Storage;
 }
 
@@ -73,11 +80,23 @@ function isCacheRow(row: unknown): row is CacheRow {
 export class ChorusFinder {
   private cache: Promise<Map<string, CacheEntry>> | null = null;
   private inFlight = new Map<string, Promise<ChorusStart>>();
+  /** Results not worth persisting, kept so this session doesn't redo them. */
+  private sessionOnly = new Map<string, CacheEntry>();
 
-  constructor(private deps: ChorusFinderDeps = { lookupLyrics: (t) => lrclib.lookup(t), storage: AsyncStorage }) {}
+  constructor(
+    private deps: ChorusFinderDeps = {
+      lookupLyrics: (t) => lrclib.lookup(t),
+      prioritize: (id) => lrclib.prioritize(id),
+      storage: AsyncStorage,
+    },
+  ) {}
 
-  /** The chorus start for a track. Never rejects: the estimate is the floor. */
-  find(track: Track, previewOffset?: PreviewOffsetLookup): Promise<ChorusStart> {
+  /**
+   * The chorus start for a track. Never rejects: the estimate is the floor.
+   * `urgent` marks the card on screen, whose lookup jumps the queue.
+   */
+  find(track: Track, previewOffset?: PreviewOffsetLookup, { urgent = false } = {}): Promise<ChorusStart> {
+    if (urgent) this.deps.prioritize(track.id);
     const pending = this.inFlight.get(track.id);
     if (pending) return pending;
     const result = this.resolve(track, previewOffset).finally(() => {
@@ -89,13 +108,13 @@ export class ChorusFinder {
 
   private async resolve(track: Track, previewOffset?: PreviewOffsetLookup): Promise<ChorusStart> {
     const cache = await this.loadCache();
-    const hit = cache.get(track.id);
+    const hit = cache.get(track.id) ?? this.sessionOnly.get(track.id);
     // A changed duration means a different recording behind the same id.
     if (hit && Math.abs(hit.duration - track.duration) < 1) {
       return { position: hit.position, source: hit.source };
     }
 
-    let lyricsUnavailable = false;
+    let failedForNow = false;
     let result: ChorusStart | null = null;
     try {
       const lookup = await this.deps.lookupLyrics(track);
@@ -107,7 +126,7 @@ export class ChorusFinder {
         if (match) result = { position: startFromLyrics(match, track.duration), source: 'lyrics' };
       }
     } catch (err) {
-      lyricsUnavailable = true;
+      failedForNow = true;
       Sentry.addBreadcrumb({ category: 'chorus', message: `Lyrics lookup failed: ${err}`, level: 'info' });
     }
 
@@ -118,12 +137,15 @@ export class ChorusFinder {
           result = { position: clampStart(offset, track.duration), source: 'preview' };
         }
       } catch (err) {
+        failedForNow = true;
         Sentry.addBreadcrumb({ category: 'chorus', message: `Preview match failed: ${err}`, level: 'info' });
       }
     }
 
     if (!result) result = { position: estimateChorusStart(track.duration), source: 'estimate' };
-    if (!(lyricsUnavailable && result.source === 'estimate')) {
+    if (failedForNow && result.source === 'estimate') {
+      this.sessionOnly.set(track.id, { ...result, duration: track.duration });
+    } else {
       this.remember(cache, track, result);
     }
     return result;

@@ -40,7 +40,7 @@ export function useChorusStart(previewOffset?: PreviewOffsetLookup) {
       });
       try {
         return await Promise.race([
-          chorusFinder.find(track, previewOffset).then((start) => start.position),
+          chorusFinder.find(track, previewOffset, { urgent: true }).then((start) => start.position),
           fallback,
         ]);
       } finally {

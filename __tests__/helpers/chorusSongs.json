@@ -99,7 +99,7 @@
     "title": "Hotel California",
     "duration": 391,
     "expected": {
-      "time": 104.78999999999999,
+      "time": 104.79,
       "method": "title"
     },
     "lrc": "[00:52.58]line 1\n[00:55.66]line 2\n[00:58.82]line 3\n[01:01.97]line 4\n\n[01:05.42]line 5\n[01:08.56]line 6\n[01:11.80]line 7\n[01:14.87]line 8\n\n[01:18.43]line 9\n[01:21.82]line 10\n[01:25.12]line 11\n[01:27.34]line 12\n\n[01:31.49]line 13\n[01:35.08]line 14\n[01:38.30]line 15\n[01:41.47]line 16\n\n[01:44.79]line 17 hotel california\n[01:50.56]line 18\n[01:53.81]line 19\n[01:57.39]line 20 hotel california\n[02:03.64]line 21\n[02:06.82]line 22\n\n[02:10.66]line 23\n[02:13.77]line 24\n[02:16.96]line 25\n[02:20.82]line 26\n\n[02:23.92]line 27\n[02:26.77]line 28\n[02:30.49]line 29\n[02:33.57]line 30\n\n[02:37.01]line 31\n[02:39.92]line 32\n[02:42.44]line 33\n[02:50.01]line 34\n[02:56.57]line 35\n[02:59.85]line 36\n\n[03:03.05]line 17 hotel california\n[03:08.82]line 18\n[03:12.08]line 19\n[03:15.48]line 37 hotel california\n[03:21.74]line 38\n[03:25.17]line 39\n\n[03:29.20]line 40\n[03:32.34]line 41\n[03:34.49]line 42\n[03:38.97]line 43\n[03:42.08]line 44\n[03:45.13]line 45\n[03:48.53]line 46\n[03:51.21]line 47\n\n[03:55.20]line 48\n[03:58.45]line 49\n[04:01.66]line 50\n[04:04.17]line 51\n[04:08.22]line 52\n[04:10.54]line 53\n[04:14.73]line 54\n[04:17.68]line 55"

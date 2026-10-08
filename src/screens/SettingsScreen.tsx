@@ -171,7 +171,8 @@ export default function SettingsScreen({ onClose: _onClose }: SettingsScreenProp
                   Start at chorus
                 </Text>
                 <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
-                  Begin each song at its chorus instead of the start.
+                  Begin each song at its chorus instead of the start. Finds it
+                  with timed lyrics from LRCLIB and Shazam's song matching.
                 </Text>
               </View>
               <Switch
@@ -244,12 +245,12 @@ const styles = StyleSheet.create({
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: SPACING.xl,
     gap: SPACING.lg,
   },
   settingText: {
     flex: 1,
-    gap: 2,
+    gap: SPACING.xs,
   },
   settingTitle: {
     fontSize: 17,

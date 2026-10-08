@@ -39,7 +39,12 @@ const MAX_WALKBACK_SECONDS = 30;
 /** Title words are compared on this many leading letters ("blinding" ~ "blinded"). */
 const STEM_LENGTH = 5;
 
-const TIME_TAG = /\[(\d{1,3}):(\d{1,2}(?:\.\d{1,3})?)\]/g;
+// [mm:ss], [mm:ss.xx] and the rarer [mm:ss:xx].
+const TIME_TAG = /\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g;
+// Enhanced LRC's per-word timing: "<00:12.34>word".
+const WORD_TAG = /<\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?>/g;
+// Common words a title shares with lyrics by chance ("For You", "The One").
+const STOP_WORDS = new Set(['the', 'and', 'you', 'for', 'but', 'with', 'your', 'are', 'not', 'all', 'that', 'this']);
 const OFFSET_TAG = /^\s*\[offset:\s*([+-]?\d+)\s*\]/im;
 const HAS_WORD = /[\p{L}\p{N}]/u;
 
@@ -66,11 +71,12 @@ export function parseSyncedLyrics(lrc: string): LyricLine[] {
     let match: RegExpExecArray | null;
     let consumed = 0;
     while ((match = TIME_TAG.exec(line)) !== null && match.index === consumed) {
-      times.push(Number(match[1]) * 60 + Number(match[2]));
+      const fraction = match[3] ? Number(`0.${match[3]}`) : 0;
+      times.push(Number(match[1]) * 60 + Number(match[2]) + fraction);
       consumed = TIME_TAG.lastIndex;
     }
     if (times.length === 0) continue;
-    const text = line.slice(consumed).trim();
+    const text = line.slice(consumed).replace(WORD_TAG, '').replace(/\s+/g, ' ').trim();
     if (!HAS_WORD.test(text)) {
       pendingBreak = true;
       continue;
@@ -108,13 +114,14 @@ export function normalizeTitle(title: string): string {
 
 /**
  * Whether a normalized lyric line sings the normalized title: the title as a
- * whole-word phrase, or, for titles with two or more words over two letters,
- * each of those words in order, long words by their stem ("blinding lights"
- * in "im blinded by the lights").
+ * whole-word phrase, or, for titles with two or more distinctive words (over
+ * two letters, not a common word like "the" or "you"), each of those words in
+ * order, long words by their stem ("blinding lights" in "im blinded by the
+ * lights").
  */
 export function singsTitle(line: string, title: string): boolean {
   if (` ${line} `.includes(` ${title} `)) return true;
-  const titleWords = title.split(' ').filter((w) => w.length > 2);
+  const titleWords = title.split(' ').filter((w) => w.length > 2 && !STOP_WORDS.has(w));
   if (titleWords.length < 2) return false;
   const lineWords = line.split(' ');
   let from = 0;
@@ -157,13 +164,15 @@ export function findChorusStart(
   const inWindow = (t: number) => t >= minTime && t <= maxTime;
 
   const norm = lines.map((l) => normalizeLyric(l.text));
-  const occurrences = new Map<string, number[]>();
-  norm.forEach((n, i) => {
-    const list = occurrences.get(n) ?? [];
-    list.push(i);
-    occurrences.set(n, list);
+  // positions[i]: every index where line i's text is sung (shared arrays).
+  const byText = new Map<string, number[]>();
+  const positions = norm.map((n) => {
+    const list = byText.get(n) ?? [];
+    byText.set(n, list);
+    return list;
   });
-  const count = (i: number) => occurrences.get(norm[i])?.length ?? 0;
+  positions.forEach((list, i) => list.push(i));
+  const count = (i: number) => positions[i].length;
 
   // Rule 1: title.
   const titleNorm = normalizeTitle(title);
@@ -172,7 +181,7 @@ export function findChorusStart(
       (n, i) => count(i) >= 2 && inWindow(lines[i].time) && singsTitle(n, titleNorm),
     );
     if (anchor !== -1) {
-      const start = walkBack(anchor, lines, norm, occurrences, minTime);
+      const start = walkBack(anchor, lines, norm, positions, minTime);
       return { time: lines[start].time, method: 'title' };
     }
   }
@@ -244,19 +253,19 @@ function walkBack(
   anchor: number,
   lines: LyricLine[],
   norm: string[],
-  occurrences: Map<string, number[]>,
+  positions: number[][],
   minTime: number,
 ): number {
   const limit = lines[anchor].time - MAX_WALKBACK_SECONDS;
-  const anchorOccurrences = occurrences.get(norm[anchor]) ?? [];
+  const anchorOccurrences = positions[anchor];
   const others = anchorOccurrences.filter((o) => o !== anchor);
   let start = anchor;
   for (let back = 1; anchor - back >= 0; back++) {
     if (lines[start].sectionStart) break;
     const i = anchor - back;
     if (lines[i].time < limit || lines[i].time < minTime) break;
-    if ((occurrences.get(norm[i])?.length ?? 0) * 2 < anchorOccurrences.length) break;
-    if (!others.some((o) => o - back >= 0 && o - back !== i && norm[o - back] === norm[i])) break;
+    if (positions[i].length * 2 < anchorOccurrences.length) break;
+    if (!others.some((o) => o - back >= 0 && norm[o - back] === norm[i])) break;
     start = i;
   }
   return start;

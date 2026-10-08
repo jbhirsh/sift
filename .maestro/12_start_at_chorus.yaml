@@ -3,9 +3,10 @@ name: "Start at Chorus Setting"
 ---
 
 # Turning on "Start at chorus" makes the next card start mid-song instead of
-# at 0:00. The E2E build runs the mock provider, whose tracks are all over a
-# minute long, so whichever source answers (LRCLIB lyrics, or the estimate
-# when the simulator can't reach LRCLIB) the start is at least 0:10.
+# at 0:00. The E2E build runs the mock provider, whose tracks run 2:17–5:54,
+# so whichever source answers the start is at least 0:13: a lyrics chorus
+# can't start before 10% of the track (minus a 0.5 s lead-in), and the
+# estimate (used when the simulator can't reach LRCLIB) is at least 0:30.
 - launchApp:
     clearState: true
 
@@ -24,6 +25,13 @@ name: "Start at Chorus Setting"
     visible:
       id: "card-track-name"
     timeout: 30000
+
+# With the setting off (the default), the first card starts at 0:00.
+- extendedWaitUntil:
+    visible:
+      id: "elapsed-time"
+      text: "0:0[0-9]"
+    timeout: 10000
 
 - tapOn:
     id: "settings-button"
@@ -49,13 +57,14 @@ name: "Start at Chorus Setting"
       id: "card-track-name"
     timeout: 30000
 
-# The next card should start at its chorus, not 0:00.
+# The next card should start at its chorus. Skipping stops the previous song
+# and resets the clock to 0:00, so reaching 0:13 within 8 s (the chorus can
+# take up to 2.5 s to resolve) means the song started mid-track: one played
+# from 0:00 couldn't get there in time.
 - tapOn: "Skip"
-
-- waitForAnimationToEnd
 
 - extendedWaitUntil:
     visible:
       id: "elapsed-time"
-      text: "(0:[1-5][0-9]|[1-9]:[0-9][0-9])"
-    timeout: 30000
+      text: "(0:1[3-9]|0:[2-5][0-9]|[1-9]:[0-9][0-9])"
+    timeout: 8000
