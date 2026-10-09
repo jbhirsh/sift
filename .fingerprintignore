@@ -1,0 +1,9 @@
+# Paths @expo/fingerprint must skip. The fingerprint is the runtime version
+# for EAS Update (app.json runtimeVersion.policy), and EAS computes it twice
+# per build: once in the checkout and once in the clean copy it builds from.
+# Anything that exists only in the checkout makes the two differ and fails
+# the build ("Runtime version mismatch").
+#
+# SwiftPM output from the expo-musickit logic tests (ios-build.yml runs them
+# before building). Only logic/Sources is compiled into the app.
+modules/expo-musickit/logic/.build/**/*
