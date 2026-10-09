@@ -162,8 +162,13 @@ Makefile                Dev commands (test, lint, typecheck, check)
   typecheck, dependency-cruiser, Jest with coverage and a production
   dependency audit on Ubuntu on every PR. The audit gates at critical, not
   high: Expo's build tooling carries high advisories only Expo can fix.
-  The Maestro iOS E2E job (macOS) also runs on every PR and push to main, with
-  `workflow_dispatch` available for manual runs.
+  The Maestro iOS E2E job (macOS) also runs on every PR, with
+  `workflow_dispatch` available for manual runs. Its app build is cached on
+  the native fingerprint plus a hash of the bundle's inputs (`src/`,
+  `index.ts`, `metro.config.js`; tests and flows don't count),
+  and on a native PR it waits for ios-build's identical build instead of
+  building in parallel. On push to main it builds and caches the app but
+  skips the suite: only caches saved on main can be restored by PRs.
 - The Claude Code PR review runs in its own workflow,
   `.github/workflows/claude-review.yml` (job `Claude Review`, pull requests
   only), in parallel with CI rather than after it, so a red PR is reviewed
