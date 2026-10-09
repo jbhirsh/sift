@@ -187,11 +187,18 @@ Makefile                Dev commands (test, lint, typecheck, check)
   Workflows (Expo's CI, not GitHub Actions) on every push to `main`. It
   fingerprints the native layer (`runtimeVersion.policy: fingerprint` in
   `app.json`): if a `preview` build with that fingerprint exists, it publishes
-  an EAS Update to the `preview` channel, which installed preview builds pick
-  up on their next launch; otherwise native code changed, which an update
+  an EAS Update to the `preview` channel, which installed preview builds
+  download on launch and run from their next cold launch; otherwise native code changed, which an update
   can't carry, so it makes a new `preview` build to install. A change that
-  touches native code (Swift, a native package, an SDK bump) therefore needs a
-  reinstall; everything else arrives by itself.
+  touches native code (Swift, a native package, an SDK bump), or edits
+  `eas.json` or the `package.json` scripts (both part of the fingerprint),
+  therefore needs a reinstall; everything else arrives by itself. Keep the
+  update job's `env` in step with `.env`: `eas update` doesn't read it.
+  Workflow builds are non-interactive, so they reuse the ad hoc provisioning
+  profile as is: a newly registered iPhone (`eas device:create`) is only added
+  by an interactive `eas build -p ios --profile preview` (Apple sign-in), or
+  by `refresh_ad_hoc_provisioning_profile: true` once an App Store Connect API
+  key is stored on EAS.
 - Security/quality gates run per PR and sweep weekly (Mon 06:00 UTC):
   `gitleaks.yml` (secret scanning), `semgrep.yml` (SAST, `--config auto`), and
   `mutation.yml` (Stryker), alongside the weekly Dependabot bumps.
