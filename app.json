@@ -4,6 +4,12 @@
     "slug": "sift-i1bgkl6kqg81gghgshzcr",
     "scheme": "sift",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/73ef36df-9686-4e09-b562-8012148bc937"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",

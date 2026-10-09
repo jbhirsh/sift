@@ -183,6 +183,15 @@ Makefile                Dev commands (test, lint, typecheck, check)
   merges only once every required check is green. So the rule must list every
   check a PR runs, Claude Review included, and require review threads to be
   resolved, or a bot PR merges past a failing or unreported gate.
+- **The phone build follows `main`.** `.eas/workflows/preview.yml` runs on EAS
+  Workflows (Expo's CI, not GitHub Actions) on every push to `main`. It
+  fingerprints the native layer (`runtimeVersion.policy: fingerprint` in
+  `app.json`): if a `preview` build with that fingerprint exists, it publishes
+  an EAS Update to the `preview` channel, which installed preview builds pick
+  up on their next launch; otherwise native code changed, which an update
+  can't carry, so it makes a new `preview` build to install. A change that
+  touches native code (Swift, a native package, an SDK bump) therefore needs a
+  reinstall; everything else arrives by itself.
 - Security/quality gates run per PR and sweep weekly (Mon 06:00 UTC):
   `gitleaks.yml` (secret scanning), `semgrep.yml` (SAST, `--config auto`), and
   `mutation.yml` (Stryker), alongside the weekly Dependabot bumps.

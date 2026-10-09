@@ -1,0 +1,52 @@
+# Keeps the preview build on the owner's phone current with main.
+#
+# On every push to main, EAS fingerprints the project's native layer and looks
+# for a preview build made from the same fingerprint:
+#   - found: only JavaScript changed, so publish an over-the-air update to the
+#     "preview" channel. The installed app downloads it on launch and runs it
+#     from the next launch.
+#   - not found: native code changed (a Swift change, a new native package, an
+#     Expo SDK bump), which an update can't carry, so make a new preview build
+#     to install from its link instead.
+#
+# Runs on EAS Workflows (Expo's CI), not GitHub Actions: EAS holds the signing
+# credentials and the build history the fingerprint is matched against.
+name: Preview build or update
+
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  fingerprint:
+    name: Fingerprint native code
+    type: fingerprint
+    environment: preview
+  get_build:
+    name: Find a preview build with this fingerprint
+    needs: [fingerprint]
+    type: get-build
+    params:
+      platform: ios
+      profile: preview
+      fingerprint_hash: ${{ needs.fingerprint.outputs.ios_fingerprint_hash }}
+  build:
+    name: Build iOS preview (native code changed)
+    needs: [get_build]
+    if: ${{ !needs.get_build.outputs.build_id }}
+    type: build
+    params:
+      platform: ios
+      profile: preview
+  update:
+    name: Publish iOS update (JavaScript only)
+    needs: [get_build]
+    if: ${{ needs.get_build.outputs.build_id }}
+    type: update
+    environment: preview
+    params:
+      platform: ios
+      channel: preview
+      # Preview builds don't upload Sentry source maps either
+      # (SENTRY_DISABLE_AUTO_UPLOAD in eas.json).
+      upload_sentry_sourcemaps: false
