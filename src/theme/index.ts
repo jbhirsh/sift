@@ -13,6 +13,14 @@ export const SPACING = {
   '4xl': 40,
 } as const;
 
+// The floating settings gear (App.tsx): its size and how far below the top
+// safe-area inset it sits. Screens that scroll under it clear
+// SETTINGS_BUTTON.top + SETTINGS_BUTTON.size.
+export const SETTINGS_BUTTON = {
+  size: 40,
+  top: SPACING.base,
+} as const;
+
 // Corner radius scale
 export const RADIUS = {
   sm: 8,
