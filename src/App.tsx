@@ -19,6 +19,7 @@ import LoadingScreen from './screens/LoadingScreen';
 import SiftScreen from './screens/SiftScreen';
 import DoneScreen from './screens/DoneScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import { SPACING } from './theme';
 
 Sentry.init({
   // DSN is read from the EXPO_PUBLIC_SENTRY_DSN env var (see .env.example).
@@ -60,20 +61,23 @@ function PhaseRouter() {
     <View style={styles.container}>
       {renderScreen()}
 
-      {state.phase !== 'setup' && (
-        <View style={[styles.settingsButtonContainer, { top: insets.top }]}>
-          <GlassCard intensity="thin" radius={18}>
-            <TouchableOpacity
-              testID="settings-button"
-              style={styles.settingsButton}
-              onPress={() => setSettingsVisible(true)}
-              activeOpacity={0.7}
-            >
-              <SymbolView name="gearshape" size={20} tintColor={colors.textSecondary} />
-            </TouchableOpacity>
-          </GlassCard>
-        </View>
-      )}
+      {/* On every screen, Setup included: Settings holds Start at chorus
+          and Check Connection, which people want before the first song.
+          Sized and placed to mirror the Sift header's back button. */}
+      <View style={[styles.settingsButtonContainer, { top: insets.top + SPACING.base }]}>
+        <GlassCard intensity="thin" radius={20}>
+          <TouchableOpacity
+            testID="settings-button"
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+            style={styles.settingsButton}
+            onPress={() => setSettingsVisible(true)}
+            activeOpacity={0.7}
+          >
+            <SymbolView name="gearshape" size={20} tintColor={colors.textSecondary} />
+          </TouchableOpacity>
+        </GlassCard>
+      </View>
 
       <Modal
         testID="settings-modal"
@@ -82,7 +86,7 @@ function PhaseRouter() {
         presentationStyle="pageSheet"
         onRequestClose={() => setSettingsVisible(false)}
       >
-        <SettingsScreen />
+        <SettingsScreen onClose={() => setSettingsVisible(false)} />
       </Modal>
 
       <StatusBar style="auto" />
@@ -116,14 +120,11 @@ const styles = StyleSheet.create({
   },
   settingsButtonContainer: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    marginTop: 8,
-    marginRight: 8,
+    right: SPACING['2xl'],
   },
   settingsButton: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },

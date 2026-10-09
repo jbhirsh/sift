@@ -13,7 +13,7 @@ import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
 import { useMusicProvider } from '../hooks/useMusicProvider';
 import GlassCard from '../components/GlassCard';
-import { RADIUS, SPACING } from '../theme';
+import { COLORS, RADIUS, SPACING } from '../theme';
 import { PROVIDER_DISPLAY } from '../types';
 
 const PROVIDER_SYMBOLS: Record<string, string> = {
@@ -25,7 +25,7 @@ interface SettingsScreenProps {
   onClose?: () => void;
 }
 
-export default function SettingsScreen({ onClose: _onClose }: SettingsScreenProps) {
+export default function SettingsScreen({ onClose }: SettingsScreenProps) {
   const { state, dispatch, setStartAtChorus } = useSift();
   const { colors } = useTheme();
   const { authorize, isAuthorized } = useMusicProvider();
@@ -61,9 +61,9 @@ export default function SettingsScreen({ onClose: _onClose }: SettingsScreenProp
       case 'checking':
         return colors.textSecondary;
       case 'connected':
-        return '#34C759';
+        return colors.keepText;
       case 'disconnected':
-        return '#FF3B30';
+        return colors.removeText;
     }
   })();
 
@@ -84,20 +84,24 @@ export default function SettingsScreen({ onClose: _onClose }: SettingsScreenProp
       case 'connected':
         return (
           <View testID="connection-status-indicator">
-            <SymbolView name="checkmark.circle.fill" size={28} tintColor="#34C759" />
+            <SymbolView name="checkmark.circle.fill" size={28} tintColor={COLORS.keep} />
           </View>
         );
       case 'disconnected':
         return (
           <View testID="connection-status-indicator">
-            <SymbolView name="xmark.circle.fill" size={28} tintColor="#FF3B30" />
+            <SymbolView name="xmark.circle.fill" size={28} tintColor={COLORS.remove} />
           </View>
         );
     }
   };
 
   return (
-    <View style={styles.container}>
+    // The sheet's own background: a pageSheet Modal is white unless its
+    // content paints one, which left white-on-white text in dark mode.
+    // surface, iOS's raised sheet color, keeps the sheet's edge visible
+    // against the black screen behind it and the cards visible on it.
+    <View style={[styles.container, { backgroundColor: colors.surface }]}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
@@ -106,6 +110,17 @@ export default function SettingsScreen({ onClose: _onClose }: SettingsScreenProp
         <Text style={[styles.headerVersion, { color: colors.textSecondary }]}>
           Version 1.0.0
         </Text>
+        {onClose && (
+          <TouchableOpacity
+            testID="settings-done-button"
+            accessibilityRole="button"
+            onPress={onClose}
+            style={styles.doneButton}
+            hitSlop={8}
+          >
+            <Text style={[styles.doneButtonText, { color: colors.accent }]}>Done</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Connection status card */}
@@ -209,6 +224,15 @@ const styles = StyleSheet.create({
   },
   headerVersion: {
     fontSize: 12,
+  },
+  doneButton: {
+    position: 'absolute',
+    right: 0,
+    top: SPACING['2xl'],
+  },
+  doneButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
   },
   cardContent: {
     padding: 16,

@@ -252,7 +252,7 @@ export default function DoneScreen() {
 
           {state.removalErrors.length > 0 && (
             <View testID="removal-errors" style={styles.removalErrorsBlock}>
-              <Text style={styles.removalErrorsTitle}>
+              <Text style={[styles.removalErrorsTitle, { color: colors.skipText }]}>
                 {state.removalErrors.length === 1
                   ? 'This track could not be removed and is still in place:'
                   : `These ${state.removalErrors.length} tracks could not be removed and are still in place:`}
@@ -295,7 +295,7 @@ export default function DoneScreen() {
 
       {state.removalPlaylistError && (
         <View style={styles.errorSection}>
-          <Text style={styles.playlistError}>{state.removalPlaylistError}</Text>
+          <Text style={[styles.playlistError, { color: colors.removeText }]}>{state.removalPlaylistError}</Text>
           {state.source.type === 'playlist' && state.kept.length > 0 && (
             <TouchableOpacity
               testID="retry-save-button"
@@ -316,7 +316,7 @@ export default function DoneScreen() {
       )}
 
       {startOverError && (
-        <Text testID="start-over-error" style={styles.playlistError}>
+        <Text testID="start-over-error" style={[styles.playlistError, { color: colors.removeText }]}>
           {startOverError}
         </Text>
       )}
@@ -403,7 +403,9 @@ export default function DoneScreen() {
         renderItem={renderTrackRow}
         keyExtractor={keyExtractor}
         style={styles.container}
-        contentContainerStyle={[styles.contentContainer, { paddingTop: insets.top }]}
+        // Clear the floating settings gear (App.tsx: 40pt at insets.top + 8),
+        // which sits in the same column as the rows' restore buttons.
+        contentContainerStyle={[styles.contentContainer, { paddingTop: insets.top + SPACING.base + 40 }]}
         ListHeaderComponent={listHeader}
         ListFooterComponent={listFooter}
       />
@@ -536,7 +538,6 @@ const styles = StyleSheet.create({
   removalErrorsTitle: {
     fontSize: 12,
     fontWeight: '600',
-    color: COLORS.skip,
   },
   removalErrorItem: {
     fontSize: 12,
@@ -557,7 +558,6 @@ const styles = StyleSheet.create({
   },
   playlistError: {
     fontSize: 12,
-    color: COLORS.remove,
     marginBottom: 8,
   },
   trackRow: {

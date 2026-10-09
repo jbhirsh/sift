@@ -65,6 +65,29 @@ export default tseslint.config(
     },
   },
   {
+    // Colors come from the theme (src/theme/index.ts), never literals: a
+    // hard-coded rgba caption was near-invisible in dark mode (#136). Applied
+    // to files already free of color literals, so the whole-tree lint in the
+    // pre-commit hook stays green; add each file here as it is cleaned.
+    files: [
+      'src/screens/SiftScreen.tsx',
+      'src/screens/SettingsScreen.tsx',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Literal[value=/^(#[0-9a-fA-F]{3,8}|rgba?\\()/]',
+          message: 'Use a theme color (useTheme().colors or COLORS), not a color literal.',
+        },
+        {
+          selector: 'TemplateElement[value.raw=/(#[0-9a-fA-F]{3,8}|rgba?\\()/]',
+          message: 'Use a theme color (useTheme().colors or COLORS), not a color literal.',
+        },
+      ],
+    },
+  },
+  {
     // RNTL 14 made render, renderHook, rerender, unmount, fireEvent.* and act
     // async, and a missed `await` leaves a test that passes without checking
     // anything (CLAUDE.md). no-floating-promises catches every un-awaited

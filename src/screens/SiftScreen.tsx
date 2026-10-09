@@ -21,7 +21,7 @@ import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
 import InteractiveCard from '../components/InteractiveCard';
 import PlayerControls from '../components/PlayerControls';
-import { RADIUS, SPACING } from '../theme';
+import { COLORS, RADIUS, SHADOWS, SPACING } from '../theme';
 import { Decision } from '../types';
 
 const SEGMENT_COUNT = 10;
@@ -157,9 +157,9 @@ export default function SiftScreen() {
       <View style={styles.statsRowContainer}>
         <GlassCard intensity="thin" radius={RADIUS.lg}>
           <View style={styles.statsRow}>
-            <StatBadge label="kept" value={state.kept.length} color="#34C759" textColor={colors.textSecondary} testID="stat-kept" />
-            <StatBadge label="removed" value={state.removed.length} color="#FF3B30" textColor={colors.textSecondary} testID="stat-removed" />
-            <StatBadge label="skipped" value={state.skipped.length} color="#FF9500" textColor={colors.textSecondary} testID="stat-skipped" />
+            <StatBadge label="kept" value={state.kept.length} color={COLORS.keep} textColor={colors.textSecondary} testID="stat-kept" />
+            <StatBadge label="removed" value={state.removed.length} color={COLORS.remove} textColor={colors.textSecondary} testID="stat-removed" />
+            <StatBadge label="skipped" value={state.skipped.length} color={COLORS.skip} textColor={colors.textSecondary} testID="stat-skipped" />
             <StatBadge label="left" value={remaining} color={colors.textTertiary} textColor={colors.textSecondary} testID="remaining-count" />
           </View>
         </GlassCard>
@@ -174,39 +174,41 @@ export default function SiftScreen() {
               key={i}
               style={[
                 styles.progressSegment,
+                // The unfilled track uses textTertiary (3:1 on the background)
+                // so progress doesn't read as loose dashes; the text-colored
+                // fill stays well apart from it (about 5:1), not by hue alone.
                 filled
                   ? { backgroundColor: colors.text }
-                  : { backgroundColor: colors.quaternary },
+                  : { backgroundColor: colors.textTertiary },
               ]}
             />
           );
         })}
       </View>
 
-      {/* Card stack */}
+      {/* Card stack. The back cards hide behind the front card at rest and
+          show while it is dragged or flies off. */}
       <View style={styles.cardArea}>
-        {/* Back card 2 */}
         {nextNextTrack != null && (
           <View style={[
             styles.backCard,
             styles.backCard2,
-            { backgroundColor: isDark ? colors.surface : '#fff' },
+            { backgroundColor: isDark ? colors.surface : colors.background },
           ]} />
         )}
-        {/* Back card 1 */}
         {nextTrack != null && (
           <View style={[
             styles.backCard,
             styles.backCard1,
-            { backgroundColor: isDark ? colors.surface : '#fff' },
+            { backgroundColor: isDark ? colors.surface : colors.background },
           ]} />
         )}
-        {/* Front card */}
         {currentTrack != null && (
           <InteractiveCard
             track={currentTrack}
             onDecide={handleCardDecide}
             programmaticOffset={programmaticOffset}
+            playsKnown={state.provider !== 'spotify'}
           />
         )}
       </View>
@@ -221,21 +223,24 @@ export default function SiftScreen() {
         <ActionButton
           symbolName="xmark.circle.fill"
           label="Remove"
-          color="#FF3B30"
+          color={COLORS.remove}
+          labelColor={colors.textSecondary}
           onPress={() => animateDecision('remove')}
           disabled={isAnimating}
         />
         <ActionButton
           symbolName="arrow.right.circle"
           label="Skip"
-          color="#FF9500"
+          color={COLORS.skip}
+          labelColor={colors.textSecondary}
           onPress={handleSkip}
           disabled={isAnimating}
         />
         <ActionButton
           symbolName="checkmark.circle.fill"
           label="Keep"
-          color="#34C759"
+          color={COLORS.keep}
+          labelColor={colors.textSecondary}
           onPress={() => animateDecision('keep')}
           disabled={isAnimating}
         />
@@ -289,12 +294,14 @@ function ActionButton({
   symbolName,
   label,
   color,
+  labelColor,
   onPress,
   disabled,
 }: {
   symbolName: string;
   label: string;
   color: string;
+  labelColor: string;
   onPress: () => void;
   disabled: boolean;
 }) {
@@ -310,7 +317,7 @@ function ActionButton({
           <SymbolView name={symbolName as SFSymbol} size={28} tintColor={color} />
         </View>
       </GlassCard>
-      <Text style={actionStyles.label}>{label.toUpperCase()}</Text>
+      <Text style={[actionStyles.label, { color: labelColor }]}>{label.toUpperCase()}</Text>
     </TouchableOpacity>
   );
 }
@@ -327,9 +334,8 @@ const actionStyles = StyleSheet.create({
     alignItems: 'center',
   },
   label: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
-    color: 'rgba(60, 60, 67, 0.6)',
   },
 });
 
@@ -392,11 +398,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     borderRadius: RADIUS.xl,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    ...SHADOWS.subtle,
   },
   backCard2: {
     transform: [{ scale: 0.94 }, { translateY: -12 }],

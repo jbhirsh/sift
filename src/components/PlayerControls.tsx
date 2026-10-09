@@ -149,20 +149,20 @@ export default function PlayerControls() {
         {/* Seek bar */}
         {currentTrack != null && (
           <View style={styles.seekRow}>
-            <Text style={[styles.timeText, { color: colors.textTertiary }]} testID="elapsed-time">
+            <Text style={[styles.timeText, { color: colors.textSecondary }]} testID="elapsed-time">
               {formatTime(state.playbackPosition)}
             </Text>
 
             <GestureDetector gesture={composed}>
               <View style={styles.sliderContainer} onLayout={onSliderLayout}>
-                <View style={[styles.sliderTrack, { backgroundColor: colors.quaternary }]}>
+                <View style={[styles.sliderTrack, { backgroundColor: colors.textTertiary }]}>
                   <Animated.View style={[styles.sliderFill, { backgroundColor: colors.accent }, fillStyle]} />
                 </View>
                 <Animated.View style={[styles.sliderThumb, thumbStyle]} />
               </View>
             </GestureDetector>
 
-            <Text style={[styles.timeText, { color: colors.textTertiary }]} testID="duration-time">
+            <Text style={[styles.timeText, { color: colors.textSecondary }]} testID="duration-time">
               {formatTime(duration)}
             </Text>
           </View>
