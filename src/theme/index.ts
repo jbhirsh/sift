@@ -40,7 +40,11 @@ export const COLORS = {
     surface: '#F2F2F7',
     quaternary: 'rgba(0,0,0,0.04)',
     separator: 'rgba(0,0,0,0.1)',
-    accent: '#007AFF',
+    // Darker than iOS system blue (#007AFF, 4.0:1 on white) so blue text
+    // and white-on-blue buttons reach 4.5:1 (owner's call, #154).
+    accent: '#0066CC',
+    // Button backgrounds under white labels.
+    accentFill: '#0066CC',
     keepText: '#1F7A35',
     removeText: '#D70015',
     skipText: '#C93400',
@@ -54,7 +58,10 @@ export const COLORS = {
     surface: '#1C1C1E',
     quaternary: 'rgba(255,255,255,0.08)',
     separator: 'rgba(255,255,255,0.15)',
+    // Blue text on dark backgrounds (5.8:1 on black). Too light for a white
+    // label on top, hence the separate fill.
     accent: '#0A84FF',
+    accentFill: '#0066CC',
     keepText: '#30D158',
     removeText: '#FF453A',
     skipText: '#FF9F0A',

@@ -9,8 +9,6 @@ import {
 import { RADIUS, SPACING, SHADOWS } from '../theme';
 import { useThemeColors } from '../theme/useThemeColors';
 
-const ACCENT = '#007AFF'; // iOS system blue
-
 type Variant = 'primary' | 'secondary' | 'plain';
 type Size = 'small' | 'regular' | 'large';
 
@@ -36,7 +34,9 @@ export function Button({
   testID,
 }: ButtonProps) {
   const colors = useThemeColors();
-  const tint = color ?? ACCENT;
+  // A filled button takes the fill blue under its white label; outlined and
+  // plain buttons draw the tint as text, so they take the text blue.
+  const tint = color ?? (variant === 'primary' ? colors.accentFill : colors.accent);
 
   const containerStyle: ViewStyle[] = [
     styles.base,

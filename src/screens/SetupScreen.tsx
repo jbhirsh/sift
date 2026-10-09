@@ -492,7 +492,7 @@ export default function SetupScreen() {
               return (
                 <>
                   <TouchableOpacity
-                    style={styles.primaryButton}
+                    style={[styles.primaryButton, { backgroundColor: colors.accentFill }]}
                     onPress={canResumeInMemory
                       ? () => dispatch({ type: 'SET_PHASE', phase: 'sifting' })
                       : handleResume}
@@ -520,7 +520,7 @@ export default function SetupScreen() {
               return (
                 <TouchableOpacity
                   testID="setup-resift"
-                  style={[styles.primaryButton, startOverBlocked && { opacity: 0.4 }]}
+                  style={[styles.primaryButton, { backgroundColor: colors.accentFill }, startOverBlocked && { opacity: 0.4 }]}
                   onPress={handleStartOver}
                   disabled={startOverBlocked}
                   activeOpacity={0.8}
@@ -533,7 +533,7 @@ export default function SetupScreen() {
             }
             return (
               <TouchableOpacity
-                style={styles.primaryButton}
+                style={[styles.primaryButton, { backgroundColor: colors.accentFill }]}
                 onPress={() => startFresh()}
                 activeOpacity={0.8}
               >
@@ -627,7 +627,6 @@ const styles = StyleSheet.create({
     marginTop: SPACING['2xl'],
   },
   primaryButton: {
-    backgroundColor: '#007AFF',
     borderRadius: RADIUS.md,
     paddingVertical: 16,
     paddingHorizontal: 24,
