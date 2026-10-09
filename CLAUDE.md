@@ -194,11 +194,11 @@ Makefile                Dev commands (test, lint, typecheck, check)
   `eas.json` or the `package.json` scripts (both part of the fingerprint),
   therefore needs a reinstall; everything else arrives by itself. Keep the
   update job's `env` in step with `.env`: `eas update` doesn't read it.
-  Workflow builds are non-interactive, so they reuse the ad hoc provisioning
-  profile as is: a newly registered iPhone (`eas device:create`) is only added
-  by an interactive `eas build -p ios --profile preview` (Apple sign-in), or
-  by `refresh_ad_hoc_provisioning_profile: true` once an App Store Connect API
-  key is stored on EAS.
+  Workflow builds are non-interactive; `refresh_ad_hoc_provisioning_profile`
+  adds iPhones registered since the last build (`eas device:create`) to the
+  ad hoc provisioning profile, using the App Store Connect API key stored on
+  EAS (`eas credentials -p ios` → App Store Connect: Manage your API Key). A
+  new iPhone is installable from the next workflow build.
 - Security/quality gates run per PR and sweep weekly (Mon 06:00 UTC):
   `gitleaks.yml` (secret scanning), `semgrep.yml` (SAST, `--config auto`), and
   `mutation.yml` (Stryker), alongside the weekly Dependabot bumps.
