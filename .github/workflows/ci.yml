@@ -90,10 +90,11 @@ jobs:
     # Skip the ~30-min macOS build on docs-only changes (the required `check`
     # still runs and gates the merge). Always runs on manual dispatch.
     if: needs.check.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
-    # Runs on GitHub-hosted macOS (free on public repos) on every PR and push
-    # to main. A cold run rebuilds the simulator app (~20-30 min); warm runs
-    # restore it from actions/cache keyed on the project fingerprint, or reuse
-    # the ios-build artifact for the same head SHA (~1 min).
+    # Runs on GitHub-hosted macOS (free on public repos) on every PR. On push
+    # to main it only builds and caches the app (see RUN_SUITE below). A cold
+    # run rebuilds the simulator app (~20-30 min); warm runs restore it from
+    # actions/cache keyed on the project fingerprint, or reuse the ios-build
+    # artifact for the same head SHA (~1 min).
     # Caveat: the build step needs EXPO_TOKEN, which dependabot-triggered PRs
     # don't receive (they read Dependabot secrets, not Actions secrets) — on a
     # cache miss those PRs fail here until the token is mirrored into
@@ -103,11 +104,28 @@ jobs:
     # image the working builds resolve to (Xcode 26; Expo SDK 57 requires
     # >=26 — macos-15's default Xcode 16.4 cannot compile expo-modules-core).
     runs-on: macos-26
-    # Cold path: ~10 min setup + ~30 min build + the Maestro step's own
-    # 40-min cap below. The step cap must expire before this one: a JOB
-    # timeout counts as cancellation, which skips the failure()/!cancelled()
-    # diagnostics and upload steps and loses all evidence.
-    timeout-minutes: 90
+    # Worst case: ~10 min setup + the 30-min ios-build wait + the build's
+    # 40-min cap + ~3 min simulator prep + the Maestro step's 40-min cap. The
+    # step caps must expire before this one: a JOB timeout counts as
+    # cancellation, which skips the failure()/!cancelled() diagnostics and
+    # upload steps and loses all evidence.
+    timeout-minutes: 135
+    # actions: read for the ios-build run lookup and artifact download (the
+    # repo default token may not grant it, and the steps fail quietly).
+    permissions:
+      contents: read
+      actions: read
+    env:
+      # Main re-ran the suite on code that had just passed as a PR. It still
+      # builds there, because only caches saved on main can be restored by
+      # PRs (a PR's cache is visible to that PR alone): a PR that leaves src/
+      # and the native layer alone then reuses main's app instead of a cold
+      # ~17-min build.
+      RUN_SUITE: ${{ github.event_name != 'push' }}
+      # The Actions API files a pull_request run under the PR's head commit,
+      # not github.sha (the temporary merge commit both workflows check out),
+      # so look ios-build runs up by the head commit.
+      RUN_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
     steps:
       - uses: actions/checkout@v7
@@ -126,7 +144,10 @@ jobs:
         id: fingerprint
         run: |
           NATIVE=$(npx expo-updates fingerprint:generate --platform ios 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['hash'])")
-          SOURCE=$(find src __tests__ -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \) -print0 | sort -z | xargs -0 shasum -a 256 | shasum -a 256 | cut -d' ' -f1)
+          # The bundle's inputs only (src/, the entry point, the Metro config):
+          # tests and Maestro flows aren't in the app, so a test-only change
+          # mustn't force a rebuild.
+          SOURCE=$( (find src -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \) -print0; printf '%s\0' index.ts metro.config.js) | sort -z | xargs -0 shasum -a 256 | shasum -a 256 | cut -d' ' -f1)
           FINGERPRINT="${NATIVE}-${SOURCE}"
           echo "hash=$FINGERPRINT" >> "$GITHUB_OUTPUT"
           echo "Fingerprint: $FINGERPRINT"
@@ -138,6 +159,35 @@ jobs:
           path: build/e2e
           key: sift-e2e-${{ steps.fingerprint.outputs.hash }}
 
+      # On a native PR, ios-build (a separate workflow, so no `needs:`) is
+      # building this same e2e-simulator app at the same time. Waiting for it
+      # and downloading its artifact beats a parallel ~30-min cold build. On
+      # other PRs its build job is skipped and the run ends within a minute.
+      # Best effort: a timeout or error just falls through to building here.
+      - name: Wait for this commit's ios-build run
+        id: wait
+        if: steps.build-cache.outputs.cache-hit != 'true' && github.event_name == 'pull_request'
+        timeout-minutes: 30
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          run_id=$(gh api "repos/${{ github.repository }}/actions/workflows/ios-build.yml/runs?head_sha=${RUN_SHA}&per_page=1" --jq '.workflow_runs[0].id // empty')
+          if [ -z "$run_id" ]; then
+            echo "No ios-build run for this sha."
+            exit 0
+          fi
+          until [ "$(gh api "repos/${{ github.repository }}/actions/runs/$run_id" --jq .status)" = completed ]; do
+            sleep 30
+          done
+          conclusion=$(gh api "repos/${{ github.repository }}/actions/runs/$run_id" --jq .conclusion)
+          echo "ios-build run $run_id finished: $conclusion"
+          # Only a successful run's artifact is reused, and only this run's:
+          # an older run for the same head was built on an older base.
+          if [ "$conclusion" = success ]; then
+            echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          fi
+
       # The ios-build job builds the identical e2e-simulator profile on PR CI
       # and uploads it; reusing that artifact turns a ~30-minute cold rebuild
       # into a ~1-minute download whenever this head already built there.
@@ -147,7 +197,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          run_id=$(gh api "repos/${{ github.repository }}/actions/workflows/ios-build.yml/runs?head_sha=${{ github.sha }}&status=success&per_page=1" --jq '.workflow_runs[0].id // empty')
+          run_id="${{ steps.wait.outputs.run_id }}"
           if [ -n "$run_id" ] && gh run download "$run_id" --repo "${{ github.repository }}" --name sift-simulator-app --dir build/; then
             mkdir -p build/e2e
             tar -xzf build/Sift-e2e.tar.gz -C build/e2e
@@ -160,6 +210,7 @@ jobs:
 
       - name: Build simulator app
         if: steps.build-cache.outputs.cache-hit != 'true' && steps.reuse.outputs.hit != 'true'
+        timeout-minutes: 40
         run: eas build --profile e2e-simulator --platform ios --local --non-interactive --output build/Sift-e2e.tar.gz
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -175,12 +226,14 @@ jobs:
       # Prints the resolved version so every run records which Maestro it
       # tested with (previously never logged, so drift was undetectable).
       - name: Install Maestro
+        if: env.RUN_SUITE == 'true'
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
           "$HOME/.maestro/bin/maestro" --version
 
       - name: Boot iOS Simulator
+        if: env.RUN_SUITE == 'true'
         run: |
           DEVICE=$(xcrun simctl list devices available -j | python3 -c "
           import json, sys
@@ -198,6 +251,7 @@ jobs:
           xcrun simctl bootstatus "$DEVICE" -b
 
       - name: Install app on simulator
+        if: env.RUN_SUITE == 'true'
         run: xcrun simctl install booted build/e2e/*.app
 
       # Warm the app before the suite runs. A plain
@@ -206,12 +260,14 @@ jobs:
       # clusters on. Best effort — a warmup hiccup must never fail the job,
       # and the first real flow's clearState wipes any residual state.
       - name: Warm up the app (prime caches before the suite)
+        if: env.RUN_SUITE == 'true'
         run: |
           xcrun simctl launch booted com.jessicahirsh.sift || true
           sleep 25
           xcrun simctl terminate booted com.jessicahirsh.sift || true
 
       - name: Run Maestro tests
+        if: env.RUN_SUITE == 'true'
         # A step timeout counts as a failure (not a cancellation), so the
         # diagnostics and artifact upload below still run. run-e2e.sh also
         # fails fast when the driver is down rather than timing out per flow.
@@ -239,7 +295,7 @@ jobs:
       # of whatever screen was up. Diagnostics must never themselves fail —
       # every command here is guarded.
       - name: Locate Maestro output (diagnostics)
-        if: failure()
+        if: failure() && env.RUN_SUITE == 'true'
         run: |
           mkdir -p maestro-results
           {
@@ -269,7 +325,7 @@ jobs:
       # still carries the failed attempt's log, which is the evidence needed
       # to chase the infra flake down instead of shrugging it off.
       - name: Upload Maestro results
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && env.RUN_SUITE == 'true' }}
         uses: actions/upload-artifact@v7
         with:
           name: maestro-results
