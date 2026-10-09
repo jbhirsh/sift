@@ -1,0 +1,129 @@
+name: Preview deploy
+
+# Keeps the preview build on the owner's phone current with main, without
+# spending EAS cloud builds (the plan has 15 iOS builds a month).
+#
+# On every push to main, fingerprint the native layer (the app's
+# runtimeVersion, app.json) and look for an EAS build with that fingerprint:
+#   - found: only JavaScript changed, so publish an EAS Update to the
+#     "preview" channel. The installed app downloads it on launch and runs it
+#     from the next cold launch (swipe Sift away, then reopen it).
+#   - not found: native code changed (Swift, a native package, an SDK bump),
+#     which an update can't carry. Build the preview app on this repo's free
+#     GitHub macOS runner (eas build --local, so no EAS build is used) and
+#     upload it to EAS for an install link (eas upload).
+#
+# TEMPORARY: pushes to the PR branch below also run, build-and-upload only (an
+# update from an unmerged branch would ship unreviewed code to the phone), to
+# prove the local build + upload path before merge. Remove before merging.
+on:
+  push:
+    branches: [main, claude/gallant-hopper-qu9vuv]
+  workflow_dispatch:
+
+# Never run two deploys at once: a second merge waits, then finds the first
+# merge's build (if it built) and publishes an update to it.
+concurrency:
+  group: preview-deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Fingerprint and find build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      fingerprint: ${{ steps.fingerprint.outputs.hash }}
+      build_id: ${{ steps.existing.outputs.build_id }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Fingerprint the native layer
+        id: fingerprint
+        run: |
+          HASH=$(npx expo-updates fingerprint:generate --platform ios | jq -r .hash)
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+          echo "Native fingerprint: $HASH"
+      - name: Find a preview build with this fingerprint
+        id: existing
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          HASH: ${{ steps.fingerprint.outputs.hash }}
+        run: |
+          ID=$(npx -y eas-cli@latest build:list --platform ios --fingerprint-hash "$HASH" \
+            --status finished --distribution internal --limit 1 --json --non-interactive \
+            | jq -r '.[0].id // empty')
+          echo "build_id=$ID" >> "$GITHUB_OUTPUT"
+          echo "Existing build: ${ID:-none}"
+
+  update:
+    name: Publish iOS update (JavaScript only)
+    needs: plan
+    if: needs.plan.outputs.build_id != '' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Bundles with the committed .env (bundler flags), like the build did.
+      - name: Publish to the preview channel
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          npx -y eas-cli@latest update --channel preview --platform ios \
+            --message "$(printf '%s' "$MESSAGE" | head -n 1)" --non-interactive
+
+  build:
+    name: Build iOS preview on GitHub (native code changed)
+    needs: plan
+    if: needs.plan.outputs.build_id == '' || github.ref != 'refs/heads/main'
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+      # Local build: signs with the EAS-managed ad hoc credentials and, with the
+      # project's App Store Connect API key on EAS, first adds any iPhone
+      # registered with `eas device:create` to the provisioning profile.
+      - name: Build the preview app
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          USE_CCACHE: '1'
+        run: |
+          eas build --local --profile preview --platform ios --non-interactive \
+            --refresh-ad-hoc-provisioning-profile --output build/Sift-preview.ipa
+      - name: Upload to EAS for an install link
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          HASH: ${{ needs.plan.outputs.fingerprint }}
+        run: |
+          eas upload --platform ios --build-path build/Sift-preview.ipa \
+            --fingerprint "$HASH" --non-interactive --json | tee upload.json
+          {
+            echo "### Preview build uploaded"
+            echo
+            echo '```json'
+            cat upload.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

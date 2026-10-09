@@ -183,22 +183,24 @@ Makefile                Dev commands (test, lint, typecheck, check)
   merges only once every required check is green. So the rule must list every
   check a PR runs, Claude Review included, and require review threads to be
   resolved, or a bot PR merges past a failing or unreported gate.
-- **The phone build follows `main`.** `.eas/workflows/preview.yml` runs on EAS
-  Workflows (Expo's CI, not GitHub Actions) on every push to `main`. It
-  fingerprints the native layer (`runtimeVersion.policy: fingerprint` in
-  `app.json`): if a `preview` build with that fingerprint exists, it publishes
-  an EAS Update to the `preview` channel, which installed preview builds
-  download on launch and run from their next cold launch; otherwise native code changed, which an update
-  can't carry, so it makes a new `preview` build to install. A change that
-  touches native code (Swift, a native package, an SDK bump), or edits
-  `eas.json` or the `package.json` scripts (both part of the fingerprint),
-  therefore needs a reinstall; everything else arrives by itself. Keep the
-  update job's `env` in step with `.env`: `eas update` doesn't read it.
-  Workflow builds are non-interactive; `refresh_ad_hoc_provisioning_profile`
-  adds iPhones registered since the last build (`eas device:create`) to the
-  ad hoc provisioning profile, using the App Store Connect API key stored on
-  EAS (`eas credentials -p ios` → App Store Connect: Manage your API Key). A
-  new iPhone is installable from the next workflow build.
+- **The phone build follows `main`.** `.github/workflows/preview-deploy.yml`
+  runs on every push to `main`. It fingerprints the native layer
+  (`runtimeVersion.policy: fingerprint` in `app.json`) and looks for an EAS
+  build with that fingerprint: if one exists, it publishes an EAS Update to
+  the `preview` channel, which installed preview builds download on launch
+  and run from their next cold launch; otherwise native code changed, which
+  an update can't carry, so it builds the `preview` app on a GitHub macOS
+  runner (`eas build --local`) and uploads it to EAS (`eas upload`) for an
+  install link. Local builds don't use the plan's EAS cloud builds (15 iOS a
+  month). A change that touches native code (Swift, a native package, an SDK
+  bump), or edits `eas.json` or the `package.json` scripts (both part of the
+  fingerprint), therefore needs a reinstall; everything else arrives by
+  itself. `--refresh-ad-hoc-provisioning-profile` adds iPhones registered
+  since the last build (`eas device:create`) to the ad hoc provisioning
+  profile, using the App Store Connect API key stored on EAS. The fingerprint
+  must come out the same in the checkout and in the build's clean copy, so
+  build output the checkout holds (SwiftPM's `.build`) goes in
+  `.fingerprintignore`.
 - Security/quality gates run per PR and sweep weekly (Mon 06:00 UTC):
   `gitleaks.yml` (secret scanning), `semgrep.yml` (SAST, `--config auto`), and
   `mutation.yml` (Stryker), alongside the weekly Dependabot bumps.

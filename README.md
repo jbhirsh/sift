@@ -91,7 +91,7 @@ npx expo start                 # subsequent launches
 
 "Start at chorus" uses ShazamKit as a fallback, which needs the **ShazamKit** App Service enabled on the App ID (Apple Developer → Identifiers → `com.jessicahirsh.sift` → App Services). Without it the setting still works from lyrics and the estimate.
 
-**Installing on an iPhone:** every merge to `main` runs `.eas/workflows/preview.yml` on EAS. JavaScript-only changes ship as an over-the-air update that the installed preview build downloads on launch and runs from the next cold launch (swipe Sift away and reopen it); changes to native code produce a new preview build instead, installed from its link on expo.dev. Preview builds install only on registered iPhones: register one with `npx eas-cli device:create`, and the next workflow build includes it (EAS updates the ad hoc provisioning profile with the project's App Store Connect API key).
+**Installing on an iPhone:** every merge to `main` runs `.github/workflows/preview-deploy.yml`. JavaScript-only changes ship as an over-the-air update that the installed preview build downloads on launch and runs from the next cold launch (swipe Sift away and reopen it); changes to native code produce a new preview build instead, built on a GitHub macOS runner and uploaded to EAS, installed from its link on expo.dev. Preview builds install only on registered iPhones: register one with `npx eas-cli device:create`, and the next preview build includes it (EAS updates the ad hoc provisioning profile with the project's App Store Connect API key).
 
 Configuration lives in environment variables — see [`.env.example`](.env.example). `EXPO_PUBLIC_*` values are inlined by Expo at build time; real secrets go in the gitignored `.env.local`.
 
