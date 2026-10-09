@@ -13,13 +13,18 @@ name: Preview deploy
 #     GitHub macOS runner (eas build --local, so no EAS build is used) and
 #     upload it to EAS for an install link (eas upload).
 #
-# TEMPORARY: pushes to the PR branch below also run, build-and-upload only (an
-# update from an unmerged branch would ship unreviewed code to the phone), to
-# prove the local build + upload path before merge. Remove before merging.
+# A run started by hand with "Build a new preview app" ticked builds even when
+# a matching build exists: that is how a newly registered iPhone gets a build
+# it can install (eas device:create, then run this).
 on:
   push:
-    branches: [main, claude/gallant-hopper-qu9vuv]
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      force_build:
+        description: Build a new preview app (for a newly registered iPhone)
+        type: boolean
+        default: false
 
 # Never run two deploys at once: a second merge waits, then finds the first
 # merge's build (if it built) and publishes an update to it.
@@ -54,6 +59,9 @@ jobs:
           HASH=$(npx expo-updates fingerprint:generate --platform ios | jq -r .hash)
           echo "hash=$HASH" >> "$GITHUB_OUTPUT"
           echo "Native fingerprint: $HASH"
+      # Local builds are only uploaded once finished, so there is no
+      # in-progress build to wait for, and the concurrency group above keeps
+      # two runs from both missing and both building.
       - name: Find a preview build with this fingerprint
         id: existing
         env:
@@ -69,7 +77,7 @@ jobs:
   update:
     name: Publish iOS update (JavaScript only)
     needs: plan
-    if: needs.plan.outputs.build_id != '' && github.ref == 'refs/heads/main'
+    if: needs.plan.outputs.build_id != '' && github.ref == 'refs/heads/main' && !inputs.force_build
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -83,7 +91,7 @@ jobs:
       - name: Publish to the preview channel
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          MESSAGE: ${{ github.event.head_commit.message }}
+          MESSAGE: ${{ github.event.head_commit.message || 'Manual preview deploy' }}
         run: |
           npx -y eas-cli@latest update --channel preview --platform ios \
             --message "$(printf '%s' "$MESSAGE" | head -n 1)" --non-interactive
@@ -91,7 +99,7 @@ jobs:
   build:
     name: Build iOS preview on GitHub (native code changed)
     needs: plan
-    if: needs.plan.outputs.build_id == '' || github.ref != 'refs/heads/main'
+    if: needs.plan.outputs.build_id == '' || inputs.force_build
     runs-on: macos-latest
     timeout-minutes: 90
     steps:
