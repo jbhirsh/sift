@@ -20,7 +20,7 @@ import { useMusicProvider } from '../hooks/useMusicProvider';
 import { clearHistoryForSource } from '../services/RemovalHistoryStore';
 import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
-import { COLORS, RADIUS, SPACING } from '../theme';
+import { COLORS, RADIUS, SETTINGS_BUTTON, SPACING } from '../theme';
 
 export default function DoneScreen() {
   const { state, dispatch, resetToSetup } = useSift();
@@ -403,9 +403,9 @@ export default function DoneScreen() {
         renderItem={renderTrackRow}
         keyExtractor={keyExtractor}
         style={styles.container}
-        // Clear the floating settings gear (App.tsx: 40pt at insets.top + 8),
-        // which sits in the same column as the rows' restore buttons.
-        contentContainerStyle={[styles.contentContainer, { paddingTop: insets.top + SPACING.base + 40 }]}
+        // Clear the floating settings gear (App.tsx), which sits in the same
+        // column as the rows' restore buttons.
+        contentContainerStyle={[styles.contentContainer, { paddingTop: insets.top + SETTINGS_BUTTON.top + SETTINGS_BUTTON.size }]}
         ListHeaderComponent={listHeader}
         ListFooterComponent={listFooter}
       />

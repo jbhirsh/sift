@@ -19,7 +19,7 @@ import LoadingScreen from './screens/LoadingScreen';
 import SiftScreen from './screens/SiftScreen';
 import DoneScreen from './screens/DoneScreen';
 import SettingsScreen from './screens/SettingsScreen';
-import { SPACING } from './theme';
+import { SETTINGS_BUTTON, SPACING } from './theme';
 
 Sentry.init({
   // DSN is read from the EXPO_PUBLIC_SENTRY_DSN env var (see .env.example).
@@ -64,7 +64,7 @@ function PhaseRouter() {
       {/* On every screen, Setup included: Settings holds Start at chorus
           and Check Connection, which people want before the first song.
           Sized and placed to mirror the Sift header's back button. */}
-      <View style={[styles.settingsButtonContainer, { top: insets.top + SPACING.base }]}>
+      <View style={[styles.settingsButtonContainer, { top: insets.top + SETTINGS_BUTTON.top }]}>
         <GlassCard intensity="thin" radius={20}>
           <TouchableOpacity
             testID="settings-button"
@@ -123,8 +123,8 @@ const styles = StyleSheet.create({
     right: SPACING['2xl'],
   },
   settingsButton: {
-    width: 40,
-    height: 40,
+    width: SETTINGS_BUTTON.size,
+    height: SETTINGS_BUTTON.size,
     justifyContent: 'center',
     alignItems: 'center',
   },
