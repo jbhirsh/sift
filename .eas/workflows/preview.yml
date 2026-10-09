@@ -41,6 +41,10 @@ jobs:
     params:
       platform: ios
       profile: preview
+      # Add iPhones registered since the last build (eas device:create) to
+      # the ad hoc provisioning profile. Uses the App Store Connect API key
+      # stored on EAS, so the build stays non-interactive.
+      refresh_ad_hoc_provisioning_profile: true
   update:
     name: Publish iOS update (JavaScript only)
     needs: [get_build]
