@@ -109,6 +109,10 @@ jobs:
       - name: Build the preview app
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          # The API key on EAS carries no Apple team, and without one the
+          # refresh prompts for it, which fails non-interactively. Not a secret:
+          # every signed build carries it.
+          EXPO_APPLE_TEAM_ID: 76AYYJCJP5
           USE_CCACHE: '1'
         run: |
           eas build --local --profile preview --platform ios --non-interactive \
