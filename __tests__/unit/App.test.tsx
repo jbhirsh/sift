@@ -109,9 +109,21 @@ describe('App', () => {
     expect(getByTestId('setup-brand')).toBeTruthy();
   });
 
-  test('does not show settings button on setup phase', async () => {
-    const { queryByTestId } = await renderApp();
-    expect(queryByTestId('settings-button')).toBeNull();
+  test('shows the settings button on the setup phase (#138)', async () => {
+    const { getByTestId } = await renderApp();
+    expect(getByTestId('settings-button')).toBeTruthy();
+  });
+
+  test('settings opens from setup and its Done button closes it', async () => {
+    const { getByTestId, queryByTestId } = await renderApp();
+    await act(async () => {
+      await fireEvent.press(getByTestId('settings-button'));
+    });
+    expect(getByTestId('settings-modal').props.visible).toBe(true);
+    await act(async () => {
+      await fireEvent.press(getByTestId('settings-done-button'));
+    });
+    expect(queryByTestId('settings-done-button')).toBeNull();
   });
 
   test('renders without crashing', async () => {
@@ -119,9 +131,8 @@ describe('App', () => {
     expect(toJSON()).toBeTruthy();
   });
 
-  test('shows settings button after leaving setup phase', async () => {
-    const { getByText, getByTestId, queryByTestId } = await renderApp();
-    expect(queryByTestId('settings-button')).toBeNull();
+  test('keeps the settings button after leaving setup phase', async () => {
+    const { getByText, getByTestId } = await renderApp();
 
     await act(async () => {
       await fireEvent.press(getByText('Start Sifting'));

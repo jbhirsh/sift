@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SymbolView } from 'expo-symbols';
 import { Track, Decision } from '../types';
 import { RADIUS } from '../theme';
+import { formatTrackMeta } from '../utils/trackMeta';
 import { useTheme } from '../theme/ThemeContext';
 import { useResolvedArtwork } from '../hooks/useResolvedArtwork';
 
@@ -28,14 +29,18 @@ interface InteractiveCardProps {
   track: Track;
   onDecide: (decision: Decision) => void;
   programmaticOffset?: SharedValue<number>;
+  /** False for providers with no play counts (Spotify), so 0 isn't shown as "Never played". */
+  playsKnown?: boolean;
 }
 
 export default function InteractiveCard({
   track,
   onDecide,
   programmaticOffset,
+  playsKnown = true,
 }: InteractiveCardProps) {
   const { colors, isDark } = useTheme();
+  const meta = formatTrackMeta(track.playCount, track.dateAdded, { playsKnown });
   const resolvedArtworkURL = useResolvedArtwork(track.id, track.artworkURL);
   const dragX = useSharedValue(0);
   const dragY = useSharedValue(0);
@@ -157,12 +162,11 @@ export default function InteractiveCard({
                   >
                     {track.album}
                   </Text>
-                  <View style={styles.playCountContainer}>
-                    <SymbolView name="play.fill" size={8} tintColor="rgba(255,255,255,0.4)" />
-                    <Text style={styles.playCount} testID="card-play-count">
-                      {track.playCount}
+                  {meta.text !== '' && (
+                    <Text style={styles.playCount} accessibilityLabel={meta.label} testID="card-play-count">
+                      {meta.text}
                     </Text>
-                  </View>
+                  )}
                 </View>
               </View>
             </View>
@@ -247,7 +251,7 @@ const styles = StyleSheet.create({
   artistName: {
     fontSize: 15,
     fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.7)',
+    color: 'rgba(255, 255, 255, 0.85)',
   },
   metaRow: {
     flexDirection: 'row',
@@ -257,18 +261,13 @@ const styles = StyleSheet.create({
   albumName: {
     fontSize: 12,
     fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: 'rgba(255, 255, 255, 0.75)',
     flex: 1,
     marginRight: 12,
   },
-  playCountContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
   playCount: {
     fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.4)',
+    color: 'rgba(255, 255, 255, 0.75)',
   },
   swipeOverlay: {
     ...StyleSheet.absoluteFill,

@@ -21,7 +21,10 @@ export const RADIUS = {
   xl: 20,
 } as const;
 
-// Semantic colors (iOS system equivalents)
+// Semantic colors (iOS system equivalents). keep/remove/skip are for fills
+// and icons in both themes. As TEXT they fail contrast on light backgrounds
+// (green and orange are about 2.2:1 on white), so text uses the per-theme
+// keepText/removeText/skipText below, which reach 4.5:1.
 export const COLORS = {
   keep: '#34C759', // System green
   remove: '#FF3B30', // System red
@@ -29,24 +32,32 @@ export const COLORS = {
   // Light mode
   light: {
     text: '#000000',
+    // At least 4.5:1 on background and surface: body text.
     textSecondary: '#6C6C70',
-    textTertiary: '#AEAEB2',
+    // At least 3:1 on background: icons, glyphs and tracks, not text.
+    textTertiary: '#8A8A8E',
     background: '#FFFFFF',
     surface: '#F2F2F7',
     quaternary: 'rgba(0,0,0,0.04)',
     separator: 'rgba(0,0,0,0.1)',
     accent: '#007AFF',
+    keepText: '#1F7A35',
+    removeText: '#D70015',
+    skipText: '#C93400',
   },
   // Dark mode
   dark: {
     text: '#FFFFFF',
     textSecondary: '#8E8E93',
-    textTertiary: '#636366',
+    textTertiary: '#6E6E73',
     background: '#000000',
     surface: '#1C1C1E',
     quaternary: 'rgba(255,255,255,0.08)',
     separator: 'rgba(255,255,255,0.15)',
     accent: '#0A84FF',
+    keepText: '#30D158',
+    removeText: '#FF453A',
+    skipText: '#FF9F0A',
   },
 } as const;
 

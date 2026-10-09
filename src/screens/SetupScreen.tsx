@@ -317,7 +317,7 @@ export default function SetupScreen() {
           <View style={styles.errorContainer}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <SymbolView name="exclamationmark.triangle.fill" size={16} tintColor="#FF9500" />
-              <Text testID="setup-error" style={styles.errorText}>
+              <Text testID="setup-error" style={[styles.errorText, { color: colors.removeText }]}>
                 {state.loadError}
               </Text>
             </View>
@@ -581,7 +581,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#FF3B30',
     textAlign: 'center',
   },
   section: {

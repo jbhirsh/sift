@@ -62,16 +62,16 @@ import { ThemeProvider } from '../../src/theme/ThemeContext';
 
 const mockTrack: Track = {
   id: '1', name: 'Test Track', artist: 'Test Artist', album: 'Test Album',
-  duration: 200, playCount: 42, dateAdded: '2020-01-01T00:00:00.000Z',
+  duration: 200, playCount: 42, dateAdded: '2020-01-15T12:00:00.000Z',
   artworkURL: 'https://example.com/art.jpg',
 };
 
-async function renderCard(track = mockTrack, onDecide = jest.fn()) {
+async function renderCard(track = mockTrack, onDecide = jest.fn(), playsKnown?: boolean) {
   panOnUpdate = undefined;
   panOnEnd = undefined;
   return { ...(await render(
     <ThemeProvider>
-      <InteractiveCard track={track} onDecide={onDecide} />
+      <InteractiveCard track={track} onDecide={onDecide} playsKnown={playsKnown} />
     </ThemeProvider>
   )), onDecide };
 }
@@ -92,9 +92,20 @@ describe('InteractiveCard', () => {
     expect(getByTestId('card-album-name').props.children).toBe('Test Album');
   });
 
-  test('renders play count', async () => {
+  test('renders the play count and add date as one meta line', async () => {
     const { getByTestId } = await renderCard();
-    expect(getByTestId('card-play-count').props.children).toBe(42);
+    expect(getByTestId('card-play-count').props.children).toBe('Played 42\u00D7 \u00B7 Added Jan 2020');
+    expect(getByTestId('card-play-count').props.accessibilityLabel).toBe('Played 42 times, added January 2020');
+  });
+
+  test('a provider without play counts shows only the add date', async () => {
+    const { getByTestId } = await renderCard({ ...mockTrack, playCount: 0 }, jest.fn(), false);
+    expect(getByTestId('card-play-count').props.children).toBe('Added Jan 2020');
+  });
+
+  test('hides the meta line when nothing is known', async () => {
+    const { queryByTestId } = await renderCard({ ...mockTrack, playCount: 0, dateAdded: '' });
+    expect(queryByTestId('card-play-count')).toBeNull();
   });
 
   test('renders placeholder when no artwork URL', async () => {
