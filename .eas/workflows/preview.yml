@@ -4,7 +4,7 @@
 # for a preview build made from the same fingerprint:
 #   - found: only JavaScript changed, so publish an over-the-air update to the
 #     "preview" channel. The installed app downloads it on launch and runs it
-#     from the next launch.
+#     from the next cold launch (swipe Sift away, then reopen it).
 #   - not found: native code changed (a Swift change, a new native package, an
 #     Expo SDK bump), which an update can't carry, so make a new preview build
 #     to install from its link instead.
@@ -30,6 +30,9 @@ jobs:
       platform: ios
       profile: preview
       fingerprint_hash: ${{ needs.fingerprint.outputs.ios_fingerprint_hash }}
+      # A merge landing while the previous merge's rebuild is still running
+      # updates that build rather than starting a duplicate one.
+      wait_for_in_progress: true
   build:
     name: Build iOS preview (native code changed)
     needs: [get_build]
@@ -44,6 +47,11 @@ jobs:
     if: ${{ needs.get_build.outputs.build_id }}
     type: update
     environment: preview
+    # `eas update` ignores .env files, so pass the committed .env's bundler
+    # flags explicitly: updates must be bundled like the build they replace.
+    env:
+      EXPO_UNSTABLE_METRO_OPTIMIZE_GRAPH: '1'
+      EXPO_UNSTABLE_TREE_SHAKING: '1'
     params:
       platform: ios
       channel: preview
