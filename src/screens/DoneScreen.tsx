@@ -323,7 +323,7 @@ export default function DoneScreen() {
 
       <TouchableOpacity
         testID="done-start-over"
-        style={[styles.primaryButton, startOverBlocked && { opacity: 0.4 }]}
+        style={[styles.primaryButton, { backgroundColor: colors.accentFill }, startOverBlocked && { opacity: 0.4 }]}
         // Disabled while a sifted-playlist save is in flight (the fallback
         // effect above or a manual Retry) or while a previous Start Over's
         // clears are still running: a concurrent clearSiftedPlaylist would
@@ -584,7 +584,6 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   primaryButton: {
-    backgroundColor: '#007AFF',
     borderRadius: RADIUS.md,
     paddingVertical: 16,
     paddingHorizontal: 24,

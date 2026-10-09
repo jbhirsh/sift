@@ -112,7 +112,7 @@ export default function ResumeSessionModal({
 
             <View style={styles.buttonSection}>
               <TouchableOpacity
-                style={[styles.resumeButton, { backgroundColor: colors.accent }]}
+                style={[styles.resumeButton, { backgroundColor: colors.accentFill }]}
                 onPress={onResume}
                 activeOpacity={0.8}
                 testID="resume-modal-resume"
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.xl,
   },
   resumeButton: {
-    // backgroundColor is theme-dependent (colors.accent) and applied inline.
+    // backgroundColor is theme-dependent (colors.accentFill) and applied inline.
     borderRadius: RADIUS.md,
     paddingVertical: SPACING.xl,
     alignItems: 'center',

@@ -10,37 +10,32 @@ import { contrastRatio } from '../helpers/contrast';
 // Not covered, deliberately: keep/remove/skip as icons and stat dots (2.2:1
 // on white) always sit next to a text label that carries the meaning.
 //
-// One waiver, for the brand blue: white labels on accent buttons (both themes:
-// white on #007AFF is 4.0:1, on dark #0A84FF 3.7:1) and light-mode accent as
-// text ("Done", "Check Connection"; #007AFF is 4.0:1 on white) are held to
-// 3:1, not 4.5:1. Darkening the blue changes every button, which is the
-// owner's call. Dark accent as text meets 4.5:1 and is held to it.
+// Blue has two tokens because one blue can't do both jobs in dark mode:
+// accent for blue text and accentFill for buttons under a white label.
 
 const TEXT = 4.5;
 const NON_TEXT = 3;
-const ACCENT_WAIVER = 3;
 
 type Pair = [label: string, foreground: string, background: string, min: number];
 
 function pairs(scheme: 'light' | 'dark'): Pair[] {
   const c = COLORS[scheme];
   const [siftTop, siftBottom] = GRADIENTS.sifting[scheme];
-  const accentTextMin = scheme === 'light' ? ACCENT_WAIVER : TEXT;
   const pairsOn = (bg: string, bgName: string): Pair[] => [
     [`text on ${bgName}`, c.text, bg, TEXT],
     [`textSecondary on ${bgName}`, c.textSecondary, bg, TEXT],
     [`keepText on ${bgName}`, c.keepText, bg, TEXT],
     [`removeText on ${bgName}`, c.removeText, bg, TEXT],
     [`skipText on ${bgName}`, c.skipText, bg, TEXT],
-    [`accent text on ${bgName}`, c.accent, bg, accentTextMin],
+    [`accent text on ${bgName}`, c.accent, bg, TEXT],
     [`textTertiary glyph on ${bgName}`, c.textTertiary, bg, NON_TEXT],
   ];
   return [
     // Settings sheet, Setup, Done and their cards.
     ...pairsOn(c.background, 'background'),
     ...pairsOn(c.surface, 'surface'),
-    // Primary buttons: white label on an accent fill.
-    [`white text on accent button`, '#FFFFFF', c.accent, ACCENT_WAIVER],
+    // Primary buttons: white label on the fill blue.
+    [`white text on accent button`, '#FFFFFF', c.accentFill, TEXT],
     // Sift screen: action captions and time labels, and the progress and
     // seek tracks, over both ends of the sifting gradient. The progress fill
     // must stand apart from its track, not just from the background, or how
