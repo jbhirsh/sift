@@ -1309,6 +1309,29 @@ describe('useMusicProvider', () => {
     expect(getByTestId('load-error').props.children).toBe('Your library has no tracks to sift.');
   });
 
+  test('the poller runs only on the Sift screen (#144)', async () => {
+    function Playing({ phase }: { phase: 'sifting' | 'done' }) {
+      const { dispatch } = useSift();
+      React.useEffect(() => {
+        dispatch({ type: 'SET_IS_PLAYING', isPlaying: true });
+        dispatch({ type: 'SET_PHASE', phase });
+      }, [dispatch, phase]);
+      return null;
+    }
+    const { rerender } = await render(<SiftProvider initialTracks={[mockTrack]}><Playing phase="sifting" /></SiftProvider>);
+    await act(async () => {
+      jest.advanceTimersByTime(600);
+    });
+    expect(mockProvider.getPlaybackState).toHaveBeenCalled();
+    // The last decision moves to Done with isPlaying still set.
+    await rerender(<SiftProvider initialTracks={[mockTrack]}><Playing phase="done" /></SiftProvider>);
+    mockProvider.getPlaybackState.mockClear();
+    await act(async () => {
+      jest.advanceTimersByTime(2000);
+    });
+    expect(mockProvider.getPlaybackState).not.toHaveBeenCalled();
+  });
+
   describe('reviewed ledger (#143)', () => {
     function LedgerConsumer() {
       const provider = useMusicProvider();

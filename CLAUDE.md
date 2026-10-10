@@ -104,7 +104,8 @@ src/
                         InteractiveCard, PlayerControls, PlaylistPicker)
     screens/            SetupScreen, LoadingScreen, SiftScreen,
                         DoneScreen, SettingsScreen
-    context/            SiftContext (useReducer state management)
+    context/            SiftContext (useReducer state management),
+                        MusicProviderContext (the one shared provider + poller)
     services/           MusicProviderInterface, AppleMusicProvider, MockMusicProvider,
                         SessionStore, RemovalHistoryStore, PreferencesStore,
                         ReviewedLedgerStore,
@@ -140,7 +141,9 @@ Makefile                Dev commands (test, lint, typecheck, check)
 - **Provider pattern**: Music services implement `MusicProviderInterface`.
   `AppleMusicProvider` is the concrete implementation (Spotify was removed,
   #140; the interface stays so another service can be added);
-  `MockMusicProvider` is used for testing/development.
+  `MockMusicProvider` is used for testing/development. `SiftProvider` renders
+  `MusicProviderHost`, which creates the provider once per provider change and
+  runs the only playback poller; every `useMusicProvider` shares it.
 - **Session persistence**: `SessionStore` saves/loads session state via AsyncStorage.
   Sessions auto-save after every decision. User settings (`startAtChorus`) are
   preferences, not session state: `PreferencesStore` persists them and

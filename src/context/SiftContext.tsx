@@ -13,6 +13,7 @@ import {
   DEFAULT_PREFERENCES,
 } from '../types';
 import { saveSession, clearSession } from '../services/SessionStore';
+import { MusicProviderHost } from './MusicProviderContext';
 import { loadPreferences, savePreferences } from '../services/PreferencesStore';
 import { sortTracks } from '../utils/sorting';
 
@@ -499,6 +500,11 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     return () => subscription.remove();
   }, [flushPendingSave]);
 
+  const onPlaybackPosition = useCallback(
+    (position: number) => dispatch({ type: 'SET_PLAYBACK_POSITION', position }),
+    [dispatch],
+  );
+
   const currentTrack = state.tracks[state.cursor];
   const nextTrack = state.tracks[state.cursor + 1];
   const nextNextTrack = state.tracks[state.cursor + 2];
@@ -600,7 +606,19 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     [state, dispatch, currentTrack, nextTrack, nextNextTrack, remaining, total, decide, startFresh, resetToSetup, flushPendingSave, togglePlayPause, setStartAtChorus, seek, skipBackward, skipForward]
   );
 
-  return <SiftContext.Provider value={value}>{children}</SiftContext.Provider>;
+  return (
+    <SiftContext.Provider value={value}>
+      {/* Polls only on the Sift screen: the last decision moves to Done
+          without clearing isPlaying, and the player there is gone. */}
+      <MusicProviderHost
+        provider={state.provider}
+        isPlaying={state.isPlaying && state.phase === 'sifting'}
+        onPosition={onPlaybackPosition}
+      >
+        {children}
+      </MusicProviderHost>
+    </SiftContext.Provider>
+  );
 }
 
 export function useSift(): SiftContextValue {

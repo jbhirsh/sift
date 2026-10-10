@@ -170,7 +170,12 @@ export default function PlayerControls() {
 
         {/* Playback controls */}
         <View style={styles.controlsRow}>
-          <TouchableOpacity onPress={skipBackward} style={styles.secondaryButton}>
+          <TouchableOpacity
+            onPress={skipBackward}
+            style={styles.secondaryButton}
+            accessibilityRole="button"
+            accessibilityLabel="Back 15 seconds"
+          >
             <SymbolView name="gobackward.15" size={20} tintColor={colors.textSecondary} />
           </TouchableOpacity>
 
@@ -182,7 +187,12 @@ export default function PlayerControls() {
             <SymbolView name={state.isPlaying ? 'pause.fill' : 'play.fill'} size={28} tintColor={colors.text} />
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={skipForward} style={styles.secondaryButton}>
+          <TouchableOpacity
+            onPress={skipForward}
+            style={styles.secondaryButton}
+            accessibilityRole="button"
+            accessibilityLabel="Forward 15 seconds"
+          >
             <SymbolView name="goforward.15" size={20} tintColor={colors.textSecondary} />
           </TouchableOpacity>
         </View>
