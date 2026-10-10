@@ -980,6 +980,17 @@ describe('useMusicProvider — observable state', () => {
     expect(mockProvider.loadPlaylists).toHaveBeenCalledTimes(2);
   });
 
+  test("the load breadcrumb never names the playlist (#147)", async () => {
+    await renderHarness([]);
+    await setPlaylistSource();
+    await act(async () => {
+      await api.loadTracks();
+    });
+    const messages = (Sentry.addBreadcrumb as jest.Mock).mock.calls.map(([crumb]) => String(crumb.message));
+    expect(messages).toContain('Loaded 1 tracks from a playlist');
+    expect(messages.join('\n')).not.toContain('My Playlist');
+  });
+
   // ── createPlaylist lifecycle ─────────────────────────
 
   test('createPlaylist shows busy while running, then created, and clears stale errors', async () => {

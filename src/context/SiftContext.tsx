@@ -490,15 +490,16 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
 
   const decide = useCallback(
     (decision: Decision) => {
-      const track = state.tracks[state.cursor];
+      // The card's position, never its name: track names are listening
+      // history (#147).
       Sentry.addBreadcrumb({
         category: 'user-action',
-        message: `Decision: ${decision} on "${track?.name ?? 'unknown'}"`,
+        message: `Decision: ${decision} on card ${state.cursor + 1} of ${state.tracks.length}`,
         level: 'info',
       });
       dispatch({ type: 'DECIDE', decision });
     },
-    [dispatch, state.tracks, state.cursor]
+    [dispatch, state.tracks.length, state.cursor]
   );
 
   // Drop a debounced save that hasn't been written: the session it holds is
