@@ -1,5 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { saveSession, loadSession, clearSession, hasSession } from '../../src/services/SessionStore';
+import type * as SessionStoreModule from '../../src/services/SessionStore';
 import { SiftSession } from '../../src/types';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -13,9 +12,21 @@ jest.mock('@sentry/react-native', () => ({
   addBreadcrumb: jest.fn(),
 }));
 
-const mockGetItem = AsyncStorage.getItem as jest.Mock;
-const mockSetItem = AsyncStorage.setItem as jest.Mock;
-const mockRemoveItem = AsyncStorage.removeItem as jest.Mock;
+// The store keeps module state (the track list it last wrote, whether a
+// legacy session may remain), so each test gets a fresh copy of the module
+// and of its mocks.
+let saveSession: typeof SessionStoreModule.saveSession;
+let loadSession: typeof SessionStoreModule.loadSession;
+let clearSession: typeof SessionStoreModule.clearSession;
+let hasSession: typeof SessionStoreModule.hasSession;
+let mockGetItem: jest.Mock;
+let mockSetItem: jest.Mock;
+let mockRemoveItem: jest.Mock;
+let Sentry: { captureException: jest.Mock; addBreadcrumb: jest.Mock };
+
+/** A session saved by a build before the compact format (#150). */
+const storeLegacy = (json: string | null) =>
+  mockGetItem.mockImplementation(async (key: string) => (key === 'sift_session' ? json : null));
 
 const sampleSession: SiftSession = {
   tracks: [
@@ -39,23 +50,53 @@ const sampleSession: SiftSession = {
 };
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  jest.resetModules();
+  const AsyncStorage = require('@react-native-async-storage/async-storage');
+  mockGetItem = AsyncStorage.getItem;
+  mockSetItem = AsyncStorage.setItem;
+  mockRemoveItem = AsyncStorage.removeItem;
+  Sentry = require('@sentry/react-native');
+  ({ saveSession, loadSession, clearSession, hasSession } = require('../../src/services/SessionStore'));
 });
 
 describe('saveSession', () => {
-  it('stores session as JSON', async () => {
+  it('stores the track list once and a compact record of ids, then drops the legacy key (#150)', async () => {
     mockSetItem.mockResolvedValue(undefined);
+    mockRemoveItem.mockResolvedValue(undefined);
 
     await saveSession(sampleSession);
 
+    expect(mockSetItem).toHaveBeenCalledTimes(2);
+    const [tracksKey, tracksJson] = mockSetItem.mock.calls[0];
+    const [stateKey, stateJson] = mockSetItem.mock.calls[1];
+    expect(tracksKey).toBe('sift_session_v2_tracks_a');
+    expect(JSON.parse(tracksJson).tracks).toEqual(sampleSession.tracks);
+    expect(stateKey).toBe('sift_session_v2');
+    expect(JSON.parse(stateJson)).toMatchObject({ v: 2, tracksSlot: 'a', cursor: 0, keptIds: [], sortOrder: 'least-played' });
+    expect(stateJson).not.toContain('Test Song');
+    // Only after the new record is down.
+    expect(mockRemoveItem).toHaveBeenCalledWith('sift_session');
+    expect(mockSetItem.mock.invocationCallOrder[1]).toBeLessThan(mockRemoveItem.mock.invocationCallOrder[0]);
+
+    // The next decision writes only the record.
+    mockSetItem.mockClear();
+    mockRemoveItem.mockClear();
+    await saveSession({ ...sampleSession, cursor: 1, skipped: sampleSession.tracks });
     expect(mockSetItem).toHaveBeenCalledTimes(1);
-    expect(mockSetItem).toHaveBeenCalledWith('sift_session', JSON.stringify(sampleSession));
+    expect(mockSetItem.mock.calls[0][0]).toBe('sift_session_v2');
+    expect(mockRemoveItem).not.toHaveBeenCalled();
+  });
+
+  it('keeps the legacy session when the new record fails to write', async () => {
+    mockSetItem.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('disk full'));
+    await saveSession(sampleSession);
+    expect(mockRemoveItem).not.toHaveBeenCalled();
   });
 });
 
 describe('loadSession', () => {
   it('returns parsed session', async () => {
-    mockGetItem.mockResolvedValue(JSON.stringify(sampleSession));
+    storeLegacy(JSON.stringify(sampleSession));
 
     const result = await loadSession();
 
@@ -63,7 +104,7 @@ describe('loadSession', () => {
   });
 
   it('returns null when no session', async () => {
-    mockGetItem.mockResolvedValue(null);
+    storeLegacy(null);
 
     const result = await loadSession();
 
@@ -71,7 +112,7 @@ describe('loadSession', () => {
   });
 
   it('returns null on invalid JSON', async () => {
-    mockGetItem.mockResolvedValue('not valid json {{{');
+    storeLegacy('not valid json {{{');
 
     const result = await loadSession();
 
@@ -80,19 +121,20 @@ describe('loadSession', () => {
 });
 
 describe('clearSession', () => {
-  it('removes the key', async () => {
+  it('removes the compact record, both track lists and any legacy session', async () => {
     mockRemoveItem.mockResolvedValue(undefined);
 
     await clearSession();
 
-    expect(mockRemoveItem).toHaveBeenCalledTimes(1);
-    expect(mockRemoveItem).toHaveBeenCalledWith('sift_session');
+    expect(mockRemoveItem.mock.calls.map(([key]) => key)).toEqual([
+      'sift_session_v2', 'sift_session_v2_tracks_a', 'sift_session_v2_tracks_b', 'sift_session',
+    ]);
   });
 });
 
 describe('hasSession', () => {
   it('returns true when session exists', async () => {
-    mockGetItem.mockResolvedValue(JSON.stringify(sampleSession));
+    storeLegacy(JSON.stringify(sampleSession));
 
     const result = await hasSession();
 
@@ -100,7 +142,7 @@ describe('hasSession', () => {
   });
 
   it('returns false when no session', async () => {
-    mockGetItem.mockResolvedValue(null);
+    storeLegacy(null);
 
     const result = await hasSession();
 
@@ -118,7 +160,6 @@ describe('hasSession', () => {
 
 describe('saveSession error handling', () => {
   it('reports the caught error to Sentry with the session-save flow tag', async () => {
-    const Sentry = jest.requireMock('@sentry/react-native');
     const error = new Error('write error');
     mockSetItem.mockRejectedValue(error);
 
@@ -135,8 +176,7 @@ describe('saveSession error handling', () => {
 
 describe('loadSession error handling', () => {
   it('reports parse failures to Sentry with the session-load flow tag', async () => {
-    const Sentry = jest.requireMock('@sentry/react-native');
-    mockGetItem.mockResolvedValue('not valid json {{{');
+    storeLegacy('not valid json {{{');
 
     const result = await loadSession();
 
@@ -150,7 +190,6 @@ describe('loadSession error handling', () => {
 
 describe('clearSession error handling', () => {
   it('records a warning breadcrumb describing the clear failure', async () => {
-    const Sentry = jest.requireMock('@sentry/react-native');
     mockRemoveItem.mockRejectedValue(new Error('remove error'));
 
     await clearSession();
@@ -170,7 +209,6 @@ describe('clearSession error handling', () => {
 
 describe('hasSession error handling', () => {
   it('records a warning breadcrumb describing the check failure', async () => {
-    const Sentry = jest.requireMock('@sentry/react-native');
     mockGetItem.mockRejectedValue(new Error('storage error'));
 
     const result = await hasSession();
@@ -188,7 +226,6 @@ describe('hasSession error handling', () => {
 });
 
 describe('loadSession with a session saved by a different build', () => {
-  const Sentry = jest.requireMock('@sentry/react-native');
 
   beforeEach(() => {
     // An earlier suite leaves setItem rejecting; these tests need it to work.
@@ -203,7 +240,7 @@ describe('loadSession with a session saved by a different build', () => {
     ['cursor', { ...sampleSession, cursor: undefined }],
     ['sortOrder', { ...sampleSession, sortOrder: undefined }],
   ])('treats a session missing %s as no session, reports it and sets it aside', async (_field, stored) => {
-    mockGetItem.mockResolvedValue(JSON.stringify(stored));
+    storeLegacy(JSON.stringify(stored));
     mockRemoveItem.mockResolvedValue(undefined);
 
     const result = await loadSession();
@@ -221,21 +258,21 @@ describe('loadSession with a session saved by a different build', () => {
   });
 
   it('rejects a session whose tracks are malformed', async () => {
-    mockGetItem.mockResolvedValue(JSON.stringify({ ...sampleSession, tracks: [{ id: '1' }] }));
+    storeLegacy(JSON.stringify({ ...sampleSession, tracks: [{ id: '1' }] }));
 
     expect(await loadSession()).toBeNull();
     expect(mockRemoveItem).toHaveBeenCalledWith('sift_session');
   });
 
   it('rejects a stored value that is valid JSON but not an object', async () => {
-    mockGetItem.mockResolvedValue('null');
+    storeLegacy('null');
 
     expect(await loadSession()).toBeNull();
     expect(mockRemoveItem).toHaveBeenCalledWith('sift_session');
   });
 
   it('sets unparseable JSON aside so it is not offered again', async () => {
-    mockGetItem.mockResolvedValue('not valid json {{{');
+    storeLegacy('not valid json {{{');
 
     expect(await loadSession()).toBeNull();
     expect(mockSetItem).toHaveBeenCalledWith('sift_session.invalid', 'not valid json {{{');
@@ -243,7 +280,7 @@ describe('loadSession with a session saved by a different build', () => {
   });
 
   it('leaves an invalid session in place when it cannot be set aside', async () => {
-    mockGetItem.mockResolvedValue(JSON.stringify({ ...sampleSession, tracks: undefined }));
+    storeLegacy(JSON.stringify({ ...sampleSession, tracks: undefined }));
     mockSetItem.mockRejectedValue(new Error('storage full'));
 
     expect(await loadSession()).toBeNull();
@@ -271,7 +308,7 @@ describe('loadSession with a session saved by a different build', () => {
       skipped: [local(2)],
       pendingKeeps: [local(1)],
     };
-    mockGetItem.mockResolvedValue(JSON.stringify(legacy));
+    storeLegacy(JSON.stringify(legacy));
 
     const result = await loadSession();
 
@@ -310,7 +347,7 @@ describe('loadSession with a session saved by a different build', () => {
       removalErrors: [],
       siftedPlaylistId: null,
     };
-    mockGetItem.mockResolvedValue(JSON.stringify(full));
+    storeLegacy(JSON.stringify(full));
 
     expect(await loadSession()).toEqual(full);
     expect(Sentry.captureException).not.toHaveBeenCalled();

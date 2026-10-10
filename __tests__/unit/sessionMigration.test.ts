@@ -7,6 +7,8 @@ import v2 from '../fixtures/sessions/v2-provider-source.json';
 import v3 from '../fixtures/sessions/v3-repair-names.json';
 import v4 from '../fixtures/sessions/v4-current.json';
 import spotify from '../fixtures/sessions/spotify-local-file.json';
+import v5State from '../fixtures/sessions/v5-compact-state.json';
+import v5Tracks from '../fixtures/sessions/v5-compact-tracks.json';
 
 jest.mock('@sentry/react-native', () => ({
   captureException: jest.fn(),
@@ -66,6 +68,18 @@ describe('saved sessions from every build (#61)', () => {
     const state = await resumeFrom(v4);
     expect(state.failedRemovalIds).toEqual(['b']);
     expect(state.siftedPlaylistId).toBeNull();
+  });
+
+  test('the compact shape (#150): the record joins its track list', async () => {
+    await AsyncStorage.setItem('sift_session_v2', JSON.stringify(v5State));
+    await AsyncStorage.setItem('sift_session_v2_tracks_b', JSON.stringify(v5Tracks));
+    const saved = await loadSession();
+    if (!saved) throw new Error('fixture did not load');
+    const state = resumeState(saved, { provider: 'apple-music', connectionStatus: 'connected' });
+    expect(state.cursor).toBe(3);
+    expect(state.kept.map((t) => t.name)).toEqual(['Peaches']);
+    expect(state.removed.map((t) => t.name)).toEqual(['Stay']);
+    expect(state.failedRemovalIds).toEqual(['b']);
   });
 
   test('a finished session resumes to Done', async () => {
