@@ -4,6 +4,7 @@ import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
 import { Track } from '../../src/types';
 import * as SessionStore from '../../src/services/SessionStore';
+import * as Sentry from '@sentry/react-native';
 
 jest.mock('../../src/services/SessionStore');
 jest.mock('@sentry/react-native', () => ({
@@ -117,6 +118,14 @@ describe('SiftProvider', () => {
     const { getByTestId } = await renderWithProvider([mockTrackA, mockTrackB]);
     await fireEvent.press(getByTestId('decide-remove'));
     expect(getByTestId('removedCount').props.children).toBe(1);
+  });
+
+  test('the decision breadcrumb names the card position, never the track (#147)', async () => {
+    const { getByTestId } = await renderWithProvider([mockTrackA, mockTrackB]);
+    await fireEvent.press(getByTestId('decide-keep'));
+    const messages = (Sentry.addBreadcrumb as jest.Mock).mock.calls.map(([crumb]) => crumb.message);
+    expect(messages).toContain('Decision: keep on card 1 of 2');
+    expect(messages.join('\n')).not.toContain('Track A');
   });
 
   test('decide skip advances cursor and adds to skipped', async () => {

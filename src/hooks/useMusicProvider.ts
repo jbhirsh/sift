@@ -359,7 +359,8 @@ export function useMusicProvider() {
 
       Sentry.addBreadcrumb({
         category: 'music-provider',
-        message: `Loaded ${tracks.length} tracks from ${label}`,
+        // Not the playlist's name (#147).
+        message: `Loaded ${tracks.length} tracks from ${source.type === 'playlist' ? 'a playlist' : 'the library'}`,
         level: 'info',
       });
 

@@ -83,6 +83,13 @@ jest.mock('../../src/hooks/useResolvedArtwork', () => ({
 }));
 
 import App from '../../src/App';
+import * as Sentry from '@sentry/react-native';
+import { scrubBreadcrumb, scrubEvent } from '../../src/utils/sentryScrub';
+
+// Captured at import, before any beforeEach clears the mock: App configures
+// Sentry once, at module load.
+const sentryConfig = (Sentry.init as jest.Mock).mock.calls[0]?.[0];
+const replayCallsAtImport = (Sentry.mobileReplayIntegration as jest.Mock).mock.calls.length;
 
 const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
 const mockFrame = { x: 0, y: 0, width: 390, height: 844 };
@@ -102,6 +109,27 @@ describe('App', () => {
       { id: '1', name: 'A', artist: 'B', album: 'C', duration: 100, playCount: 1, dateAdded: '2020-01-01' },
       { id: '2', name: 'D', artist: 'E', album: 'F', duration: 120, playCount: 2, dateAdded: '2020-01-02' },
     ]);
+  });
+
+  test('Sentry collects only what crash diagnosis needs and scrubs names (#147)', () => {
+    expect(sentryConfig).toMatchObject({
+      sendDefaultPii: false,
+      beforeBreadcrumb: scrubBreadcrumb,
+      beforeSend: scrubEvent,
+      beforeSendTransaction: scrubEvent,
+    });
+    expect(sentryConfig.tracesSampleRate).toBeLessThanOrEqual(0.05);
+    // No session replay, profiling or log capture.
+    expect(sentryConfig).not.toHaveProperty('replaysSessionSampleRate');
+    expect(sentryConfig).not.toHaveProperty('replaysOnErrorSampleRate');
+    expect(sentryConfig).not.toHaveProperty('profilesSampleRate');
+    expect(sentryConfig).not.toHaveProperty('enableLogs');
+    expect(replayCallsAtImport).toBe(0);
+    expect(sentryConfig.integrations).toHaveLength(1);
+    // No trace headers to other services, and no native network breadcrumbs
+    // (native crash reports skip the scrubber).
+    expect(sentryConfig.tracePropagationTargets).toEqual([]);
+    expect(sentryConfig.enableNetworkBreadcrumbs).toBe(false);
   });
 
   test('renders SetupScreen initially', async () => {

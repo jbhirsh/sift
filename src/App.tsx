@@ -20,22 +20,30 @@ import SiftScreen from './screens/SiftScreen';
 import DoneScreen from './screens/DoneScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { SETTINGS_BUTTON, SPACING } from './theme';
+import { scrubBreadcrumb, scrubEvent } from './utils/sentryScrub';
 
 Sentry.init({
   // DSN is read from the EXPO_PUBLIC_SENTRY_DSN env var (see .env.example).
   // Provide the real value in an untracked .env.local for local runs; leave
   // it unset to disable Sentry reporting entirely.
   dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
-  sendDefaultPii: true,
-  tracesSampleRate: 0.2,
-  enableLogs: true,
-  profilesSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1.0,
-  replaysSessionSampleRate: 0.1,
-  integrations: [
-    Sentry.reactNativeTracingIntegration(),
-    Sentry.mobileReplayIntegration(),
-  ],
+  // Only what diagnosing crashes needs (#147): no default PII, no session
+  // replay, no profiling, few traces. JavaScript-side breadcrumbs and events
+  // have quoted names and URL queries scrubbed (utils/sentryScrub) before
+  // they leave.
+  sendDefaultPii: false,
+  tracesSampleRate: 0.05,
+  integrations: [Sentry.reactNativeTracingIntegration()],
+  // No trace headers on requests to other services (LRCLIB, Spotify).
+  tracePropagationTargets: [],
+  // Native crash reports skip the JavaScript hooks below, and the native SDK
+  // records every NSURLSession request as a breadcrumb, LRCLIB's track and
+  // artist query included. The React Native SDK passes options through to
+  // sentry-cocoa's options dictionary, but doesn't declare this one.
+  ...({ enableNetworkBreadcrumbs: false } as Record<string, unknown>),
+  beforeBreadcrumb: scrubBreadcrumb,
+  beforeSend: scrubEvent,
+  beforeSendTransaction: scrubEvent,
 });
 
 function PhaseRouter() {
