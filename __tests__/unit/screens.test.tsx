@@ -1073,6 +1073,106 @@ describe('SetupScreen', () => {
   });
 });
 
+describe('SetupScreen: songs sifted before (#143)', () => {
+  const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+  afterEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  function SkipProbe() {
+    const { state } = useSift();
+    return <Text testID="probe-skip">{`${state.phase}:${state.skipFiltering}`}</Text>;
+  }
+
+  test('no switch before anything was kept', async () => {
+    const { queryByTestId } = await renderWithProviders(<SetupScreen />);
+    await act(async () => {});
+    expect(queryByTestId('include-sifted-switch')).toBeNull();
+  });
+
+  test('says how many kept songs a library sift leaves out, and the switch brings them back', async () => {
+    await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({ 'apple-music:library': ['a', 'b', 'c'] }));
+    const { getByTestId } = await renderWithProviders(<><SetupScreen /><SkipProbe /></>);
+    await act(async () => {});
+    expect(getByTestId('reviewed-note').props.children).toBe('3 songs you’ve already kept are left out of new sifts.');
+    await act(async () => {
+      await fireEvent(getByTestId('include-sifted-switch'), 'valueChange', true);
+    });
+    expect(getByTestId('reviewed-note').props.children).toBe('Songs you’ve already kept are included in new sifts.');
+    await act(async () => {
+      await fireEvent.press(getByTestId('setup-start-sifting'));
+    });
+    expect(getByTestId('probe-skip').props.children).toBe('loading:true');
+  });
+
+  test('left off, a new library sift filters them out', async () => {
+    await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({ 'apple-music:library': ['a'] }));
+    const { getByTestId } = await renderWithProviders(<><SetupScreen /><SkipProbe /></>);
+    await act(async () => {});
+    expect(getByTestId('reviewed-note').props.children).toBe('1 song you’ve already kept is left out of new sifts.');
+    await act(async () => {
+      await fireEvent.press(getByTestId('setup-start-sifting'));
+    });
+    expect(getByTestId('probe-skip').props.children).toBe('loading:false');
+  });
+});
+
+describe('SetupScreen: Start Over and songs sifted before (#143)', () => {
+  const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+  afterEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  function BackedOut() {
+    const { dispatch, decide, state } = useSift();
+    // One-shot: decide's identity changes with state, and a re-run would
+    // undo the Start Over under test.
+    const ran = React.useRef(false);
+    React.useEffect(() => {
+      if (ran.current) return;
+      ran.current = true;
+      dispatch({ type: 'LOAD_TRACKS', tracks: [mockTrackA, mockTrackB, mockTrackC] });
+      decide('keep');
+      dispatch({ type: 'SET_PHASE', phase: 'setup' });
+    }, [dispatch, decide]);
+    return (
+      <>
+        <SetupScreen />
+        <Text testID="probe-skip">{`${state.phase}:${state.skipFiltering}`}</Text>
+      </>
+    );
+  }
+
+  test.each([
+    [false, 'loading:false'],
+    [true, 'loading:true'],
+  ])('a library Start Over follows the switch (on: %s)', async (on, expected) => {
+    jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
+      buttons?.find((b) => b.style === 'destructive')?.onPress?.();
+    });
+    const { InteractionManager } = require('react-native');
+    jest.spyOn(InteractionManager, 'runAfterInteractions').mockImplementation((cb: unknown) => {
+      (cb as () => void)();
+      return { then: () => undefined, done: () => undefined, cancel: () => undefined };
+    });
+    await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({ 'apple-music:library': ['x'] }));
+    const { getByTestId } = await renderWithProviders(<BackedOut />);
+    await act(async () => {});
+    // Shown beside the resume block too: it decides what Start Over loads.
+    if (on) {
+      await act(async () => {
+        await fireEvent(getByTestId('include-sifted-switch'), 'valueChange', true);
+      });
+    }
+    await act(async () => {
+      await fireEvent.press(getByTestId('setup-start-over'));
+    });
+    await act(async () => {});
+    expect(getByTestId('probe-skip').props.children).toBe(expected);
+    jest.restoreAllMocks();
+  });
+});
+
 describe('LoadingScreen', () => {
   test('renders brand text', async () => {
     const { getByTestId } = await renderWithProviders(<LoadingScreen />);

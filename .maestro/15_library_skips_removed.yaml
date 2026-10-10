@@ -76,6 +76,20 @@ name: "Library Sift Skips Removed Songs"
       id: "setup-brand"
     timeout: 30000
 
+# The 8 kept songs would be left out too (#143, flow 17): include them, so
+# only the removal filter is in play. It applies either way.
+- extendedWaitUntil:
+    visible:
+      id: "include-sifted-switch"
+    timeout: 30000
+- tapOn:
+    id: "include-sifted-switch"
+- extendedWaitUntil:
+    visible:
+      id: "reviewed-note"
+      text: "Songs you’ve already kept are included in new sifts\\."
+    timeout: 10000
+
 - tapOn: "Start Sifting"
 
 # Peaches' removal failed, so it is offered again; drivers license was
