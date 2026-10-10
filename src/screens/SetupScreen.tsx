@@ -27,7 +27,7 @@ import { clearArtworkCache } from '../hooks/useResolvedArtwork';
 import { clearHistoryForSource } from '../services/RemovalHistoryStore';
 import { loadReviewedIds } from '../services/ReviewedLedgerStore';
 import { ledgerKey, reviewedNote } from '../utils/reviewedLedger';
-import { RADIUS, SPACING } from '../theme';
+import { CONTENT_COLUMN, RADIUS, SPACING } from '../theme';
 import {
   Playlist,
   SiftSession,
@@ -658,6 +658,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    ...CONTENT_COLUMN,
     flexGrow: 1,
     paddingHorizontal: 40,
   },
