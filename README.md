@@ -29,7 +29,7 @@ Settings: the optional **Start at chorus** switch (Apple Music).
 - **"Liquid glass" UI** — a reusable blur/material design system (`GlassCard`, `GlassBackground`) with centralized design tokens and automatic light/dark theming.
 - **Start at chorus** — an optional setting that starts each song at its most recognizable part. The chorus is found from timed lyrics ([LRCLIB](https://lrclib.net)): the block of lines a song repeats. When that fails, ShazamKit locates Apple Music's preview clip (which labels start at "the good part") inside the full track. Results are cached per song, and the next cards are resolved ahead of time so swiping stays instant.
 - **Crash-safe sessions** — all state lives in a single typed `useReducer`; sessions auto-save (debounced) to `AsyncStorage` after every decision and resume exactly where you left off.
-- **Observability** — Sentry is wired for errors, tracing, and session replay, with breadcrumbs on every user action and provider call.
+- **Observability** — Sentry is wired for errors and sampled tracing (5%), with breadcrumbs on user actions and provider calls. No session replay, profiling or default PII; breadcrumbs never name a track or playlist, and quoted names and URL queries are scrubbed from JavaScript events before they leave the device (`utils/sentryScrub`).
 - **Tested & CI-gated** — 28 Jest unit suites (80% coverage threshold) run on every PR via GitHub Actions, plus 7 Maestro E2E flows runnable on demand.
 
 ---
