@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { Alert, Linking } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { useSift } from '../context/SiftContext';
-import { createMusicProvider, MusicProviderService } from '../services';
+import { useMusicProviderService } from '../context/MusicProviderContext';
 import { logRemoval, loadHistory, removeFromHistory } from '../services/RemovalHistoryStore';
 import { sortTracks } from '../utils/sorting';
 import { trackIdentity } from '../utils/trackIdentity';
@@ -11,7 +11,6 @@ import { ledgerKey } from '../utils/reviewedLedger';
 import { loadReviewedIds, markReviewed } from '../services/ReviewedLedgerStore';
 import { Playlist, Track } from '../types';
 
-const POLL_INTERVAL_MS = 500;
 const SKIP_SECONDS = 15;
 // Upper bound on how long clearSiftedPlaylist waits for in-flight keeps to
 // settle. A native add that never settles would otherwise park the clear's
@@ -27,16 +26,12 @@ const CLEAR_KEEP_QUEUE_TIMEOUT_MS = 15000;
 let keepQueue: Promise<void> = Promise.resolve();
 
 /**
- * Hook that manages the active music provider and playback polling.
- *
- * Creates/recreates the provider when `state.provider` changes, polls
- * playback position while playing, and exposes convenience methods that
- * dispatch the appropriate actions to SiftContext.
+ * The music provider's operations, wired to SiftContext. The provider itself
+ * and the playback poller are shared, owned by MusicProviderHost (#144).
  */
 export function useMusicProvider() {
   const { state, dispatch } = useSift();
-  const providerRef = useRef<MusicProviderService>(createMusicProvider(state.provider));
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const providerRef = useMusicProviderService();
 
   const siftedPlaylistIdRef = useRef<string | null>(null);
   const siftedPlaylistForRef = useRef<string | null>(null);
@@ -77,55 +72,12 @@ export function useMusicProvider() {
     };
   }, []);
 
-  // Recreate provider when the provider type changes
-  useEffect(() => {
-    providerRef.current = createMusicProvider(state.provider);
-  }, [state.provider]);
-
-  // ── Playback position polling ─────────────────────────
-
-  const startPolling = useCallback(() => {
-    if (pollingRef.current) return; // already polling
-    pollingRef.current = setInterval(() => {
-      const { position, isPlaying } = providerRef.current.getPlaybackState();
-      // Every screen's hook polls while anything plays, but each hook owns
-      // its own provider instance, and only the one that started the song
-      // knows where it is: the others (a per-instance player, like the E2E
-      // mock's, that never played) would report 0 and overwrite the real
-      // position. Apple
-      // Music's player is shared, so every instance reports the same.
-      if (isPlaying) dispatch({ type: 'SET_PLAYBACK_POSITION', position });
-    }, POLL_INTERVAL_MS);
-  }, [dispatch]);
-
-  const stopPolling = useCallback(() => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-  }, []);
-
-  // Start/stop polling based on isPlaying state
-  useEffect(() => {
-    if (state.isPlaying) {
-      startPolling();
-    } else {
-      stopPolling();
-    }
-    return stopPolling;
-  }, [state.isPlaying, startPolling, stopPolling]);
-
-  // Clean up on unmount
-  useEffect(() => {
-    return () => stopPolling();
-  }, [stopPolling]);
-
   // ── Provider methods ──────────────────────────────────
 
   /** Whether the provider is already authorized (no prompt). */
   const isAuthorized = useCallback(async (): Promise<boolean> => {
     return providerRef.current.isAuthorized();
-  }, []);
+  }, [providerRef]);
 
   /**
    * Prompt for authorization and mirror the result into connectionStatus.
@@ -146,7 +98,7 @@ export function useMusicProvider() {
       dispatch({ type: 'SET_CONNECTION_STATUS', status: 'disconnected' });
       return false;
     }
-  }, [dispatch]);
+  }, [providerRef, dispatch]);
 
   const loadLibrary = useCallback(async () => {
     dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0, message: 'Loading library\u2026' });
@@ -185,7 +137,7 @@ export function useMusicProvider() {
       const message = err instanceof Error ? err.message : 'Failed to load library';
       dispatch({ type: 'SET_LOAD_ERROR', error: message });
     }
-  }, [dispatch, state.sortOrder]);
+  }, [providerRef, dispatch, state.sortOrder]);
 
   const play = useCallback(
     async (trackID: string, position?: number) => {
@@ -197,7 +149,7 @@ export function useMusicProvider() {
         Sentry.addBreadcrumb({ category: 'playback', message: `Play failed: ${err}`, level: 'warning' });
       }
     },
-    [dispatch]
+    [providerRef, dispatch]
   );
 
   const pause = useCallback(async () => {
@@ -207,7 +159,7 @@ export function useMusicProvider() {
     } catch (err) {
       Sentry.addBreadcrumb({ category: 'playback', message: `Pause failed: ${err}`, level: 'warning' });
     }
-  }, [dispatch]);
+  }, [providerRef, dispatch]);
 
   /** Pause and reset the position: the current track is being replaced. */
   const stop = useCallback(async () => {
@@ -222,21 +174,21 @@ export function useMusicProvider() {
     } catch (err) {
       Sentry.addBreadcrumb({ category: 'playback', message: `Resume failed: ${err}`, level: 'warning' });
     }
-  }, [dispatch]);
+  }, [providerRef, dispatch]);
 
   const seek = useCallback(
     (position: number) => {
       providerRef.current.seek(position);
       dispatch({ type: 'SET_PLAYBACK_POSITION', position });
     },
-    [dispatch]
+    [providerRef, dispatch]
   );
 
   /** Where a track's preview sits in the full track (a chorus hint); null when unknown. */
   const previewOffset = useCallback(
     async (trackID: string): Promise<number | null> =>
       (await providerRef.current.previewOffset?.(trackID)) ?? null,
-    []
+    [providerRef]
   );
 
   const togglePlayPause = useCallback(async () => {
@@ -254,14 +206,14 @@ export function useMusicProvider() {
     const newPos = Math.min(currentTrack.duration, position + SKIP_SECONDS);
     providerRef.current.seek(newPos);
     dispatch({ type: 'SET_PLAYBACK_POSITION', position: newPos });
-  }, [state.tracks, state.cursor, dispatch]);
+  }, [providerRef, state.tracks, state.cursor, dispatch]);
 
   const skipBackward = useCallback(() => {
     const { position } = providerRef.current.getPlaybackState();
     const newPos = Math.max(0, position - SKIP_SECONDS);
     providerRef.current.seek(newPos);
     dispatch({ type: 'SET_PLAYBACK_POSITION', position: newPos });
-  }, [dispatch]);
+  }, [providerRef, dispatch]);
 
   const loadPlaylists = useCallback(async (): Promise<Playlist[]> => {
     try {
@@ -276,7 +228,7 @@ export function useMusicProvider() {
       Sentry.captureException(err, { tags: { flow: 'load-playlists' } });
       return [];
     }
-  }, []);
+  }, [providerRef]);
 
   const loadTracks = useCallback(async (options?: { skipFiltering?: boolean }) => {
     if (loadingInProgressRef.current) {
@@ -435,7 +387,7 @@ export function useMusicProvider() {
     } finally {
       loadingInProgressRef.current = false;
     }
-  }, [dispatch, state.source, state.sortOrder, state.siftedPlaylistId, state.provider]);
+  }, [providerRef, dispatch, state.source, state.sortOrder, state.siftedPlaylistId, state.provider]);
 
   const removeTrack = useCallback(
     async (track: Track) => {
@@ -468,7 +420,7 @@ export function useMusicProvider() {
         if (appleLibrary) await removeFromHistory(track.id, source);
       }
     },
-    [dispatch, state.source, state.provider],
+    [providerRef, dispatch, state.source, state.provider],
   );
 
   const restoreTrack = useCallback(
@@ -516,7 +468,7 @@ export function useMusicProvider() {
         dispatch({ type: 'ADD_REMOVAL_ERROR', error: `${track.name}: ${message}` });
       }
     },
-    [dispatch, state.source, state.provider],
+    [providerRef, dispatch, state.source, state.provider],
   );
 
   const createPlaylist = useCallback(
@@ -534,7 +486,7 @@ export function useMusicProvider() {
         dispatch({ type: 'SET_CREATING_PLAYLIST', creating: false });
       }
     },
-    [dispatch]
+    [providerRef, dispatch]
   );
 
   const saveSiftedPlaylist = useCallback(
@@ -626,7 +578,7 @@ export function useMusicProvider() {
         dispatch({ type: 'SET_CREATING_PLAYLIST', creating: false });
       }
     },
-    [dispatch, state.siftedPlaylistId],
+    [providerRef, dispatch, state.siftedPlaylistId],
   );
 
   const findSiftedPlaylistWithRetry = useCallback(
@@ -652,7 +604,7 @@ export function useMusicProvider() {
       }
       return null;
     },
-    [],
+    [providerRef],
   );
 
   const keepTrack = useCallback(
@@ -744,7 +696,7 @@ export function useMusicProvider() {
       keepQueue = next;
       return next;
     },
-    [state.source, state.provider, state.siftedPlaylistId, findSiftedPlaylistWithRetry, dispatch],
+    [providerRef, state.source, state.provider, state.siftedPlaylistId, findSiftedPlaylistWithRetry, dispatch],
   );
 
   const warmCache = useCallback(async (trackIDs: string[]): Promise<void> => {
@@ -768,7 +720,7 @@ export function useMusicProvider() {
     } catch (err) {
       Sentry.captureException(err, { tags: { flow: 'warm-cache' } });
     }
-  }, []);
+  }, [providerRef]);
 
   /**
    * Empty the "<name> - Sifted" playlist. Returns false when the clear could
@@ -832,7 +784,7 @@ export function useMusicProvider() {
         return false;
       }
     },
-    [state.siftedPlaylistId],
+    [providerRef, state.siftedPlaylistId],
   );
 
   return {

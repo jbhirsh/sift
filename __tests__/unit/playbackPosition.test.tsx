@@ -6,12 +6,11 @@ import { useSift } from '../../src/context/SiftContext';
 import { renderWithProviders } from '../helpers/renderWithProviders';
 import { Track } from '../../src/types';
 
-// The Sift screen and its player controls each run their own
-// useMusicProvider, so each owns a provider instance, and both poll while a
-// song plays. Only the player controls' instance plays. With the real mock
-// provider (one player per instance), the screen's idle
-// instance used to report 0 and overwrite the position, so the clock stuck
-// at 0:00 and E2E flow 12 failed.
+// The Sift screen and its player controls each call useMusicProvider. Each
+// call used to own a provider instance and a poller; with the real mock
+// provider (one player per instance), the screen's idle instance reported 0
+// and overwrote the position, so the clock stuck at 0:00 and E2E flow 12
+// failed. Now they share one provider and one poller (#144).
 
 jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
   __esModule: true,
@@ -52,10 +51,10 @@ jest.mock('@sentry/react-native', () => ({
   addBreadcrumb: jest.fn(),
   captureException: jest.fn(),
 }));
-// The real mock provider, a new instance per hook, as in the E2E build.
+// The real mock provider, a new instance per call, as in the E2E build.
 jest.mock('../../src/services', () => {
   const { MockMusicProvider } = jest.requireActual('../../src/services/MockMusicProvider');
-  return { createMusicProvider: () => new MockMusicProvider() };
+  return { createMusicProvider: jest.fn(() => new MockMusicProvider()) };
 });
 jest.mock('../../src/services/SessionStore', () => ({
   hasSession: jest.fn().mockResolvedValue(false),
@@ -78,7 +77,7 @@ const toSeconds = (clock: string) => {
   return m * 60 + s;
 };
 
-describe('playback position with a provider per hook', () => {
+describe('playback position with one shared provider', () => {
   let fetchBefore: typeof globalThis.fetch;
   beforeEach(() => {
     jest.useFakeTimers();
@@ -111,5 +110,28 @@ describe('playback position with a provider per hook', () => {
     // The chorus estimate (20% of 200 s) lands within CHORUS_WAIT_MS.
     await advance(3000);
     expect(elapsed()).toBeGreaterThanOrEqual(13);
+  });
+
+  test('one provider for every screen, and a skip ahead holds while playing (#144)', async () => {
+    const { createMusicProvider } = jest.requireMock('../../src/services');
+    (createMusicProvider as jest.Mock).mockClear();
+    const { getByTestId, getByLabelText } = await renderWithProviders(
+      <SiftScreen />,
+      { initialTracks: [track('a', 'Peaches'), track('b', 'drivers license')] },
+    );
+    const elapsed = () => toSeconds(String(getByTestId('elapsed-time').props.children));
+    const advance = async (ms: number) => {
+      await act(async () => {
+        jest.advanceTimersByTime(ms);
+      });
+    };
+    await advance(2000);
+    const before = elapsed();
+    await fireEvent.press(getByLabelText('Forward 15 seconds'));
+    // Several polls later the position is still past the jump: no other
+    // instance reports its own idle player over it.
+    await advance(2000);
+    expect(elapsed()).toBeGreaterThanOrEqual(before + 15);
+    expect(createMusicProvider).toHaveBeenCalledTimes(1);
   });
 });
