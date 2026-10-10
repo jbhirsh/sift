@@ -7,7 +7,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
-import { SPACING, RADIUS } from '../theme';
+import { CONTENT_COLUMN, SPACING, RADIUS } from '../theme';
 import GlassCard from './GlassCard';
 import { Button } from './Button';
 import SessionStatRow from './SessionStatRow';
@@ -117,6 +117,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheetContainer: {
+    ...CONTENT_COLUMN,
     maxHeight: '70%',
   },
   sheet: {

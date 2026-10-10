@@ -30,7 +30,7 @@ import {
   nothingRemovedNote,
   removedListSubtitle,
 } from '../utils/sessionCopy';
-import { COLORS, RADIUS, SETTINGS_BUTTON, SPACING } from '../theme';
+import { COLORS, CONTENT_COLUMN, RADIUS, SETTINGS_BUTTON, SPACING } from '../theme';
 
 export default function DoneScreen() {
   const { state, dispatch, resetToSetup } = useSift();
@@ -543,6 +543,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
+    ...CONTENT_COLUMN,
     paddingBottom: 40,
   },
   titleSection: {

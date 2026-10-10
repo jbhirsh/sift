@@ -1,4 +1,4 @@
-import { SPACING, RADIUS, COLORS, SHADOWS } from '../../src/theme';
+import { SPACING, RADIUS, COLORS, SHADOWS, CONTENT_COLUMN } from '../../src/theme';
 
 describe('SPACING', () => {
   it('has all expected keys', () => {
@@ -56,5 +56,11 @@ describe('SHADOWS', () => {
       expect(shadow).toHaveProperty('shadowOffset');
       expect(shadow).toHaveProperty('elevation');
     }
+  });
+});
+
+describe('CONTENT_COLUMN (#149)', () => {
+  test('full width on a phone, centered and capped on iPad', () => {
+    expect(CONTENT_COLUMN).toEqual({ width: '100%', maxWidth: 560, alignSelf: 'center' });
   });
 });
