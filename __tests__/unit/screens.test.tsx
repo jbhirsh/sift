@@ -381,6 +381,63 @@ describe('SetupScreen', () => {
     expect(queryByText('Start Sifting')).toBeNull();
   });
 
+  test('"Finish and see summary" after backing out of a sift shows Done (#142)', async () => {
+    const BackedOut = () => {
+      const { dispatch, state } = useSift();
+      React.useEffect(() => {
+        dispatch({ type: 'LOAD_TRACKS', tracks: [mockTrackA, mockTrackB] });
+        dispatch({ type: 'SET_PHASE', phase: 'setup' });
+      }, [dispatch]);
+      return (
+        <>
+          <SetupScreen />
+          <Text testID="probe-phase">{state.phase}</Text>
+        </>
+      );
+    };
+    const { getByTestId } = await renderWithProviders(<BackedOut />);
+    await act(async () => {});
+    await act(async () => {
+      await fireEvent.press(getByTestId('setup-finish'));
+    });
+    expect(getByTestId('probe-phase').props.children).toBe('done');
+  });
+
+  test('"Finish and see summary" resumes a saved sift straight to Done (#142)', async () => {
+    function PhaseProbe() {
+      const { state } = useSift();
+      return <Text testID="probe-phase">{`${state.phase}:${state.cursor}`}</Text>;
+    }
+    const { loadSession } = require('../../src/services/SessionStore');
+    let resolveSession: ((session: unknown) => void) | undefined;
+    (loadSession as jest.Mock).mockImplementationOnce(
+      () => new Promise((res) => { resolveSession = res; }),
+    );
+    const { getByTestId } = await renderWithProviders(<><SetupScreen /><PhaseProbe /></>);
+    // The source is picked while the saved sift loads, so no sheet pops up
+    // and the inline Resume block offers it instead.
+    await act(async () => {
+      await fireEvent.press(getByTestId('source-library'));
+    });
+    await act(async () => {
+      resolveSession?.({
+        tracks: [mockTrackA, mockTrackB, mockTrackC],
+        cursor: 1,
+        kept: [mockTrackA],
+        removed: [],
+        skipped: [],
+        sortOrder: 'least-played',
+        savedAt: '2026-04-10T00:00:00.000Z',
+        provider: 'apple-music',
+        source: { type: 'library' },
+      });
+    });
+    await act(async () => {
+      await fireEvent.press(getByTestId('setup-finish'));
+    });
+    expect(getByTestId('probe-phase').props.children).toBe('done:1');
+  });
+
   test('Resume restores persisted pendingKeeps and removalErrors', async () => {
     function PendingProbe() {
       const { state } = useSift();
@@ -1651,6 +1708,133 @@ describe('DoneScreen', () => {
     expect(mockProvider.createPlaylist).not.toHaveBeenCalled();
   });
 
+});
+
+describe('DoneScreen: Finish, Continue, Review skipped (#142)', () => {
+  const tracks = [mockTrackA, mockTrackB, mockTrackC];
+
+  // Applies the given decisions once, then shows Done beside probes of the
+  // phase and the track list, as the router would.
+  function DoneAfter({ decisions }: { decisions: ('keep' | 'remove' | 'skip')[] }) {
+    const { decide, dispatch, state } = useSift();
+    const applied = React.useRef(false);
+    React.useEffect(() => {
+      if (applied.current) return;
+      applied.current = true;
+      decisions.forEach((d) => decide(d));
+      // As the Finish button would; a no-op once the last decision has
+      // already ended the sift.
+      dispatch({ type: 'FINISH' });
+    }, [decide, dispatch, decisions]);
+    return (
+      <>
+        <Text testID="probe-phase">{state.phase}</Text>
+        <Text testID="probe-tracks">{state.tracks.map((t) => t.id).join(',')}</Text>
+        <DoneScreen />
+      </>
+    );
+  }
+
+  test('a sift ended early says how far it got and offers Continue sifting', async () => {
+    const { getByTestId, queryByTestId } = await renderWithProviders(
+      <DoneAfter decisions={['keep']} />,
+      { initialTracks: tracks },
+    );
+    await act(async () => {});
+    expect(getByTestId('done-title').props.children).toBe('Finished for now.');
+    expect(getByTestId('done-subtitle').props.children).toBe('You reviewed 1 of the 3 songs in this sift of your library. 2 not reviewed.');
+    // Cards remain: Continue comes first, and Review skipped waits.
+    expect(getByTestId('done-continue')).toBeTruthy();
+    expect(queryByTestId('done-review-skipped')).toBeNull();
+    expect(getByTestId('probe-phase').props.children).toBe('done');
+
+    await act(async () => {
+      await fireEvent.press(getByTestId('done-continue'));
+    });
+    expect(getByTestId('probe-phase').props.children).toBe('sifting');
+  });
+
+  test('Continue sifting waits for a sifted-playlist save in flight', async () => {
+    function Saving() {
+      const { dispatch } = useSift();
+      React.useEffect(() => {
+        dispatch({ type: 'SET_CREATING_PLAYLIST', creating: true });
+      }, [dispatch]);
+      return null;
+    }
+    const { getByTestId } = await renderWithProviders(
+      <><DoneAfter decisions={['keep']} /><Saving /></>,
+      { initialTracks: tracks },
+    );
+    await act(async () => {});
+    expect(getByTestId('probe-phase').props.children).toBe('done');
+    await act(async () => {
+      await fireEvent.press(getByTestId('done-continue'));
+    });
+    // The resumed sift's keeps would race the save and could create a
+    // second "- Sifted" playlist.
+    expect(getByTestId('probe-phase').props.children).toBe('done');
+  });
+
+  test('a complete sift says so and offers no Continue', async () => {
+    const { getByTestId, queryByTestId } = await renderWithProviders(
+      <DoneAfter decisions={['keep', 'keep', 'keep']} />,
+      { initialTracks: tracks },
+    );
+    await act(async () => {});
+    expect(getByTestId('done-title').props.children).toBe('All done.');
+    expect(getByTestId('done-subtitle').props.children).toBe('You reviewed every song in this sift of your library.');
+    expect(queryByTestId('done-continue')).toBeNull();
+  });
+
+  test('Review N skipped starts a sift of just the skipped songs', async () => {
+    const { getByTestId, getByText } = await renderWithProviders(
+      <DoneAfter decisions={['skip', 'keep', 'skip']} />,
+      { initialTracks: tracks },
+    );
+    await act(async () => {});
+    expect(getByText('Review 2 skipped')).toBeTruthy();
+    await act(async () => {
+      await fireEvent.press(getByTestId('done-review-skipped'));
+    });
+    expect(getByTestId('probe-phase').props.children).toBe('sifting');
+    expect(getByTestId('probe-tracks').props.children).toBe(`${mockTrackA.id},${mockTrackC.id}`);
+  });
+
+  test('Review skipped asks first when it would clear removals and their Restore buttons', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const { getByTestId } = await renderWithProviders(
+      <DoneAfter decisions={['remove', 'skip', 'keep']} />,
+      { initialTracks: tracks },
+    );
+    await act(async () => {});
+    await act(async () => {
+      await fireEvent.press(getByTestId('done-review-skipped'));
+    });
+    expect(alertSpy).toHaveBeenCalledWith('Review skipped songs?', expect.stringContaining('Restore buttons'), expect.anything());
+    // Not started until confirmed.
+    expect(getByTestId('probe-phase').props.children).toBe('done');
+    alertSpy.mockRestore();
+  });
+
+  test('Restore is a labeled button, not a bare "+"', async () => {
+    const { getByTestId } = await renderWithProviders(
+      <DoneAfter decisions={['remove', 'keep', 'keep']} />,
+      { initialTracks: tracks },
+    );
+    await act(async () => {});
+    const restore = getByTestId(`restore-track-${mockTrackA.id}`);
+    expect(restore.props.accessibilityLabel).toBe(`Restore ${mockTrackA.name}`);
+  });
+
+  test('with nothing removed, Done points at the next thing to do', async () => {
+    const { getByTestId } = await renderWithProviders(
+      <DoneAfter decisions={['keep']} />,
+      { initialTracks: tracks },
+    );
+    await act(async () => {});
+    expect(getByTestId('nothing-removed').props.children).toBe('Nothing removed yet. Continue sifting to keep going.');
+  });
 });
 
 describe('PlaylistPicker', () => {

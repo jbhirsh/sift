@@ -122,6 +122,33 @@ describe('siftReducer', () => {
     expect(next.phase).toBe('loading');
   });
 
+  test('FINISH ends a sift early at Done, keeping every decision (#142)', () => {
+    const state = makeState({ phase: 'sifting', tracks: [trackA, trackB], cursor: 1, kept: [trackA], isPlaying: true });
+    const next = siftReducer(state, { type: 'FINISH' });
+    expect(next.phase).toBe('done');
+    expect(next.isPlaying).toBe(false);
+    expect(next.cursor).toBe(1);
+    expect(next.kept).toEqual([trackA]);
+    expect(next.tracks).toEqual([trackA, trackB]);
+  });
+
+  test('FINISH outside a sift does nothing', () => {
+    const state = makeState({ phase: 'setup' });
+    expect(siftReducer(state, { type: 'FINISH' })).toBe(state);
+  });
+
+  test('CONTINUE_SIFTING goes back to the next card while cards remain', () => {
+    const state = makeState({ phase: 'done', tracks: [trackA, trackB], cursor: 1 });
+    expect(siftReducer(state, { type: 'CONTINUE_SIFTING' }).phase).toBe('sifting');
+  });
+
+  test('CONTINUE_SIFTING does nothing when no cards remain or outside Done', () => {
+    const finished = makeState({ phase: 'done', tracks: [trackA], cursor: 1 });
+    expect(siftReducer(finished, { type: 'CONTINUE_SIFTING' })).toBe(finished);
+    const setup = makeState({ phase: 'setup', tracks: [trackA], cursor: 0 });
+    expect(siftReducer(setup, { type: 'CONTINUE_SIFTING' })).toBe(setup);
+  });
+
   test('SET_SORT_ORDER changes sortOrder', () => {
     const state = makeState({ sortOrder: 'least-played' });
     const next = siftReducer(state, { type: 'SET_SORT_ORDER', sortOrder: 'newest' });
@@ -388,6 +415,13 @@ describe('siftReducer', () => {
     const state = makeState({ skipFiltering: true });
     const next = siftReducer(state, { type: 'START_FRESH' });
     expect(next.skipFiltering).toBe(false);
+  });
+
+  test('LOAD_TRACKS clears the last sift\'s save status (Review N skipped, #142)', () => {
+    const state = makeState({ removalPlaylistCreated: true, removalPlaylistError: 'Could not save' });
+    const next = siftReducer(state, { type: 'LOAD_TRACKS', tracks: [trackA] });
+    expect(next.removalPlaylistCreated).toBe(false);
+    expect(next.removalPlaylistError).toBeNull();
   });
 
   test('LOAD_TRACKS resets skipFiltering', () => {

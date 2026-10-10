@@ -162,6 +162,32 @@ describe('SiftScreen', () => {
     expect(getByTestId('current-phase').props.children).toBe('setup');
   });
 
+  test('Finish ends the sift here and shows Done (#142)', async () => {
+    const FinishAndCheck = () => {
+      const { state } = useSift();
+      return (
+        <>
+          <SiftScreen />
+          <Text testID="current-phase">{state.phase}</Text>
+          <Text testID="current-cursor">{state.cursor}</Text>
+        </>
+      );
+    };
+    const { getByTestId, getByLabelText } = await renderWithProviders(<FinishAndCheck />, { initialTracks: tracks });
+    await fireEvent.press(getByLabelText('Skip'));
+    // Mid-decision (the skip's settle window), Finish does nothing: a
+    // Keep/Remove decides only when its animation ends.
+    await fireEvent.press(getByTestId('finish-button'));
+    expect(getByTestId('current-phase').props.children).toBe('sifting');
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    });
+    await fireEvent.press(getByTestId('finish-button'));
+    expect(getByTestId('current-phase').props.children).toBe('done');
+    // Where it stopped is kept, so Continue sifting picks up there.
+    expect(getByTestId('current-cursor').props.children).toBe(1);
+  });
+
   test('renders progress segments', async () => {
     const { toJSON } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
     expect(toJSON()).toBeTruthy();

@@ -21,7 +21,15 @@ import { clearHistoryForSource } from '../services/RemovalHistoryStore';
 import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
 import { Button } from '../components/Button';
-import { decisionCounts, discardConfirmation, failedRemovalCount, removedListSubtitle } from '../utils/sessionCopy';
+import {
+  decisionCounts,
+  discardConfirmation,
+  doneHeadline,
+  failedRemovalCount,
+  keptDestination,
+  nothingRemovedNote,
+  removedListSubtitle,
+} from '../utils/sessionCopy';
 import { COLORS, RADIUS, SETTINGS_BUTTON, SPACING } from '../theme';
 
 export default function DoneScreen() {
@@ -150,14 +158,17 @@ export default function DoneScreen() {
             {track.artist}
           </Text>
         </View>
+        {/* A labeled button: the bare "+" it replaces read as "add" (#142). */}
         <TouchableOpacity
           testID={`restore-track-${track.id}`}
           onPress={() => handleRestore(track)}
           disabled={restoringIds.has(track.id)}
           style={[styles.restoreButton, restoringIds.has(track.id) && { opacity: 0.4 }]}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
+          accessibilityLabel={`Restore ${track.name}`}
         >
-          <SymbolView name="plus.circle.fill" size={22} tintColor={colors.accent} />
+          <Text style={[styles.restoreButtonText, { color: colors.accent }]}>Restore</Text>
         </TouchableOpacity>
       </View>
     ),
@@ -167,6 +178,31 @@ export default function DoneScreen() {
   const keyExtractor = useCallback((track: Track) => track.id, []);
 
   const failedRemovals = failedRemovalCount(state.removed, state.failedRemovalIds);
+  // Cards not yet decided: a sift ended early with Finish (#142).
+  const remaining = Math.max(0, state.tracks.length - state.cursor);
+  const headline = doneHeadline(state.source, state.cursor, state.tracks.length);
+  const keptLine = keptDestination(state.source, state.kept.length);
+  // Review N skipped replaces this session (LOAD_TRACKS), so it waits for
+  // unsaved keeps and is offered only once no cards remain: with cards
+  // left, Continue sifting comes first and nothing is dropped.
+  const canReviewSkipped = remaining === 0 && state.skipped.length > 0;
+  const reviewSkippedBlocked = startOverBlocked || state.pendingKeeps.length > 0;
+
+  const reviewSkipped = () => {
+    const start = () => dispatch({ type: 'LOAD_TRACKS', tracks: state.skipped });
+    if (state.removed.length === 0) {
+      start();
+      return;
+    }
+    Alert.alert(
+      'Review skipped songs?',
+      'This starts a sift of the songs you skipped, and clears this summary and its Restore buttons.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Review Skipped', onPress: start },
+      ],
+    );
+  };
 
   const listHeader = (
     <>
@@ -176,10 +212,10 @@ export default function DoneScreen() {
           testID="done-title"
           style={[styles.titleText, { color: colors.text }]}
         >
-          All done.
+          {headline.title}
         </Text>
-        <Text style={[styles.subtitleText, { color: colors.textSecondary }]}>
-          Your library has been sifted.
+        <Text testID="done-subtitle" style={[styles.subtitleText, { color: colors.textSecondary }]}>
+          {headline.subtitle}
         </Text>
       </View>
 
@@ -213,7 +249,18 @@ export default function DoneScreen() {
             />
           </View>
         </GlassCard>
+        {keptLine && (
+          <Text testID="kept-destination" style={[styles.keptDestination, { color: colors.textSecondary }]}>
+            {keptLine}
+          </Text>
+        )}
       </View>
+
+      {state.removed.length === 0 && (
+        <Text testID="nothing-removed" style={[styles.nothingRemoved, { color: colors.textSecondary }]}>
+          {nothingRemovedNote(remaining, state.skipped.length)}
+        </Text>
+      )}
 
       {/* Removed tracks header */}
       {state.removed.length > 0 && (
@@ -314,6 +361,28 @@ export default function DoneScreen() {
         </Text>
       )}
 
+      {remaining > 0 && (
+        <Button
+          title="Continue sifting"
+          testID="done-continue"
+          size="large"
+          // Not while a sifted-playlist save runs: the sift's fresh hook
+          // doesn't know the playlist yet and a keep would create another.
+          disabled={startOverBlocked}
+          onPress={() => dispatch({ type: 'CONTINUE_SIFTING' })}
+        />
+      )}
+
+      {canReviewSkipped && (
+        <Button
+          title={`Review ${state.skipped.length.toLocaleString('en-US')} skipped`}
+          testID="done-review-skipped"
+          size="large"
+          disabled={reviewSkippedBlocked}
+          onPress={reviewSkipped}
+        />
+      )}
+
       {/* Disabled while a sifted-playlist save is in flight (the fallback
           effect above or a manual Retry) or while a previous Start Over's
           clears are still running: a concurrent clearSiftedPlaylist would
@@ -388,7 +457,7 @@ export default function DoneScreen() {
               resetToSetup();
               return;
             }
-            const copy = discardConfirmation(state.provider, state.source, counts, 'done');
+            const copy = discardConfirmation(state.provider, state.source, counts, 'done', { unfinished: remaining > 0 });
             Alert.alert(copy.title, copy.message, [
               { text: 'Cancel', style: 'cancel' },
               { text: copy.confirm, style: 'destructive', onPress: () => resetToSetup() },
@@ -491,6 +560,8 @@ const styles = StyleSheet.create({
   },
   subtitleText: {
     fontSize: 20,
+    textAlign: 'center',
+    paddingHorizontal: SPACING['2xl'],
   },
   summaryWrapper: {
     alignSelf: 'center',
@@ -572,6 +643,21 @@ const styles = StyleSheet.create({
   },
   restoreButton: {
     paddingLeft: 12,
+  },
+  restoreButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  keptDestination: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: SPACING.base,
+  },
+  nothingRemoved: {
+    fontSize: 15,
+    textAlign: 'center',
+    marginHorizontal: SPACING['2xl'],
+    marginTop: SPACING.xl,
   },
   trackName: {
     fontSize: 16,

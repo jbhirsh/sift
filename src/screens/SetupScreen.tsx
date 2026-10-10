@@ -163,7 +163,8 @@ export default function SetupScreen() {
     }
   };
 
-  const handleResume = async () => {
+  // finish: resume straight to Done, ending the sift where it left off (#142).
+  const handleResume = async ({ finish = false }: { finish?: boolean } = {}) => {
     if (!savedSession) return;
     setShowResumeModal(false);
 
@@ -190,7 +191,7 @@ export default function SetupScreen() {
         // unflushed pendingKeeps — resume it straight to Done so the
         // fallback save can repair them instead of replaying a sift with
         // nothing left to decide.
-        phase: savedSession.cursor >= savedSession.tracks.length ? 'done' : 'sifting',
+        phase: finish || savedSession.cursor >= savedSession.tracks.length ? 'done' : 'sifting',
         loadProgress: 1,
         loadMessage: '',
         loadError: null,
@@ -498,7 +499,7 @@ export default function SetupScreen() {
         {showResumeModal && savedSession && (
           <ResumeSessionModal
             session={savedSession}
-            onResume={handleResume}
+            onResume={() => { handleResume(); }}
             onStartOver={handleStartOver}
             onCancel={() => {
               setShowResumeModal(false);
@@ -528,8 +529,19 @@ export default function SetupScreen() {
                     size="large"
                     onPress={canResumeInMemory
                       ? () => dispatch({ type: 'SET_PHASE', phase: 'sifting' })
-                      : handleResume}
+                      : () => { handleResume(); }}
                   />
+                  {/* End the sift where it is and see its summary (#142). */}
+                  <TouchableOpacity
+                    testID="setup-finish"
+                    style={styles.finishLink}
+                    accessibilityRole="button"
+                    onPress={canResumeInMemory
+                      ? () => dispatch({ type: 'SET_PHASE', phase: 'done' })
+                      : () => { handleResume({ finish: true }); }}
+                  >
+                    <Text style={[styles.finishLinkText, { color: colors.accent }]}>Finish and see summary</Text>
+                  </TouchableOpacity>
                   {/* Destructive: kept clear of Resume Sifting (#137). */}
                   <View style={styles.startOverGap} />
                   <Button
@@ -652,6 +664,14 @@ const styles = StyleSheet.create({
   },
   startOverGap: {
     height: SPACING.base,
+  },
+  finishLink: {
+    alignSelf: 'center',
+    paddingVertical: SPACING.base,
+  },
+  finishLinkText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   footnote: {
     fontSize: 13,
