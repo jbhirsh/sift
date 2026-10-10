@@ -16,7 +16,7 @@ jobs:
           xmark.circle.fill checkmark.circle.fill arrow.right.circle chevron.backward
           gearshape gobackward.15 goforward.15 play.fill pause.fill music.note
           music.note.list music.mic arrow.clockwise exclamationmark.triangle.fill
-          questionmark.circle
+          questionmark.circle arrow.uturn.backward arrow.counterclockwise arrow.uturn.backward.circle.fill
       - uses: actions/upload-artifact@v7
         with:
           name: sf-symbols
