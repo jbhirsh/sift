@@ -154,10 +154,12 @@ const MOCK_PLAYLISTS: Playlist[] = [
 //     keepTrack; "Chill Vibes" has no companion, so its keeps buffer and
 //     the Done fallback goes through createPlaylist; flow 08's re-sift
 //     only clears). Only 09_save_failure_retry.yaml triggers adds.
-//   - removeFromLibrary: only flows 03 and 11 tap Remove on a library
+//   - removeFromLibrary: only flows 03, 11 and 15 tap Remove on a library
 //     sift. Flow 03 never reaches the Done screen and asserts only
 //     DECIDE-driven stats, which a silently-failing native removal does
-//     not change; 11_removal_error.yaml is the flow built around it.
+//     not change; flow 15 relies on its first remove failing (the failed
+//     song is offered again by the next library sift, the second is not);
+//     11_removal_error.yaml is the flow built around it.
 //   - removeFromPlaylist is NOT injectable on purpose: Start Over /
 //     Re-sift clears (flows 08 and 09) depend on it succeeding, and a
 //     launch-wide counter cannot distinguish a sift-decision remove from

@@ -10,9 +10,10 @@ name: "Failed Removal Shows the Removal-Errors Warning"
 # into the bundle (eas.json), which makes MockMusicProvider reject the FIRST
 # removeFromLibrary call of each app launch; later calls succeed. This is
 # only safe because of a flow audit (see the injection comment in
-# MockMusicProvider.ts): the only other flow that removes from the library
-# is 03, which never reaches Done and asserts only DECIDE-driven stats that
-# a silently-failed native removal does not change. removeFromPlaylist is
+# MockMusicProvider.ts): the only other flows that remove from the library
+# are 03, which never reaches Done and asserts only DECIDE-driven stats that
+# a silently-failed native removal does not change, and 15, which relies on
+# its first remove failing. removeFromPlaylist is
 # deliberately NOT injectable — the Start Over clears in flows 08/09 depend
 # on it.
 #

@@ -106,7 +106,6 @@ function TestConsumer() {
         lastLoadPlaylistsResult = await provider.loadPlaylists();
       }} />
       <TouchableOpacity testID="load-tracks" onPress={() => provider.loadTracks()} />
-      <TouchableOpacity testID="restore" onPress={() => provider.restoreTrack(mockTrack)} />
       <TouchableOpacity testID="warm-cache" onPress={() => provider.warmCache(['1', '2'])} />
     </>
   );
@@ -143,6 +142,9 @@ function TestConsumerWithPlaylistActions() {
       <TouchableOpacity testID="save-sifted-empty" onPress={() => provider.saveSiftedPlaylist('My Playlist', [])} />
       <TouchableOpacity testID="warm-cache" onPress={() => provider.warmCache(['1', '2'])} />
       <TouchableOpacity testID="clear-sifted" onPress={() => provider.clearSiftedPlaylist('My Playlist')} />
+      <TouchableOpacity testID="set-provider-spotify" onPress={() => {
+        dispatch({ type: 'SET_PROVIDER', provider: 'spotify' });
+      }} />
       <TouchableOpacity testID="set-sifted-id" onPress={() => {
         dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: 'sifted-renamed' });
       }} />
@@ -575,10 +577,19 @@ describe('useMusicProvider', () => {
     expect(getByTestId('track-order').props.children).toBe('3,5,10');
   });
 
-  test('restoreTrack re-adds to the library and purges its history record', async () => {
-    const { getByTestId } = await renderWithProvider();
+  test('restoreTrack on a Spotify library re-adds to the library and purges its history record', async () => {
+    // Spotify's library Remove really deletes the song; Apple's restore,
+    // which takes it out of "Sift — Removed", is in useMusicProvider.state.
+    const { getByTestId } = await render(
+      <SiftProvider initialTracks={[mockTrack]}>
+        <TestConsumerWithPlaylistActions />
+      </SiftProvider>
+    );
     await act(async () => {
-      await fireEvent.press(getByTestId('restore'));
+      await fireEvent.press(getByTestId('set-provider-spotify'));
+    });
+    await act(async () => {
+      await fireEvent.press(getByTestId('restore-track'));
     });
     // Default source is library, so it re-adds to the library…
     expect(mockProvider.addToLibrary).toHaveBeenCalledWith(['1']);
@@ -609,11 +620,18 @@ describe('useMusicProvider', () => {
     });
   });
 
-  test('restoreTrack does not purge history when the re-add fails', async () => {
+  test('restoreTrack does not purge history when the Spotify library re-add fails', async () => {
     mockProvider.addToLibrary.mockRejectedValueOnce(new Error('network'));
-    const { getByTestId } = await renderWithProvider();
+    const { getByTestId } = await render(
+      <SiftProvider initialTracks={[mockTrack]}>
+        <TestConsumerWithPlaylistActions />
+      </SiftProvider>
+    );
     await act(async () => {
-      await fireEvent.press(getByTestId('restore'));
+      await fireEvent.press(getByTestId('set-provider-spotify'));
+    });
+    await act(async () => {
+      await fireEvent.press(getByTestId('restore-track'));
     });
     // The re-add was attempted…
     expect(mockProvider.addToLibrary).toHaveBeenCalledWith(['1']);

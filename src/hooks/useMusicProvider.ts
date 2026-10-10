@@ -6,6 +6,7 @@ import { createMusicProvider, MusicProviderService } from '../services';
 import { logRemoval, loadHistory, removeFromHistory } from '../services/RemovalHistoryStore';
 import { sortTracks } from '../utils/sorting';
 import { trackIdentity } from '../utils/trackIdentity';
+import { APPLE_REMOVED_PLAYLIST, libraryRemovedIds } from '../utils/libraryRemovals';
 import { Playlist, Track } from '../types';
 
 const POLL_INTERVAL_MS = 500;
@@ -37,6 +38,10 @@ export function useMusicProvider() {
 
   const siftedPlaylistIdRef = useRef<string | null>(null);
   const siftedPlaylistForRef = useRef<string | null>(null);
+  // Ids of the "Sift — Removed" playlists, looked up on the first Apple
+  // library restore. Restores run on the Done screen, so this lives as long
+  // as that screen's hook instance does.
+  const removedPlaylistIdsRef = useRef<string[] | null>(null);
   // Once-per-session readback of the sifted playlist's contents (ids and
   // identities), consulted before keepTrack's direct add so re-keeping a
   // song that already landed can't double-add it. Kept current as adds
@@ -360,6 +365,18 @@ export function useMusicProvider() {
       } else {
         tracks = await providerRef.current.loadLibrary();
         unfilteredCount = tracks.length;
+        if (state.provider === 'apple-music') {
+          // Skip songs removed in an earlier library sift (#139). On Apple
+          // Music they never left the library (they sit in "Sift — Removed"),
+          // so without this every library sift offered them again. Applies
+          // with skipFiltering too: a library Start Over starts the decisions
+          // over but un-removes nothing. A Spotify Remove really deletes the
+          // song, so one back in the library was re-added on purpose.
+          const removedIds = libraryRemovedIds(await loadHistory(), state.provider);
+          const beforeRemovedFilter = tracks.length;
+          tracks = tracks.filter((t) => !removedIds.has(t.id));
+          filteredAsRemoved = beforeRemovedFilter - tracks.length;
+        }
       }
 
       Sentry.addBreadcrumb({
@@ -383,7 +400,9 @@ export function useMusicProvider() {
                 : 'All tracks in this playlist have already been sifted or removed.'
             : source.type === 'playlist'
               ? 'This playlist has no tracks to sift.'
-              : 'Your library has no tracks to sift.';
+              : filteredAsRemoved > 0
+                ? 'Every song in your library was removed in a previous sift.'
+                : 'Your library has no tracks to sift.';
         dispatch({ type: 'SET_LOAD_ERROR', error });
         return;
       }
@@ -397,12 +416,18 @@ export function useMusicProvider() {
     } finally {
       loadingInProgressRef.current = false;
     }
-  }, [dispatch, state.source, state.sortOrder, state.siftedPlaylistId]);
+  }, [dispatch, state.source, state.sortOrder, state.siftedPlaylistId, state.provider]);
 
   const removeTrack = useCallback(
     async (track: Track) => {
       const source = state.source;
-      // Always log removal — the user's intent is what matters
+      const appleLibrary = source.type === 'library' && state.provider === 'apple-music';
+      // An Apple Music song removed in an earlier library sift is already
+      // recorded and already in "Sift — Removed"; removing it again (if a
+      // sift offers it anyway) would add a duplicate there (#139).
+      if (appleLibrary && libraryRemovedIds(await loadHistory(), state.provider).has(track.id)) return;
+      // Log the removal before attempting it — the user's intent is what
+      // matters, and a playlist's failed removal stays filtered out.
       await logRemoval({
         track,
         source,
@@ -418,6 +443,10 @@ export function useMusicProvider() {
       } catch (err) {
         Sentry.captureException(err, { tags: { flow: 'remove-track' } });
         dispatch({ type: 'ADD_REMOVAL_ERROR', error: track.name, failedRemovalId: track.id });
+        // A failed Apple library removal left the song in the library and
+        // out of "Sift — Removed": drop its record so the next library sift
+        // offers it again rather than hiding it for good.
+        if (appleLibrary) await removeFromHistory(track.id, source);
       }
     },
     [dispatch, state.source, state.provider],
@@ -429,6 +458,32 @@ export function useMusicProvider() {
         const source = state.source;
         if (source.type === 'playlist') {
           await providerRef.current.addToPlaylist?.(source.playlist.id, [track.id]);
+        } else if (state.provider === 'apple-music') {
+          // An Apple Music library Remove never took the song out of the
+          // library: it put it in "Sift — Removed". Restoring means taking it
+          // back out of there (#139); addToLibrary did nothing for a song
+          // that never left, yet reported success.
+          // Every playlist by that name (the user, or a missed lookup in the
+          // native remove, can make a second), found once per screen:
+          // loadPlaylists reads every playlist's tracks. An empty result
+          // isn't kept: a removal still landing can create the playlist.
+          let removedIds = removedPlaylistIdsRef.current;
+          if (removedIds == null) {
+            const playlists = await providerRef.current.loadPlaylists?.() ?? [];
+            removedIds = playlists
+              .filter((p) => p.name === APPLE_REMOVED_PLAYLIST)
+              .map((p) => p.id);
+            removedPlaylistIdsRef.current = removedIds.length > 0 ? removedIds : null;
+          }
+          try {
+            for (const id of removedIds) {
+              await providerRef.current.removeFromPlaylist?.(id, [track.id]);
+            }
+          } catch (err) {
+            // The playlist may have been deleted since: look again next time.
+            removedPlaylistIdsRef.current = null;
+            throw err;
+          }
         } else {
           await providerRef.current.addToLibrary?.([track.id]);
         }
@@ -442,7 +497,7 @@ export function useMusicProvider() {
         dispatch({ type: 'ADD_REMOVAL_ERROR', error: `${track.name}: ${message}` });
       }
     },
-    [dispatch, state.source],
+    [dispatch, state.source, state.provider],
   );
 
   const createPlaylist = useCallback(
