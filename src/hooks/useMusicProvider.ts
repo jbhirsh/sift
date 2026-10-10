@@ -412,7 +412,7 @@ export function useMusicProvider() {
         }
       } catch (err) {
         Sentry.captureException(err, { tags: { flow: 'remove-track' } });
-        dispatch({ type: 'ADD_REMOVAL_ERROR', error: track.name });
+        dispatch({ type: 'ADD_REMOVAL_ERROR', error: track.name, failedRemovalId: track.id });
       }
     },
     [dispatch, state.source, state.provider],

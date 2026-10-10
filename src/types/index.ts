@@ -47,6 +47,9 @@ export interface SiftSession {
   pendingKeeps?: Track[];
   /** Failed-removal messages, persisted for the same reason. */
   removalErrors?: string[];
+  /** Ids of the removed tracks whose removal failed; optional for the same
+   *  reason. */
+  failedRemovalIds?: string[];
   /** Id of the "<name> - Sifted" companion playlist, persisted so a resumed
    *  session resolves it by id (rename-proof). Optional because sessions
    *  saved by older builds don't carry it — those fall back to name match. */

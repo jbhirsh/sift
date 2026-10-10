@@ -32,3 +32,27 @@ export async function savePreferences(preferences: Preferences): Promise<void> {
     Sentry.captureException(err, { tags: { flow: 'preferences-save' } });
   }
 }
+
+// Whether the one-time note on the first Apple Music library remove has been
+// shown (#141). Kept under its own key, not in the Preferences blob: it is
+// written from the Sift screen, and a whole-blob save from there could race
+// the Settings toggle and overwrite startAtChorus.
+const SEEN_REMOVE_NOTE_KEY = 'sift_seen_remove_note';
+
+/** True once the first-remove note was shown. A failed read counts as seen, so the note never nags. */
+export async function loadSeenRemoveNote(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(SEEN_REMOVE_NOTE_KEY)) === '1';
+  } catch (err) {
+    Sentry.captureException(err, { tags: { flow: 'preferences-load' } });
+    return true;
+  }
+}
+
+export async function markRemoveNoteSeen(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(SEEN_REMOVE_NOTE_KEY, '1');
+  } catch (err) {
+    Sentry.captureException(err, { tags: { flow: 'preferences-save' } });
+  }
+}

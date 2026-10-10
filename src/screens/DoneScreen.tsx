@@ -20,6 +20,8 @@ import { useMusicProvider } from '../hooks/useMusicProvider';
 import { clearHistoryForSource } from '../services/RemovalHistoryStore';
 import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
+import { Button } from '../components/Button';
+import { decisionCounts, discardConfirmation, failedRemovalCount, removedListSubtitle } from '../utils/sessionCopy';
 import { COLORS, RADIUS, SETTINGS_BUTTON, SPACING } from '../theme';
 
 export default function DoneScreen() {
@@ -63,11 +65,6 @@ export default function DoneScreen() {
       if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
     };
   }, []);
-
-  const isAppleMusicLibrary = state.source.type === 'library' && state.provider === 'apple-music';
-  const sourceLabel = state.source.type === 'playlist'
-    ? `"${state.source.playlist.name}"`
-    : 'your library';
 
   // Fallback: persist the full kept list when anything went wrong during
   // incremental sifting — keeps that were buffered because their playlist add
@@ -169,6 +166,8 @@ export default function DoneScreen() {
 
   const keyExtractor = useCallback((track: Track) => track.id, []);
 
+  const failedRemovals = failedRemovalCount(state.removed, state.failedRemovalIds);
+
   const listHeader = (
     <>
       {/* Title section */}
@@ -225,16 +224,10 @@ export default function DoneScreen() {
                 Tracks Removed
               </Text>
               <Text style={[styles.removedSubtitle, { color: colors.textSecondary }]}>
-                {state.removalErrors.length > 0
-                  // Some removals failed — a blanket "have been removed"
-                  // claim would be false. The warning block below names the
-                  // tracks that are actually still in place.
-                  ? (isAppleMusicLibrary
-                      ? 'Most of these tracks have been moved to "Sift — Removed" in Music, but some could not be.'
-                      : `Most of these tracks have been removed from ${sourceLabel}, but some could not be.`)
-                  : (isAppleMusicLibrary
-                      ? 'These tracks have been moved to "Sift — Removed" in Music.'
-                      : `These tracks have been removed from ${sourceLabel}.`)}
+                {/* Real counts when some failed: "Most of these" was shown
+                    even when every removal failed (#141). The warning block
+                    below names the tracks that are still in place. */}
+                {removedListSubtitle(state.provider, state.source, state.removed.length, failedRemovals)}
               </Text>
             </View>
             <View style={styles.removedActions}>
@@ -321,14 +314,17 @@ export default function DoneScreen() {
         </Text>
       )}
 
-      <TouchableOpacity
+      {/* Disabled while a sifted-playlist save is in flight (the fallback
+          effect above or a manual Retry) or while a previous Start Over's
+          clears are still running: a concurrent clearSiftedPlaylist would
+          race the save on the same remote playlist, and the interleaving
+          can leave it neither fully cleared nor fully saved. */}
+      <Button
+        title="Start Over"
         testID="done-start-over"
-        style={[styles.primaryButton, { backgroundColor: colors.accentFill }, startOverBlocked && { opacity: 0.4 }]}
-        // Disabled while a sifted-playlist save is in flight (the fallback
-        // effect above or a manual Retry) or while a previous Start Over's
-        // clears are still running: a concurrent clearSiftedPlaylist would
-        // race the save on the same remote playlist, and the interleaving
-        // can leave it neither fully cleared nor fully saved.
+        size="large"
+        variant="secondary"
+        color={colors.removeText}
         disabled={startOverBlocked}
         onPress={() => {
           if (state.source.type === 'playlist') {
@@ -385,13 +381,21 @@ export default function DoneScreen() {
               ],
             );
           } else {
-            resetToSetup();
+            // Library: nothing remote is cleared, but the session and its
+            // decisions are, so ask first (#137).
+            const counts = decisionCounts(state);
+            if (counts.total === 0) {
+              resetToSetup();
+              return;
+            }
+            const copy = discardConfirmation(state.provider, state.source, counts, 'done');
+            Alert.alert(copy.title, copy.message, [
+              { text: 'Cancel', style: 'cancel' },
+              { text: copy.confirm, style: 'destructive', onPress: () => resetToSetup() },
+            ]);
           }
         }}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.primaryButtonText}>Start Over</Text>
-      </TouchableOpacity>
+      />
     </View>
   );
 
@@ -582,18 +586,6 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: 40,
     marginTop: 20,
-  },
-  primaryButton: {
-    borderRadius: RADIUS.md,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    width: '100%',
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '600',
   },
   siftedConfirmation: {
     flexDirection: 'row',

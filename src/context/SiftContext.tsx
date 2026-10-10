@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useMemo, useCallback, useEffect, useRef, ReactNode } from 'react';
 import * as Sentry from '@sentry/react-native';
+import { AppState } from 'react-native';
 import {
   Track,
   Decision,
@@ -38,6 +39,12 @@ export interface SiftState {
   removalPlaylistError: string | null;
   isCreatingPlaylist: boolean;
   removalErrors: string[];
+  /**
+   * Ids of the removed tracks whose removal failed. removalErrors holds
+   * names for display, and two songs can share a name ("Intro"), so counts
+   * key on these.
+   */
+  failedRemovalIds: string[];
   connectionStatus: ConnectionStatus;
   /**
    * Kept tracks whose add to the sifted playlist could not land yet (e.g. the
@@ -85,6 +92,7 @@ const initialState: SiftState = {
   removalPlaylistError: null,
   isCreatingPlaylist: false,
   removalErrors: [],
+  failedRemovalIds: [],
   connectionStatus: 'unknown',
   pendingKeeps: [],
   skipFiltering: false,
@@ -109,7 +117,7 @@ type SiftAction =
   | { type: 'SET_PLAYLIST_CREATED'; created: boolean }
   | { type: 'SET_PLAYLIST_ERROR'; error: string | null }
   | { type: 'SET_CREATING_PLAYLIST'; creating: boolean }
-  | { type: 'ADD_REMOVAL_ERROR'; error: string }
+  | { type: 'ADD_REMOVAL_ERROR'; error: string; failedRemovalId?: string }
   | { type: 'ADD_PENDING_KEEP'; track: Track }
   | { type: 'REMOVE_PENDING_KEEPS'; trackIds: string[] }
   | { type: 'SET_SIFTED_PLAYLIST_ID'; id: string | null }
@@ -175,6 +183,7 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         removed: [],
         skipped: [],
         removalErrors: [],
+        failedRemovalIds: [],
         // Intentional discard: loading a fresh track list abandons the
         // previous sift wholesale (kept/removed/skipped included), so any
         // still-buffered keeps from it are deliberately dropped with it.
@@ -218,7 +227,13 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
       return { ...state, isCreatingPlaylist: action.creating };
 
     case 'ADD_REMOVAL_ERROR':
-      return { ...state, removalErrors: [...state.removalErrors, action.error] };
+      return {
+        ...state,
+        removalErrors: [...state.removalErrors, action.error],
+        ...(action.failedRemovalId != null && {
+          failedRemovalIds: [...state.failedRemovalIds, action.failedRemovalId],
+        }),
+      };
 
     case 'ADD_PENDING_KEEP': {
       if (state.pendingKeeps.some((t) => t.id === action.track.id)) return state;
@@ -295,6 +310,7 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         removalPlaylistCreated: false,
         removalPlaylistError: null,
         removalErrors: [],
+        failedRemovalIds: [],
         // Intentional discard — START_FRESH is a deliberate abandonment of
         // the previous sift (its kept list included), not mid-sift cleanup.
         pendingKeeps: [],
@@ -320,6 +336,7 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         removalPlaylistCreated: false,
         removalPlaylistError: null,
         removalErrors: [],
+        failedRemovalIds: [],
         // Intentional discard — RESET_TO_SETUP abandons the finished sift
         // entirely; see the LOAD_TRACKS note above.
         pendingKeeps: [],
@@ -423,6 +440,7 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
       // signal and Done's fallback save never fires.
       pendingKeeps: state.pendingKeeps,
       removalErrors: state.removalErrors,
+      failedRemovalIds: state.failedRemovalIds,
       // Persisted so a resumed session keeps resolving its sifted playlist
       // by id (rename-proof) instead of falling back to the name match.
       siftedPlaylistId: state.siftedPlaylistId,
@@ -438,7 +456,7 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [state.cursor, state.kept, state.removed, state.skipped, state.tracks, state.phase, state.sortOrder, state.provider, state.source, state.pendingKeeps, state.removalErrors, state.siftedPlaylistId]);
+  }, [state.cursor, state.kept, state.removed, state.skipped, state.tracks, state.phase, state.sortOrder, state.provider, state.source, state.pendingKeeps, state.removalErrors, state.failedRemovalIds, state.siftedPlaylistId]);
 
   // Flush a debounced session write immediately (see SiftContextValue docs).
   const flushPendingSave = useCallback(() => {
@@ -452,6 +470,17 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
       saveSession(pending);
     }
   }, []);
+
+  // The autosave is debounced, so a swipe followed straight away by a call,
+  // a lock or the app switcher could lose that decision (while its remote
+  // removal had already gone through). Write it out as the app leaves the
+  // foreground (#137).
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') flushPendingSave();
+    });
+    return () => subscription.remove();
+  }, [flushPendingSave]);
 
   const currentTrack = state.tracks[state.cursor];
   const nextTrack = state.tracks[state.cursor + 1];
@@ -472,19 +501,32 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     [dispatch, state.tracks, state.cursor]
   );
 
+  // Drop a debounced save that hasn't been written: the session it holds is
+  // the one being discarded, and the background flush below would otherwise
+  // write it back to disk after it was cleared.
+  const dropPendingSave = useCallback(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    pendingSessionRef.current = null;
+  }, []);
+
   const startFresh = useCallback((skipFiltering?: boolean) => {
     Sentry.addBreadcrumb({ category: 'user-action', message: 'Started fresh session', level: 'info' });
+    dropPendingSave();
     clearSession().then(() => {
       dispatch({ type: 'START_FRESH', skipFiltering });
     });
-  }, [dispatch]);
+  }, [dispatch, dropPendingSave]);
 
   const resetToSetup = useCallback(() => {
     Sentry.addBreadcrumb({ category: 'user-action', message: 'Reset to setup', level: 'info' });
+    dropPendingSave();
     clearSession().then(() => {
       dispatch({ type: 'RESET_TO_SETUP' });
     });
-  }, [dispatch]);
+  }, [dispatch, dropPendingSave]);
 
   const togglePlayPause = useCallback(
     () => dispatch({ type: 'TOGGLE_PLAY_PAUSE' }),

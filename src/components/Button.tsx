@@ -42,7 +42,7 @@ export function Button({
     styles.base,
     sizeStyles[size],
     variantContainer(variant, tint, disabled),
-    variant !== 'plain' ? SHADOWS.button : {},
+    variant === 'primary' ? SHADOWS.button : {},
   ];
 
   const textStyle: TextStyle[] = [
@@ -56,6 +56,8 @@ export function Button({
       onPress={onPress}
       disabled={disabled}
       testID={testID}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
       style={({ pressed }) => [
         ...containerStyle,
         pressed && !disabled && styles.pressed,
@@ -137,10 +139,11 @@ const sizeStyles: Record<Size, ViewStyle> = {
     paddingHorizontal: SPACING.xl,
     borderRadius: RADIUS.sm,
   },
+  // The app's full-width action buttons (Start Sifting, Resume, Start Over).
   large: {
-    paddingVertical: SPACING.lg,
+    paddingVertical: SPACING.xl,
     paddingHorizontal: SPACING['2xl'],
-    borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.md,
     width: '100%' as unknown as number,
   },
 };
@@ -148,5 +151,5 @@ const sizeStyles: Record<Size, ViewStyle> = {
 const sizeLabelStyles: Record<Size, TextStyle> = {
   small: { fontSize: 13 },
   regular: { fontSize: 16 },
-  large: { fontSize: 18 },
+  large: { fontSize: 17 },
 };

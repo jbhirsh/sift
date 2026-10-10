@@ -685,6 +685,8 @@ describe('useMusicProvider — observable state', () => {
       await api.removeTrack(mockTrack);
     });
     expect(sift.state.removalErrors).toEqual(['Track A']);
+    // By id too: the counts key on it, since names can repeat.
+    expect(sift.state.failedRemovalIds).toEqual(['1']);
     // The user's intent is what matters — it is logged before the attempt.
     expect(logRemoval).toHaveBeenCalledTimes(1);
     expect(Sentry.captureException).toHaveBeenCalledWith(

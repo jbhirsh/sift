@@ -22,6 +22,7 @@ function makeState(overrides: Partial<SiftState> = {}): SiftState {
     removalPlaylistError: null,
     isCreatingPlaylist: false,
     removalErrors: [],
+    failedRemovalIds: [],
     connectionStatus: 'unknown',
     pendingKeeps: [],
     skipFiltering: false,
@@ -356,6 +357,15 @@ describe('siftReducer', () => {
     expect(next.removalErrors).toEqual(['first error', 'second error']);
   });
 
+  test('ADD_REMOVAL_ERROR records a failed removal by id too', () => {
+    const state = makeState({ failedRemovalIds: ['1'] });
+    const next = siftReducer(state, { type: 'ADD_REMOVAL_ERROR', error: 'Intro', failedRemovalId: '2' });
+    expect(next.removalErrors).toEqual(['Intro']);
+    expect(next.failedRemovalIds).toEqual(['1', '2']);
+    // A restore failure carries no id.
+    expect(siftReducer(next, { type: 'ADD_REMOVAL_ERROR', error: 'Intro: offline' }).failedRemovalIds).toEqual(['1', '2']);
+  });
+
   test('ADD_REMOVAL_ERROR on empty array', () => {
     const state = makeState();
     const next = siftReducer(state, { type: 'ADD_REMOVAL_ERROR', error: 'some error' });
@@ -363,8 +373,9 @@ describe('siftReducer', () => {
   });
 
   test('LOAD_TRACKS resets removalErrors', () => {
-    const state = makeState({ removalErrors: ['old error'] });
+    const state = makeState({ removalErrors: ['old error'], failedRemovalIds: ['1'] });
     const next = siftReducer(state, { type: 'LOAD_TRACKS', tracks: [trackA] });
+    expect(next.failedRemovalIds).toEqual([]);
     expect(next.removalErrors).toEqual([]);
   });
 

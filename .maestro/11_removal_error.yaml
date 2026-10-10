@@ -45,6 +45,17 @@ name: "Failed Removal Shows the Removal-Errors Warning"
 - tapOn: "Remove"
 - waitForAnimationToEnd
 
+# The first library remove explains where removed songs go, and the failure
+# shows during the sift, not only on Done (#141).
+- extendedWaitUntil:
+    visible:
+      id: "first-remove-note"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "unsynced-chip"
+    timeout: 30000
+
 # Keep the remaining 9 tracks to reach Done
 - repeat:
     times: 9
@@ -62,10 +73,10 @@ name: "Failed Removal Shows the Removal-Errors Warning"
     text: "1"
 
 # The warning block names the track that is actually still in place, and
-# the blanket "have been moved" claim is qualified.
+# the blanket "have been moved" claim gives way to real counts.
 - assertVisible:
     id: "removal-errors"
 - assertVisible:
     id: "removal-error-0"
     text: "Peaches"
-- assertVisible: ".*but some could not be.*"
+- assertVisible: "1 of 1 could not be moved.*"

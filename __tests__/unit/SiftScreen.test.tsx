@@ -97,7 +97,14 @@ jest.mock('../../src/components/InteractiveCard', () => {
   };
 });
 
+jest.mock('../../src/services/PreferencesStore', () => ({
+  ...jest.requireActual('../../src/services/PreferencesStore'),
+  loadSeenRemoveNote: jest.fn().mockResolvedValue(false),
+  markRemoveNoteSeen: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { renderWithProviders, mockTrackA, mockTrackB, mockTrackC } from '../helpers/renderWithProviders';
+import { loadSeenRemoveNote, markRemoveNoteSeen } from '../../src/services/PreferencesStore';
 import { useSift } from '../../src/context/SiftContext';
 import SiftScreen from '../../src/screens/SiftScreen';
 
@@ -291,5 +298,56 @@ describe('SiftScreen', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  describe('first-remove note (#141)', () => {
+    test('the first Apple library remove explains where songs go, once, until the next decision', async () => {
+      (markRemoveNoteSeen as jest.Mock).mockClear();
+      const { getByLabelText, getByTestId, queryByTestId } = await renderWithProviders(<SiftScreen />, {
+        initialTracks: [mockTrackA, mockTrackB, mockTrackC],
+      });
+      await act(async () => {});
+      expect(queryByTestId('first-remove-note')).toBeNull();
+
+      await fireEvent.press(getByLabelText('Remove'));
+      expect(getByTestId('first-remove-note')).toBeTruthy();
+      expect(markRemoveNoteSeen).toHaveBeenCalledTimes(1);
+
+      await fireEvent.press(getByTestId('mock-card-keep'));
+      expect(queryByTestId('first-remove-note')).toBeNull();
+    });
+
+    test('not shown again once seen', async () => {
+      (loadSeenRemoveNote as jest.Mock).mockResolvedValueOnce(true);
+      const { getByLabelText, queryByTestId } = await renderWithProviders(<SiftScreen />, {
+        initialTracks: [mockTrackA, mockTrackB, mockTrackC],
+      });
+      await act(async () => {});
+      await fireEvent.press(getByLabelText('Remove'));
+      expect(queryByTestId('first-remove-note')).toBeNull();
+    });
+  });
+
+  test('changes that did not reach the provider show as a chip during the sift (#141)', async () => {
+    const FailOnce = () => {
+      const { dispatch } = useSift();
+      const done = React.useRef(false);
+      React.useEffect(() => {
+        if (done.current) return;
+        done.current = true;
+        // Remove the first card (A), whose removal then fails.
+        dispatch({ type: 'DECIDE', decision: 'remove' });
+        dispatch({ type: 'ADD_REMOVAL_ERROR', error: mockTrackA.name, failedRemovalId: mockTrackA.id });
+        dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrackB });
+      }, [dispatch]);
+      return null;
+    };
+    const { getByTestId } = await renderWithProviders(<><SiftScreen /><FailOnce /></>, {
+      initialTracks: [mockTrackA, mockTrackB, mockTrackC],
+    });
+    await act(async () => {});
+    const chip = getByTestId('unsynced-chip');
+    expect(chip.props.children).toBe('2 didn\u2019t sync');
+    expect(chip.props.accessibilityLabel).toBe("2 changes didn't reach Apple Music");
   });
 });

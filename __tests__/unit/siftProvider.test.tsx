@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TouchableOpacity } from 'react-native';
+import { AppState, Text, TouchableOpacity, type AppStateStatus } from 'react-native';
 import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
 import { Track } from '../../src/types';
@@ -267,6 +267,53 @@ describe('SiftProvider', () => {
         jest.advanceTimersByTime(1000);
       });
       expect(SessionStore.saveSession).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('the debounced save is written when the app leaves the foreground (#137)', async () => {
+    jest.useFakeTimers();
+    try {
+      const { getByTestId } = await renderWithProvider([mockTrackA, mockTrackB]);
+      // React Native's Jest setup mocks AppState; read the listener the
+      // provider registered off the mock rather than replacing it.
+      const listeners = (AppState.addEventListener as jest.Mock).mock.calls
+        .filter(([type]) => type === 'change')
+        .map(([, listener]) => listener as (state: AppStateStatus) => void);
+      expect(listeners.length).toBeGreaterThan(0);
+      await fireEvent.press(getByTestId('decide-remove'));
+      expect(SessionStore.saveSession).not.toHaveBeenCalled();
+
+      // Coming back to the foreground writes nothing; leaving it does.
+      await act(() => listeners.forEach((l) => l('active')));
+      expect(SessionStore.saveSession).not.toHaveBeenCalled();
+      await act(() => listeners.forEach((l) => l('background')));
+      expect(SessionStore.saveSession).toHaveBeenCalledTimes(1);
+      expect(SessionStore.saveSession).toHaveBeenCalledWith(
+        expect.objectContaining({ cursor: 1, removed: [mockTrackA] }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('a discarded session is not written back by a later background flush (#137)', async () => {
+    jest.useFakeTimers();
+    try {
+      const { getByTestId } = await renderWithProvider([mockTrackA, mockTrackB]);
+      const listeners = (AppState.addEventListener as jest.Mock).mock.calls
+        .filter(([type]) => type === 'change')
+        .map(([, listener]) => listener as (state: AppStateStatus) => void);
+      // A decision leaves a debounced save pending; starting fresh discards
+      // the session before that save fires.
+      await fireEvent.press(getByTestId('decide-keep'));
+      await fireEvent.press(getByTestId('start-fresh'));
+      await act(() => listeners.forEach((l) => l('background')));
+      await act(() => {
+        jest.advanceTimersByTime(1000);
+      });
+      expect(SessionStore.saveSession).not.toHaveBeenCalled();
     } finally {
       jest.useRealTimers();
     }
