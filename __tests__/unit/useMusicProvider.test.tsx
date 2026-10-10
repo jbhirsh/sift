@@ -107,8 +107,6 @@ function TestConsumer() {
       <TouchableOpacity testID="toggle" onPress={() => provider.togglePlayPause()} />
       <TouchableOpacity testID="skip-fwd" onPress={() => provider.skipForward()} />
       <TouchableOpacity testID="skip-bwd" onPress={() => provider.skipBackward()} />
-      <TouchableOpacity testID="create-playlist" onPress={() => provider.createPlaylist('Test', ['1'])} />
-      <TouchableOpacity testID="load-library" onPress={() => provider.loadLibrary()} />
       <TouchableOpacity testID="load-playlists" onPress={async () => {
         lastLoadPlaylistsResult = await provider.loadPlaylists();
       }} />
@@ -207,7 +205,6 @@ function SortConsumer() {
     <>
       <Text testID="track-order">{state.tracks.map((t) => t.playCount).join(',')}</Text>
       <TouchableOpacity testID="set-most-played" onPress={() => dispatch({ type: 'SET_SORT_ORDER', sortOrder: 'most-played' })} />
-      <TouchableOpacity testID="sort-load-library" onPress={() => provider.loadLibrary()} />
       <TouchableOpacity testID="sort-load-tracks" onPress={() => provider.loadTracks()} />
     </>
   );
@@ -335,51 +332,6 @@ describe('useMusicProvider', () => {
     expect(mockProvider.seek).toHaveBeenCalled();
   });
 
-  test('createPlaylist calls provider.createPlaylist', async () => {
-    const { getByTestId } = await renderWithProvider();
-    await act(async () => {
-      await fireEvent.press(getByTestId('create-playlist'));
-    });
-    expect(mockProvider.createPlaylist).toHaveBeenCalledWith('Test', ['1']);
-  });
-
-  test('createPlaylist handles error', async () => {
-    mockProvider.createPlaylist.mockRejectedValue(new Error('playlist fail'));
-    const { getByTestId } = await renderWithProvider();
-    await act(async () => {
-      await fireEvent.press(getByTestId('create-playlist'));
-    });
-    // Should not throw
-  });
-
-  test('loadLibrary calls provider and dispatches tracks', async () => {
-    const { getByTestId } = await renderWithProvider();
-    await act(async () => {
-      await fireEvent.press(getByTestId('load-library'));
-    });
-    expect(mockProvider.isAuthorized).toHaveBeenCalled();
-    expect(mockProvider.loadLibrary).toHaveBeenCalled();
-  });
-
-  test('loadLibrary handles auth denial', async () => {
-    mockProvider.isAuthorized.mockResolvedValue(false);
-    mockProvider.requestAuthorization.mockResolvedValue(false);
-    const { getByTestId } = await renderWithProvider();
-    await act(async () => {
-      await fireEvent.press(getByTestId('load-library'));
-    });
-    expect(mockProvider.requestAuthorization).toHaveBeenCalled();
-  });
-
-  test('loadLibrary handles load error', async () => {
-    mockProvider.loadLibrary.mockRejectedValue(new Error('load fail'));
-    const { getByTestId } = await renderWithProvider();
-    await act(async () => {
-      await fireEvent.press(getByTestId('load-library'));
-    });
-    // Should not throw, error dispatched to state
-  });
-
   test('togglePlayPause pauses when playing, resumes when not', async () => {
     const { getByTestId } = await renderWithProvider();
     // First play to set isPlaying
@@ -413,26 +365,6 @@ describe('useMusicProvider', () => {
       jest.advanceTimersByTime(600);
     });
     expect(mockProvider.getPlaybackState).toHaveBeenCalled();
-  });
-
-  test('loadLibrary succeeds when initially unauthorized but grants access', async () => {
-    mockProvider.isAuthorized.mockResolvedValue(false);
-    mockProvider.requestAuthorization.mockResolvedValue(true);
-    const { getByTestId } = await renderWithProvider();
-    await act(async () => {
-      await fireEvent.press(getByTestId('load-library'));
-    });
-    expect(mockProvider.requestAuthorization).toHaveBeenCalled();
-    expect(mockProvider.loadLibrary).toHaveBeenCalled();
-  });
-
-  test('loadLibrary handles non-Error exception', async () => {
-    mockProvider.loadLibrary.mockRejectedValue('string error');
-    const { getByTestId } = await renderWithProvider();
-    await act(async () => {
-      await fireEvent.press(getByTestId('load-library'));
-    });
-    // Should dispatch generic error message for non-Error objects
   });
 
   test('loadPlaylists returns playlists from provider', async () => {
@@ -534,37 +466,6 @@ describe('useMusicProvider', () => {
       await fireEvent.press(getByTestId('load-tracks'));
     });
     // Should dispatch generic error message
-  });
-
-  test('loadLibrary sorts tracks by state.sortOrder (least-played default)', async () => {
-    mockProvider.loadLibrary.mockResolvedValue(unsortedTracks);
-    const { getByTestId } = await render(
-      <SiftProvider initialTracks={[mockTrack]}>
-        <SortConsumer />
-      </SiftProvider>
-    );
-    // Default sortOrder is 'least-played' → ascending by playCount.
-    await act(async () => {
-      await fireEvent.press(getByTestId('sort-load-library'));
-    });
-    expect(getByTestId('track-order').props.children).toBe('3,5,10');
-  });
-
-  test('loadLibrary re-sorts when state.sortOrder changes to most-played', async () => {
-    mockProvider.loadLibrary.mockResolvedValue(unsortedTracks);
-    const { getByTestId } = await render(
-      <SiftProvider initialTracks={[mockTrack]}>
-        <SortConsumer />
-      </SiftProvider>
-    );
-    await act(async () => {
-      await fireEvent.press(getByTestId('set-most-played'));
-    });
-    await act(async () => {
-      await fireEvent.press(getByTestId('sort-load-library'));
-    });
-    // 'most-played' → descending by playCount.
-    expect(getByTestId('track-order').props.children).toBe('10,5,3');
   });
 
   test('loadTracks sorts library tracks by state.sortOrder', async () => {

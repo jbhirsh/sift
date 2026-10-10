@@ -11,10 +11,6 @@ export function getAuthorizationStatus(): string {
   return ExpoMusicKit.getAuthorizationStatus();
 }
 
-export async function loadLibrary(sortOrder: string, offset: number, limit: number): Promise<MusicKitTrack[]> {
-  return ExpoMusicKit.loadLibrary(sortOrder, offset, limit);
-}
-
 export async function loadFullLibrary(): Promise<MusicKitTrack[]> {
   return ExpoMusicKit.loadFullLibrary();
 }

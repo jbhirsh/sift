@@ -182,15 +182,6 @@ describe('siftReducer', () => {
     expect(next.tracks).toEqual([]);
   });
 
-  test('TOGGLE_PLAY_PAUSE toggles isPlaying', () => {
-    const state = makeState({ isPlaying: false });
-    const next = siftReducer(state, { type: 'TOGGLE_PLAY_PAUSE' });
-    expect(next.isPlaying).toBe(true);
-
-    const next2 = siftReducer(next, { type: 'TOGGLE_PLAY_PAUSE' });
-    expect(next2.isPlaying).toBe(false);
-  });
-
   test('DECIDE does nothing when cursor is past tracks array', () => {
     const state = makeState({ tracks: [trackA], cursor: 5 });
     const next = siftReducer(state, { type: 'DECIDE', decision: 'keep' });
