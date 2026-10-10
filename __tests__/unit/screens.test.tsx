@@ -1073,6 +1073,50 @@ describe('SetupScreen', () => {
   });
 });
 
+describe('SetupScreen: songs sifted before (#143)', () => {
+  const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+  afterEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  function SkipProbe() {
+    const { state } = useSift();
+    return <Text testID="probe-skip">{`${state.phase}:${state.skipFiltering}`}</Text>;
+  }
+
+  test('no switch before anything was kept', async () => {
+    const { queryByTestId } = await renderWithProviders(<SetupScreen />);
+    await act(async () => {});
+    expect(queryByTestId('include-sifted-switch')).toBeNull();
+  });
+
+  test('says how many kept songs a library sift leaves out, and the switch brings them back', async () => {
+    await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({ 'apple-music:library': ['a', 'b', 'c'] }));
+    const { getByTestId } = await renderWithProviders(<><SetupScreen /><SkipProbe /></>);
+    await act(async () => {});
+    expect(getByTestId('reviewed-note').props.children).toBe('3 songs you kept in earlier sifts are left out.');
+    await act(async () => {
+      await fireEvent(getByTestId('include-sifted-switch'), 'valueChange', true);
+    });
+    expect(getByTestId('reviewed-note').props.children).toBe('Songs you kept in earlier sifts are included.');
+    await act(async () => {
+      await fireEvent.press(getByTestId('setup-start-sifting'));
+    });
+    expect(getByTestId('probe-skip').props.children).toBe('loading:true');
+  });
+
+  test('left off, a new library sift filters them out', async () => {
+    await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({ 'apple-music:library': ['a'] }));
+    const { getByTestId } = await renderWithProviders(<><SetupScreen /><SkipProbe /></>);
+    await act(async () => {});
+    expect(getByTestId('reviewed-note').props.children).toBe('1 song you kept in an earlier sift is left out.');
+    await act(async () => {
+      await fireEvent.press(getByTestId('setup-start-sifting'));
+    });
+    expect(getByTestId('probe-skip').props.children).toBe('loading:false');
+  });
+});
+
 describe('LoadingScreen', () => {
   test('renders brand text', async () => {
     const { getByTestId } = await renderWithProviders(<LoadingScreen />);

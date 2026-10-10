@@ -107,6 +107,7 @@ src/
     context/            SiftContext (useReducer state management)
     services/           MusicProviderInterface, AppleMusicProvider, MockMusicProvider,
                         SessionStore, RemovalHistoryStore, PreferencesStore,
+                        ReviewedLedgerStore,
                         ChorusFinder + LrclibClient ("Start at chorus")
     hooks/              useKeyboardShortcuts, useMusicProvider, useResolvedArtwork,
                         useChorusStart
@@ -144,6 +145,10 @@ Makefile                Dev commands (test, lint, typecheck, check)
   Sessions auto-save after every decision. User settings (`startAtChorus`) are
   preferences, not session state: `PreferencesStore` persists them and
   `RESUME_SESSION` never touches them.
+- **Reviewed ledger**: library keeps leave the song in place, so
+  `ReviewedLedgerStore` records kept ids per source and later library sifts
+  leave them out; `skipFiltering` (Setup's "Include songs I've already
+  sifted", Start Over) brings them back. Skipped songs aren't recorded.
 - **Start at chorus** (Apple Music only): `ChorusFinder` picks each track's start
   from LRCLIB synced lyrics (the repeated block, `utils/chorus`), then from where
   ShazamKit places Apple's preview clip in the track (native `previewOffset`), then

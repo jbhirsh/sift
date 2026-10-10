@@ -7,6 +7,8 @@ import { logRemoval, loadHistory, removeFromHistory } from '../services/RemovalH
 import { sortTracks } from '../utils/sorting';
 import { trackIdentity } from '../utils/trackIdentity';
 import { APPLE_REMOVED_PLAYLIST, libraryRemovedIds } from '../utils/libraryRemovals';
+import { ledgerKey } from '../utils/reviewedLedger';
+import { loadReviewedIds, markReviewed } from '../services/ReviewedLedgerStore';
 import { Playlist, Track } from '../types';
 
 const POLL_INTERVAL_MS = 500;
@@ -322,6 +324,7 @@ export function useMusicProvider() {
       // removed" instead of blaming the sifted filter for both.
       let filteredAsSifted = 0;
       let filteredAsRemoved = 0;
+      let filteredAsReviewed = 0;
       if (source.type === 'playlist') {
         const result = await providerRef.current.loadPlaylistTracks?.(source.playlist.id);
         if (!result) throw new Error('This provider does not support playlist loading');
@@ -379,6 +382,17 @@ export function useMusicProvider() {
           tracks = tracks.filter((t) => !removedIds.has(t.id));
           filteredAsRemoved = beforeRemovedFilter - tracks.length;
         }
+        if (shouldFilter) {
+          // Leave out songs kept in earlier library sifts (#143), so a big
+          // library gets through over many sittings. By id, like the removal
+          // filter above. Skipped songs were never recorded, so they come
+          // back. Setup's "Include songs I've already sifted" and Start Over
+          // pass skipFiltering to bring them all back.
+          const reviewedIds = await loadReviewedIds(ledgerKey(state.provider, source));
+          const beforeReviewedFilter = tracks.length;
+          tracks = tracks.filter((t) => !reviewedIds.has(t.id));
+          filteredAsReviewed = beforeReviewedFilter - tracks.length;
+        }
       }
 
       Sentry.addBreadcrumb({
@@ -403,9 +417,11 @@ export function useMusicProvider() {
                 : 'All tracks in this playlist have already been sifted or removed.'
             : source.type === 'playlist'
               ? 'This playlist has no tracks to sift.'
-              : filteredAsRemoved > 0
-                ? 'Every song in your library was removed in a previous sift.'
-                : 'Your library has no tracks to sift.';
+              : filteredAsReviewed > 0
+                ? 'You\u2019ve sifted every song in your library. Turn on \u201cInclude songs I\u2019ve already sifted\u201d to go through them again.'
+                : filteredAsRemoved > 0
+                  ? 'Every song in your library was removed in a previous sift.'
+                  : 'Your library has no tracks to sift.';
         dispatch({ type: 'SET_LOAD_ERROR', error });
         return;
       }
@@ -641,7 +657,11 @@ export function useMusicProvider() {
 
   const keepTrack = useCallback(
     (track: Track): Promise<void> => {
-      if (state.source.type !== 'playlist') return Promise.resolve();
+      if (state.source.type !== 'playlist') {
+        // A library keep leaves the song where it is; remember it so later
+        // library sifts leave it out (#143).
+        return markReviewed(ledgerKey(state.provider, state.source), track.id);
+      }
       const playlistName = state.source.playlist.name;
       const siftedName = `${playlistName} - Sifted`;
       const knownSiftedId = state.siftedPlaylistId;
@@ -724,7 +744,7 @@ export function useMusicProvider() {
       keepQueue = next;
       return next;
     },
-    [state.source, state.siftedPlaylistId, findSiftedPlaylistWithRetry, dispatch],
+    [state.source, state.provider, state.siftedPlaylistId, findSiftedPlaylistWithRetry, dispatch],
   );
 
   const warmCache = useCallback(async (trackIDs: string[]): Promise<void> => {

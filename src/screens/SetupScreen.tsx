@@ -4,6 +4,7 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
+  Switch,
   Platform,
   ActionSheetIOS,
   Alert,
@@ -24,6 +25,8 @@ import { decisionCounts, discardConfirmation, legacyFailedRemovalIds, removeExpl
 import { loadSession } from '../services/SessionStore';
 import { clearArtworkCache } from '../hooks/useResolvedArtwork';
 import { clearHistoryForSource } from '../services/RemovalHistoryStore';
+import { loadReviewedIds } from '../services/ReviewedLedgerStore';
+import { ledgerKey, reviewedNote } from '../utils/reviewedLedger';
 import { RADIUS, SPACING } from '../theme';
 import {
   Playlist,
@@ -75,6 +78,21 @@ export default function SetupScreen() {
   const [savedSession, setSavedSession] = useState<SiftSession | null>(null);
   const [showResumeModal, setShowResumeModal] = useState(false);
   const [alreadySifted, setAlreadySifted] = useState(false);
+  // Songs kept in earlier library sifts, which a new one leaves out unless
+  // the switch says otherwise (#143).
+  const [reviewedCount, setReviewedCount] = useState(0);
+  const [includeSifted, setIncludeSifted] = useState(false);
+  const isLibrary = state.source.type === 'library';
+  useEffect(() => {
+    if (!isLibrary) return;
+    let cancelled = false;
+    loadReviewedIds(ledgerKey(state.provider, { type: 'library' })).then((ids) => {
+      if (!cancelled) setReviewedCount(ids.size);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLibrary, state.provider]);
   // True while performStartOver's remote clears are running. Together with
   // state.isCreatingPlaylist this gates every start-over path, so a clear
   // can never run concurrently with an in-flight sifted-playlist save (or
@@ -335,12 +353,14 @@ export default function SetupScreen() {
   // Starting a sift replaces the one saved session, whatever its source
   // (#137). If that would throw away an unfinished sift's decisions, ask.
   const handleStartSifting = () => withDiscardCheck(async () => {
+    // skipFiltering brings back the songs kept in earlier library sifts.
+    const includeReviewed = isLibrary && includeSifted;
     const risk = await sessionAtRisk();
     if (!risk) {
-      startFresh();
+      startFresh(includeReviewed);
       return;
     }
-    confirmDiscard(discardConfirmation(risk.provider, risk.source, risk.counts, 'new-sift'), () => startFresh());
+    confirmDiscard(discardConfirmation(risk.provider, risk.source, risk.counts, 'new-sift'), () => startFresh(includeReviewed));
   });
 
   const openPlaylistPicker = () => {
@@ -354,6 +374,18 @@ export default function SetupScreen() {
       setLoadingPlaylists(false);
     });
   };
+
+  const canResumeInMemory = state.tracks.length > 0
+    && state.cursor < state.tracks.length
+    && state.activeSource != null
+    && sourceMatches(state.source, state.activeSource);
+  const canResumeFromSaved = !canResumeInMemory
+    && savedSession != null
+    && savedSession.source != null
+    && sourceMatches(state.source, savedSession.source)
+    && savedSession.cursor < savedSession.tracks.length;
+  // Only beside Start Sifting: it decides what a new library sift loads.
+  const showIncludeSifted = isLibrary && reviewedCount > 0 && !canResumeInMemory && !canResumeFromSaved;
 
   return (
     <View style={styles.container}>
@@ -458,6 +490,27 @@ export default function SetupScreen() {
           <Text testID="remove-explanation" style={[styles.footnote, { color: colors.textSecondary }]}>
             {removeExplanation(state.provider, state.source)}
           </Text>
+          {showIncludeSifted && (
+            <>
+              <GlassCard intensity="thin" radius={RADIUS.md}>
+                <View style={styles.switchRow}>
+                  <Text style={[styles.switchLabel, { color: colors.text }]}>
+                    Include songs I{'\u2019'}ve already sifted
+                  </Text>
+                  <Switch
+                    testID="include-sifted-switch"
+                    accessibilityLabel="Include songs I've already sifted"
+                    value={includeSifted}
+                    onValueChange={setIncludeSifted}
+                    trackColor={{ true: colors.accent, false: colors.quaternary }}
+                  />
+                </View>
+              </GlassCard>
+              <Text testID="reviewed-note" style={[styles.footnote, { color: colors.textSecondary }]}>
+                {reviewedNote(reviewedCount, includeSifted)}
+              </Text>
+            </>
+          )}
         </View>
 
         {showPlaylistPicker && (
@@ -512,16 +565,6 @@ export default function SetupScreen() {
         {/* Action buttons */}
         <View style={styles.buttonSection}>
           {(() => {
-            const canResumeInMemory = state.tracks.length > 0
-              && state.cursor < state.tracks.length
-              && state.activeSource != null
-              && sourceMatches(state.source, state.activeSource);
-            const canResumeFromSaved = !canResumeInMemory
-              && savedSession != null
-              && savedSession.source != null
-              && sourceMatches(state.source, savedSession.source)
-              && savedSession.cursor < savedSession.tracks.length;
-
             if (canResumeInMemory || canResumeFromSaved) {
               // Same counts as the resume sheet, so the session being
               // resumed (or finished) is visible here too (#142).
@@ -683,6 +726,17 @@ const styles = StyleSheet.create({
   finishLinkText: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.lg,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.lg,
+  },
+  switchLabel: {
+    flex: 1,
+    fontSize: 15,
   },
   footnote: {
     fontSize: 13,

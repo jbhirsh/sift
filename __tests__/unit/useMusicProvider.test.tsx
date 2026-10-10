@@ -4,6 +4,7 @@ import { render, fireEvent, act } from '@testing-library/react-native';
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
 import { useMusicProvider } from '../../src/hooks/useMusicProvider';
 import { removeFromHistory } from '../../src/services/RemovalHistoryStore';
+import { loadReviewedIds, markReviewed } from '../../src/services/ReviewedLedgerStore';
 import { Track } from '../../src/types';
 
 // Mock Sentry
@@ -45,6 +46,12 @@ const mockProvider = {
 jest.mock('../../src/services', () => ({
   createMusicProvider: jest.fn(() => mockProvider),
   MusicProviderService: {},
+}));
+
+// The reviewed ledger (#143): observable, and empty unless a test says so.
+jest.mock('../../src/services/ReviewedLedgerStore', () => ({
+  loadReviewedIds: jest.fn(() => Promise.resolve(new Set())),
+  markReviewed: jest.fn(() => Promise.resolve()),
 }));
 
 // Mock the removal-history store so restore/remove wiring is observable and
@@ -1300,6 +1307,72 @@ describe('useMusicProvider', () => {
     });
     expect(getByTestId('phase').props.children).toBe('setup');
     expect(getByTestId('load-error').props.children).toBe('Your library has no tracks to sift.');
+  });
+
+  describe('reviewed ledger (#143)', () => {
+    function LedgerConsumer() {
+      const provider = useMusicProvider();
+      const { state } = useSift();
+      return (
+        <>
+          <Text testID="track-ids">{state.tracks.map((t) => t.id).join(',')}</Text>
+          <Text testID="load-error">{state.loadError ?? ''}</Text>
+          <TouchableOpacity testID="load-tracks" onPress={async () => { await provider.loadTracks(); }} />
+          <TouchableOpacity testID="load-tracks-skip" onPress={async () => { await provider.loadTracks({ skipFiltering: true }); }} />
+          <TouchableOpacity testID="keep-track" onPress={() => provider.keepTrack(mockTrack)} />
+        </>
+      );
+    }
+    const renderLedger = () => render(
+      <SiftProvider initialTracks={[]}>
+        <LedgerConsumer />
+      </SiftProvider>,
+    );
+
+    test('a library keep is recorded under the library key', async () => {
+      const { getByTestId } = await renderLedger();
+      await act(async () => {
+        await fireEvent.press(getByTestId('keep-track'));
+      });
+      expect(markReviewed).toHaveBeenCalledWith('apple-music:library', '1');
+      // Nothing to add to: library keeps leave the song where it is.
+      expect(mockProvider.addToPlaylist).not.toHaveBeenCalled();
+    });
+
+    test('a library sift leaves out songs kept earlier, but not skipped ones', async () => {
+      mockProvider.loadLibrary.mockResolvedValue([mockTrack, mockTrackB]);
+      (loadReviewedIds as jest.Mock).mockResolvedValueOnce(new Set(['1']));
+      const { getByTestId } = await renderLedger();
+      await act(async () => {
+        await fireEvent.press(getByTestId('load-tracks'));
+      });
+      expect(loadReviewedIds).toHaveBeenCalledWith('apple-music:library');
+      expect(getByTestId('track-ids').props.children).toBe('2');
+    });
+
+    test('skipFiltering (the Include switch, Start Over) brings them back', async () => {
+      mockProvider.loadLibrary.mockResolvedValue([mockTrack, mockTrackB]);
+      (loadReviewedIds as jest.Mock).mockResolvedValue(new Set(['1']));
+      const { getByTestId } = await renderLedger();
+      await act(async () => {
+        await fireEvent.press(getByTestId('load-tracks-skip'));
+      });
+      // Least played first.
+      expect(getByTestId('track-ids').props.children).toBe('2,1');
+      (loadReviewedIds as jest.Mock).mockResolvedValue(new Set());
+    });
+
+    test('a library that is all sifted says how to go again', async () => {
+      mockProvider.loadLibrary.mockResolvedValue([mockTrack]);
+      (loadReviewedIds as jest.Mock).mockResolvedValueOnce(new Set(['1']));
+      const { getByTestId } = await renderLedger();
+      await act(async () => {
+        await fireEvent.press(getByTestId('load-tracks'));
+      });
+      expect(getByTestId('load-error').props.children).toBe(
+        'You\u2019ve sifted every song in your library. Turn on \u201cInclude songs I\u2019ve already sifted\u201d to go through them again.',
+      );
+    });
   });
 
   test('re-sift does not re-offer a kept track that read back under a library-instance id', async () => {
