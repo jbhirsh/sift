@@ -12,8 +12,8 @@ import { Track } from '../types';
 export const CHORUS_WAIT_MS = 2500;
 
 /**
- * "Start at chorus": where each card's playback should begin. Off (or on
- * Spotify, whose fixed 30-second previews can't start at a chorus) every
+ * "Start at chorus": where each card's playback should begin. Off (or on a
+ * provider other than Apple Music, whose full-track playback it needs) every
  * track starts at 0:00. On, the current and next two cards are resolved in
  * the background so a swipe can start the next song at its chorus at once.
  *

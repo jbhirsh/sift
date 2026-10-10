@@ -9,7 +9,7 @@ import { Track } from '../../src/types';
 // The Sift screen and its player controls each run their own
 // useMusicProvider, so each owns a provider instance, and both poll while a
 // song plays. Only the player controls' instance plays. With the real mock
-// provider (one player per instance, as Spotify's is), the screen's idle
+// provider (one player per instance), the screen's idle
 // instance used to report 0 and overwrite the position, so the clock stuck
 // at 0:00 and E2E flow 12 failed.
 

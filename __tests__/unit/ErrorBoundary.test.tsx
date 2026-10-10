@@ -43,10 +43,10 @@ function SiftProbe() {
   if (shouldThrow) throw new Error('render exploded');
   return (
     <>
-      <Text testID="provider">{state.provider}</Text>
+      <Text testID="sort-order">{state.sortOrder}</Text>
       <Pressable
-        testID="pick-spotify"
-        onPress={() => dispatch({ type: 'SET_PROVIDER', provider: 'spotify' })}
+        testID="change-sort"
+        onPress={() => dispatch({ type: 'SET_SORT_ORDER', sortOrder: 'most-played' })}
       />
     </>
   );
@@ -117,19 +117,19 @@ describe('ErrorBoundary', () => {
         <SiftProbe />
       </SiftProvider>,
     );
-    const initialProvider = getByTestId('provider').props.children;
-    await fireEvent.press(getByTestId('pick-spotify'));
-    expect(getByTestId('provider')).toHaveTextContent('spotify');
-    expect(initialProvider).not.toBe('spotify');
+    const initialSort = getByTestId('sort-order').props.children;
+    await fireEvent.press(getByTestId('change-sort'));
+    expect(getByTestId('sort-order')).toHaveTextContent('most-played');
+    expect(initialSort).not.toBe('most-played');
 
     // Crash on the next render…
     shouldThrow = true;
-    await fireEvent.press(getByTestId('pick-spotify'));
+    await fireEvent.press(getByTestId('change-sort'));
     expect(getByTestId('error-fallback')).toBeTruthy();
 
-    // …and Restart brings back a fresh provider, not the crashed state.
+    // …and Restart brings back fresh state, not the crashed state.
     shouldThrow = false;
     await fireEvent.press(getByTestId('error-restart'));
-    expect(getByTestId('provider')).toHaveTextContent(initialProvider);
+    expect(getByTestId('sort-order')).toHaveTextContent(initialSort);
   });
 });

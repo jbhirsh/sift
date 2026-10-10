@@ -255,13 +255,14 @@ describe('loadSession with a session saved by a different build', () => {
     );
   });
 
-  it('resumes a legacy Spotify session with its local files (null ids) removed', async () => {
-    // Builds before local files were skipped saved them with id null.
+  it('resumes a legacy session with its id-less tracks removed', async () => {
+    // Builds before local files were skipped saved them with id null (they
+    // came from Spotify, since removed: a Spotify session itself is now set
+    // aside, see validators).
     const local = (n: number) => ({ ...sampleSession.tracks[0], id: null, name: `Local ${n}` });
     const t = (id: string) => ({ ...sampleSession.tracks[0], id });
     const legacy = {
       ...sampleSession,
-      provider: 'spotify',
       // Decided: a, local1, b, local2 (cursor 4); next up: c, local3, d.
       tracks: [t('a'), local(1), t('b'), local(2), t('c'), local(3), t('d')],
       cursor: 4,

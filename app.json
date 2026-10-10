@@ -80,10 +80,7 @@
         }
       ],
       "expo-dev-client",
-      "expo-audio",
       "expo-image",
-      "expo-secure-store",
-      "expo-web-browser",
       [
         "@sentry/react-native/expo",
         {

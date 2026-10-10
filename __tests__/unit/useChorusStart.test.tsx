@@ -13,7 +13,7 @@ const track = (id: string, duration = 200): Track => ({
 const [t1, t2, t3] = [track('t1'), track('t2'), track('t3')];
 
 const mockSift = {
-  state: { startAtChorus: true, provider: 'apple-music' as 'apple-music' | 'spotify' },
+  state: { startAtChorus: true, provider: 'apple-music' as const },
   currentTrack: t1 as Track | undefined,
   nextTrack: t2 as Track | undefined,
   nextNextTrack: t3 as Track | undefined,
@@ -50,7 +50,6 @@ describe('useChorusStart', () => {
 
   it.each([
     ['the setting is off', { startAtChorus: false, provider: 'apple-music' as const }],
-    ['the provider is Spotify', { startAtChorus: true, provider: 'spotify' as const }],
   ])('is disabled, prefetches nothing and starts at 0 when %s', async (_, state) => {
     mockSift.state = state;
     const { result } = await renderHook(() => useChorusStart(previewOffset));

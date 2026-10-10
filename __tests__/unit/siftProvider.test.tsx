@@ -154,7 +154,7 @@ describe('SiftProvider', () => {
       skipped: [],
       sortOrder: 'newest',
       savedAt: '2024-01-01T00:00:00.000Z',
-      provider: 'spotify',
+      provider: 'apple-music',
     });
     const { getByTestId } = await renderWithProvider();
     // Should stay in setup — SiftProvider no longer auto-resumes

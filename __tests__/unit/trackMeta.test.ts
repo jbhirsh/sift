@@ -35,7 +35,7 @@ describe('formatTrackMeta', () => {
     expect(formatTrackMeta(0, '')).toEqual({ text: '', label: '' });
   });
 
-  test('a provider without play counts (Spotify) shows only the add date', () => {
+  test('a provider without play counts shows only the add date', () => {
     expect(formatTrackMeta(0, '2021-03-15T12:00:00.000Z', { playsKnown: false })).toEqual({
       text: 'Added Mar 2021',
       label: 'Added March 2021',
