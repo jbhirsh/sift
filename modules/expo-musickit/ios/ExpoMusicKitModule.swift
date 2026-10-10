@@ -11,7 +11,7 @@ import ShazamKit
 
 public class ExpoMusicKitModule: Module {
   /// Cached Song objects keyed by MusicItemID raw value.
-  /// Populated by loadLibrary/loadFullLibrary and used for playback lookups.
+  /// Populated by loadFullLibrary and used for playback lookups.
   private var songCache: [String: Song] = [:]
   /// Cached Track objects for playlist tracks not in the user's library.
   /// Used as a playback fallback when Song lookup fails.
@@ -51,37 +51,6 @@ public class ExpoMusicKitModule: Module {
     }
 
     // MARK: - Library
-
-    AsyncFunction("loadLibrary") { (sortOrder: String, offset: Int, limit: Int) -> [[String: Any]] in
-      guard MusicAuthorization.currentStatus == .authorized else {
-        throw MusicKitError.notAuthorized
-      }
-
-      var request = MusicLibraryRequest<Song>()
-      request.limit = limit
-      request.offset = offset
-
-      switch sortOrder {
-      case "dateAdded":
-        request.sort(by: \.libraryAddedDate, ascending: false)
-      case "title":
-        request.sort(by: \.title, ascending: true)
-      case "artist":
-        request.sort(by: \.artistName, ascending: true)
-      default:
-        break
-      }
-
-      let response = try await request.response()
-      let songs = Array(response.items)
-
-      var results: [[String: Any]] = []
-      for song in songs {
-        self.songCache[song.id.rawValue] = song
-        results.append(self.songToDictionary(song))
-      }
-      return results
-    }
 
     AsyncFunction("loadFullLibrary") { () -> [[String: Any]] in
       guard MusicAuthorization.currentStatus == .authorized else {

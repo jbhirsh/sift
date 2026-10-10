@@ -110,7 +110,7 @@ src/
                         SessionStore, RemovalHistoryStore, PreferencesStore,
                         ReviewedLedgerStore,
                         ChorusFinder + LrclibClient ("Start at chorus")
-    hooks/              useKeyboardShortcuts, useMusicProvider, useResolvedArtwork,
+    hooks/              useMusicProvider, useResolvedArtwork,
                         useChorusStart
     theme/              Design tokens (SPACING, RADIUS, COLORS, SHADOWS,
                         FONTS, GLASS, GRADIENTS), ThemeContext

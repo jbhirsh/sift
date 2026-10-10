@@ -109,7 +109,7 @@ jobs:
           CHANGED=$(git diff --name-only --diff-filter=d "origin/${BASE_REF}"...HEAD -- \
               src/context src/services src/utils src/hooks \
             | grep -E '\.(ts|tsx)$' \
-            | grep -Ev '(/index\.ts$|MusicProviderInterface\.ts$|useKeyboardShortcuts\.ts$|mockData\.ts$|MockMusicProvider\.ts$)' \
+            | grep -Ev '(/index\.ts$|MusicProviderInterface\.ts$|mockData\.ts$|MockMusicProvider\.ts$)' \
             || true)
           if [ -z "$CHANGED" ]; then
             echo "No mutable files changed — running utils smoke scope to validate the Stryker setup."

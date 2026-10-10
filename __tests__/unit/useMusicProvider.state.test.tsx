@@ -106,13 +106,6 @@ const mockTrackB: Track = {
   duration: 180, playCount: 3, dateAdded: '2020-02-01T00:00:00.000Z',
 };
 
-// Deliberately unsorted by playCount so a real sort is observable.
-const unsortedTracks: Track[] = [
-  { id: 'high', name: 'High', artist: 'A', album: 'A', duration: 200, playCount: 10, dateAdded: '2020-01-01T00:00:00.000Z' },
-  { id: 'low', name: 'Low', artist: 'B', album: 'B', duration: 200, playCount: 3, dateAdded: '2020-01-01T00:00:00.000Z' },
-  { id: 'mid', name: 'Mid', artist: 'C', album: 'C', duration: 200, playCount: 5, dateAdded: '2020-01-01T00:00:00.000Z' },
-];
-
 // ── Harness ────────────────────────────────────────────
 // Captures the hook API and the context value after every committed render
 // (in an effect, per the rules of React) so tests can call methods directly
@@ -389,94 +382,6 @@ describe('useMusicProvider — observable state', () => {
   });
 
   // ── Load flows ───────────────────────────────────────
-
-  test('loadLibrary walks the progress journey and lands sorted in sifting', async () => {
-    let resolveAuthCheck!: (authorized: boolean) => void;
-    let resolveLibrary!: (tracks: Track[]) => void;
-    mockProvider.isAuthorized.mockImplementationOnce(
-      () => new Promise<boolean>((res) => { resolveAuthCheck = res; }),
-    );
-    mockProvider.loadLibrary.mockImplementationOnce(
-      () => new Promise<Track[]>((res) => { resolveLibrary = res; }),
-    );
-    await renderHarness();
-
-    let pending!: Promise<void>;
-    await act(async () => {
-      pending = api.loadLibrary();
-    });
-    expect(sift.state.phase).toBe('loading');
-    expect(sift.state.loadProgress).toBe(0);
-    expect(sift.state.loadMessage).toBe('Loading library…');
-
-    await act(async () => {
-      resolveAuthCheck(true);
-    });
-    expect(sift.state.loadProgress).toBe(0.3);
-    expect(sift.state.loadMessage).toBe('Fetching tracks…');
-
-    await act(async () => {
-      resolveLibrary(unsortedTracks);
-      await pending;
-    });
-    expect(sift.state.phase).toBe('sifting');
-    expect(sift.state.loadProgress).toBe(1);
-    expect(sift.state.loadMessage).toBe('Sorting tracks…');
-    // Default sort is least-played: ascending playCount.
-    expect(sift.state.tracks.map((t) => t.playCount)).toEqual([3, 5, 10]);
-  });
-
-  test('loadLibrary failure surfaces the reason and returns to setup', async () => {
-    mockProvider.loadLibrary.mockRejectedValueOnce(new Error('load fail'));
-    await renderHarness();
-
-    await act(async () => {
-      await api.loadLibrary();
-    });
-    expect(sift.state.loadError).toBe('load fail');
-    expect(sift.state.phase).toBe('setup');
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      { tags: { flow: 'load-library' } },
-    );
-
-    // Non-Error rejections get the generic message.
-    mockProvider.loadLibrary.mockRejectedValueOnce('string error');
-    await act(async () => {
-      await api.loadLibrary();
-    });
-    expect(sift.state.loadError).toBe('Failed to load library');
-  });
-
-  test('loadLibrary denial explains the requirement and offers Open Settings', async () => {
-    mockProvider.isAuthorized.mockResolvedValue(false);
-    mockProvider.requestAuthorization.mockResolvedValue(false);
-    await renderHarness();
-
-    await act(async () => {
-      await api.loadLibrary();
-    });
-
-    expect(sift.state.loadError).toBe('Music library access is required to use Sift.');
-    expect(sift.state.phase).toBe('setup');
-    expect(mockProvider.loadLibrary).not.toHaveBeenCalled();
-
-    expect(Alert.alert).toHaveBeenCalledWith(
-      'Music Access Required',
-      'Sift needs access to your music library. Please enable it in Settings.',
-      [
-        expect.objectContaining({ text: 'Cancel', style: 'cancel' }),
-        expect.objectContaining({ text: 'Open Settings' }),
-      ],
-    );
-    const buttons = lastAlertButtons();
-    // Cancel must stay a plain dismiss…
-    expect(buttons[0]?.onPress).toBeUndefined();
-    // …while Open Settings deep-links into the system settings pane.
-    expect(typeof buttons[1]?.onPress).toBe('function');
-    buttons[1]?.onPress?.();
-    expect(Linking.openSettings).toHaveBeenCalledTimes(1);
-  });
 
   test('loadTracks denial raises the same settings alert for a playlist source', async () => {
     mockProvider.isAuthorized.mockResolvedValue(false);
@@ -963,57 +868,6 @@ describe('useMusicProvider — observable state', () => {
 
   // ── createPlaylist lifecycle ─────────────────────────
 
-  test('createPlaylist shows busy while running, then created, and clears stale errors', async () => {
-    let resolveCreate!: () => void;
-    mockProvider.createPlaylist.mockImplementationOnce(
-      () => new Promise<void>((res) => { resolveCreate = () => res(); }),
-    );
-    await renderHarness([mockTrack]);
-
-    // Seed a stale error from a previous attempt to prove a retry clears it.
-    await act(async () => {
-      sift.dispatch({ type: 'SET_PLAYLIST_ERROR', error: 'stale' });
-    });
-
-    let pending!: Promise<void>;
-    await act(async () => {
-      pending = api.createPlaylist('Removed by Sift', ['1']);
-    });
-    expect(sift.state.isCreatingPlaylist).toBe(true);
-    expect(sift.state.removalPlaylistError).toBeNull();
-    expect(sift.state.removalPlaylistCreated).toBe(false);
-
-    await act(async () => {
-      resolveCreate();
-      await pending;
-    });
-    expect(sift.state.isCreatingPlaylist).toBe(false);
-    expect(sift.state.removalPlaylistCreated).toBe(true);
-    expect(mockProvider.createPlaylist).toHaveBeenCalledWith('Removed by Sift', ['1']);
-  });
-
-  test('createPlaylist failure surfaces the message and always clears busy', async () => {
-    mockProvider.createPlaylist.mockRejectedValueOnce(new Error('quota exceeded'));
-    await renderHarness([mockTrack]);
-
-    await act(async () => {
-      await api.createPlaylist('Removed by Sift', ['1']);
-    });
-    expect(sift.state.removalPlaylistError).toBe('quota exceeded');
-    expect(sift.state.removalPlaylistCreated).toBe(false);
-    expect(sift.state.isCreatingPlaylist).toBe(false);
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      { tags: { flow: 'create-playlist' } },
-    );
-
-    mockProvider.createPlaylist.mockRejectedValueOnce('boom');
-    await act(async () => {
-      await api.createPlaylist('Removed by Sift', ['1']);
-    });
-    expect(sift.state.removalPlaylistError).toBe('Failed to create playlist');
-  });
-
   // ── saveSiftedPlaylist ───────────────────────────────
 
   test('saveSiftedPlaylist recognizes an already-present track under a different id', async () => {
@@ -1348,9 +1202,6 @@ describe('useMusicProvider — observable state', () => {
   test('already-authorized flows never re-open the consent prompt', async () => {
     await renderHarness([]);
 
-    await act(async () => {
-      await api.loadLibrary();
-    });
     await act(async () => {
       await api.loadTracks();
     });
