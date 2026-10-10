@@ -62,6 +62,7 @@ jest.mock('../../src/hooks/useResolvedArtwork', () => ({
 
 // Must import after mocks
 import { renderWithProviders, mockTrackA, mockTrackB, mockTrackC } from '../helpers/renderWithProviders';
+import { a11yViolations } from '../helpers/a11yScan';
 import { clearHistoryForSource } from '../../src/services/RemovalHistoryStore';
 import { clearSession } from '../../src/services/SessionStore';
 import { useSift } from '../../src/context/SiftContext';
@@ -2130,4 +2131,62 @@ describe('SettingsScreen', () => {
     expect(getByTestId('start-at-chorus-value').props.children).toBe('false');
   });
 
+});
+
+describe('VoiceOver scan (#146)', () => {
+  test('Setup, with a playlist picked and the resume block showing', async () => {
+    const Backed = () => {
+      const { dispatch, decide } = useSift();
+      const ran = React.useRef(false);
+      React.useEffect(() => {
+        if (ran.current) return;
+        ran.current = true;
+        dispatch({ type: 'LOAD_TRACKS', tracks: [mockTrackA, mockTrackB] });
+        decide('keep');
+        dispatch({ type: 'SET_PHASE', phase: 'setup' });
+      }, [dispatch, decide]);
+      return <SetupScreen />;
+    };
+    const { toJSON } = await renderWithProviders(<Backed />);
+    await act(async () => {});
+    expect(a11yViolations(toJSON())).toEqual([]);
+  });
+
+  test('Done, with a removed song to restore and cards left', async () => {
+    const WithRemoved = () => {
+      const { decide, dispatch } = useSift();
+      const ran = React.useRef(false);
+      React.useEffect(() => {
+        if (ran.current) return;
+        ran.current = true;
+        decide('remove');
+        decide('skip');
+        dispatch({ type: 'FINISH' });
+      }, [decide, dispatch]);
+      return <DoneScreen />;
+    };
+    const { toJSON } = await renderWithProviders(<WithRemoved />, { initialTracks: [mockTrackA, mockTrackB, mockTrackC] });
+    await act(async () => {});
+    expect(a11yViolations(toJSON())).toEqual([]);
+  });
+
+  test('the source segments say which is selected', async () => {
+    const { getByTestId } = await renderWithProviders(<SetupScreen />);
+    await act(async () => {});
+    expect(getByTestId('source-library').props.accessibilityState).toMatchObject({ selected: true });
+    expect(getByTestId('source-playlist').props.accessibilityState).toMatchObject({ selected: false });
+  });
+
+  test('Settings', async () => {
+    const { toJSON } = await renderWithProviders(<SettingsScreen />);
+    await act(async () => {});
+    expect(a11yViolations(toJSON())).toEqual([]);
+  });
+
+  test('the playlist picker', async () => {
+    const { toJSON } = await renderWithProviders(
+      <PlaylistPicker playlists={[{ id: 'p1', name: 'Chill Vibes', trackCount: 12 }]} loading={false} onSelect={jest.fn()} onCancel={jest.fn()} />,
+    );
+    expect(a11yViolations(toJSON())).toEqual([]);
+  });
 });

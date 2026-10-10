@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render, fireEvent } from '@testing-library/react-native';
 import { Track } from '../../src/types';
 
 jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
@@ -59,6 +59,7 @@ jest.mock('../../src/hooks/useResolvedArtwork', () => ({
 import { useResolvedArtwork } from '../../src/hooks/useResolvedArtwork';
 import InteractiveCard from '../../src/components/InteractiveCard';
 import { ThemeProvider } from '../../src/theme/ThemeContext';
+import { a11yViolations } from '../helpers/a11yScan';
 
 const mockTrack: Track = {
   id: '1', name: 'Test Track', artist: 'Test Artist', album: 'Test Album',
@@ -79,7 +80,7 @@ async function renderCard(track = mockTrack, onDecide = jest.fn(), playsKnown?: 
 describe('InteractiveCard', () => {
   test('renders track name', async () => {
     const { getByTestId } = await renderCard();
-    expect(getByTestId('card-track-name').props.children).toBe('Test Track');
+    expect(getByTestId('card-track-name')).toHaveTextContent('Test Track');
   });
 
   test('renders artist name', async () => {
@@ -156,6 +157,31 @@ describe('InteractiveCard', () => {
         />
       </ThemeProvider>
     );
-    expect(getByTestId('card-track-name').props.children).toBe('Test Track');
+    expect(getByTestId('card-track-name')).toHaveTextContent('Test Track');
+  });
+});
+
+describe('InteractiveCard VoiceOver (#146)', () => {
+  test('Keep, Remove and Skip are actions on the song name', async () => {
+    const { getByTestId, onDecide } = await renderCard();
+    const name = getByTestId('card-track-name');
+    expect(name.props.accessibilityActions.map((a: { name: string }) => a.name)).toEqual(['keep', 'remove', 'skip']);
+    await fireEvent(name, 'accessibilityAction', { nativeEvent: { actionName: 'remove' } });
+    expect(onDecide).toHaveBeenLastCalledWith('remove');
+    await fireEvent(name, 'accessibilityAction', { nativeEvent: { actionName: 'skip' } });
+    expect(onDecide).toHaveBeenLastCalledWith('skip');
+    await fireEvent(name, 'accessibilityAction', { nativeEvent: { actionName: 'magicTap' } });
+    expect(onDecide).toHaveBeenCalledTimes(2);
+  });
+
+  test('the invisible KEEP and REMOVE stamps are hidden from VoiceOver', async () => {
+    const { toJSON } = await renderCard();
+    // The scanner skips hidden subtrees, so their text never shows up in it;
+    // check the stamps directly too.
+    expect(a11yViolations(toJSON())).toEqual([]);
+    const { queryByText } = await renderCard();
+    expect(queryByText('KEEP')).toBeNull();
+    expect(queryByText('REMOVE')).toBeNull();
+    expect(queryByText('KEEP', { includeHiddenElements: true })).toBeTruthy();
   });
 });

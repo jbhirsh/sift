@@ -281,6 +281,7 @@ export default function DoneScreen() {
               <TouchableOpacity
                 style={[styles.smallSecondaryButton, { borderColor: colors.accent }]}
                 onPress={copyRemovedList}
+                accessibilityRole="button"
                 activeOpacity={0.8}
               >
                 <Text style={[styles.smallSecondaryButtonText, { color: colors.accent }]}>
@@ -326,7 +327,7 @@ export default function DoneScreen() {
 
       {state.removalPlaylistCreated && state.source.type === 'playlist' && (
         <View style={styles.siftedConfirmation}>
-          <SymbolView name="checkmark.circle.fill" size={18} tintColor={COLORS.keep} />
+          <SymbolView name="checkmark.circle.fill" size={18} tintColor={COLORS.keep} accessibilityElementsHidden />
           <Text style={[styles.siftedConfirmationText, { color: colors.text }]}>
             Sifted playlist created!
           </Text>
@@ -503,7 +504,7 @@ function SummaryItem({
 }) {
   return (
     <View style={summaryStyles.item}>
-      <SymbolView name={symbolName as SFSymbol} size={32} tintColor={color} />
+      <SymbolView name={symbolName as SFSymbol} size={32} tintColor={color} accessibilityElementsHidden />
       <Text
         testID={`summary-count-${label}`}
         style={[summaryStyles.count, { color: textColor }]}

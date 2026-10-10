@@ -24,6 +24,11 @@ import { useTheme } from '../theme/ThemeContext';
 import { useResolvedArtwork } from '../hooks/useResolvedArtwork';
 
 const DRAG_THRESHOLD = 80;
+const CARD_ACTIONS = [
+  { name: 'keep', label: 'Keep' },
+  { name: 'remove', label: 'Remove' },
+  { name: 'skip', label: 'Skip' },
+];
 
 interface InteractiveCardProps {
   track: Track;
@@ -106,6 +111,9 @@ export default function InteractiveCard({
           <View style={styles.artworkContainer}>
             {resolvedArtworkURL ? (
               <Image
+                // Decorative: the song's name, artist and album are read.
+                accessible={false}
+                accessibilityElementsHidden
                 source={resolvedArtworkURL}
                 style={styles.artwork}
                 contentFit="cover"
@@ -118,7 +126,7 @@ export default function InteractiveCard({
                 end={{ x: 1, y: 1 }}
                 style={styles.placeholderArtwork}
               >
-                <SymbolView name="music.note" size={48} tintColor={colors.textTertiary} />
+                <SymbolView name="music.note" size={48} tintColor={colors.textTertiary} accessibilityElementsHidden />
               </LinearGradient>
             )}
 
@@ -139,13 +147,28 @@ export default function InteractiveCard({
               />
               <View style={styles.trackInfoContent}>
                 <View style={styles.trackTextGroup}>
-                  <Text
-                    style={styles.trackName}
-                    numberOfLines={2}
+                  {/* Keep, Remove and Skip as VoiceOver actions on the song's
+                      name (swipe up or down to pick one): the card's swipe
+                      isn't available to VoiceOver (#146). On a View: iOS
+                      drops custom actions and hints set on a Text. Around
+                      the name only, not the card: an accessible card would
+                      hide the artist and album texts from XCUITest. This
+                      View reads as the name, so Maestro's id + text match
+                      still holds. */}
+                  <View
+                    accessible
                     testID="card-track-name"
+                    accessibilityHint="Swipe up or down for Keep, Remove or Skip"
+                    accessibilityActions={CARD_ACTIONS}
+                    onAccessibilityAction={(event) => {
+                      const decision = event.nativeEvent.actionName;
+                      if (decision === 'keep' || decision === 'remove' || decision === 'skip') handleDecide(decision);
+                    }}
                   >
-                    {track.name}
-                  </Text>
+                    <Text style={styles.trackName} numberOfLines={2}>
+                      {track.name}
+                    </Text>
+                  </View>
                   <Text
                     style={styles.artistName}
                     numberOfLines={1}
@@ -174,14 +197,23 @@ export default function InteractiveCard({
         </View>
 
         {/* Keep overlay — glass tinted green */}
-        <Animated.View style={[styles.swipeOverlay, keepOverlayStyle]}>
+        <Animated.View
+          style={[styles.swipeOverlay, keepOverlayStyle]}
+          // Invisible at rest: VoiceOver mustn't read "KEEP" with the song.
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
           <BlurView intensity={30} tint="default" style={StyleSheet.absoluteFill} />
           <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(52, 199, 89, 0.2)' }]} />
           <Text style={styles.keepText}>KEEP</Text>
         </Animated.View>
 
         {/* Remove overlay — glass tinted red */}
-        <Animated.View style={[styles.swipeOverlay, styles.removeOverlayAlign, removeOverlayStyle]}>
+        <Animated.View
+          style={[styles.swipeOverlay, styles.removeOverlayAlign, removeOverlayStyle]}
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        >
           <BlurView intensity={30} tint="default" style={StyleSheet.absoluteFill} />
           <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(255, 59, 48, 0.2)' }]} />
           <Text style={styles.removeText}>REMOVE</Text>

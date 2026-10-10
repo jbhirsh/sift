@@ -422,7 +422,7 @@ export default function SetupScreen() {
         {state.loadError ? (
           <View style={styles.errorContainer}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <SymbolView name="exclamationmark.triangle.fill" size={16} tintColor="#FF9500" />
+              <SymbolView name="exclamationmark.triangle.fill" size={16} tintColor="#FF9500" accessibilityElementsHidden />
               <Text testID="setup-error" style={[styles.errorText, { color: colors.removeText }]}>
                 {state.loadError}
               </Text>
@@ -436,13 +436,17 @@ export default function SetupScreen() {
             Sift source
           </Text>
           <GlassCard intensity="thin" radius={RADIUS.sm}>
-            <View style={styles.segmentedControl}>
+            <View style={styles.segmentedControl} accessibilityRole="tabbar">
               {SOURCE_TYPES.map((sourceType) => {
                 const isSelected = state.source.type === sourceType;
                 return (
                   <TouchableOpacity
                     key={sourceType}
                     testID={`source-${sourceType}`}
+                    // A button with its selected state: iOS has no tab trait
+                    // for a segment, and the container is the tab bar.
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isSelected }}
                     style={[
                       styles.segment,
                       isSelected && [styles.segmentSelected, { borderColor: glass.borderColor }],
@@ -546,6 +550,10 @@ export default function SetupScreen() {
               onPress={openSortPicker}
               style={styles.sortButton}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              // The label stays the visible text (Maestro matches on it);
+              // the hint says what it sets.
+              accessibilityHint="Sort order. Changes the order songs come in"
             >
               <Text style={[styles.sortButtonText, { color: colors.accent }]}>
                 {SORT_ORDER_DISPLAY[state.sortOrder]}

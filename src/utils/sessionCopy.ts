@@ -1,4 +1,4 @@
-import type { MusicProvider, SiftSource, Track } from '../types';
+import type { Decision, MusicProvider, SiftSource, Track } from '../types';
 import { APPLE_REMOVED_PLAYLIST } from './libraryRemovals';
 
 // What Remove and Keep actually do, said the same way everywhere: the Setup
@@ -201,4 +201,9 @@ export function nothingRemovedNote(remaining: number, skipped: number): string {
   if (remaining > 0) return 'Nothing removed yet. Continue sifting to keep going.';
   if (skipped > 0) return 'Nothing removed this time. Review the songs you skipped, or start a new sift.';
   return 'Nothing removed this time. Start a new sift any time.';
+}
+
+/** What VoiceOver says after a decision (#146). */
+export function decisionAnnouncement(trackName: string, decision: Decision): string {
+  return `${trackName} ${{ keep: 'kept', remove: 'removed', skip: 'skipped' }[decision]}.`;
 }

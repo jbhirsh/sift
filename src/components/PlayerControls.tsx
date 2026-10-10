@@ -22,6 +22,8 @@ import { formatTime } from '../utils/formatTime';
 import { RADIUS } from '../theme';
 import { Track } from '../types';
 
+const SEEK_ACTIONS = [{ name: 'increment' }, { name: 'decrement' }];
+
 export default function PlayerControls() {
   const { state, currentTrack } = useSift();
   const { colors } = useTheme();
@@ -154,7 +156,27 @@ export default function PlayerControls() {
             </Text>
 
             <GestureDetector gesture={composed}>
-              <View style={styles.sliderContainer} onLayout={onSliderLayout}>
+              {/* Adjustable for VoiceOver: swipe up or down to move 15
+                  seconds, like the buttons (#146). */}
+              <View
+                style={styles.sliderContainer}
+                onLayout={onSliderLayout}
+                testID="seek-bar"
+                accessible
+                accessibilityRole="adjustable"
+                accessibilityLabel="Playback position"
+                accessibilityValue={{
+                  min: 0,
+                  max: Math.round(duration),
+                  now: Math.round(state.playbackPosition),
+                  text: `${formatTime(state.playbackPosition)} of ${formatTime(duration)}`,
+                }}
+                accessibilityActions={SEEK_ACTIONS}
+                onAccessibilityAction={(event) => {
+                  if (event.nativeEvent.actionName === 'increment') skipForward();
+                  if (event.nativeEvent.actionName === 'decrement') skipBackward();
+                }}
+              >
                 <View style={[styles.sliderTrack, { backgroundColor: colors.textTertiary }]}>
                   <Animated.View style={[styles.sliderFill, { backgroundColor: colors.accent }, fillStyle]} />
                 </View>
@@ -183,6 +205,8 @@ export default function PlayerControls() {
             onPress={handlePlayPause}
             style={styles.playButton}
             testID="play-pause-button"
+            accessibilityRole="button"
+            accessibilityLabel={state.isPlaying ? 'Pause' : 'Play'}
           >
             <SymbolView name={state.isPlaying ? 'pause.fill' : 'play.fill'} size={28} tintColor={colors.text} />
           </TouchableOpacity>
