@@ -104,6 +104,8 @@ const initialState: SiftState = {
 
 type SiftAction =
   | { type: 'DECIDE'; decision: Decision }
+  | { type: 'FINISH' }
+  | { type: 'CONTINUE_SIFTING' }
   | { type: 'SET_PHASE'; phase: AppPhase }
   | { type: 'SET_PROVIDER'; provider: MusicProvider }
   | { type: 'SET_SORT_ORDER'; sortOrder: SortOrder }
@@ -156,6 +158,17 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
 
       return next;
     }
+
+    // End a sift early (#142): Done with the decisions so far. The session
+    // is untouched, so CONTINUE_SIFTING (or a later resume) picks up at the
+    // next card.
+    case 'FINISH':
+      if (state.phase !== 'sifting') return state;
+      return { ...state, phase: 'done', isPlaying: false };
+
+    case 'CONTINUE_SIFTING':
+      if (state.phase !== 'done' || state.cursor >= state.tracks.length) return state;
+      return { ...state, phase: 'sifting' };
 
     case 'SET_PHASE':
       return { ...state, phase: action.phase };

@@ -1,0 +1,52 @@
+appId: com.jessicahirsh.sift
+name: "Finish Early, Then Continue"
+---
+
+# A sift can end before the last card (#142): Finish shows Done with the
+# decisions so far, and Continue sifting picks up at the next card.
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
+
+- tapOn: "Start Sifting"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000
+
+- tapOn: "Keep"
+- waitForAnimationToEnd
+- tapOn: "Skip"
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "finish-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "done-title"
+      text: "Finished for now\\."
+    timeout: 30000
+
+- assertVisible:
+    id: "done-subtitle"
+    text: "You reviewed 2 of 10 songs in your library\\. 8 not reviewed\\."
+
+- tapOn:
+    id: "done-continue"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000
+
+- assertVisible:
+    id: "remaining-count"
+    text: "8 left"
