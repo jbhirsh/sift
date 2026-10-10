@@ -159,3 +159,41 @@ export function removedListSubtitle(
   }
   return `${(removedCount - failedCount).toLocaleString('en-US')} of ${removedCount.toLocaleString('en-US')} have been ${where}; ${failedCount.toLocaleString('en-US')} could not be.`;
 }
+
+// ── Done screen (#142) ─────────────────────────────────
+
+/** The sift's source as a sentence names it: your library, or "Mix". */
+function sourceName(source: SiftSource): string {
+  return source.type === 'playlist' ? `"${source.playlist.name}"` : 'your library';
+}
+
+/**
+ * Done's title and subtitle. A sift ended early with Finish says how far it
+ * got; a complete one names what was sifted, library or playlist.
+ */
+export function doneHeadline(source: SiftSource, reviewed: number, total: number): { title: string; subtitle: string } {
+  const n = (x: number) => x.toLocaleString('en-US');
+  if (reviewed < total) {
+    return {
+      title: 'Finished for now.',
+      subtitle: `You reviewed ${n(reviewed)} of ${plural(total, 'song')} in ${sourceName(source)}. ${n(total - reviewed)} not reviewed.`,
+    };
+  }
+  return {
+    title: 'All done.',
+    subtitle: source.type === 'playlist' ? `"${source.playlist.name}" has been sifted.` : 'Your library has been sifted.',
+  };
+}
+
+/** Where kept songs went: only a playlist sift copies them anywhere. */
+export function keptDestination(source: SiftSource, kept: number): string | null {
+  if (source.type !== 'playlist' || kept === 0) return null;
+  return `Kept songs go to "${siftedPlaylistName(source.playlist.name)}".`;
+}
+
+/** Done with nothing removed: point at the next thing to do. */
+export function nothingRemovedNote(remaining: number, skipped: number): string {
+  if (remaining > 0) return 'Nothing removed yet. Continue sifting to keep going.';
+  if (skipped > 0) return 'Nothing removed this time. Review the songs you skipped, or start a new sift.';
+  return 'Nothing removed this time. Start a new sift any time.';
+}

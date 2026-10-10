@@ -7,6 +7,9 @@ import {
   unsyncedCount,
   failedRemovalCount,
   legacyFailedRemovalIds,
+  doneHeadline,
+  keptDestination,
+  nothingRemovedNote,
 } from '../../src/utils/sessionCopy';
 import type { SiftSource, Track } from '../../src/types';
 
@@ -141,5 +144,32 @@ describe('removedListSubtitle', () => {
 
   test('never claims more failures than removals', () => {
     expect(removedListSubtitle('apple-music', library, 3, 4)).toBe(`3 of 3 could not be moved to "${APPLE_REMOVED_PLAYLIST}" in Music; they are still in place.`);
+  });
+});
+
+describe('Done copy (#142)', () => {
+  test('doneHeadline: a sift ended early says how far it got', () => {
+    expect(doneHeadline(library, 37, 2655)).toEqual({
+      title: 'Finished for now.',
+      subtitle: 'You reviewed 37 of 2,655 songs in your library. 2,618 not reviewed.',
+    });
+    expect(doneHeadline(playlist, 1, 1).title).toBe('All done.');
+  });
+
+  test('doneHeadline: a complete sift names what was sifted', () => {
+    expect(doneHeadline(library, 10, 10).subtitle).toBe('Your library has been sifted.');
+    expect(doneHeadline(playlist, 10, 10).subtitle).toBe('"Workout Mix" has been sifted.');
+  });
+
+  test('keptDestination: only a playlist sift copies keeps anywhere', () => {
+    expect(keptDestination(playlist, 3)).toBe('Kept songs go to "Workout Mix - Sifted".');
+    expect(keptDestination(playlist, 0)).toBeNull();
+    expect(keptDestination(library, 3)).toBeNull();
+  });
+
+  test('nothingRemovedNote points at the next action', () => {
+    expect(nothingRemovedNote(5, 2)).toBe('Nothing removed yet. Continue sifting to keep going.');
+    expect(nothingRemovedNote(0, 2)).toBe('Nothing removed this time. Review the songs you skipped, or start a new sift.');
+    expect(nothingRemovedNote(0, 0)).toBe('Nothing removed this time. Start a new sift any time.');
   });
 });

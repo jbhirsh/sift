@@ -183,9 +183,28 @@ export default function SiftScreen() {
           </TouchableOpacity>
         </GlassCard>
 
-        <Text style={[styles.title, { color: colors.text }]}>Sift</Text>
+        {/* End the sift here and see the summary (#142). In the header, not
+            a menu, where a first-time user will find it. The session stays,
+            so Done's Continue sifting picks up at the next card. */}
+        <GlassCard intensity="thin" radius={20}>
+          <TouchableOpacity
+            onPress={() => {
+              flushPendingSave();
+              dispatch({ type: 'FINISH' });
+            }}
+            style={styles.finishButton}
+            testID="finish-button"
+            accessibilityRole="button"
+            accessibilityHint="Ends this sift here and shows your summary"
+          >
+            <Text style={[styles.finishText, { color: colors.text }]}>Finish</Text>
+          </TouchableOpacity>
+        </GlassCard>
 
-        <View style={styles.headerSpacer} />
+        {/* Centered on the screen, not between the header's buttons. */}
+        <Text style={[styles.title, { color: colors.text, top: insets.top + 8 }]} pointerEvents="none">
+          Sift
+        </Text>
       </View>
 
       {/* Stats row in glass pill */}
@@ -408,6 +427,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING['2xl'],
     paddingVertical: SPACING.lg,
+    gap: SPACING.base,
   },
   backButton: {
     width: 40,
@@ -415,14 +435,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  finishButton: {
+    height: 40,
+    paddingHorizontal: SPACING.xl,
+    justifyContent: 'center',
+  },
+  finishText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
   title: {
-    flex: 1,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 40,
+    lineHeight: 40,
     textAlign: 'center',
     fontSize: 20,
     fontWeight: 'bold',
-  },
-  headerSpacer: {
-    width: 40,
   },
   statsRowContainer: {
     paddingHorizontal: SPACING['2xl'],
