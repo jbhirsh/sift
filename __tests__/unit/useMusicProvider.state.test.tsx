@@ -180,6 +180,8 @@ describe('useMusicProvider — observable state', () => {
     mockProvider.addToPlaylist.mockResolvedValue(undefined);
     mockProvider.addToLibrary.mockResolvedValue(undefined);
     mockProvider.warmSongCache.mockResolvedValue(undefined);
+    // Tests that seed a persistent history must not leak it into later ones.
+    (loadHistory as jest.Mock).mockReset().mockResolvedValue([]);
     mockProvider.getPlaybackState.mockReturnValue({ position: 30, isPlaying: true });
   });
 
@@ -714,6 +716,10 @@ describe('useMusicProvider — observable state', () => {
   test('restoreTrack failure surfaces "name: reason" and keeps the history record', async () => {
     mockProvider.addToLibrary.mockRejectedValueOnce(new Error('network down'));
     await renderHarness([mockTrack]);
+    // Spotify: its library restore re-adds the song (Apple's is below).
+    await act(async () => {
+      sift.dispatch({ type: 'SET_PROVIDER', provider: 'spotify' });
+    });
 
     await act(async () => {
       await api.restoreTrack(mockTrack);
@@ -734,6 +740,244 @@ describe('useMusicProvider — observable state', () => {
       'Track A: network down',
       'Track A: Failed to restore track',
     ]);
+  });
+
+  // ── Library removals (#139) ──────────────────────────
+  // An Apple Music library Remove only moves the song into "Sift — Removed";
+  // it stays in the library. These pin the library-sift filter, the
+  // no-duplicate guard and the restore that takes it back out of there.
+
+  const peaches: Track = {
+    id: 'peaches', name: 'Peaches', artist: 'Justin Bieber', album: 'Justice',
+    duration: 198, playCount: 4, dateAdded: '2021-03-19T00:00:00.000Z',
+  };
+  const libraryRemoval = (track: Track, provider: 'apple-music' | 'spotify' = 'apple-music') => ({
+    track, source: { type: 'library' as const }, provider, removedAt: '2026-10-01T12:00:00.000Z',
+  });
+  const removedPlaylist: Playlist = { id: 'removed-pl', name: 'Sift \u2014 Removed', trackCount: 1 };
+
+  test('a library sift skips songs removed in an earlier Apple library sift', async () => {
+    mockProvider.loadLibrary.mockResolvedValue([mockTrack, peaches, mockTrackB]);
+    (loadHistory as jest.Mock).mockResolvedValueOnce([
+      libraryRemoval(peaches),
+      // A playlist removal leaves the song in the library: not filtered.
+      {
+        track: mockTrackB,
+        source: { type: 'playlist', playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 } },
+        provider: 'apple-music',
+        removedAt: '2026-10-01T12:00:00.000Z',
+      },
+    ]);
+    await renderHarness([]);
+
+    await act(async () => {
+      await api.loadTracks();
+    });
+    expect(sift.state.phase).toBe('sifting');
+    expect(sift.state.tracks.map((t) => t.id).sort()).toEqual(['1', '2']);
+  });
+
+  test('the library filter matches by id: a second copy of a removed song is still offered', async () => {
+    // A duplicate (same name, artist and length, its own library id) wasn't
+    // removed; only the copy the user removed is skipped.
+    const secondCopy: Track = { ...peaches, id: 'peaches-copy' };
+    mockProvider.loadLibrary.mockResolvedValue([mockTrack, peaches, secondCopy]);
+    (loadHistory as jest.Mock).mockResolvedValueOnce([libraryRemoval(peaches)]);
+    await renderHarness([]);
+
+    await act(async () => {
+      await api.loadTracks();
+    });
+    expect(sift.state.tracks.map((t) => t.id).sort()).toEqual(['1', 'peaches-copy']);
+  });
+
+  test('a Spotify library sift offers a removed song again: Remove deleted it, so it was re-added', async () => {
+    mockProvider.loadLibrary.mockResolvedValue([mockTrack, peaches]);
+    (loadHistory as jest.Mock).mockResolvedValueOnce([libraryRemoval(peaches, 'spotify')]);
+    await renderHarness([]);
+    await act(async () => {
+      sift.dispatch({ type: 'SET_PROVIDER', provider: 'spotify' });
+    });
+
+    await act(async () => {
+      await api.loadTracks();
+    });
+    expect(sift.state.tracks.map((t) => t.id).sort()).toEqual(['1', 'peaches']);
+  });
+
+  test('a library Start Over (skipFiltering) still skips removed Apple songs', async () => {
+    // Starting the decisions over un-removes nothing: the songs are still
+    // in "Sift — Removed".
+    mockProvider.loadLibrary.mockResolvedValue([mockTrack, peaches]);
+    (loadHistory as jest.Mock).mockResolvedValueOnce([libraryRemoval(peaches)]);
+    await renderHarness([]);
+
+    await act(async () => {
+      await api.loadTracks({ skipFiltering: true });
+    });
+    expect(sift.state.tracks.map((t) => t.id)).toEqual(['1']);
+  });
+
+  test('a library emptied by the removal filter says so instead of "no tracks"', async () => {
+    mockProvider.loadLibrary.mockResolvedValue([peaches]);
+    (loadHistory as jest.Mock).mockResolvedValueOnce([libraryRemoval(peaches)]);
+    await renderHarness([]);
+
+    await act(async () => {
+      await api.loadTracks();
+    });
+    expect(sift.state.phase).toBe('setup');
+    expect(sift.state.loadError).toBe('Every song in your library was removed in a previous sift.');
+  });
+
+  test('removing an already-removed Apple library song neither logs it nor adds a duplicate', async () => {
+    (loadHistory as jest.Mock).mockResolvedValue([libraryRemoval(peaches)]);
+    await renderHarness([peaches]);
+
+    await act(async () => {
+      await api.removeTrack(peaches);
+    });
+    expect(mockProvider.removeFromLibrary).not.toHaveBeenCalled();
+    expect(logRemoval).not.toHaveBeenCalled();
+
+    // A song not removed before goes through as usual.
+    await act(async () => {
+      await api.removeTrack(mockTrack);
+    });
+    expect(mockProvider.removeFromLibrary).toHaveBeenCalledWith(['1']);
+    expect(logRemoval).toHaveBeenCalledWith(expect.objectContaining({ track: mockTrack }));
+  });
+
+  test('a Spotify library remove is never skipped by the Apple guard', async () => {
+    (loadHistory as jest.Mock).mockResolvedValue([libraryRemoval(peaches, 'spotify')]);
+    await renderHarness([peaches]);
+    await act(async () => {
+      sift.dispatch({ type: 'SET_PROVIDER', provider: 'spotify' });
+    });
+
+    await act(async () => {
+      await api.removeTrack(peaches);
+    });
+    expect(mockProvider.removeFromLibrary).toHaveBeenCalledWith(['peaches']);
+  });
+
+  test('a playlist remove of a song removed from the library still goes through', async () => {
+    (loadHistory as jest.Mock).mockResolvedValue([libraryRemoval(peaches)]);
+    await renderHarness([peaches]);
+    await setPlaylistSource();
+
+    await act(async () => {
+      await api.removeTrack(peaches);
+    });
+    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('p1', ['peaches']);
+  });
+
+  test('a failed Apple library removal drops its record so the next sift offers the song again', async () => {
+    mockProvider.removeFromLibrary.mockRejectedValueOnce(new Error('offline'));
+    await renderHarness([peaches]);
+
+    await act(async () => {
+      await api.removeTrack(peaches);
+    });
+    expect(logRemoval).toHaveBeenCalledWith(expect.objectContaining({ track: peaches }));
+    expect(removeFromHistory).toHaveBeenCalledWith('peaches', { type: 'library' });
+    expect(sift.state.removalErrors).toEqual(['Peaches']);
+  });
+
+  test('a failed playlist removal keeps its record', async () => {
+    mockProvider.removeFromPlaylist.mockRejectedValueOnce(new Error('offline'));
+    await renderHarness([peaches]);
+    await setPlaylistSource();
+
+    await act(async () => {
+      await api.removeTrack(peaches);
+    });
+    expect(removeFromHistory).not.toHaveBeenCalled();
+  });
+
+  test('Apple library restore takes the song out of "Sift \u2014 Removed" instead of re-adding it', async () => {
+    mockProvider.loadPlaylists.mockResolvedValue([
+      { id: 'other', name: 'Road Trip', trackCount: 3 },
+      removedPlaylist,
+    ]);
+    await renderHarness([mockTrack]);
+
+    await act(async () => {
+      await api.restoreTrack(mockTrack);
+    });
+    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('removed-pl', ['1']);
+    expect(mockProvider.addToLibrary).not.toHaveBeenCalled();
+    expect(removeFromHistory).toHaveBeenCalledWith('1', { type: 'library' });
+    expect(sift.state.removalErrors).toEqual([]);
+  });
+
+  test('Apple library restore clears the song from every "Sift \u2014 Removed" and looks them up once', async () => {
+    mockProvider.loadPlaylists.mockResolvedValue([
+      removedPlaylist,
+      { id: 'removed-pl-2', name: 'Sift \u2014 Removed', trackCount: 4 },
+    ]);
+    await renderHarness([mockTrack, mockTrackB]);
+
+    await act(async () => {
+      await api.restoreTrack(mockTrack);
+    });
+    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('removed-pl', ['1']);
+    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('removed-pl-2', ['1']);
+
+    await act(async () => {
+      await api.restoreTrack(mockTrackB);
+    });
+    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('removed-pl-2', ['2']);
+    // loadPlaylists reads every playlist's tracks: once is enough.
+    expect(mockProvider.loadPlaylists).toHaveBeenCalledTimes(1);
+  });
+
+  test('an Apple library restore looks for "Sift \u2014 Removed" again when it found none', async () => {
+    // A removal still landing can create the playlist after the first look.
+    mockProvider.loadPlaylists.mockResolvedValueOnce([]).mockResolvedValue([removedPlaylist]);
+    await renderHarness([mockTrack, mockTrackB]);
+
+    await act(async () => {
+      await api.restoreTrack(mockTrack);
+    });
+    expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await api.restoreTrack(mockTrackB);
+    });
+    expect(mockProvider.loadPlaylists).toHaveBeenCalledTimes(2);
+    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('removed-pl', ['2']);
+  });
+
+  test('Apple library restore with no "Sift \u2014 Removed" playlist still purges the record', async () => {
+    // The user may have deleted the playlist: nothing to take the song out of.
+    mockProvider.loadPlaylists.mockResolvedValue([]);
+    await renderHarness([mockTrack]);
+
+    await act(async () => {
+      await api.restoreTrack(mockTrack);
+    });
+    expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
+    expect(removeFromHistory).toHaveBeenCalledWith('1', { type: 'library' });
+    expect(sift.state.removalErrors).toEqual([]);
+  });
+
+  test('a failed Apple library restore surfaces the error and keeps the record', async () => {
+    mockProvider.loadPlaylists.mockResolvedValue([removedPlaylist]);
+    mockProvider.removeFromPlaylist.mockRejectedValueOnce(new Error('not editable'));
+    await renderHarness([mockTrack]);
+
+    await act(async () => {
+      await api.restoreTrack(mockTrack);
+    });
+    expect(sift.state.removalErrors).toEqual(['Track A: not editable']);
+    expect(removeFromHistory).not.toHaveBeenCalled();
+
+    // The playlist may be gone: the next restore looks it up again.
+    await act(async () => {
+      await api.restoreTrack(mockTrack);
+    });
+    expect(mockProvider.loadPlaylists).toHaveBeenCalledTimes(2);
   });
 
   // ── createPlaylist lifecycle ─────────────────────────

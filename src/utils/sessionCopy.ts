@@ -1,11 +1,13 @@
 import type { MusicProvider, SiftSource, Track } from '../types';
+import { APPLE_REMOVED_PLAYLIST } from './libraryRemovals';
 
 // What Remove and Keep actually do, said the same way everywhere: the Setup
 // footnote, the first-remove note, the discard confirmation and Done. One
 // place, so the screens can't drift apart (#141, #137).
 
-/** Name of the playlist an Apple Music library Remove collects songs in. */
-export const APPLE_REMOVED_PLAYLIST = 'Sift — Removed';
+// The playlist name lives with the code that reads the playlist; it's
+// re-exported here for the copy and its tests.
+export { APPLE_REMOVED_PLAYLIST };
 
 export function siftedPlaylistName(playlistName: string): string {
   return `${playlistName} - Sifted`;

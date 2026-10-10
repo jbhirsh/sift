@@ -1,0 +1,100 @@
+appId: com.jessicahirsh.sift
+name: "Library Sift Skips Removed Songs"
+---
+
+# An Apple Music library Remove only moves the song into "Sift — Removed";
+# it stays in the library. The next library sift must not offer it again,
+# unless the removal failed (#139). The E2E build's mock provider is Apple
+# Music.
+#
+# Default sort is Least Played: Peaches (playCount 28), drivers license
+# (31), Montero (39), ... The build fails the first removeFromLibrary of
+# each launch (see flow 11), so Peaches' removal fails and drivers
+# license's succeeds.
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
+
+- tapOn: "Start Sifting"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+      text: "Peaches"
+    timeout: 30000
+
+- tapOn: "Remove"
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+      text: "drivers license"
+    timeout: 30000
+
+- tapOn: "Remove"
+- waitForAnimationToEnd
+
+- repeat:
+    times: 8
+    commands:
+      - tapOn: "Keep"
+      - waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "done-title"
+    timeout: 30000
+
+- assertVisible:
+    id: "summary-count-removed"
+    text: "2"
+
+# Give the autosave (debounced 500 ms) time to write the finished session:
+# stopApp kills the app without a background flush, and a session saved one
+# card short would pop the resume sheet on relaunch. Waits for an id that
+# never appears.
+- extendedWaitUntil:
+    visible:
+      id: "wait-for-autosave"
+    timeout: 1500
+    optional: true
+
+# A second library sift: relaunch and start one. A finished session isn't
+# offered for resume, so Setup goes straight to Start Sifting.
+- stopApp
+- launchApp
+
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
+
+- tapOn: "Start Sifting"
+
+# Peaches' removal failed, so it is offered again; drivers license was
+# removed, so the sift goes from Peaches straight to Montero, one short.
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+      text: "Peaches"
+    timeout: 30000
+
+- assertVisible:
+    id: "remaining-count"
+    text: "9 left"
+
+- tapOn: "Skip"
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+      text: "Montero \\(Call Me By Your Name\\)"
+    timeout: 30000
