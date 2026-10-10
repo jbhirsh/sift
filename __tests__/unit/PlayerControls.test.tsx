@@ -128,6 +128,21 @@ describe('PlayerControls', () => {
     expect(getByTestId('duration-time')).toBeTruthy();
   });
 
+  test('VoiceOver: play/pause says which, and the seek bar is adjustable by 15 s (#146)', async () => {
+    mockState.isPlaying = true;
+    const { getByTestId, getByLabelText } = await render(<PlayerControls />);
+    expect(getByTestId('play-pause-button').props.accessibilityLabel).toBe('Pause');
+    expect(getByLabelText('Back 15 seconds')).toBeTruthy();
+    expect(getByLabelText('Forward 15 seconds')).toBeTruthy();
+    const bar = getByTestId('seek-bar');
+    expect(bar.props.accessibilityRole).toBe('adjustable');
+    expect(bar.props.accessibilityValue.text).toBe('0:30 of 3:20');
+    await fireEvent(bar, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+    expect(mockSkipForward).toHaveBeenCalled();
+    await fireEvent(bar, 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
+    expect(mockSkipBackward).toHaveBeenCalled();
+  });
+
   test('renders play/pause button', async () => {
     const { getByTestId } = await render(<PlayerControls />);
     expect(getByTestId('play-pause-button')).toBeTruthy();

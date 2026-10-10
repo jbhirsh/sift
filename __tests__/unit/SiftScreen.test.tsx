@@ -90,8 +90,8 @@ jest.mock('../../src/components/InteractiveCard', () => {
         <Text testID="card-artist-name">{track.artist}</Text>
         <Text testID="card-album-name">{track.album}</Text>
         <Text testID="card-play-count">{track.playCount}</Text>
-        <TouchableOpacity testID="mock-card-keep" onPress={() => onDecide('keep')} />
-        <TouchableOpacity testID="mock-card-remove" onPress={() => onDecide('remove')} />
+        <TouchableOpacity testID="mock-card-keep" accessibilityRole="button" accessibilityLabel="Swipe keep" onPress={() => onDecide('keep')} />
+        <TouchableOpacity testID="mock-card-remove" accessibilityRole="button" accessibilityLabel="Swipe remove" onPress={() => onDecide('remove')} />
       </View>
     );
   };
@@ -107,6 +107,7 @@ import { renderWithProviders, mockTrackA, mockTrackB, mockTrackC } from '../help
 import { loadSeenRemoveNote, markRemoveNoteSeen } from '../../src/services/PreferencesStore';
 import { useSift } from '../../src/context/SiftContext';
 import SiftScreen from '../../src/screens/SiftScreen';
+import { a11yViolations } from '../helpers/a11yScan';
 
 describe('SiftScreen', () => {
   const tracks = [mockTrackA, mockTrackB, mockTrackC];
@@ -407,5 +408,25 @@ describe('SiftScreen', () => {
     const chip = getByTestId('unsynced-chip');
     expect(chip.props.children).toBe('2 didn\u2019t sync');
     expect(chip.props.accessibilityLabel).toBe("2 changes didn't reach Apple Music");
+  });
+});
+
+describe('VoiceOver scan (#146)', () => {
+  test('the Sift screen and its player', async () => {
+    const { toJSON } = await renderWithProviders(<SiftScreen />, { initialTracks: [mockTrackA, mockTrackB, mockTrackC] });
+    expect(a11yViolations(toJSON())).toEqual([]);
+  });
+});
+
+describe('decision announcements (#146)', () => {
+  test('VoiceOver hears what happened to the song', async () => {
+    const { AccessibilityInfo } = require('react-native');
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    const { getByLabelText, getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: [mockTrackA, mockTrackB, mockTrackC] });
+    await fireEvent.press(getByLabelText('Skip'));
+    expect(announce).toHaveBeenLastCalledWith('Track A skipped.');
+    await fireEvent.press(getByTestId('mock-card-remove'));
+    await act(async () => {});
+    announce.mockRestore();
   });
 });

@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, fireEvent, within } from '@testing-library/react-native';
 import ResumeSessionModal from '../../src/components/ResumeSessionModal';
+import { a11yViolations } from '../helpers/a11yScan';
 import { SiftSession } from '../../src/types';
 
 jest.mock('expo-symbols', () => ({
@@ -197,5 +198,14 @@ describe('ResumeSessionModal', () => {
 
     await fireEvent.press(getByTestId('resume-modal-cancel'));
     expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('VoiceOver scan (#146)', () => {
+  test('the resume sheet', async () => {
+    const { toJSON } = await render(
+      <ResumeSessionModal session={session} onResume={jest.fn()} onStartOver={jest.fn()} onCancel={jest.fn()} />,
+    );
+    expect(a11yViolations(toJSON())).toEqual([]);
   });
 });

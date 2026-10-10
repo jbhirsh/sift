@@ -7,6 +7,7 @@ import {
   unsyncedCount,
   failedRemovalCount,
   legacyFailedRemovalIds,
+  decisionAnnouncement,
   doneHeadline,
   keptDestination,
   nothingRemovedNote,
@@ -178,5 +179,13 @@ describe('Done copy (#142)', () => {
     expect(nothingRemovedNote(5, 2)).toBe('Nothing removed yet. Continue sifting to keep going.');
     expect(nothingRemovedNote(0, 2)).toBe('Nothing removed this time. Review the songs you skipped, or start a new sift.');
     expect(nothingRemovedNote(0, 0)).toBe('Nothing removed this time. Start a new sift any time.');
+  });
+});
+
+describe('decisionAnnouncement (#146)', () => {
+  test('names the song and what happened', () => {
+    expect(decisionAnnouncement('Peaches', 'keep')).toBe('Peaches kept.');
+    expect(decisionAnnouncement('Peaches', 'remove')).toBe('Peaches removed.');
+    expect(decisionAnnouncement('Peaches', 'skip')).toBe('Peaches skipped.');
   });
 });

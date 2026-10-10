@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   View,
   Text,
   TouchableOpacity,
@@ -22,9 +23,9 @@ import GlassCard from '../components/GlassCard';
 import InteractiveCard from '../components/InteractiveCard';
 import PlayerControls from '../components/PlayerControls';
 import { COLORS, RADIUS, SHADOWS, SPACING } from '../theme';
-import { Decision, PROVIDER_DISPLAY } from '../types';
+import { Decision, PROVIDER_DISPLAY, Track } from '../types';
 import { loadSeenRemoveNote, markRemoveNoteSeen } from '../services/PreferencesStore';
-import { FIRST_REMOVE_NOTE, unsyncedCount } from '../utils/sessionCopy';
+import { decisionAnnouncement, FIRST_REMOVE_NOTE, unsyncedCount } from '../utils/sessionCopy';
 import { compactCount } from '../utils/compactCount';
 
 const SEGMENT_COUNT = 10;
@@ -86,7 +87,10 @@ export default function SiftScreen() {
       cancelled = true;
     };
   }, []);
-  const afterDecision = useCallback((decision: Decision) => {
+  const afterDecision = useCallback((decision: Decision, track: Track | undefined) => {
+    // Say what happened: a swipe or button gives a sighted user motion,
+    // VoiceOver nothing (#146).
+    if (track) AccessibilityInfo.announceForAccessibility(decisionAnnouncement(track.name, decision));
     setShowRemoveNote(false);
     if (decision === 'remove' && removeNoteEligible && !seenRemoveNoteRef.current) {
       seenRemoveNoteRef.current = true;
@@ -120,7 +124,7 @@ export default function SiftScreen() {
 
     const onComplete = () => {
       decide(decision);
-      afterDecision(decision);
+      afterDecision(decision, track);
       if (track) {
         if (decision === 'remove') removeTrack(track);
         if (decision === 'keep') keepTrack(track);
@@ -146,16 +150,16 @@ export default function SiftScreen() {
     // could double-decide the still-current track.
     if (!beginDecision()) return;
     decide('skip');
-    afterDecision('skip');
+    afterDecision('skip', currentTrack);
     settleTimeoutRef.current = setTimeout(endDecision, 300);
-  }, [beginDecision, endDecision, decide, afterDecision]);
+  }, [beginDecision, endDecision, decide, afterDecision, currentTrack]);
 
   const handleCardDecide = useCallback(
     (decision: Decision) => {
       if (!beginDecision()) return;
       const track = currentTrack;
       decide(decision);
-      afterDecision(decision);
+      afterDecision(decision, track);
       if (track) {
         if (decision === 'remove') removeTrack(track);
         if (decision === 'keep') keepTrack(track);
@@ -184,6 +188,9 @@ export default function SiftScreen() {
             }}
             style={styles.backButton}
             testID="back-button"
+            accessibilityRole="button"
+            accessibilityLabel="Back"
+            accessibilityHint="Your progress is saved"
           >
             <SymbolView name="chevron.backward" size={18} tintColor={colors.textSecondary} />
           </TouchableOpacity>
@@ -419,6 +426,7 @@ function ActionButton({
       onPress={onPress}
       disabled={disabled}
       style={actionStyles.wrapper}
+      accessibilityRole="button"
       accessibilityLabel={label}
     >
       <GlassCard intensity="regular" radius={32}>

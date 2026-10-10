@@ -34,6 +34,8 @@ export default function PlaylistPicker({
       onPress={() => onSelect(item)}
       activeOpacity={0.7}
       testID={`playlist-row-${item.id}`}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.name}, ${item.trackCount} ${item.trackCount === 1 ? 'track' : 'tracks'}`}
     >
       <Text style={[styles.playlistName, { color: colors.text }]} numberOfLines={1}>
         {item.name}
@@ -57,7 +59,7 @@ export default function PlaylistPicker({
               <Text style={[styles.title, { color: colors.text }]}>
                 Choose a Playlist
               </Text>
-              <TouchableOpacity onPress={onCancel} activeOpacity={0.7} testID="playlist-picker-cancel">
+              <TouchableOpacity onPress={onCancel} activeOpacity={0.7} testID="playlist-picker-cancel" accessibilityRole="button">
                 <Text style={[styles.cancelText, { color: colors.accent }]}>
                   Cancel
                 </Text>

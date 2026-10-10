@@ -71,7 +71,7 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
       case 'unknown':
         return (
           <View testID="connection-status-indicator">
-            <SymbolView name="questionmark.circle" size={28} tintColor={colors.textSecondary} />
+            <SymbolView accessibilityElementsHidden name="questionmark.circle" size={28} tintColor={colors.textSecondary} />
           </View>
         );
       case 'checking':
@@ -83,13 +83,13 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
       case 'connected':
         return (
           <View testID="connection-status-indicator">
-            <SymbolView name="checkmark.circle.fill" size={28} tintColor={COLORS.keep} />
+            <SymbolView accessibilityElementsHidden name="checkmark.circle.fill" size={28} tintColor={COLORS.keep} />
           </View>
         );
       case 'disconnected':
         return (
           <View testID="connection-status-indicator">
-            <SymbolView name="xmark.circle.fill" size={28} tintColor={COLORS.remove} />
+            <SymbolView accessibilityElementsHidden name="xmark.circle.fill" size={28} tintColor={COLORS.remove} />
           </View>
         );
     }
@@ -127,6 +127,7 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
         <View style={styles.cardContent}>
           <View style={styles.providerRow}>
             <SymbolView
+              accessibilityElementsHidden
               name={(PROVIDER_SYMBOLS[state.provider] || 'music.note.list') as SFSymbol}
               size={28}
               tintColor={colors.text}
@@ -150,6 +151,7 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
           <GlassCard intensity="thin" radius={RADIUS.sm}>
             <TouchableOpacity
               testID="check-connection-button"
+              accessibilityRole="button"
               style={[
                 styles.checkButton,
                 state.connectionStatus === 'checking' && { opacity: 0.5 },
@@ -176,6 +178,7 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
           <GlassCard intensity="regular" radius={RADIUS.md}>
             <View style={styles.settingRow}>
               <SymbolView
+                accessibilityElementsHidden
                 name="music.mic"
                 size={22}
                 tintColor={colors.text}
