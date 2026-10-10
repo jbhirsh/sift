@@ -28,7 +28,7 @@ import { clearArtworkCache } from '../hooks/useResolvedArtwork';
 import { clearHistoryForSource } from '../services/RemovalHistoryStore';
 import { loadReviewedIds } from '../services/ReviewedLedgerStore';
 import { ledgerKey, reviewedNote } from '../utils/reviewedLedger';
-import { CONTENT_COLUMN, RADIUS, SPACING } from '../theme';
+import { COLORS, CONTENT_COLUMN, RADIUS, SPACING } from '../theme';
 import {
   Playlist,
   SiftSession,
@@ -392,7 +392,7 @@ export default function SetupScreen() {
         {state.loadError ? (
           <View style={styles.errorContainer}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <SymbolView name="exclamationmark.triangle.fill" size={16} tintColor="#FF9500" accessibilityElementsHidden />
+              <SymbolView name="exclamationmark.triangle.fill" size={16} tintColor={COLORS.skip} accessibilityElementsHidden />
               <Text testID="setup-error" style={[styles.errorText, { color: colors.removeText }]}>
                 {state.loadError}
               </Text>
