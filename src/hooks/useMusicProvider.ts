@@ -80,8 +80,13 @@ export function useMusicProvider() {
   const startPolling = useCallback(() => {
     if (pollingRef.current) return; // already polling
     pollingRef.current = setInterval(() => {
-      const { position } = providerRef.current.getPlaybackState();
-      dispatch({ type: 'SET_PLAYBACK_POSITION', position });
+      const { position, isPlaying } = providerRef.current.getPlaybackState();
+      // Every screen's hook polls while anything plays, but each hook owns
+      // its own provider instance, and only the one that started the song
+      // knows where it is: the others (a mock or Spotify player that never
+      // played) would report 0 and overwrite the real position. Apple
+      // Music's player is shared, so every instance reports the same.
+      if (isPlaying) dispatch({ type: 'SET_PLAYBACK_POSITION', position });
     }, POLL_INTERVAL_MS);
   }, [dispatch]);
 
