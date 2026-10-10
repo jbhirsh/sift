@@ -26,6 +26,12 @@ name: "Finish Early, Then Continue"
 - tapOn: "Skip"
 - waitForAnimationToEnd
 
+- extendedWaitUntil:
+    visible:
+      id: "session-count"
+      text: "This session: 2"
+    timeout: 10000
+
 - tapOn:
     id: "finish-button"
 
