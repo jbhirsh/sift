@@ -58,6 +58,7 @@ export default function ResumeSessionModal({
               <TouchableOpacity
                 onPress={onCancel}
                 activeOpacity={0.7}
+                accessibilityRole="button"
                 testID="resume-modal-cancel"
               >
                 <Text style={[styles.cancelText, { color: colors.accent }]}>

@@ -44,6 +44,11 @@ everything.
 - Every new reducer action, service function, or utility must have a unit test in `__tests__/unit/`.
 - Every new user-facing flow should have a Maestro E2E flow in `.maestro/`.
 - Unit tests must be pure logic — no device rendering.
+- Every touchable needs an `accessibilityRole` and a name (label or text);
+  `__tests__/helpers/a11yScan.ts` fails a screen's "VoiceOver scan" test
+  otherwise. A new screen gets one of those tests. Don't make a container
+  that holds Maestro-targeted text `accessible`: it hides the text's testID
+  from XCUITest.
 - Tests are written alongside the implementation, not after the commit.
 
 ---

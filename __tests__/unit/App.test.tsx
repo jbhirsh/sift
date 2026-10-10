@@ -85,6 +85,7 @@ jest.mock('../../src/hooks/useResolvedArtwork', () => ({
 import App from '../../src/App';
 import * as Sentry from '@sentry/react-native';
 import { scrubBreadcrumb, scrubEvent } from '../../src/utils/sentryScrub';
+import { a11yViolations } from '../helpers/a11yScan';
 
 // Captured at import, before any beforeEach clears the mock: App configures
 // Sentry once, at module load.
@@ -252,5 +253,12 @@ describe('App', () => {
     await fireEvent.press(getByTestId('back-button'));
 
     expect(getByText('Resume Sifting')).toBeTruthy();
+  });
+});
+
+describe('VoiceOver scan (#146)', () => {
+  test('the app shell on Setup, settings gear included', async () => {
+    const { toJSON } = await renderApp();
+    expect(a11yViolations(toJSON())).toEqual([]);
   });
 });
