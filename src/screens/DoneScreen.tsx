@@ -17,6 +17,7 @@ import type { SFSymbol } from 'sf-symbols-typescript';
 import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
 import { useMusicProvider } from '../hooks/useMusicProvider';
+import { useSendPending } from '../hooks/usePendingDecision';
 import { clearHistoryForSource } from '../services/RemovalHistoryStore';
 import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
@@ -37,6 +38,12 @@ export default function DoneScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { restoreTrack, saveSiftedPlaylist, clearSiftedPlaylist } = useMusicProvider();
+  // A decision still held back (a session resumed straight to Done, #152)
+  // has nothing left to undo it here: send it.
+  const sendPending = useSendPending({ bufferPlaylistKeeps: true });
+  useEffect(() => {
+    sendPending(state.pending);
+  }, [state.pending, sendPending]);
   const [copied, setCopied] = useState(false);
   const [restoringIds, setRestoringIds] = useState<Set<string>>(new Set());
   const [startOverError, setStartOverError] = useState<string | null>(null);

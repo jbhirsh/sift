@@ -1,0 +1,34 @@
+{
+  "v": 2,
+  "tracksSlot": "b",
+  "tracksVersion": "mgk2x1-1",
+  "cursor": 3,
+  "keptIds": [
+    "a"
+  ],
+  "removedIds": [
+    "b"
+  ],
+  "skippedIds": [
+    "c"
+  ],
+  "sortOrder": "least-played",
+  "savedAt": "2026-10-10T12:00:00.000Z",
+  "provider": "apple-music",
+  "source": {
+    "type": "library"
+  },
+  "pendingKeeps": [],
+  "removalErrors": [
+    "Stay"
+  ],
+  "failedRemovalIds": [
+    "b"
+  ],
+  "siftedPlaylistId": null,
+  "pending": {
+    "trackId": "c",
+    "decision": "skip",
+    "at": 1760097600000
+  }
+}

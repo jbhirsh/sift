@@ -12,6 +12,19 @@ export interface Track {
 
 export type Decision = 'keep' | 'remove' | 'skip';
 
+/**
+ * The latest decision, held back from the music service for the undo window
+ * (#152): Undo can take it back until it is sent. Sent on the next decision,
+ * after the window, or when the Sift screen goes away (Finish, Back, the app
+ * leaving the foreground).
+ */
+export interface PendingDecision {
+  trackId: string;
+  decision: Decision;
+  /** When it was made (ms since epoch). */
+  at: number;
+}
+
 export type AppPhase = 'setup' | 'loading' | 'sifting' | 'done';
 
 export type SortOrder = 'least-played' | 'most-played' | 'oldest' | 'newest' | 'random';
@@ -60,6 +73,9 @@ export interface SiftSession {
    *  session resolves it by id (rename-proof). Optional because sessions
    *  saved by older builds don't carry it — those fall back to name match. */
   siftedPlaylistId?: string | null;
+  /** A decision not yet sent when the session was saved (#152); sent on
+   *  resume. Optional because sessions saved by older builds don't carry it. */
+  pending?: PendingDecision | null;
 }
 
 export interface RemovalRecord {
