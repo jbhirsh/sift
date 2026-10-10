@@ -438,6 +438,51 @@ describe('SetupScreen', () => {
     expect(getByTestId('probe-phase').props.children).toBe('done:1');
   });
 
+  test('the inline Resume block shows the saved sift\'s counts (#142)', async () => {
+    const { loadSession } = require('../../src/services/SessionStore');
+    let resolveSession: ((session: unknown) => void) | undefined;
+    (loadSession as jest.Mock).mockImplementationOnce(
+      () => new Promise((res) => { resolveSession = res; }),
+    );
+    const { getByTestId } = await renderWithProviders(<SetupScreen />);
+    await act(async () => {
+      await fireEvent.press(getByTestId('source-library'));
+    });
+    await act(async () => {
+      resolveSession?.({
+        tracks: [mockTrackA, mockTrackB, mockTrackC],
+        cursor: 2,
+        kept: [mockTrackA],
+        removed: [mockTrackB],
+        skipped: [],
+        sortOrder: 'least-played',
+        savedAt: '2026-04-10T00:00:00.000Z',
+        provider: 'apple-music',
+        source: { type: 'library' },
+      });
+    });
+    expect(getByTestId('setup-stat-kept').props.accessibilityLabel).toBe('1 kept');
+    expect(getByTestId('setup-stat-removed').props.accessibilityLabel).toBe('1 removed');
+    expect(getByTestId('setup-stat-skipped').props.accessibilityLabel).toBe('0 skipped');
+    expect(getByTestId('setup-stat-remaining').props.accessibilityLabel).toBe('1 remaining');
+  });
+
+  test('the inline Resume block counts an in-memory sift after backing out (#142)', async () => {
+    const BackedOut = () => {
+      const { dispatch, decide } = useSift();
+      React.useEffect(() => {
+        dispatch({ type: 'LOAD_TRACKS', tracks: [mockTrackA, mockTrackB, mockTrackC] });
+        decide('skip');
+        dispatch({ type: 'SET_PHASE', phase: 'setup' });
+      }, [dispatch, decide]);
+      return <SetupScreen />;
+    };
+    const { getByTestId } = await renderWithProviders(<BackedOut />);
+    await act(async () => {});
+    expect(getByTestId('setup-stat-skipped').props.accessibilityLabel).toBe('1 skipped');
+    expect(getByTestId('setup-stat-remaining').props.accessibilityLabel).toBe('2 remaining');
+  });
+
   test('Resume restores persisted pendingKeeps and removalErrors', async () => {
     function PendingProbe() {
       const { state } = useSift();

@@ -113,7 +113,7 @@ describe('SiftScreen', () => {
 
   test('renders remaining count', async () => {
     const { getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
-    expect(getByTestId('remaining-count').props.children).toEqual([3, ' ', 'left']);
+    expect(getByTestId('remaining-count').props.children).toEqual(['3', ' ', 'left']);
   });
 
   test('renders stat badges', async () => {
@@ -144,7 +144,7 @@ describe('SiftScreen', () => {
     const { getByLabelText, getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
     await fireEvent.press(getByLabelText('Skip'));
     expect(getByTestId('card-track-name').props.children).toBe('Track B');
-    expect(getByTestId('stat-skipped').props.children).toEqual([1, ' ', 'skipped']);
+    expect(getByTestId('stat-skipped').props.children).toEqual(['1', ' ', 'skipped']);
   });
 
   test('pressing back button transitions to setup', async () => {
@@ -181,6 +181,38 @@ describe('SiftScreen', () => {
     expect(getByTestId('current-cursor').props.children).toBe(1);
   });
 
+  test('big counts are compacted so the pill fits, with the exact number spoken (#142)', async () => {
+    const many = Array.from({ length: 2655 }, (_, i) => ({ ...mockTrackA, id: `t${i}`, name: `Track ${i}` }));
+    const { getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: many });
+    const left = getByTestId('remaining-count');
+    expect(left.props.children).toEqual(['2.6k', ' ', 'left']);
+    expect(left.props.accessibilityLabel).toBe('2655 left');
+    expect(left.props.numberOfLines).toBe(1);
+  });
+
+  test('"This session" counts decisions made since the screen opened (#142)', async () => {
+    const Sitting = () => {
+      const { decide } = useSift();
+      const [open, setOpen] = React.useState(false);
+      return (
+        <>
+          {/* A decision from an earlier sitting, before the screen mounts. */}
+          <Text testID="earlier" onPress={() => decide('keep')}>earlier</Text>
+          <Text testID="open" onPress={() => setOpen(true)}>open</Text>
+          {open && <SiftScreen />}
+        </>
+      );
+    };
+    const { getByTestId, getByLabelText } = await renderWithProviders(<Sitting />, { initialTracks: tracks });
+    await fireEvent.press(getByTestId('earlier'));
+    await fireEvent.press(getByTestId('open'));
+    expect(getByTestId('session-count').props.children).toEqual(['This session: ', '0']);
+    await fireEvent.press(getByLabelText('Skip'));
+    expect(getByTestId('session-count').props.children).toEqual(['This session: ', '1']);
+    // The pill still counts the whole sift.
+    expect(getByTestId('remaining-count').props.children).toEqual(['1', ' ', 'left']);
+  });
+
   test('renders progress segments', async () => {
     const { toJSON } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
     expect(toJSON()).toBeTruthy();
@@ -199,14 +231,14 @@ describe('SiftScreen', () => {
     // animateDecision fires withTiming which our mock immediately resolves,
     // calling decide('remove') and advancing the cursor
     expect(getByTestId('card-track-name').props.children).toBe('Track B');
-    expect(getByTestId('stat-removed').props.children).toEqual([1, ' ', 'removed']);
+    expect(getByTestId('stat-removed').props.children).toEqual(['1', ' ', 'removed']);
   });
 
   test('pressing Keep button triggers animateDecision', async () => {
     const { getByLabelText, getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
     await fireEvent.press(getByLabelText('Keep'));
     expect(getByTestId('card-track-name').props.children).toBe('Track B');
-    expect(getByTestId('stat-kept').props.children).toEqual([1, ' ', 'kept']);
+    expect(getByTestId('stat-kept').props.children).toEqual(['1', ' ', 'kept']);
   });
 
   test('card swipe keep via handleCardDecide advances track', async () => {
@@ -215,32 +247,32 @@ describe('SiftScreen', () => {
     // Press the mock card's keep button — triggers handleCardDecide('keep')
     await fireEvent.press(getByTestId('mock-card-keep'));
     expect(getByTestId('card-track-name').props.children).toBe('Track B');
-    expect(getByTestId('stat-kept').props.children).toEqual([1, ' ', 'kept']);
+    expect(getByTestId('stat-kept').props.children).toEqual(['1', ' ', 'kept']);
   });
 
   test('card swipe remove via handleCardDecide advances track', async () => {
     const { getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
     await fireEvent.press(getByTestId('mock-card-remove'));
     expect(getByTestId('card-track-name').props.children).toBe('Track B');
-    expect(getByTestId('stat-removed').props.children).toEqual([1, ' ', 'removed']);
+    expect(getByTestId('stat-removed').props.children).toEqual(['1', ' ', 'removed']);
   });
 
   test('renders with single track (no back cards)', async () => {
     const { getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: [mockTrackA] });
     expect(getByTestId('card-track-name').props.children).toBe('Track A');
-    expect(getByTestId('remaining-count').props.children).toEqual([1, ' ', 'left']);
+    expect(getByTestId('remaining-count').props.children).toEqual(['1', ' ', 'left']);
   });
 
   test('renders with two tracks (one back card)', async () => {
     const { getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: [mockTrackA, mockTrackB] });
     expect(getByTestId('card-track-name').props.children).toBe('Track A');
-    expect(getByTestId('remaining-count').props.children).toEqual([2, ' ', 'left']);
+    expect(getByTestId('remaining-count').props.children).toEqual(['2', ' ', 'left']);
   });
 
   test('progress is 0 when no tracks', async () => {
     const { getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: [] });
     // No current track → no card rendered
-    expect(getByTestId('remaining-count').props.children).toEqual([0, ' ', 'left']);
+    expect(getByTestId('remaining-count').props.children).toEqual(['0', ' ', 'left']);
   });
 
   test('back button flushes the debounced session save before leaving', async () => {
@@ -276,8 +308,8 @@ describe('SiftScreen', () => {
       // to rely only on the render-lagged disabled prop.
       await fireEvent.press(getByLabelText('Skip'));
 
-      expect(getByTestId('stat-kept').props.children).toEqual([1, ' ', 'kept']);
-      expect(getByTestId('stat-skipped').props.children).toEqual([0, ' ', 'skipped']);
+      expect(getByTestId('stat-kept').props.children).toEqual(['1', ' ', 'kept']);
+      expect(getByTestId('stat-skipped').props.children).toEqual(['0', ' ', 'skipped']);
       expect(getByTestId('card-track-name').props.children).toBe('Track B');
 
       // After the settle window, skipping works again — and holds the guard
@@ -287,7 +319,7 @@ describe('SiftScreen', () => {
       });
       await fireEvent.press(getByLabelText('Skip'));
       await fireEvent.press(getByLabelText('Skip'));
-      expect(getByTestId('stat-skipped').props.children).toEqual([1, ' ', 'skipped']);
+      expect(getByTestId('stat-skipped').props.children).toEqual(['1', ' ', 'skipped']);
       expect(getByTestId('card-track-name').props.children).toBe('Track C');
     } finally {
       jest.useRealTimers();
@@ -304,7 +336,7 @@ describe('SiftScreen', () => {
       // …then a button press in the settle window must be ignored.
       await fireEvent.press(getByLabelText('Keep'));
 
-      expect(getByTestId('stat-kept').props.children).toEqual([1, ' ', 'kept']);
+      expect(getByTestId('stat-kept').props.children).toEqual(['1', ' ', 'kept']);
       expect(getByTestId('card-track-name').props.children).toBe('Track B');
 
       // After the settle window, decisions work again.
@@ -312,7 +344,7 @@ describe('SiftScreen', () => {
         jest.advanceTimersByTime(400);
       });
       await fireEvent.press(getByLabelText('Keep'));
-      expect(getByTestId('stat-kept').props.children).toEqual([2, ' ', 'kept']);
+      expect(getByTestId('stat-kept').props.children).toEqual(['2', ' ', 'kept']);
       expect(getByTestId('card-track-name').props.children).toBe('Track C');
     } finally {
       jest.useRealTimers();

@@ -6,12 +6,11 @@ import {
   Modal,
   StyleSheet,
 } from 'react-native';
-import { SymbolView } from 'expo-symbols';
-import type { SFSymbol } from 'sf-symbols-typescript';
 import { useTheme } from '../theme/ThemeContext';
-import { SPACING, RADIUS, COLORS } from '../theme';
+import { SPACING, RADIUS } from '../theme';
 import GlassCard from './GlassCard';
 import { Button } from './Button';
+import SessionStatRow from './SessionStatRow';
 import type { SiftSession } from '../types';
 
 interface ResumeSessionModalProps {
@@ -76,40 +75,12 @@ export default function ResumeSessionModal({
                 : `You have an unfinished sift for ${sourceLabel}.`}
             </Text>
 
-            <View style={styles.statsRow}>
-              <StatItem
-                count={session.kept.length}
-                label="kept"
-                symbolName="checkmark.circle.fill"
-                color={COLORS.keep}
-                textColor={colors.text}
-                secondaryColor={colors.textSecondary}
-              />
-              <StatItem
-                count={session.removed.length}
-                label="removed"
-                symbolName="xmark.circle.fill"
-                color={COLORS.remove}
-                textColor={colors.text}
-                secondaryColor={colors.textSecondary}
-              />
-              <StatItem
-                count={session.skipped.length}
-                label="skipped"
-                symbolName="arrow.right.circle"
-                color={COLORS.skip}
-                textColor={colors.text}
-                secondaryColor={colors.textSecondary}
-              />
-              <StatItem
-                count={remaining}
-                label="remaining"
-                symbolName="music.note.list"
-                color={colors.textSecondary}
-                textColor={colors.text}
-                secondaryColor={colors.textSecondary}
-              />
-            </View>
+            <SessionStatRow
+              kept={session.kept.length}
+              removed={session.removed.length}
+              skipped={session.skipped.length}
+              remaining={remaining}
+            />
 
             <View style={styles.buttonSection}>
               <Button
@@ -135,30 +106,6 @@ export default function ResumeSessionModal({
         </View>
       </View>
     </Modal>
-  );
-}
-
-function StatItem({
-  count,
-  label,
-  symbolName,
-  color,
-  textColor,
-  secondaryColor,
-}: {
-  count: number;
-  label: string;
-  symbolName: SFSymbol;
-  color: string;
-  textColor: string;
-  secondaryColor: string;
-}) {
-  return (
-    <View style={styles.statItem} testID={`resume-stat-${label}`}>
-      <SymbolView name={symbolName} size={22} tintColor={color} />
-      <Text style={[styles.statCount, { color: textColor }]}>{count}</Text>
-      <Text style={[styles.statLabel, { color: secondaryColor }]}>{label}</Text>
-    </View>
   );
 }
 
@@ -192,23 +139,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     paddingHorizontal: SPACING['2xl'],
     marginBottom: SPACING.xl,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.xl,
-  },
-  statItem: {
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  statCount: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  statLabel: {
-    fontSize: 12,
   },
   buttonSection: {
     paddingHorizontal: SPACING['2xl'],
