@@ -3,9 +3,9 @@ import { Playlist, Track } from '../types';
 /**
  * Abstract interface for music provider services.
  *
- * Both Apple Music (via native MusicKit module) and Spotify (via Web API)
- * implement this interface so the UI layer doesn't need to know which
- * provider is active.
+ * Apple Music (via the native MusicKit module) and the mock implement this
+ * interface, so the UI layer doesn't need to know which provider is active
+ * and another service can be added behind it (Spotify was removed, #140).
  */
 export interface MusicProviderService {
   /** Request authorization from the user. Returns true if granted. */

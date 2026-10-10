@@ -96,10 +96,11 @@ describe('SetupScreen', () => {
     expect(queryByTestId('setup-error')).toBeNull();
   });
 
-  test('renders music service picker with Apple Music and Spotify', async () => {
-    const { getByText } = await renderWithProviders(<SetupScreen />);
-    expect(getByText('Apple Music')).toBeTruthy();
-    expect(getByText('Spotify')).toBeTruthy();
+  test('offers no music service choice: Apple Music only (#140)', async () => {
+    const { queryByText } = await renderWithProviders(<SetupScreen />);
+    // Spotify was removed: no option, and no service picker.
+    expect(queryByText('Spotify')).toBeNull();
+    expect(queryByText('Music service')).toBeNull();
   });
 
   test('renders sort by section', async () => {
@@ -129,13 +130,6 @@ describe('SetupScreen', () => {
     await fireEvent.press(getByText('Least Played'));
     expect(getByText('Most Played')).toBeTruthy();
     spy.mockRestore();
-  });
-
-  test('pressing provider segment switches provider', async () => {
-    const { getByText } = await renderWithProviders(<SetupScreen />);
-    await fireEvent.press(getByText('Spotify'));
-    // Component should still render without error
-    expect(getByText('Spotify')).toBeTruthy();
   });
 
   test('renders source picker with Library and Playlist options', async () => {
@@ -357,36 +351,6 @@ describe('SetupScreen', () => {
     expect(message).toContain('It also empties "My Playlist - Sifted"');
     expect(clearSession).not.toHaveBeenCalled();
     expect(clearHistoryForSource).not.toHaveBeenCalled();
-    alertSpy.mockRestore();
-  });
-
-  test('the discard copy speaks for the sift\'s own provider, not the one now selected (#137)', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const { loadSession } = require('../../src/services/SessionStore');
-    const appleSift = {
-      tracks: [mockTrackA, mockTrackB, mockTrackC],
-      cursor: 1,
-      kept: [],
-      removed: [mockTrackA],
-      skipped: [],
-      sortOrder: 'least-played',
-      savedAt: '2026-04-10T00:00:00.000Z',
-      provider: 'apple-music',
-      source: { type: 'library' },
-    };
-    (loadSession as jest.Mock).mockResolvedValueOnce(appleSift).mockResolvedValueOnce(appleSift);
-    const { getByTestId, getByText } = await renderWithProviders(<SetupScreen />);
-    await act(async () => {});
-    await act(async () => {
-      await fireEvent.press(getByTestId('resume-modal-cancel'));
-    });
-    await act(async () => {
-      await fireEvent.press(getByText('Spotify'));
-    });
-    await act(async () => {
-      await fireEvent.press(getByText('Start Sifting'));
-    });
-    expect(alertSpy.mock.calls[0][1]).toContain('Songs you removed stay in "Sift \u2014 Removed".');
     alertSpy.mockRestore();
   });
 
@@ -870,7 +834,7 @@ describe('SetupScreen', () => {
     expect(queryByText('Resume Sifting')).toBeTruthy();
   });
 
-  test('a provider picked while the session is still loading is not overwritten', async () => {
+  test('a source picked while the session is still loading is not overwritten', async () => {
     const { loadSession } = require('../../src/services/SessionStore');
     let resolveSession: ((session: unknown) => void) | undefined;
     (loadSession as jest.Mock).mockImplementationOnce(
@@ -886,14 +850,13 @@ describe('SetupScreen', () => {
       );
     };
 
-    const { getByText, getByTestId, queryByTestId } = await renderWithProviders(
+    const { getByTestId, queryByTestId } = await renderWithProviders(
       <><SetupScreen /><ProviderProbe /></>,
     );
-    // The user picks Spotify while loadSession is still pending…
+    // The user picks the library source while loadSession is still pending…
     await act(async () => {
-      await fireEvent.press(getByText('Spotify'));
+      await fireEvent.press(getByTestId('source-library'));
     });
-    expect(getByTestId('probe-provider').props.children).toBe('spotify');
 
     // …then the saved session (apple-music, playlist source) finally loads.
     await act(async () => {
@@ -910,9 +873,8 @@ describe('SetupScreen', () => {
       });
     });
 
-    // The explicit choice survives: no provider/source overwrite, no modal
-    // shoved on top of an in-progress setup.
-    expect(getByTestId('probe-provider').props.children).toBe('spotify');
+    // The explicit choice survives: no source overwrite, no modal shoved on
+    // top of an in-progress setup.
     expect(getByTestId('probe-source-type').props.children).toBe('library');
     expect(queryByTestId('resume-session-modal')).toBeNull();
   });
@@ -1839,21 +1801,4 @@ describe('SettingsScreen', () => {
     expect(getByTestId('start-at-chorus-value').props.children).toBe('false');
   });
 
-  test('"Start at chorus" is hidden for Spotify, whose previews are fixed clips', async () => {
-    function UseSpotify() {
-      const { dispatch } = useSift();
-      React.useEffect(() => {
-        dispatch({ type: 'SET_PROVIDER', provider: 'spotify' });
-      }, [dispatch]);
-      return null;
-    }
-    const { queryByTestId, getByText } = await renderWithProviders(
-      <>
-        <UseSpotify />
-        <SettingsScreen />
-      </>,
-    );
-    expect(getByText('Spotify')).toBeTruthy();
-    expect(queryByTestId('start-at-chorus-switch')).toBeNull();
-  });
 });

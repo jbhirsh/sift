@@ -122,12 +122,6 @@ describe('siftReducer', () => {
     expect(next.phase).toBe('loading');
   });
 
-  test('SET_PROVIDER changes provider', () => {
-    const state = makeState({ provider: 'apple-music' });
-    const next = siftReducer(state, { type: 'SET_PROVIDER', provider: 'spotify' });
-    expect(next.provider).toBe('spotify');
-  });
-
   test('SET_SORT_ORDER changes sortOrder', () => {
     const state = makeState({ sortOrder: 'least-played' });
     const next = siftReducer(state, { type: 'SET_SORT_ORDER', sortOrder: 'newest' });
@@ -240,7 +234,6 @@ describe('siftReducer', () => {
       tracks: [trackA, trackB],
       cursor: 1,
       kept: [trackA],
-      provider: 'spotify' as const,
       phase: 'sifting' as const,
     };
     const next = siftReducer(state, { type: 'RESUME_SESSION', session });

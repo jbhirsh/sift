@@ -1,6 +1,6 @@
 # Sift
 
-**Tinder for your music library.** Swipe through every track you own and decide, in a second each: **Keep**, **Skip**, or **Remove** — with instant playback so you actually hear what you're culling. Works with **Apple Music** and **Spotify**.
+**Tinder for your music library.** Swipe through every track you own and decide, in a second each: **Keep**, **Skip**, or **Remove** — with instant playback so you actually hear what you're culling. Works with **Apple Music**.
 
 Sift is a production-quality React Native (Expo) app built in TypeScript, with a hand-written Swift/MusicKit native module, gesture-driven animations, offline session persistence, and a full CI pipeline.
 
@@ -17,14 +17,14 @@ Sift is a production-quality React Native (Expo) app built in TypeScript, with a
 
 Settings: the optional **Start at chorus** switch (Apple Music).
 
-> Rendered from the real app running on Expo Web with a local mock music provider (native Apple Music / Spotify auth is device-only).
+> Rendered from the real app running on Expo Web with a local mock music provider (native Apple Music access is device-only).
 
 ---
 
 ## Highlights
 
 - **Custom native Expo module (`modules/expo-musickit`)** — a hand-written Swift module bridging Apple's **MusicKit** into React Native via the Expo Modules API. It handles authorization, paginated library loading (500 tracks/page), in-app playback through `ApplicationMusicPlayer`, playlist read/create/edit, and on-device artwork resolution with a file cache. Because MusicKit can't delete library items, removals are gracefully rerouted into a `Sift — Removed` playlist the user can clear manually. See [`modules/expo-musickit/ios/ExpoMusicKitModule.swift`](modules/expo-musickit/ios/ExpoMusicKitModule.swift).
-- **Two music backends behind one interface** — Apple Music (native) and Spotify (OAuth via `expo-auth-session` + 30s preview playback) both implement a single `MusicProviderService`. A factory swaps them at runtime and falls back to an in-memory mock when no native module is present (Expo Go, web, CI).
+- **A music backend behind one interface** — Apple Music (native MusicKit) implements `MusicProviderService`, so another service can be added behind it (a Spotify provider was removed in [#140](https://github.com/jbhirsh/sift/issues/140)). A factory picks it at runtime and falls back to an in-memory mock when no native module is present (Expo Go, web, CI).
 - **Gesture-driven swipe deck** — the card stack is built on `react-native-gesture-handler` + `react-native-reanimated` worklets, with drag rotation, spring-back, and threshold-based Keep/Remove overlays.
 - **"Liquid glass" UI** — a reusable blur/material design system (`GlassCard`, `GlassBackground`) with centralized design tokens and automatic light/dark theming.
 - **Start at chorus** — an optional setting that starts each song at its most recognizable part. The chorus is found from timed lyrics ([LRCLIB](https://lrclib.net)): the block of lines a song repeats. When that fails, ShazamKit locates Apple Music's preview clip (which labels start at "the good part") inside the full track. Results are cached per song, and the next cards are resolved ahead of time so swiping stays instant.
@@ -42,8 +42,7 @@ Settings: the optional **Start at chorus** switch (Apple Music).
 | Language | TypeScript (strict) |
 | Native | Swift + MusicKit (custom Expo module), Expo Modules API |
 | Animation | Reanimated 4 + Gesture Handler, worklets |
-| Auth | `expo-auth-session` (Spotify OAuth 2.0 + PKCE) |
-| Storage | AsyncStorage, `expo-secure-store` |
+| Storage | AsyncStorage |
 | State | `useReducer` + Context (no external state lib) |
 | Monitoring | Sentry (`@sentry/react-native`) |
 | Testing | Jest + React Native Testing Library, Maestro (E2E) |
@@ -60,8 +59,8 @@ src/
                         PlayerControls, PlaylistPicker, Button)
   screens/              SetupScreen, LoadingScreen, SiftScreen, DoneScreen, SettingsScreen
   context/              SiftContext (useReducer state management)
-  services/             MusicProviderInterface, AppleMusicProvider, SpotifyProvider,
-                        MockMusicProvider, SessionStore, RemovalHistoryStore, spotify/
+  services/             MusicProviderInterface, AppleMusicProvider, MockMusicProvider,
+                        SessionStore, RemovalHistoryStore
   hooks/                useMusicProvider, useKeyboardShortcuts, useResolvedArtwork
   theme/                Design tokens + ThemeContext (light/dark)
   types/                Shared TypeScript types

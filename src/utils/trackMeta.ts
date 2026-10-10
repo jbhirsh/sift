@@ -15,10 +15,10 @@ export interface TrackMeta {
  * The card's meta line: how often a song was played and when it was added,
  * the two things people decide on.
  *
- * A play count is only shown when the provider knows it. Spotify has no play
- * counts (every track says 0), and Apple Music's catalog/playlist fallback
- * tracks carry playCount 0 with no add date, so a 0 there means "unknown",
- * never "never played". An empty or unparseable add date is dropped rather
+ * A play count is only shown when the provider knows it (playsKnown: a
+ * provider without play counts reports 0 for every track), and Apple
+ * Music's catalog/playlist fallback tracks carry playCount 0 with no add
+ * date, so a 0 there means "unknown", never "never played". An empty or unparseable add date is dropped rather
  * than shown as "Added NaN". The month is the local one, as the person
  * remembers it.
  */

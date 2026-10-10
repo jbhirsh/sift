@@ -83,8 +83,9 @@ export function useMusicProvider() {
       const { position, isPlaying } = providerRef.current.getPlaybackState();
       // Every screen's hook polls while anything plays, but each hook owns
       // its own provider instance, and only the one that started the song
-      // knows where it is: the others (a mock or Spotify player that never
-      // played) would report 0 and overwrite the real position. Apple
+      // knows where it is: the others (a per-instance player, like the E2E
+      // mock's, that never played) would report 0 and overwrite the real
+      // position. Apple
       // Music's player is shared, so every instance reports the same.
       if (isPlaying) dispatch({ type: 'SET_PLAYBACK_POSITION', position });
     }, POLL_INTERVAL_MS);
@@ -122,7 +123,7 @@ export function useMusicProvider() {
   /**
    * Prompt for authorization and mirror the result into connectionStatus.
    * Only call this when {@link isAuthorized} is false — it opens the provider's
-   * consent flow (e.g. the Spotify browser).
+   * consent flow (e.g. Apple Music's permission prompt).
    */
   const authorize = useCallback(async (): Promise<boolean> => {
     dispatch({ type: 'SET_CONNECTION_STATUS', status: 'checking' });

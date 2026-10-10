@@ -1136,26 +1136,11 @@ describe('useMusicProvider — observable state', () => {
       await api.warmCache(['1']);
     });
     // isAuthorized answered true every time — prompting again would throw
-    // the user into a needless consent flow (e.g. the Spotify browser).
+    // the user into a needless consent flow.
     expect(mockProvider.requestAuthorization).not.toHaveBeenCalled();
   });
 
   // ── Provider lifecycle ───────────────────────────────
-
-  test('switching the provider routes subsequent calls to the new provider', async () => {
-    const spotifyProvider = makeMinimalProvider();
-    await renderHarness([mockTrack]);
-
-    await act(async () => {
-      mockActiveProvider = spotifyProvider;
-      sift.dispatch({ type: 'SET_PROVIDER', provider: 'spotify' });
-    });
-    await act(async () => {
-      await api.pause();
-    });
-    expect(spotifyProvider.pause).toHaveBeenCalledTimes(1);
-    expect(mockProvider.pause).not.toHaveBeenCalled();
-  });
 
   // ── loadTracks filtering behaviors ───────────────────
 

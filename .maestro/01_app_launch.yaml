@@ -13,9 +13,10 @@ name: "App Launch - Setup Screen"
       id: "setup-brand"
     timeout: 30000
 
-# Verify provider selector is visible (Apple Music selected by default)
-- assertVisible: "Apple Music"
-- assertVisible: "Spotify"
+# Apple Music is the only provider (Spotify was removed, #140): no service
+# picker, and no Spotify option.
+- assertNotVisible: "Music service"
+- assertNotVisible: "Spotify"
 
 # Verify sort order picker is visible
 - assertVisible: "Least Played"

@@ -1,26 +1,3 @@
-jest.mock('expo-audio', () => ({
-  createAudioPlayer: jest.fn(() => ({
-    play: jest.fn(),
-    pause: jest.fn(),
-    seekTo: jest.fn(),
-    remove: jest.fn(),
-    addListener: jest.fn(),
-    currentTime: 0,
-    playing: false,
-  })),
-}));
-
-jest.mock('expo-auth-session', () => ({
-  makeRedirectUri: jest.fn(() => 'sift-music://spotify-callback'),
-  startAsync: jest.fn(),
-}));
-
-jest.mock('expo-crypto', () => ({
-  digestStringAsync: jest.fn(),
-  CryptoDigestAlgorithm: { SHA256: 'SHA-256' },
-  getRandomBytes: jest.fn(() => new Uint8Array(64)),
-}));
-
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(),
   setItem: jest.fn(),
@@ -33,11 +10,6 @@ import { createMusicProvider } from '../../src/services';
 describe('createMusicProvider', () => {
   test('returns a provider for apple-music', () => {
     const provider = createMusicProvider('apple-music');
-    expect(provider).toBeDefined();
-  });
-
-  test('returns a provider for spotify', () => {
-    const provider = createMusicProvider('spotify');
     expect(provider).toBeDefined();
   });
 

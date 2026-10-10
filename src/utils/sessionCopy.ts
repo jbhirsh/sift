@@ -23,7 +23,7 @@ export function removeExplanation(provider: MusicProvider, source: SiftSource): 
   if (isAppleLibrary(provider, source)) {
     return `Removed songs are collected in "${APPLE_REMOVED_PLAYLIST}" for you to delete in Music.`;
   }
-  return 'Removed songs are taken out of your Liked Songs.';
+  return 'Removed songs are taken out of your library.';
 }
 
 /**
@@ -129,7 +129,7 @@ export function legacyFailedRemovalIds(removed: readonly Track[], removalErrors:
   return removed.filter((t) => names.has(t.name)).map((t) => t.id);
 }
 
-/** Changes that didn't reach Apple Music/Spotify: failed removals and parked keeps. */
+/** Changes that didn't reach the music service: failed removals and parked keeps. */
 export function unsyncedCount(
   removed: readonly Track[],
   failedRemovalIds: readonly string[],

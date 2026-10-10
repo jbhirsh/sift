@@ -243,7 +243,6 @@ export default function SiftScreen() {
             track={currentTrack}
             onDecide={handleCardDecide}
             programmaticOffset={programmaticOffset}
-            playsKnown={state.provider !== 'spotify'}
           />
         )}
         {/* Over the top of the card, not in the layout: appearing mid-sift

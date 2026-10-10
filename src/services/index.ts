@@ -2,13 +2,11 @@ import * as Sentry from '@sentry/react-native';
 import type { MusicProviderService } from './MusicProviderInterface';
 import type { MusicProvider } from '../types';
 import { MockMusicProvider } from './MockMusicProvider';
-import { SpotifyProvider } from './SpotifyProvider';
 
 /**
  * Factory that returns the appropriate MusicProviderService for the given
  * provider type.
  *
- * Returns SpotifyProvider for 'spotify' (preview playback via expo-audio).
  * For Apple Music, attempts to load the native MusicKit module and falls
  * back to MockMusicProvider if the native module is unavailable (e.g. Expo Go)
  * or if EXPO_PUBLIC_USE_MOCK_PROVIDER is set (e.g. E2E simulator builds).
@@ -24,8 +22,6 @@ export function createMusicProvider(provider: MusicProvider): MusicProviderServi
   }
 
   switch (provider) {
-    case 'spotify':
-      return new SpotifyProvider();
     case 'apple-music':
     default:
       try {

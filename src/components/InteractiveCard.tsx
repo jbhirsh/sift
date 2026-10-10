@@ -29,7 +29,7 @@ interface InteractiveCardProps {
   track: Track;
   onDecide: (decision: Decision) => void;
   programmaticOffset?: SharedValue<number>;
-  /** False for providers with no play counts (Spotify), so 0 isn't shown as "Never played". */
+  /** False for a provider without play counts, so 0 isn't shown as "Never played". */
   playsKnown?: boolean;
 }
 
