@@ -175,6 +175,13 @@ describe('SiftScreen', () => {
     };
     const { getByTestId, getByLabelText } = await renderWithProviders(<FinishAndCheck />, { initialTracks: tracks });
     await fireEvent.press(getByLabelText('Skip'));
+    // Mid-decision (the skip's settle window), Finish does nothing: a
+    // Keep/Remove decides only when its animation ends.
+    await fireEvent.press(getByTestId('finish-button'));
+    expect(getByTestId('current-phase').props.children).toBe('sifting');
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+    });
     await fireEvent.press(getByTestId('finish-button'));
     expect(getByTestId('current-phase').props.children).toBe('done');
     // Where it stopped is kept, so Continue sifting picks up there.

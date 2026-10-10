@@ -49,7 +49,7 @@ name: "Library Sift Skips Kept Songs"
 - extendedWaitUntil:
     visible:
       id: "reviewed-note"
-      text: "2 songs you kept in earlier sifts are left out\\."
+      text: "2 songs you’ve already kept are left out of new sifts\\."
     timeout: 30000
 
 - assertVisible:

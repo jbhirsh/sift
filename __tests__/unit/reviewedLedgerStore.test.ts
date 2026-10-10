@@ -55,6 +55,21 @@ describe('ReviewedLedgerStore', () => {
     await expect(loadReviewedIds('k')).resolves.toEqual(new Set(['a', 'b']));
   });
 
+  test('a keep not yet written still counts for a load', async () => {
+    let release: (() => void) | undefined;
+    setItem.mockImplementationOnce(async (key: string, value: string) => {
+      await new Promise<void>((resolve) => { release = resolve; });
+      return AsyncStorage.setItem(key, value);
+    });
+    const first = markReviewed('k', 'a');
+    await new Promise<void>((resolve) => { setImmediate(() => resolve()); });
+    const second = markReviewed('k', 'b');
+    // 'a' is being written, 'b' is waiting: both are already reviewed.
+    await expect(loadReviewedIds('k')).resolves.toEqual(new Set(['a', 'b']));
+    release?.();
+    await Promise.all([first, second]);
+  });
+
   test('an unparseable ledger is reported and started over, not written around forever', async () => {
     await AsyncStorage.setItem(KEY, '{"cut short');
     await markReviewed('k', 'a');

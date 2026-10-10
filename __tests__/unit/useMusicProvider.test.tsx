@@ -1323,6 +1323,10 @@ describe('useMusicProvider', () => {
         </>
       );
     }
+    afterEach(() => {
+      // Back to the empty default even when a test fails part-way.
+      (loadReviewedIds as jest.Mock).mockReset().mockResolvedValue(new Set());
+    });
     const renderLedger = () => render(
       <SiftProvider initialTracks={[]}>
         <LedgerConsumer />
@@ -1359,7 +1363,6 @@ describe('useMusicProvider', () => {
       });
       // Least played first.
       expect(getByTestId('track-ids').props.children).toBe('2,1');
-      (loadReviewedIds as jest.Mock).mockResolvedValue(new Set());
     });
 
     test('a library that is all sifted says how to go again', async () => {

@@ -195,20 +195,31 @@ export default function SiftScreen() {
         <GlassCard intensity="thin" radius={20}>
           <TouchableOpacity
             onPress={() => {
+              // Not mid-decision: the Keep/Remove animation decides only
+              // when it ends, and finishing first would drop that decision
+              // or land it under Done.
+              if (isAnimatingRef.current) return;
               flushPendingSave();
               dispatch({ type: 'FINISH' });
             }}
+            disabled={isAnimating}
             style={styles.finishButton}
             testID="finish-button"
             accessibilityRole="button"
             accessibilityHint="Ends this sift here and shows your summary"
           >
-            <Text style={[styles.finishText, { color: colors.text }]}>Finish</Text>
+            {/* Capped so the largest text sizes can't push it under the
+                centered title. */}
+            <Text style={[styles.finishText, { color: colors.text }]} maxFontSizeMultiplier={1.3}>Finish</Text>
           </TouchableOpacity>
         </GlassCard>
 
         {/* Centered on the screen, not between the header's buttons. */}
-        <Text style={[styles.title, { color: colors.text, top: insets.top + 8 }]} pointerEvents="none">
+        <Text
+          style={[styles.title, { color: colors.text, top: insets.top + 8 }]}
+          pointerEvents="none"
+          maxFontSizeMultiplier={1.3}
+        >
           Sift
         </Text>
       </View>

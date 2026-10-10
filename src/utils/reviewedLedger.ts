@@ -43,9 +43,9 @@ export function mergeIntoLedger(ledger: ReviewedLedger, key: string, ids: Iterab
 
 /** Setup's footnote under "Include songs I've already sifted". */
 export function reviewedNote(count: number, included: boolean): string {
-  if (included) return 'Songs you kept in earlier sifts are included.';
+  if (included) return 'Songs you’ve already kept are included in new sifts.';
   const n = count.toLocaleString('en-US');
   return count === 1
-    ? '1 song you kept in an earlier sift is left out.'
-    : `${n} songs you kept in earlier sifts are left out.`;
+    ? '1 song you’ve already kept is left out of new sifts.'
+    : `${n} songs you’ve already kept are left out of new sifts.`;
 }

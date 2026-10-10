@@ -43,7 +43,7 @@ name: "Finish Early, Then Continue"
 
 - assertVisible:
     id: "done-subtitle"
-    text: "You reviewed 2 of 10 songs in your library\\. 8 not reviewed\\."
+    text: "You reviewed 2 of the 10 songs in this sift of your library\\. 8 not reviewed\\."
 
 - tapOn:
     id: "done-continue"

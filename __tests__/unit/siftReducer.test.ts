@@ -417,6 +417,13 @@ describe('siftReducer', () => {
     expect(next.skipFiltering).toBe(false);
   });
 
+  test('LOAD_TRACKS clears the last sift\'s save status (Review N skipped, #142)', () => {
+    const state = makeState({ removalPlaylistCreated: true, removalPlaylistError: 'Could not save' });
+    const next = siftReducer(state, { type: 'LOAD_TRACKS', tracks: [trackA] });
+    expect(next.removalPlaylistCreated).toBe(false);
+    expect(next.removalPlaylistError).toBeNull();
+  });
+
   test('LOAD_TRACKS resets skipFiltering', () => {
     const state = makeState({ skipFiltering: true });
     const next = siftReducer(state, { type: 'LOAD_TRACKS', tracks: [trackA] });
