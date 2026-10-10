@@ -1,0 +1,68 @@
+appId: com.jessicahirsh.sift
+name: "Library Sift Skips Kept Songs"
+---
+
+# Songs kept in one library sift are left out of the next (#143), and Setup
+# says so beside the switch that brings them back.
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
+
+# Nothing kept yet, so no switch.
+- assertNotVisible:
+    id: "include-sifted-switch"
+
+- tapOn: "Start Sifting"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000
+
+- tapOn: "Keep"
+- waitForAnimationToEnd
+- tapOn: "Keep"
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "finish-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "done-start-over"
+    timeout: 30000
+
+- tapOn:
+    id: "done-start-over"
+
+- extendedWaitUntil:
+    visible: "Discard and Start Over"
+    timeout: 30000
+- tapOn: "Discard and Start Over"
+
+- extendedWaitUntil:
+    visible:
+      id: "reviewed-note"
+      text: "2 songs you kept in earlier sifts are left out\\."
+    timeout: 30000
+
+- assertVisible:
+    id: "include-sifted-switch"
+
+- tapOn:
+    id: "setup-start-sifting"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000
+
+- assertVisible:
+    id: "remaining-count"
+    text: "8 left"
