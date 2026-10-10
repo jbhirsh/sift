@@ -65,10 +65,6 @@ function TestConsumer() {
         })}
       />
       <TouchableOpacity testID="set-phase-setup" onPress={() => ctx.dispatch({ type: 'SET_PHASE', phase: 'setup' })} />
-      <TouchableOpacity testID="toggle-play" onPress={ctx.togglePlayPause} />
-      <TouchableOpacity testID="seek" onPress={() => ctx.seek(42)} />
-      <TouchableOpacity testID="skip-backward" onPress={ctx.skipBackward} />
-      <TouchableOpacity testID="skip-forward" onPress={ctx.skipForward} />
     </>
   );
 }
@@ -161,41 +157,6 @@ describe('SiftProvider', () => {
     await waitFor(() => {
       expect(getByTestId('phase').props.children).toBe('setup');
     });
-  });
-
-  test('togglePlayPause toggles isPlaying', async () => {
-    const { getByTestId } = await renderWithProvider([mockTrackA]);
-    expect(getByTestId('isPlaying').props.children).toBe('false');
-    await fireEvent.press(getByTestId('toggle-play'));
-    expect(getByTestId('isPlaying').props.children).toBe('true');
-    await fireEvent.press(getByTestId('toggle-play'));
-    expect(getByTestId('isPlaying').props.children).toBe('false');
-  });
-
-  test('seek updates playback position', async () => {
-    const { getByTestId } = await renderWithProvider([mockTrackA]);
-    await fireEvent.press(getByTestId('seek'));
-    expect(getByTestId('playbackPosition').props.children).toBe(42);
-  });
-
-  test('skipBackward reduces position by 15', async () => {
-    const { getByTestId } = await renderWithProvider([mockTrackA]);
-    // Set position to 30 first
-    await fireEvent.press(getByTestId('seek')); // sets to 42
-    await fireEvent.press(getByTestId('skip-backward'));
-    expect(getByTestId('playbackPosition').props.children).toBe(27);
-  });
-
-  test('skipBackward clamps to 0', async () => {
-    const { getByTestId } = await renderWithProvider([mockTrackA]);
-    await fireEvent.press(getByTestId('skip-backward'));
-    expect(getByTestId('playbackPosition').props.children).toBe(0);
-  });
-
-  test('skipForward increases position by 15, clamped to duration', async () => {
-    const { getByTestId } = await renderWithProvider([mockTrackA]);
-    await fireEvent.press(getByTestId('skip-forward'));
-    expect(getByTestId('playbackPosition').props.children).toBe(15);
   });
 
   test('useSift throws when used outside SiftProvider', async () => {

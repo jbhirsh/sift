@@ -100,45 +100,6 @@ export function useMusicProvider() {
     }
   }, [providerRef, dispatch]);
 
-  const loadLibrary = useCallback(async () => {
-    dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0, message: 'Loading library\u2026' });
-    dispatch({ type: 'SET_PHASE', phase: 'loading' });
-
-    try {
-      // Check authorization before loading
-      const isAuth = await providerRef.current.isAuthorized();
-      if (!isAuth) {
-        const granted = await providerRef.current.requestAuthorization();
-        if (!granted) {
-          dispatch({ type: 'SET_LOAD_ERROR', error: 'Music library access is required to use Sift.' });
-          Alert.alert(
-            'Music Access Required',
-            'Sift needs access to your music library. Please enable it in Settings.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Open Settings', onPress: () => Linking.openSettings() },
-            ],
-          );
-          return;
-        }
-      }
-
-      dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0.3, message: 'Fetching tracks\u2026' });
-      const tracks = await providerRef.current.loadLibrary();
-      Sentry.addBreadcrumb({
-        category: 'music-provider',
-        message: `Loaded ${tracks.length} tracks from library`,
-        level: 'info',
-      });
-      dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0.9, message: 'Sorting tracks\u2026' });
-      dispatch({ type: 'LOAD_TRACKS', tracks: sortTracks(tracks, state.sortOrder) });
-    } catch (err) {
-      Sentry.captureException(err, { tags: { flow: 'load-library' } });
-      const message = err instanceof Error ? err.message : 'Failed to load library';
-      dispatch({ type: 'SET_LOAD_ERROR', error: message });
-    }
-  }, [providerRef, dispatch, state.sortOrder]);
-
   const play = useCallback(
     async (trackID: string, position?: number) => {
       try {
@@ -471,24 +432,6 @@ export function useMusicProvider() {
     [providerRef, dispatch, state.source, state.provider],
   );
 
-  const createPlaylist = useCallback(
-    async (name: string, trackIDs: string[]) => {
-      dispatch({ type: 'SET_CREATING_PLAYLIST', creating: true });
-      dispatch({ type: 'SET_PLAYLIST_ERROR', error: null });
-      try {
-        await providerRef.current.createPlaylist(name, trackIDs);
-        dispatch({ type: 'SET_PLAYLIST_CREATED', created: true });
-      } catch (err) {
-        Sentry.captureException(err, { tags: { flow: 'create-playlist' } });
-        const message = err instanceof Error ? err.message : 'Failed to create playlist';
-        dispatch({ type: 'SET_PLAYLIST_ERROR', error: message });
-      } finally {
-        dispatch({ type: 'SET_CREATING_PLAYLIST', creating: false });
-      }
-    },
-    [providerRef, dispatch]
-  );
-
   const saveSiftedPlaylist = useCallback(
     async (playlistName: string, keptTracks: Track[]) => {
       if (keptTracks.length === 0) return;
@@ -790,7 +733,6 @@ export function useMusicProvider() {
   return {
     authorize,
     isAuthorized,
-    loadLibrary,
     loadPlaylists,
     loadTracks,
     play,
@@ -801,7 +743,6 @@ export function useMusicProvider() {
     togglePlayPause,
     skipForward,
     skipBackward,
-    createPlaylist,
     saveSiftedPlaylist,
     keepTrack,
     removeTrack,

@@ -26,7 +26,6 @@
     "src/hooks/**/*.ts",
     "!src/**/index.ts",
     "!src/services/MusicProviderInterface.ts",
-    "!src/hooks/useKeyboardShortcuts.ts",
     "!src/utils/mockData.ts",
     "!src/services/MockMusicProvider.ts"
   ],

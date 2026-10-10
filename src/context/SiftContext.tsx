@@ -115,7 +115,6 @@ type SiftAction =
   | { type: 'SET_LOAD_ERROR'; error: string }
   | { type: 'SET_PLAYBACK_POSITION'; position: number }
   | { type: 'SET_IS_PLAYING'; isPlaying: boolean }
-  | { type: 'TOGGLE_PLAY_PAUSE' }
   | { type: 'SET_CONNECTION_STATUS'; status: ConnectionStatus }
   | { type: 'SET_PLAYLIST_CREATED'; created: boolean }
   | { type: 'SET_PLAYLIST_ERROR'; error: string | null }
@@ -228,9 +227,6 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
 
     case 'SET_IS_PLAYING':
       return { ...state, isPlaying: action.isPlaying };
-
-    case 'TOGGLE_PLAY_PAUSE':
-      return { ...state, isPlaying: !state.isPlaying };
 
     case 'SET_CONNECTION_STATUS':
       return { ...state, connectionStatus: action.status };
@@ -390,12 +386,8 @@ interface SiftContextValue {
    * are not lost when the autosave effect's cleanup cancels the pending timer.
    */
   flushPendingSave: () => void;
-  togglePlayPause: () => void;
   /** Change and persist the "Start at chorus" setting. */
   setStartAtChorus: (enabled: boolean) => void;
-  seek: (position: number) => void;
-  skipBackward: () => void;
-  skipForward: () => void;
 }
 
 const SiftContext = createContext<SiftContextValue | null>(null);
@@ -552,11 +544,6 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     });
   }, [dispatch, dropPendingSave]);
 
-  const togglePlayPause = useCallback(
-    () => dispatch({ type: 'TOGGLE_PLAY_PAUSE' }),
-    [dispatch]
-  );
-
   const setStartAtChorus = useCallback(
     (enabled: boolean) => {
       preferencesChangedRef.current = true;
@@ -566,23 +553,6 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     },
     [dispatch]
   );
-
-  const seek = useCallback(
-    (position: number) => dispatch({ type: 'SET_PLAYBACK_POSITION', position }),
-    [dispatch]
-  );
-
-  const skipBackward = useCallback(() => {
-    const newPos = Math.max(0, state.playbackPosition - 15);
-    dispatch({ type: 'SET_PLAYBACK_POSITION', position: newPos });
-  }, [dispatch, state.playbackPosition]);
-
-  const skipForward = useCallback(() => {
-    const track = state.tracks[state.cursor];
-    if (!track) return;
-    const newPos = Math.min(track.duration, state.playbackPosition + 15);
-    dispatch({ type: 'SET_PLAYBACK_POSITION', position: newPos });
-  }, [dispatch, state.playbackPosition, state.tracks, state.cursor]);
 
   const value = useMemo<SiftContextValue>(
     () => ({
@@ -597,13 +567,9 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
       startFresh,
       resetToSetup,
       flushPendingSave,
-      togglePlayPause,
       setStartAtChorus,
-      seek,
-      skipBackward,
-      skipForward,
     }),
-    [state, dispatch, currentTrack, nextTrack, nextNextTrack, remaining, total, decide, startFresh, resetToSetup, flushPendingSave, togglePlayPause, setStartAtChorus, seek, skipBackward, skipForward]
+    [state, dispatch, currentTrack, nextTrack, nextNextTrack, remaining, total, decide, startFresh, resetToSetup, flushPendingSave, setStartAtChorus]
   );
 
   return (

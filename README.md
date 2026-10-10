@@ -61,7 +61,7 @@ src/
   context/              SiftContext (useReducer state management)
   services/             MusicProviderInterface, AppleMusicProvider, MockMusicProvider,
                         SessionStore, RemovalHistoryStore
-  hooks/                useMusicProvider, useKeyboardShortcuts, useResolvedArtwork
+  hooks/                useMusicProvider, useResolvedArtwork
   theme/                Design tokens + ThemeContext (light/dark)
   types/                Shared TypeScript types
   utils/                formatTime, sorting, mockData

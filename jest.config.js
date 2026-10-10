@@ -20,15 +20,14 @@ module.exports = {
     '!src/types/**',
     '!src/**/index.ts',
     '!src/services/MusicProviderInterface.ts',
-    '!src/hooks/useKeyboardShortcuts.ts',
   ],
   // Per-file coverage enforcement (mirrors BoardGames' vite.config.ts
   // `coverage.thresholds.perFile: true, lines: 80`). A glob key applies the
   // threshold to EACH matched file individually rather than to the aggregate,
   // so a weak file can no longer hide behind well-covered ones the way it
   // could under the previous `global` block. `collectCoverageFrom` above still
-  // decides which files are measured (types, barrels, MusicProviderInterface,
-  // and useKeyboardShortcuts are excluded), and every measured file is a .ts
+  // decides which files are measured (types, barrels and MusicProviderInterface
+  // are excluded), and every measured file is a .ts
   // or .tsx that this glob matches.
   coverageThreshold: {
     '**/*.{ts,tsx}': {
