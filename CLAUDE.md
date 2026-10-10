@@ -150,7 +150,12 @@ Makefile                Dev commands (test, lint, typecheck, check)
   `MusicProviderHost`, which creates the provider once per provider change and
   runs the only playback poller; every `useMusicProvider` shares it.
 - **Session persistence**: `SessionStore` saves/loads session state via AsyncStorage.
-  Sessions auto-save after every decision. User settings (`startAtChorus`) are
+  Sessions auto-save after every decision. The track list is stored once per
+  list (two alternating slots, so a crash mid-write keeps the last pair
+  intact) and each save writes a compact record of ids (`utils/sessionFormat`,
+  #150); a pre-#150 `sift_session` blob still loads and is removed after the
+  first compact save. `__tests__/fixtures/sessions` holds a frozen copy of
+  every saved shape: add one when the shape changes, never edit them. User settings (`startAtChorus`) are
   preferences, not session state: `PreferencesStore` persists them and
   `RESUME_SESSION` never touches them.
 - **Reviewed ledger**: library keeps leave the song in place, so

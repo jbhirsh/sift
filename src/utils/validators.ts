@@ -9,6 +9,7 @@ import {
   type SortOrder,
   type Track,
 } from '../types';
+import type { CompactSession, StoredTracks } from './sessionFormat';
 
 /**
  * Type guards for data that enters the app from storage it doesn't control
@@ -157,4 +158,35 @@ export function isSiftSession(value: unknown): value is SiftSession {
       value.siftedPlaylistId === null ||
       typeof value.siftedPlaylistId === 'string')
   );
+}
+
+/** A stored compact session (#150), before it is joined to its track list. */
+export function isCompactSession(value: unknown): value is CompactSession {
+  return (
+    isObject(value) &&
+    value.v === 2 &&
+    (value.tracksSlot === 'a' || value.tracksSlot === 'b') &&
+    typeof value.tracksVersion === 'string' &&
+    isFiniteNumber(value.cursor) &&
+    Number.isInteger(value.cursor) &&
+    value.cursor >= 0 &&
+    isArrayOf(value.keptIds, isString) &&
+    isArrayOf(value.removedIds, isString) &&
+    isArrayOf(value.skippedIds, isString) &&
+    isSortOrder(value.sortOrder) &&
+    typeof value.savedAt === 'string' &&
+    (value.provider === undefined || isMusicProvider(value.provider)) &&
+    (value.source === undefined || isSiftSource(value.source)) &&
+    (value.pendingKeeps === undefined || isArrayOf(value.pendingKeeps, isTrack)) &&
+    (value.removalErrors === undefined || isArrayOf(value.removalErrors, isString)) &&
+    (value.failedRemovalIds === undefined || isArrayOf(value.failedRemovalIds, isString)) &&
+    (value.siftedPlaylistId === undefined ||
+      value.siftedPlaylistId === null ||
+      typeof value.siftedPlaylistId === 'string')
+  );
+}
+
+/** The stored track list a compact session points at (#150). */
+export function isStoredTracks(value: unknown): value is StoredTracks {
+  return isObject(value) && typeof value.version === 'string' && isArrayOf(value.tracks, isTrack);
 }
