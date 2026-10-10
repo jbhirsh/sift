@@ -18,7 +18,6 @@ import { PROVIDER_DISPLAY } from '../types';
 
 const PROVIDER_SYMBOLS: Record<string, string> = {
   'apple-music': 'music.note.list',
-  spotify: 'music.note',
 };
 
 interface SettingsScreenProps {
@@ -34,7 +33,7 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
     dispatch({ type: 'SET_CONNECTION_STATUS', status: 'checking' });
     // Only open the provider's consent flow when we're not already authorized,
     // mirroring the load paths — checking an existing connection must never
-    // re-prompt (e.g. re-open the Spotify browser).
+    // re-prompt.
     if (await isAuthorized()) {
       dispatch({ type: 'SET_CONNECTION_STATUS', status: 'connected' });
       return;
@@ -170,8 +169,8 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
         </View>
       </GlassCard>
 
-      {/* Playback settings. Apple Music only: Spotify plays fixed
-          30-second previews, which can't start at a song's chorus. */}
+      {/* Playback settings. Apple Music only: starting at the chorus needs
+          full-track playback. */}
       {state.provider === 'apple-music' && (
         <View style={styles.section}>
           <GlassCard intensity="regular" radius={RADIUS.md}>

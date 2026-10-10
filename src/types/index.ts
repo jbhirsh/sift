@@ -16,7 +16,13 @@ export type AppPhase = 'setup' | 'loading' | 'sifting' | 'done';
 
 export type SortOrder = 'least-played' | 'most-played' | 'oldest' | 'newest' | 'random';
 
-export type MusicProvider = 'apple-music' | 'spotify';
+/**
+ * Apple Music only. Spotify was removed (#140): its token lacked the scope
+ * library Remove and Restore need, it no longer returns previews to new
+ * apps, and it couldn't be disconnected. The provider abstraction stays, so
+ * another service can come back behind MusicProviderService.
+ */
+export type MusicProvider = 'apple-music';
 
 export type ConnectionStatus = 'unknown' | 'checking' | 'connected' | 'disconnected';
 
@@ -73,7 +79,6 @@ export const SORT_ORDER_DISPLAY: Record<SortOrder, string> = {
 
 export const PROVIDER_DISPLAY: Record<MusicProvider, string> = {
   'apple-music': 'Apple Music',
-  spotify: 'Spotify',
 };
 
 /** User settings that outlive any one sift session. */

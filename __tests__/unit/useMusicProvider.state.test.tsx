@@ -714,12 +714,9 @@ describe('useMusicProvider — observable state', () => {
   });
 
   test('restoreTrack failure surfaces "name: reason" and keeps the history record', async () => {
-    mockProvider.addToLibrary.mockRejectedValueOnce(new Error('network down'));
+    mockProvider.loadPlaylists.mockResolvedValue([{ id: 'removed-pl', name: 'Sift \u2014 Removed', trackCount: 1 }]);
+    mockProvider.removeFromPlaylist.mockRejectedValueOnce(new Error('network down'));
     await renderHarness([mockTrack]);
-    // Spotify: its library restore re-adds the song (Apple's is below).
-    await act(async () => {
-      sift.dispatch({ type: 'SET_PROVIDER', provider: 'spotify' });
-    });
 
     await act(async () => {
       await api.restoreTrack(mockTrack);
@@ -732,7 +729,7 @@ describe('useMusicProvider — observable state', () => {
     );
 
     // Non-Error rejections get the generic reason.
-    mockProvider.addToLibrary.mockRejectedValueOnce('boom');
+    mockProvider.removeFromPlaylist.mockRejectedValueOnce('boom');
     await act(async () => {
       await api.restoreTrack(mockTrack);
     });
@@ -751,8 +748,8 @@ describe('useMusicProvider — observable state', () => {
     id: 'peaches', name: 'Peaches', artist: 'Justin Bieber', album: 'Justice',
     duration: 198, playCount: 4, dateAdded: '2021-03-19T00:00:00.000Z',
   };
-  const libraryRemoval = (track: Track, provider: 'apple-music' | 'spotify' = 'apple-music') => ({
-    track, source: { type: 'library' as const }, provider, removedAt: '2026-10-01T12:00:00.000Z',
+  const libraryRemoval = (track: Track) => ({
+    track, source: { type: 'library' as const }, provider: 'apple-music' as const, removedAt: '2026-10-01T12:00:00.000Z',
   });
   const removedPlaylist: Playlist = { id: 'removed-pl', name: 'Sift \u2014 Removed', trackCount: 1 };
 
@@ -789,20 +786,6 @@ describe('useMusicProvider — observable state', () => {
       await api.loadTracks();
     });
     expect(sift.state.tracks.map((t) => t.id).sort()).toEqual(['1', 'peaches-copy']);
-  });
-
-  test('a Spotify library sift offers a removed song again: Remove deleted it, so it was re-added', async () => {
-    mockProvider.loadLibrary.mockResolvedValue([mockTrack, peaches]);
-    (loadHistory as jest.Mock).mockResolvedValueOnce([libraryRemoval(peaches, 'spotify')]);
-    await renderHarness([]);
-    await act(async () => {
-      sift.dispatch({ type: 'SET_PROVIDER', provider: 'spotify' });
-    });
-
-    await act(async () => {
-      await api.loadTracks();
-    });
-    expect(sift.state.tracks.map((t) => t.id).sort()).toEqual(['1', 'peaches']);
   });
 
   test('a library Start Over (skipFiltering) still skips removed Apple songs', async () => {
@@ -846,19 +829,6 @@ describe('useMusicProvider — observable state', () => {
     });
     expect(mockProvider.removeFromLibrary).toHaveBeenCalledWith(['1']);
     expect(logRemoval).toHaveBeenCalledWith(expect.objectContaining({ track: mockTrack }));
-  });
-
-  test('a Spotify library remove is never skipped by the Apple guard', async () => {
-    (loadHistory as jest.Mock).mockResolvedValue([libraryRemoval(peaches, 'spotify')]);
-    await renderHarness([peaches]);
-    await act(async () => {
-      sift.dispatch({ type: 'SET_PROVIDER', provider: 'spotify' });
-    });
-
-    await act(async () => {
-      await api.removeTrack(peaches);
-    });
-    expect(mockProvider.removeFromLibrary).toHaveBeenCalledWith(['peaches']);
   });
 
   test('a playlist remove of a song removed from the library still goes through', async () => {
@@ -1391,26 +1361,11 @@ describe('useMusicProvider — observable state', () => {
       await api.warmCache(['1']);
     });
     // isAuthorized answered true every time — prompting again would throw
-    // the user into a needless consent flow (e.g. the Spotify browser).
+    // the user into a needless consent flow.
     expect(mockProvider.requestAuthorization).not.toHaveBeenCalled();
   });
 
   // ── Provider lifecycle ───────────────────────────────
-
-  test('switching the provider routes subsequent calls to the new provider', async () => {
-    const spotifyProvider = makeMinimalProvider();
-    await renderHarness([mockTrack]);
-
-    await act(async () => {
-      mockActiveProvider = spotifyProvider;
-      sift.dispatch({ type: 'SET_PROVIDER', provider: 'spotify' });
-    });
-    await act(async () => {
-      await api.pause();
-    });
-    expect(spotifyProvider.pause).toHaveBeenCalledTimes(1);
-    expect(mockProvider.pause).not.toHaveBeenCalled();
-  });
 
   // ── loadTracks filtering behaviors ───────────────────
 

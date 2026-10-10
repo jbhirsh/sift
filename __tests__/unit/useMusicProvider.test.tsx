@@ -142,9 +142,6 @@ function TestConsumerWithPlaylistActions() {
       <TouchableOpacity testID="save-sifted-empty" onPress={() => provider.saveSiftedPlaylist('My Playlist', [])} />
       <TouchableOpacity testID="warm-cache" onPress={() => provider.warmCache(['1', '2'])} />
       <TouchableOpacity testID="clear-sifted" onPress={() => provider.clearSiftedPlaylist('My Playlist')} />
-      <TouchableOpacity testID="set-provider-spotify" onPress={() => {
-        dispatch({ type: 'SET_PROVIDER', provider: 'spotify' });
-      }} />
       <TouchableOpacity testID="set-sifted-id" onPress={() => {
         dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: 'sifted-renamed' });
       }} />
@@ -577,27 +574,6 @@ describe('useMusicProvider', () => {
     expect(getByTestId('track-order').props.children).toBe('3,5,10');
   });
 
-  test('restoreTrack on a Spotify library re-adds to the library and purges its history record', async () => {
-    // Spotify's library Remove really deletes the song; Apple's restore,
-    // which takes it out of "Sift — Removed", is in useMusicProvider.state.
-    const { getByTestId } = await render(
-      <SiftProvider initialTracks={[mockTrack]}>
-        <TestConsumerWithPlaylistActions />
-      </SiftProvider>
-    );
-    await act(async () => {
-      await fireEvent.press(getByTestId('set-provider-spotify'));
-    });
-    await act(async () => {
-      await fireEvent.press(getByTestId('restore-track'));
-    });
-    // Default source is library, so it re-adds to the library…
-    expect(mockProvider.addToLibrary).toHaveBeenCalledWith(['1']);
-    // …and clears the history entry (kept consistent with removeTrack, which
-    // logs removals for both source types).
-    expect(removeFromHistory).toHaveBeenCalledWith('1', { type: 'library' });
-  });
-
   test('restoreTrack on a playlist re-adds to the playlist and purges the exclusion record', async () => {
     // This is the user-facing fix: the playlist load path filters out tracks in
     // removal history, so restoring must clear that record or the track stays
@@ -618,26 +594,6 @@ describe('useMusicProvider', () => {
       type: 'playlist',
       playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 },
     });
-  });
-
-  test('restoreTrack does not purge history when the Spotify library re-add fails', async () => {
-    mockProvider.addToLibrary.mockRejectedValueOnce(new Error('network'));
-    const { getByTestId } = await render(
-      <SiftProvider initialTracks={[mockTrack]}>
-        <TestConsumerWithPlaylistActions />
-      </SiftProvider>
-    );
-    await act(async () => {
-      await fireEvent.press(getByTestId('set-provider-spotify'));
-    });
-    await act(async () => {
-      await fireEvent.press(getByTestId('restore-track'));
-    });
-    // The re-add was attempted…
-    expect(mockProvider.addToLibrary).toHaveBeenCalledWith(['1']);
-    // …but history is purged only after a successful re-add, so a failed
-    // restore must leave the exclusion record in place.
-    expect(removeFromHistory).not.toHaveBeenCalled();
   });
 
   test('loadTracks filters out sifted and removed tracks for playlist source', async () => {

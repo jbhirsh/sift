@@ -25,13 +25,11 @@ import { clearArtworkCache } from '../hooks/useResolvedArtwork';
 import { clearHistoryForSource } from '../services/RemovalHistoryStore';
 import { RADIUS, SPACING } from '../theme';
 import {
-  MusicProvider,
   Playlist,
   SiftSession,
   SiftSource,
   SortOrder,
   SORT_ORDER_DISPLAY,
-  PROVIDER_DISPLAY,
 } from '../types';
 
 function sourceMatches(a: SiftSource, b: SiftSource): boolean {
@@ -40,7 +38,6 @@ function sourceMatches(a: SiftSource, b: SiftSource): boolean {
   return true;
 }
 
-const PROVIDERS: MusicProvider[] = ['apple-music', 'spotify'];
 const SORT_ORDERS: SortOrder[] = [
   'least-played',
   'most-played',
@@ -394,46 +391,6 @@ export default function SetupScreen() {
             </View>
           </View>
         ) : null}
-
-        {/* Music provider picker */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.text }]}>
-            Music service
-          </Text>
-          <GlassCard intensity="thin" radius={RADIUS.sm}>
-            <View style={styles.segmentedControl}>
-              {PROVIDERS.map((provider) => {
-                const isSelected = state.provider === provider;
-                return (
-                  <TouchableOpacity
-                    key={provider}
-                    style={[
-                      styles.segment,
-                      isSelected && [styles.segmentSelected, { borderColor: glass.borderColor }],
-                    ]}
-                    onPress={() => {
-                      setupTouchedRef.current = true;
-                      dispatch({ type: 'SET_PROVIDER', provider });
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.segmentText,
-                        {
-                          color: isSelected ? colors.text : colors.textSecondary,
-                          fontWeight: isSelected ? '600' : '400',
-                        },
-                      ]}
-                    >
-                      {PROVIDER_DISPLAY[provider]}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </GlassCard>
-        </View>
 
         {/* Sift source picker */}
         <View style={styles.section}>

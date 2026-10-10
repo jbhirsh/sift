@@ -1,5 +1,5 @@
 import { libraryRemovedIds } from '../../src/utils/libraryRemovals';
-import type { RemovalRecord, Track } from '../../src/types';
+import type { MusicProvider, RemovalRecord, Track } from '../../src/types';
 
 const track = (id: string, name: string): Track => ({
   id, name, artist: 'Artist', album: 'Album', duration: 200, playCount: 0, dateAdded: '2020-01-01T00:00:00.000Z',
@@ -29,7 +29,10 @@ describe('libraryRemovedIds', () => {
   });
 
   test("ignores another provider's removals", () => {
-    const ids = libraryRemovedIds([record(track('a1', 'Peaches'), { provider: 'spotify' })], 'apple-music');
+    // Spotify was removed (#140), but a history file can still hold its
+    // records until they're validated out.
+    const spotify = 'spotify' as unknown as MusicProvider;
+    const ids = libraryRemovedIds([record(track('a1', 'Peaches'), { provider: spotify })], 'apple-music');
     expect(ids.size).toBe(0);
   });
 

@@ -25,12 +25,8 @@ describe('removeExplanation', () => {
     expect(removeExplanation('apple-music', playlist)).toBe(
       'Removed songs leave this playlist; kept songs are collected in "Workout Mix - Sifted".',
     );
-    expect(removeExplanation('spotify', playlist)).toContain('"Workout Mix - Sifted"');
   });
 
-  test('Spotify library: removed songs leave Liked Songs', () => {
-    expect(removeExplanation('spotify', library)).toBe('Removed songs are taken out of your Liked Songs.');
-  });
 });
 
 describe('decisionCounts', () => {
@@ -73,10 +69,6 @@ describe('discardConfirmation', () => {
     expect(copy.message).toContain('in your sift of "Workout Mix".');
     expect(copy.message).toContain('Starting over empties "Workout Mix - Sifted" and clears this playlist\'s removal history.');
     expect(copy.message.endsWith(RESUME)).toBe(true);
-  });
-
-  test('a Spotify library sift with removals says they stay removed', () => {
-    expect(discardConfirmation('spotify', library, counts, 'start-over').message).toContain('Songs you removed stay removed.');
   });
 
   test('no removals: no line about removed songs, and one decision is singular', () => {
@@ -136,7 +128,6 @@ describe('removedListSubtitle', () => {
   test('all landed', () => {
     expect(removedListSubtitle('apple-music', library, 5, 0)).toBe(`These tracks have been moved to "${APPLE_REMOVED_PLAYLIST}" in Music.`);
     expect(removedListSubtitle('apple-music', playlist, 5, 0)).toBe('These tracks have been removed from "Workout Mix".');
-    expect(removedListSubtitle('spotify', library, 5, 0)).toBe('These tracks have been removed from your library.');
   });
 
   test('some failed: real counts, never "most"', () => {

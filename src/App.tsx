@@ -34,7 +34,7 @@ Sentry.init({
   sendDefaultPii: false,
   tracesSampleRate: 0.05,
   integrations: [Sentry.reactNativeTracingIntegration()],
-  // No trace headers on requests to other services (LRCLIB, Spotify).
+  // No trace headers on requests to other services (LRCLIB).
   tracePropagationTargets: [],
   // Native crash reports skip the JavaScript hooks below, and the native SDK
   // records every NSURLSession request as a breadcrumb, LRCLIB's track and

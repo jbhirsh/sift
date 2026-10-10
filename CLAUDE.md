@@ -3,7 +3,7 @@
 ## What This Project Is
 A React Native (Expo) mobile app for rapidly reviewing a music library.
 Users swipe/tap through their tracks: keep, remove, or skip.
-Supports Apple Music and Spotify. Built with Expo SDK 57, React Native 0.86,
+Supports Apple Music (Spotify was removed, #140). Built with Expo SDK 57, React Native 0.86,
 React 19, and TypeScript.
 
 ---
@@ -105,8 +105,7 @@ src/
     screens/            SetupScreen, LoadingScreen, SiftScreen,
                         DoneScreen, SettingsScreen
     context/            SiftContext (useReducer state management)
-    services/           MusicProviderInterface, AppleMusicProvider,
-                        SpotifyProvider (+ spotify/ API & auth), MockMusicProvider,
+    services/           MusicProviderInterface, AppleMusicProvider, MockMusicProvider,
                         SessionStore, RemovalHistoryStore, PreferencesStore,
                         ChorusFinder + LrclibClient ("Start at chorus")
     hooks/              useKeyboardShortcuts, useMusicProvider, useResolvedArtwork,
@@ -138,7 +137,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
 - **Phase routing**: `PhaseRouter` in `App.tsx` switches screens based on `state.phase`
   (setup, loading, sifting, paused, done). No React Navigation — phase-driven switching.
 - **Provider pattern**: Music services implement `MusicProviderInterface`.
-  `AppleMusicProvider` and `SpotifyProvider` are concrete implementations;
+  `AppleMusicProvider` is the concrete implementation (Spotify was removed,
+  #140; the interface stays so another service can be added);
   `MockMusicProvider` is used for testing/development.
 - **Session persistence**: `SessionStore` saves/loads session state via AsyncStorage.
   Sessions auto-save after every decision. User settings (`startAtChorus`) are

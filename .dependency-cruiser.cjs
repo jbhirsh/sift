@@ -11,7 +11,7 @@
  *   utils    → types                     pure helpers: formatTime, sorting, …
  *   theme    → types, react/react-native design tokens + ThemeContext
  *   services → types, services           MusicProviderInterface + providers,
- *                                         SessionStore, Spotify API/auth
+ *                                         SessionStore, stores, chorus finder
  *   context  → types, utils, services    the single SiftContext reducer
  *   hooks    → context, services, utils  glue between state and providers
  *   components / screens                  the UI, top of the graph

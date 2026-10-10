@@ -26,7 +26,7 @@ const playlistSource = {
 const record: RemovalRecord = {
   track,
   source: { type: 'library' },
-  provider: 'spotify',
+  provider: 'apple-music',
   removedAt: '2026-04-08T12:00:00.000Z',
 };
 
@@ -153,7 +153,7 @@ describe('isSiftSession', () => {
       removed: [track],
       skipped: [track],
       cursor: 1,
-      provider: 'spotify',
+      provider: 'apple-music',
       source: playlistSource,
       pendingKeeps: [track],
       removalErrors: ['failed'],
@@ -180,6 +180,8 @@ describe('isSiftSession', () => {
     ['an unknown sortOrder', { ...session, sortOrder: 'alphabetical' }],
     ['a missing savedAt', { ...session, savedAt: undefined }],
     ['an unknown provider', { ...session, provider: 'tidal' }],
+    // Spotify was removed (#140): its saved sessions are set aside, not resumed.
+    ['a Spotify provider', { ...session, provider: 'spotify' }],
     ['a malformed source', { ...session, source: { type: 'playlist' } }],
     ['pendingKeeps not an array', { ...session, pendingKeeps: 'x' }],
     ['a malformed pending keep', { ...session, pendingKeeps: [{}] }],
