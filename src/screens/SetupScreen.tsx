@@ -21,7 +21,8 @@ import PlaylistPicker from '../components/PlaylistPicker';
 import ResumeSessionModal from '../components/ResumeSessionModal';
 import SessionStatRow from '../components/SessionStatRow';
 import { Button } from '../components/Button';
-import { decisionCounts, discardConfirmation, legacyFailedRemovalIds, removeExplanation } from '../utils/sessionCopy';
+import { decisionCounts, discardConfirmation, removeExplanation } from '../utils/sessionCopy';
+import { resumeState } from '../context/resumeSession';
 import { loadSession } from '../services/SessionStore';
 import { clearArtworkCache } from '../hooks/useResolvedArtwork';
 import { clearHistoryForSource } from '../services/RemovalHistoryStore';
@@ -196,42 +197,11 @@ export default function SetupScreen() {
     // while the cache warms, so restoring the session must not wait for it.
     dispatch({
       type: 'RESUME_SESSION',
-      session: {
-        tracks: savedSession.tracks,
-        cursor: savedSession.cursor,
-        kept: savedSession.kept,
-        removed: savedSession.removed,
-        skipped: savedSession.skipped,
-        sortOrder: savedSession.sortOrder,
-        provider: savedSession.provider ?? state.provider,
-        source: savedSession.source ?? { type: 'library' },
-        activeSource: savedSession.source ?? { type: 'library' },
-        // A FINISHED session is only offered here when it still has
-        // unflushed pendingKeeps — resume it straight to Done so the
-        // fallback save can repair them instead of replaying a sift with
-        // nothing left to decide.
-        phase: finish || savedSession.cursor >= savedSession.tracks.length ? 'done' : 'sifting',
-        loadProgress: 1,
-        loadMessage: '',
-        loadError: null,
-        playbackPosition: 0,
-        isPlaying: false,
-        removalPlaylistCreated: false,
-        removalPlaylistError: null,
-        isCreatingPlaylist: false,
-        // Legacy sessions predate these fields — default to empty rather
-        // than dropping the persisted repair signal on the floor.
-        removalErrors: savedSession.removalErrors ?? [],
-        failedRemovalIds:
-          savedSession.failedRemovalIds ??
-          legacyFailedRemovalIds(savedSession.removed, savedSession.removalErrors ?? []),
+      session: resumeState(savedSession, {
+        provider: state.provider,
         connectionStatus: state.connectionStatus,
-        pendingKeeps: savedSession.pendingKeeps ?? [],
-        skipFiltering: false,
-        // Legacy sessions predate this field too — null falls back to the
-        // name-based sifted-playlist lookup.
-        siftedPlaylistId: savedSession.siftedPlaylistId ?? null,
-      },
+        finish,
+      }),
     });
 
     // Warm the native song cache in the background for playback/artwork.
