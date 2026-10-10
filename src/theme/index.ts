@@ -30,6 +30,14 @@ export const CONTENT_COLUMN = {
   alignSelf: 'center',
 } as const;
 
+// The Toast pill (#152) and the slot screens reserve for it, derived from
+// one height so the two can't drift apart.
+export const TOAST = {
+  height: SPACING['3xl'],
+  slotHeight: SPACING['3xl'] + SPACING.base,
+  fontSize: 13,
+} as const;
+
 // Corner radius scale
 export const RADIUS = {
   sm: 8,

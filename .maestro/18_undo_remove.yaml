@@ -1,0 +1,53 @@
+appId: com.jessicahirsh.sift
+name: "Undo a Remove"
+---
+
+# The latest decision waits a few seconds before it reaches the music
+# service, and Undo takes it back: the same card returns, and nothing was
+# removed (#152).
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
+
+- tapOn: "Start Sifting"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+      text: "Peaches"
+    timeout: 30000
+
+# Undo has to land inside the 5 s window. After a tap Maestro waits for the
+# screen to settle, and the playing song's seek bar never does, so cap that
+# wait: left to its default, it can eat the window on a slow runner. The
+# Undo tap waits for the pill itself.
+- tapOn:
+    text: "Remove"
+    waitToSettleTimeoutMs: 500
+
+- tapOn:
+    id: "undo-toast-action"
+    waitToSettleTimeoutMs: 500
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+      text: "Peaches"
+    timeout: 10000
+
+- assertVisible:
+    id: "remaining-count"
+    text: "10 left"
+
+- assertVisible:
+    id: "stat-removed"
+    text: "0 removed"
+
+- assertNotVisible:
+    id: "undo-toast"

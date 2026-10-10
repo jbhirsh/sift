@@ -1505,7 +1505,10 @@ describe('DoneScreen', () => {
           type: 'SET_SOURCE',
           source: { type: 'playlist', playlist: { id: 'p1', name: 'Mix', trackCount: 3 } },
         });
-        dispatch({ type: 'DECIDE', decision: 'keep' });
+        // The keep was sent during the sift (and failed into pendingKeeps):
+        // nothing is held back for Done to send (#152).
+        dispatch({ type: 'DECIDE', decision: 'keep', at: 1 });
+        dispatch({ type: 'PENDING_SENT', trackId: mockTrackA.id, at: 1 });
         dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrackA });
         dispatch({ type: 'SET_PLAYLIST_ERROR', error: 'Failed to save sifted playlist' });
       }, [dispatch]);

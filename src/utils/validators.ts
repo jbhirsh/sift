@@ -2,6 +2,7 @@ import {
   PROVIDER_DISPLAY,
   SORT_ORDER_DISPLAY,
   type MusicProvider,
+  type PendingDecision,
   type Playlist,
   type RemovalRecord,
   type SiftSession,
@@ -137,6 +138,15 @@ export function migrateLegacySession(value: unknown): unknown {
   return migrated;
 }
 
+function isPendingDecision(value: unknown): value is PendingDecision {
+  return (
+    isObject(value) &&
+    typeof value.trackId === 'string' &&
+    (value.decision === 'keep' || value.decision === 'remove' || value.decision === 'skip') &&
+    isFiniteNumber(value.at)
+  );
+}
+
 export function isSiftSession(value: unknown): value is SiftSession {
   return (
     isObject(value) &&
@@ -156,7 +166,8 @@ export function isSiftSession(value: unknown): value is SiftSession {
     (value.failedRemovalIds === undefined || isArrayOf(value.failedRemovalIds, isString)) &&
     (value.siftedPlaylistId === undefined ||
       value.siftedPlaylistId === null ||
-      typeof value.siftedPlaylistId === 'string')
+      typeof value.siftedPlaylistId === 'string') &&
+    (value.pending === undefined || value.pending === null || isPendingDecision(value.pending))
   );
 }
 
@@ -182,7 +193,8 @@ export function isCompactSession(value: unknown): value is CompactSession {
     (value.failedRemovalIds === undefined || isArrayOf(value.failedRemovalIds, isString)) &&
     (value.siftedPlaylistId === undefined ||
       value.siftedPlaylistId === null ||
-      typeof value.siftedPlaylistId === 'string')
+      typeof value.siftedPlaylistId === 'string') &&
+    (value.pending === undefined || value.pending === null || isPendingDecision(value.pending))
   );
 }
 

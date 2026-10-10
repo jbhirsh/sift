@@ -10,6 +10,7 @@ import {
   ConnectionStatus,
   SiftSession,
   SiftSource,
+  PendingDecision,
   DEFAULT_PREFERENCES,
 } from '../types';
 import { saveSession, clearSession } from '../services/SessionStore';
@@ -71,6 +72,8 @@ export interface SiftState {
    * PreferencesStore, never saved with or restored from a session.
    */
   startAtChorus: boolean;
+  /** The latest decision, not yet sent to the music service (#152). */
+  pending: PendingDecision | null;
 }
 
 const initialState: SiftState = {
@@ -98,13 +101,16 @@ const initialState: SiftState = {
   pendingKeeps: [],
   skipFiltering: false,
   siftedPlaylistId: null,
+  pending: null,
   startAtChorus: DEFAULT_PREFERENCES.startAtChorus,
 };
 
 // ── Actions ────────────────────────────────────────────
 
 type SiftAction =
-  | { type: 'DECIDE'; decision: Decision }
+  | { type: 'DECIDE'; decision: Decision; /** ms since epoch */ at?: number }
+  | { type: 'PENDING_SENT'; trackId: string; at: number }
+  | { type: 'UNDO_LAST' }
   | { type: 'FINISH' }
   | { type: 'CONTINUE_SIFTING' }
   | { type: 'SET_PHASE'; phase: AppPhase }
@@ -130,6 +136,11 @@ type SiftAction =
   | { type: 'START_FRESH'; skipFiltering?: boolean }
   | { type: 'RESET_TO_SETUP' };
 
+/** Two sources are the same sift source: library, or the same playlist. */
+function sameSource(a: SiftSource, b: SiftSource): boolean {
+  return a.type === 'playlist' && b.type === 'playlist' ? a.playlist.id === b.playlist.id : a.type === b.type;
+}
+
 // ── Reducer ────────────────────────────────────────────
 
 export function siftReducer(state: SiftState, action: SiftAction): SiftState {
@@ -138,7 +149,13 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
       const track = state.tracks[state.cursor];
       if (!track) return state;
 
-      const next: SiftState = { ...state, cursor: state.cursor + 1 };
+      const next: SiftState = {
+        ...state,
+        cursor: state.cursor + 1,
+        // Whoever dispatches DECIDE sends the previous pending decision
+        // first (SiftScreen); this one waits out the undo window.
+        pending: { trackId: track.id, decision: action.decision, at: action.at ?? 0 },
+      };
 
       switch (action.decision) {
         case 'keep':
@@ -157,6 +174,33 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
       }
 
       return next;
+    }
+
+    case 'PENDING_SENT':
+      return state.pending?.trackId === action.trackId && state.pending.at === action.at
+        ? { ...state, pending: null }
+        : state;
+
+    // Take back the latest decision while it hasn't been sent (#152): the
+    // card comes back, and the music service never heard of it.
+    case 'UNDO_LAST': {
+      const pending = state.pending;
+      const track = state.tracks[state.cursor - 1];
+      if (!pending || !track || track.id !== pending.trackId) return state;
+      const drop = (list: Track[]) => {
+        const i = list.map((t) => t.id).lastIndexOf(track.id);
+        return i < 0 ? list : [...list.slice(0, i), ...list.slice(i + 1)];
+      };
+      // From whichever list holds it: a Restore moves a removed song to kept.
+      return {
+        ...state,
+        cursor: state.cursor - 1,
+        kept: drop(state.kept),
+        removed: drop(state.removed),
+        skipped: drop(state.skipped),
+        pending: null,
+        phase: state.phase === 'done' ? 'sifting' : state.phase,
+      };
     }
 
     // End a sift early (#142): Done with the decisions so far. The session
@@ -202,6 +246,7 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         // still-buffered keeps from it are deliberately dropped with it.
         // Mid-sift cleanup must use REMOVE_PENDING_KEEPS instead.
         pendingKeeps: [],
+        pending: null,
         // The last sift's save status: a stale error would also stop Done's
         // fallback save for this sift's keeps (Review N skipped, #142).
         removalPlaylistCreated: false,
@@ -328,6 +373,7 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         // Intentional discard — START_FRESH is a deliberate abandonment of
         // the previous sift (its kept list included), not mid-sift cleanup.
         pendingKeeps: [],
+        pending: null,
         phase: 'loading',
         skipFiltering: action.skipFiltering ?? false,
         isPlaying: false,
@@ -354,6 +400,7 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         // Intentional discard — RESET_TO_SETUP abandons the finished sift
         // entirely; see the LOAD_TRACKS note above.
         pendingKeeps: [],
+        pending: null,
         phase: 'setup',
         skipFiltering: false,
         isPlaying: false,
@@ -377,7 +424,8 @@ interface SiftContextValue {
   nextNextTrack: Track | undefined;
   remaining: number;
   total: number;
-  decide: (decision: Decision) => void;
+  /** Returns the decision as held (#152), or null when there was no card. */
+  decide: (decision: Decision) => PendingDecision | null;
   startFresh: (skipFiltering?: boolean) => void;
   resetToSetup: () => void;
   /**
@@ -432,7 +480,14 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
 
   // Auto-save session after every decision (debounced to avoid rapid-fire writes during fast swiping)
   useEffect(() => {
-    if (state.phase !== 'sifting' && state.phase !== 'done') return;
+    // Setup with tracks is a sift backed out of: still saved, so a held
+    // decision sent on the way out (#152) isn't left on disk to come back.
+    // Only while Setup shows that sift's own source: picking another one
+    // changes the source and drops the sifted-playlist id in state.
+    const backedOut = state.phase === 'setup'
+      && state.activeSource != null
+      && sameSource(state.activeSource, state.source);
+    if (state.phase !== 'sifting' && state.phase !== 'done' && !backedOut) return;
     if (state.tracks.length === 0) return;
 
     const session: SiftSession = {
@@ -444,7 +499,9 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
       sortOrder: state.sortOrder,
       savedAt: new Date().toISOString(),
       provider: state.provider,
-      source: state.source,
+      // The source these tracks came from: on Setup the picker can already
+      // show another one.
+      source: state.activeSource ?? state.source,
       // Persisted so the never-silently-dropped guarantee survives an app
       // kill/relaunch: without these, a resumed session forgets the repair
       // signal and Done's fallback save never fires.
@@ -454,6 +511,9 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
       // Persisted so a resumed session keeps resolving its sifted playlist
       // by id (rename-proof) instead of falling back to the name match.
       siftedPlaylistId: state.siftedPlaylistId,
+      // Persisted before it is sent, so a crash in the undo window still
+      // sends it on resume (#152).
+      pending: state.pending,
     };
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -466,7 +526,7 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [state.cursor, state.kept, state.removed, state.skipped, state.tracks, state.phase, state.sortOrder, state.provider, state.source, state.pendingKeeps, state.removalErrors, state.failedRemovalIds, state.siftedPlaylistId]);
+  }, [state.cursor, state.kept, state.removed, state.skipped, state.tracks, state.phase, state.sortOrder, state.provider, state.source, state.activeSource, state.pendingKeeps, state.removalErrors, state.failedRemovalIds, state.siftedPlaylistId, state.pending]);
 
   // Flush a debounced session write immediately (see SiftContextValue docs).
   const flushPendingSave = useCallback(() => {
@@ -503,6 +563,11 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
   const remaining = Math.max(0, state.tracks.length - state.cursor);
   const total = state.tracks.length;
 
+  const tracksRef = useRef(state.tracks);
+  useEffect(() => {
+    tracksRef.current = state.tracks;
+  }, [state.tracks]);
+
   const decide = useCallback(
     (decision: Decision) => {
       // The card's position, never its name: track names are listening
@@ -512,8 +577,15 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
         message: `Decision: ${decision} on card ${state.cursor + 1} of ${state.tracks.length}`,
         level: 'info',
       });
-      dispatch({ type: 'DECIDE', decision });
+      const at = Date.now();
+      // The reducer judges the card from its own state; this is only what
+      // the caller gets back.
+      dispatch({ type: 'DECIDE', decision, at });
+      const track = tracksRef.current[state.cursor];
+      return track ? { trackId: track.id, decision, at } : null;
     },
+    // Not keyed on the tracks array: every LOAD_TRACKS makes a new one, and
+    // decide's identity would change with it.
     [dispatch, state.tracks.length, state.cursor]
   );
 

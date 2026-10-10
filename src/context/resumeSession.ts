@@ -51,5 +51,7 @@ export function resumeState(
     skipFiltering: false,
     // Null falls back to the name-based sifted-playlist lookup.
     siftedPlaylistId: saved.siftedPlaylistId ?? null,
+    // Sent on resume by the screen that resumes (#152).
+    pending: saved.pending ?? null,
   };
 }

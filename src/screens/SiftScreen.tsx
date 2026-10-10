@@ -17,15 +17,16 @@ import {
 } from 'react-native-reanimated';
 import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
-import { useMusicProvider } from '../hooks/useMusicProvider';
 import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
 import InteractiveCard from '../components/InteractiveCard';
 import PlayerControls from '../components/PlayerControls';
-import { COLORS, RADIUS, SHADOWS, SPACING } from '../theme';
-import { Decision, PROVIDER_DISPLAY, Track } from '../types';
+import { COLORS, RADIUS, SHADOWS, SPACING, TOAST } from '../theme';
+import { Decision, PendingDecision, PROVIDER_DISPLAY, Track } from '../types';
 import { loadSeenRemoveNote, markRemoveNoteSeen } from '../services/PreferencesStore';
-import { decisionAnnouncement, FIRST_REMOVE_NOTE, unsyncedCount } from '../utils/sessionCopy';
+import { decisionAnnouncement, FIRST_REMOVE_NOTE, undoMessage, unsyncedCount } from '../utils/sessionCopy';
+import { useHoldPendingDecision, useSendPending, wasSent } from '../hooks/usePendingDecision';
+import Toast from '../components/Toast';
 import { compactCount } from '../utils/compactCount';
 
 const SEGMENT_COUNT = 10;
@@ -42,7 +43,14 @@ export default function SiftScreen() {
     flushPendingSave,
   } = useSift();
 
-  const { keepTrack, removeTrack } = useMusicProvider();
+  // Decisions reach the music service after the undo window (#152).
+  const sendPending = useSendPending();
+  useHoldPendingDecision(sendPending);
+  // The last card's decision goes now: Done has no Undo, and this screen's
+  // keep path still knows a "- Sifted" playlist it created moments ago.
+  const sendIfLast = useCallback((held: PendingDecision | null) => {
+    if (held && state.tracks[state.tracks.length - 1]?.id === held.trackId) sendPending(held);
+  }, [sendPending, state.tracks]);
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [isAnimating, setIsAnimating] = useState(false);
@@ -109,6 +117,10 @@ export default function SiftScreen() {
   const [startCursor] = useState(state.cursor);
   const sessionDecisions = Math.max(0, state.cursor - startCursor);
 
+  const undoable = state.pending != null
+    && state.tracks[state.cursor - 1]?.id === state.pending.trackId
+    && !wasSent(state.pending);
+
   const progress = state.tracks.length > 0
     ? state.cursor / state.tracks.length
     : 0;
@@ -123,12 +135,10 @@ export default function SiftScreen() {
     const direction = decision === 'keep' ? 500 : -500;
 
     const onComplete = () => {
-      decide(decision);
+      // The previous decision can't be undone any more: send it.
+      sendPending(state.pending);
+      sendIfLast(decide(decision));
       afterDecision(decision, track);
-      if (track) {
-        if (decision === 'remove') removeTrack(track);
-        if (decision === 'keep') keepTrack(track);
-      }
       programmaticOffset.value = 0;
       endDecision();
     };
@@ -149,26 +159,24 @@ export default function SiftScreen() {
     // alone lags a render behind the ref, so a skip tap racing a card swipe
     // could double-decide the still-current track.
     if (!beginDecision()) return;
-    decide('skip');
+    sendPending(state.pending);
+    sendIfLast(decide('skip'));
     afterDecision('skip', currentTrack);
     settleTimeoutRef.current = setTimeout(endDecision, 300);
-  }, [beginDecision, endDecision, decide, afterDecision, currentTrack]);
+  }, [beginDecision, endDecision, decide, afterDecision, currentTrack, sendPending, sendIfLast, state.pending]);
 
   const handleCardDecide = useCallback(
     (decision: Decision) => {
       if (!beginDecision()) return;
       const track = currentTrack;
-      decide(decision);
+      sendPending(state.pending);
+      sendIfLast(decide(decision));
       afterDecision(decision, track);
-      if (track) {
-        if (decision === 'remove') removeTrack(track);
-        if (decision === 'keep') keepTrack(track);
-      }
       // Hold the guard briefly while the swiped card settles so a button
       // press right after a swipe cannot decide the next card too.
       settleTimeoutRef.current = setTimeout(endDecision, 300);
     },
-    [beginDecision, endDecision, decide, afterDecision, currentTrack, removeTrack, keepTrack],
+    [beginDecision, endDecision, decide, afterDecision, currentTrack, sendPending, sendIfLast, state.pending],
   );
 
   return (
@@ -184,6 +192,8 @@ export default function SiftScreen() {
               // the autosave effect's cleanup would otherwise cancel them.
               flushPendingSave();
               dispatch({ type: 'SET_IS_PLAYING', isPlaying: false });
+              // Sent while this screen is still up (see sendIfLast).
+              sendPending(state.pending);
               dispatch({ type: 'SET_PHASE', phase: 'setup' });
             }}
             style={styles.backButton}
@@ -206,6 +216,7 @@ export default function SiftScreen() {
               // when it ends, and finishing first would drop that decision
               // or land it under Done.
               if (isAnimatingRef.current) return;
+              sendPending(state.pending);
               flushPendingSave();
               dispatch({ type: 'FINISH' });
             }}
@@ -324,6 +335,24 @@ export default function SiftScreen() {
       {/* Player controls */}
       <View style={styles.playerControls}>
         <PlayerControls />
+      </View>
+
+      {/* Undo the latest decision while it hasn't been sent (#152). A slot
+          that is always there, so the card doesn't jump when it shows; above
+          the actions, in thumb reach, never over the card. */}
+      <View style={styles.undoSlot}>
+        {undoable && state.pending && (
+          <Toast
+            testID="undo-toast"
+            message={undoMessage(state.tracks[state.cursor - 1].name, state.pending.decision)}
+            actionLabel="Undo"
+            actionAccessibilityLabel={`Undo: ${undoMessage(state.tracks[state.cursor - 1].name, state.pending.decision)}`}
+            onAction={() => {
+              if (isAnimatingRef.current) return;
+              dispatch({ type: 'UNDO_LAST' });
+            }}
+          />
+        )}
       </View>
 
       {/* Action buttons */}
@@ -542,6 +571,12 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 3,
     borderRadius: 2,
+  },
+  undoSlot: {
+    height: TOAST.slotHeight,
+    paddingHorizontal: SPACING['2xl'],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cardArea: {
     flex: 1,

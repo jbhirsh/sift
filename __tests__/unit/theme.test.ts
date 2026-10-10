@@ -1,4 +1,4 @@
-import { SPACING, RADIUS, COLORS, SHADOWS, CONTENT_COLUMN } from '../../src/theme';
+import { SPACING, RADIUS, COLORS, SHADOWS, CONTENT_COLUMN, TOAST } from '../../src/theme';
 
 describe('SPACING', () => {
   it('has all expected keys', () => {
@@ -62,5 +62,11 @@ describe('SHADOWS', () => {
 describe('CONTENT_COLUMN (#149)', () => {
   test('full width on a phone, centered and capped on iPad', () => {
     expect(CONTENT_COLUMN).toEqual({ width: '100%', maxWidth: 560, alignSelf: 'center' });
+  });
+});
+
+describe('TOAST (#152)', () => {
+  test('the reserved slot is the pill plus a margin, from one height', () => {
+    expect(TOAST.slotHeight).toBe(TOAST.height + SPACING.base);
   });
 });

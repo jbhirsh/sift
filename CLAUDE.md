@@ -163,6 +163,12 @@ Makefile                Dev commands (test, lint, typecheck, check)
   leave them out; Setup's "Include songs I've already sifted" switch passes
   `skipFiltering` (for Start Sifting and a library Start Over) to bring them
   back. Skipped songs aren't recorded.
+- **Undo** (#152): the latest decision is held in `state.pending` (persisted
+  with the session) and reaches the music service only after a 5 s undo
+  window, on the next decision, or when the Sift screen goes away or the app
+  leaves the foreground (`hooks/usePendingDecision`). `UNDO_LAST` takes it
+  back while it's held. Nothing calls `removeTrack`/`keepTrack` for a
+  decision directly: send through `useSendPending`, which sends each once.
 - **Start at chorus** (Apple Music only): `ChorusFinder` picks each track's start
   from LRCLIB synced lyrics (the repeated block, `utils/chorus`), then from where
   ShazamKit places Apple's preview clip in the track (native `previewOffset`), then
