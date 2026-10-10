@@ -33,9 +33,9 @@ function textOf(node: HostNode | string): string {
 
 function isHidden(node: HostNode): boolean {
   const p = node.props;
-  return p.accessibilityElementsHidden === true
-    || p['aria-hidden'] === true
-    || p.importantForAccessibility === 'no-hide-descendants';
+  // importantForAccessibility is Android-only: it hides nothing from
+  // VoiceOver, so it doesn't count here.
+  return p.accessibilityElementsHidden === true || p['aria-hidden'] === true;
 }
 
 function nameOf(node: HostNode): string {

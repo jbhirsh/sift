@@ -149,12 +149,14 @@ export default function InteractiveCard({
                 <View style={styles.trackTextGroup}>
                   {/* Keep, Remove and Skip as VoiceOver actions on the song's
                       name (swipe up or down to pick one): the card's swipe
-                      isn't available to VoiceOver (#146). On the name, not
-                      the card: an accessible card would hide these texts
-                      from XCUITest, and Maestro finds them by id. */}
-                  <Text
-                    style={styles.trackName}
-                    numberOfLines={2}
+                      isn't available to VoiceOver (#146). On a View: iOS
+                      drops custom actions and hints set on a Text. Around
+                      the name only, not the card: an accessible card would
+                      hide the artist and album texts from XCUITest. This
+                      View reads as the name, so Maestro's id + text match
+                      still holds. */}
+                  <View
+                    accessible
                     testID="card-track-name"
                     accessibilityHint="Swipe up or down for Keep, Remove or Skip"
                     accessibilityActions={CARD_ACTIONS}
@@ -163,8 +165,10 @@ export default function InteractiveCard({
                       if (decision === 'keep' || decision === 'remove' || decision === 'skip') handleDecide(decision);
                     }}
                   >
-                    {track.name}
-                  </Text>
+                    <Text style={styles.trackName} numberOfLines={2}>
+                      {track.name}
+                    </Text>
+                  </View>
                   <Text
                     style={styles.artistName}
                     numberOfLines={1}
