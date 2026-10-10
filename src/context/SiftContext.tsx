@@ -574,7 +574,13 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
 
   return (
     <SiftContext.Provider value={value}>
-      <MusicProviderHost provider={state.provider} isPlaying={state.isPlaying} onPosition={onPlaybackPosition}>
+      {/* Polls only on the Sift screen: the last decision moves to Done
+          without clearing isPlaying, and the player there is gone. */}
+      <MusicProviderHost
+        provider={state.provider}
+        isPlaying={state.isPlaying && state.phase === 'sifting'}
+        onPosition={onPlaybackPosition}
+      >
         {children}
       </MusicProviderHost>
     </SiftContext.Provider>

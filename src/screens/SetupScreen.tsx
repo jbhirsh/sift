@@ -406,14 +406,16 @@ export default function SetupScreen() {
             Sift source
           </Text>
           <GlassCard intensity="thin" radius={RADIUS.sm}>
-            <View style={styles.segmentedControl} accessibilityRole="tablist">
+            <View style={styles.segmentedControl} accessibilityRole="tabbar">
               {SOURCE_TYPES.map((sourceType) => {
                 const isSelected = state.source.type === sourceType;
                 return (
                   <TouchableOpacity
                     key={sourceType}
                     testID={`source-${sourceType}`}
-                    accessibilityRole="tab"
+                    // A button with its selected state: iOS has no tab trait
+                    // for a segment, and the container is the tab bar.
+                    accessibilityRole="button"
                     accessibilityState={{ selected: isSelected }}
                     style={[
                       styles.segment,

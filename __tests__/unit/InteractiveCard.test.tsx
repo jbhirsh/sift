@@ -80,7 +80,7 @@ async function renderCard(track = mockTrack, onDecide = jest.fn(), playsKnown?: 
 describe('InteractiveCard', () => {
   test('renders track name', async () => {
     const { getByTestId } = await renderCard();
-    expect(getByTestId('card-track-name').props.children).toBe('Test Track');
+    expect(getByTestId('card-track-name')).toHaveTextContent('Test Track');
   });
 
   test('renders artist name', async () => {
@@ -157,7 +157,7 @@ describe('InteractiveCard', () => {
         />
       </ThemeProvider>
     );
-    expect(getByTestId('card-track-name').props.children).toBe('Test Track');
+    expect(getByTestId('card-track-name')).toHaveTextContent('Test Track');
   });
 });
 
