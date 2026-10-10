@@ -30,6 +30,14 @@ export const CONTENT_COLUMN = {
   alignSelf: 'center',
 } as const;
 
+// The Undo pill (#152). The Sift screen centres it on the action buttons'
+// label row, which it replaces while shown, so it needs no space of its own.
+export const UNDO_PILL = {
+  height: SPACING['2xl'] + SPACING.sm,
+  iconSize: 14,
+  fontSize: 14,
+} as const;
+
 // Corner radius scale
 export const RADIUS = {
   sm: 8,

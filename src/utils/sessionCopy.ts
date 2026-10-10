@@ -207,3 +207,8 @@ export function nothingRemovedNote(remaining: number, skipped: number): string {
 export function decisionAnnouncement(trackName: string, decision: Decision): string {
   return `${trackName} ${{ keep: 'kept', remove: 'removed', skip: 'skipped' }[decision]}.`;
 }
+
+/** The Undo pill's message (#152): what Undo would take back. */
+export function undoMessage(trackName: string, decision: Decision): string {
+  return `${{ keep: 'Kept', remove: 'Removed', skip: 'Skipped' }[decision]} ${trackName}`;
+}

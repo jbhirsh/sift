@@ -30,6 +30,9 @@ jest.mock('react-native-reanimated', () => ({
     const ratio = (val - inputRange[0]) / (inputRange[1] - inputRange[0]);
     return outputRange[0] + ratio * (outputRange[1] - outputRange[0]);
   },
+  // The Undo pill's fade (#152): layout animations are a no-op here.
+  FadeIn: { duration: () => undefined },
+  FadeOut: { duration: () => undefined },
   runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 

@@ -28,6 +28,7 @@ function makeState(overrides: Partial<SiftState> = {}): SiftState {
     skipFiltering: false,
     siftedPlaylistId: null,
     startAtChorus: false,
+    pending: null,
     ...overrides,
   };
 }
@@ -674,5 +675,65 @@ describe('siftReducer', () => {
       source: { type: 'playlist', playlist: playlistA },
     });
     expect(state.siftedPlaylistId).toBeNull();
+  });
+});
+
+describe('held-back decisions and Undo (#152)', () => {
+  const tracks = [trackA, trackB];
+
+  test('a decision is held back with its time', () => {
+    const next = siftReducer(makeState({ tracks }), { type: 'DECIDE', decision: 'remove', at: 42 });
+    expect(next.pending).toEqual({ trackId: trackA.id, decision: 'remove', at: 42 });
+  });
+
+  test('PENDING_SENT clears only the decision it names', () => {
+    const held = siftReducer(makeState({ tracks }), { type: 'DECIDE', decision: 'remove', at: 42 });
+    expect(siftReducer(held, { type: 'PENDING_SENT', trackId: trackA.id, at: 41 })).toBe(held);
+    expect(siftReducer(held, { type: 'PENDING_SENT', trackId: trackB.id, at: 42 })).toBe(held);
+    expect(siftReducer(held, { type: 'PENDING_SENT', trackId: trackA.id, at: 42 }).pending).toBeNull();
+  });
+
+  test.each(['keep', 'remove', 'skip'] as const)('UNDO_LAST takes back a %s and brings the card back', (decision) => {
+    const held = siftReducer(makeState({ tracks }), { type: 'DECIDE', decision, at: 1 });
+    const undone = siftReducer(held, { type: 'UNDO_LAST' });
+    expect(undone.cursor).toBe(0);
+    expect(undone.kept).toEqual([]);
+    expect(undone.removed).toEqual([]);
+    expect(undone.skipped).toEqual([]);
+    expect(undone.pending).toBeNull();
+  });
+
+  test('UNDO_LAST of the last card goes back to sifting', () => {
+    let state = siftReducer(makeState({ tracks }), { type: 'DECIDE', decision: 'keep', at: 1 });
+    state = siftReducer(state, { type: 'DECIDE', decision: 'remove', at: 2 });
+    expect(state.phase).toBe('done');
+    state = siftReducer(state, { type: 'UNDO_LAST' });
+    expect(state.phase).toBe('sifting');
+    expect(state.cursor).toBe(1);
+    expect(state.kept.map((t) => t.id)).toEqual([trackA.id]);
+  });
+
+  test('UNDO_LAST finds the song wherever it is now (a Restore moved it to kept)', () => {
+    let state = siftReducer(makeState({ tracks }), { type: 'DECIDE', decision: 'remove', at: 1 });
+    state = siftReducer(state, { type: 'RESTORE_TRACK', trackId: trackA.id });
+    state = siftReducer(state, { type: 'UNDO_LAST' });
+    expect(state.cursor).toBe(0);
+    expect(state.kept).toEqual([]);
+    expect(state.removed).toEqual([]);
+  });
+
+  test('nothing to undo once it was sent', () => {
+    let state = siftReducer(makeState({ tracks }), { type: 'DECIDE', decision: 'remove', at: 1 });
+    state = siftReducer(state, { type: 'PENDING_SENT', trackId: trackA.id, at: 1 });
+    expect(siftReducer(state, { type: 'UNDO_LAST' })).toBe(state);
+  });
+
+  test.each([
+    { type: 'LOAD_TRACKS' as const, tracks },
+    { type: 'START_FRESH' as const },
+    { type: 'RESET_TO_SETUP' as const },
+  ])('$type drops a held decision', (action) => {
+    const held = siftReducer(makeState({ tracks }), { type: 'DECIDE', decision: 'keep', at: 1 });
+    expect(siftReducer(held, action).pending).toBeNull();
   });
 });
