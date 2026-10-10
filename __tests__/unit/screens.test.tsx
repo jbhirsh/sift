@@ -1094,11 +1094,11 @@ describe('SetupScreen: songs sifted before (#143)', () => {
     await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({ 'apple-music:library': ['a', 'b', 'c'] }));
     const { getByTestId } = await renderWithProviders(<><SetupScreen /><SkipProbe /></>);
     await act(async () => {});
-    expect(getByTestId('reviewed-note').props.children).toBe('3 songs you kept in earlier sifts are left out.');
+    expect(getByTestId('reviewed-note').props.children).toBe('3 songs you’ve already kept are left out of new sifts.');
     await act(async () => {
       await fireEvent(getByTestId('include-sifted-switch'), 'valueChange', true);
     });
-    expect(getByTestId('reviewed-note').props.children).toBe('Songs you kept in earlier sifts are included.');
+    expect(getByTestId('reviewed-note').props.children).toBe('Songs you’ve already kept are included in new sifts.');
     await act(async () => {
       await fireEvent.press(getByTestId('setup-start-sifting'));
     });
@@ -1109,11 +1109,67 @@ describe('SetupScreen: songs sifted before (#143)', () => {
     await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({ 'apple-music:library': ['a'] }));
     const { getByTestId } = await renderWithProviders(<><SetupScreen /><SkipProbe /></>);
     await act(async () => {});
-    expect(getByTestId('reviewed-note').props.children).toBe('1 song you kept in an earlier sift is left out.');
+    expect(getByTestId('reviewed-note').props.children).toBe('1 song you’ve already kept is left out of new sifts.');
     await act(async () => {
       await fireEvent.press(getByTestId('setup-start-sifting'));
     });
     expect(getByTestId('probe-skip').props.children).toBe('loading:false');
+  });
+});
+
+describe('SetupScreen: Start Over and songs sifted before (#143)', () => {
+  const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+  afterEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  function BackedOut() {
+    const { dispatch, decide, state } = useSift();
+    // One-shot: decide's identity changes with state, and a re-run would
+    // undo the Start Over under test.
+    const ran = React.useRef(false);
+    React.useEffect(() => {
+      if (ran.current) return;
+      ran.current = true;
+      dispatch({ type: 'LOAD_TRACKS', tracks: [mockTrackA, mockTrackB, mockTrackC] });
+      decide('keep');
+      dispatch({ type: 'SET_PHASE', phase: 'setup' });
+    }, [dispatch, decide]);
+    return (
+      <>
+        <SetupScreen />
+        <Text testID="probe-skip">{`${state.phase}:${state.skipFiltering}`}</Text>
+      </>
+    );
+  }
+
+  test.each([
+    [false, 'loading:false'],
+    [true, 'loading:true'],
+  ])('a library Start Over follows the switch (on: %s)', async (on, expected) => {
+    jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
+      buttons?.find((b) => b.style === 'destructive')?.onPress?.();
+    });
+    const { InteractionManager } = require('react-native');
+    jest.spyOn(InteractionManager, 'runAfterInteractions').mockImplementation((cb: unknown) => {
+      (cb as () => void)();
+      return { then: () => undefined, done: () => undefined, cancel: () => undefined };
+    });
+    await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({ 'apple-music:library': ['x'] }));
+    const { getByTestId } = await renderWithProviders(<BackedOut />);
+    await act(async () => {});
+    // Shown beside the resume block too: it decides what Start Over loads.
+    if (on) {
+      await act(async () => {
+        await fireEvent(getByTestId('include-sifted-switch'), 'valueChange', true);
+      });
+    }
+    await act(async () => {
+      await fireEvent.press(getByTestId('setup-start-over'));
+    });
+    await act(async () => {});
+    expect(getByTestId('probe-skip').props.children).toBe(expected);
+    jest.restoreAllMocks();
   });
 });
 
@@ -1805,13 +1861,16 @@ describe('DoneScreen: Finish, Continue, Review skipped (#142)', () => {
   // Applies the given decisions once, then shows Done beside probes of the
   // phase and the track list, as the router would.
   function DoneAfter({ decisions }: { decisions: ('keep' | 'remove' | 'skip')[] }) {
-    const { decide, state } = useSift();
+    const { decide, dispatch, state } = useSift();
     const applied = React.useRef(false);
     React.useEffect(() => {
       if (applied.current) return;
       applied.current = true;
       decisions.forEach((d) => decide(d));
-    }, [decide, decisions]);
+      // As the Finish button would; a no-op once the last decision has
+      // already ended the sift.
+      dispatch({ type: 'FINISH' });
+    }, [decide, dispatch, decisions]);
     return (
       <>
         <Text testID="probe-phase">{state.phase}</Text>
@@ -1828,15 +1887,38 @@ describe('DoneScreen: Finish, Continue, Review skipped (#142)', () => {
     );
     await act(async () => {});
     expect(getByTestId('done-title').props.children).toBe('Finished for now.');
-    expect(getByTestId('done-subtitle').props.children).toBe('You reviewed 1 of 3 songs in your library. 2 not reviewed.');
+    expect(getByTestId('done-subtitle').props.children).toBe('You reviewed 1 of the 3 songs in this sift of your library. 2 not reviewed.');
     // Cards remain: Continue comes first, and Review skipped waits.
     expect(getByTestId('done-continue')).toBeTruthy();
     expect(queryByTestId('done-review-skipped')).toBeNull();
+    expect(getByTestId('probe-phase').props.children).toBe('done');
 
     await act(async () => {
       await fireEvent.press(getByTestId('done-continue'));
     });
     expect(getByTestId('probe-phase').props.children).toBe('sifting');
+  });
+
+  test('Continue sifting waits for a sifted-playlist save in flight', async () => {
+    function Saving() {
+      const { dispatch } = useSift();
+      React.useEffect(() => {
+        dispatch({ type: 'SET_CREATING_PLAYLIST', creating: true });
+      }, [dispatch]);
+      return null;
+    }
+    const { getByTestId } = await renderWithProviders(
+      <><DoneAfter decisions={['keep']} /><Saving /></>,
+      { initialTracks: tracks },
+    );
+    await act(async () => {});
+    expect(getByTestId('probe-phase').props.children).toBe('done');
+    await act(async () => {
+      await fireEvent.press(getByTestId('done-continue'));
+    });
+    // The resumed sift's keeps would race the save and could create a
+    // second "- Sifted" playlist.
+    expect(getByTestId('probe-phase').props.children).toBe('done');
   });
 
   test('a complete sift says so and offers no Continue', async () => {
@@ -1846,7 +1928,7 @@ describe('DoneScreen: Finish, Continue, Review skipped (#142)', () => {
     );
     await act(async () => {});
     expect(getByTestId('done-title').props.children).toBe('All done.');
-    expect(getByTestId('done-subtitle').props.children).toBe('Your library has been sifted.');
+    expect(getByTestId('done-subtitle').props.children).toBe('You reviewed every song in this sift of your library.');
     expect(queryByTestId('done-continue')).toBeNull();
   });
 

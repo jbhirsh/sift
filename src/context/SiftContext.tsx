@@ -202,6 +202,10 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         // still-buffered keeps from it are deliberately dropped with it.
         // Mid-sift cleanup must use REMOVE_PENDING_KEEPS instead.
         pendingKeeps: [],
+        // The last sift's save status: a stale error would also stop Done's
+        // fallback save for this sift's keeps (Review N skipped, #142).
+        removalPlaylistCreated: false,
+        removalPlaylistError: null,
         phase: 'sifting',
         loadProgress: 1,
         activeSource: state.source,

@@ -263,7 +263,11 @@ export default function SetupScreen() {
       }
       setSavedSession(null);
       setAlreadySifted(false);
-      startFresh(true);
+      // A playlist Start Over skips the sifted filter (its companion was
+      // just emptied). A library one keeps leaving out songs kept in
+      // earlier sifts unless the switch says otherwise (#143): dropping an
+      // unfinished sift shouldn't bring back thousands of reviewed songs.
+      startFresh(source.type === 'playlist' || includeSifted);
     } finally {
       setIsStartingOver(false);
     }
@@ -384,8 +388,8 @@ export default function SetupScreen() {
     && savedSession.source != null
     && sourceMatches(state.source, savedSession.source)
     && savedSession.cursor < savedSession.tracks.length;
-  // Only beside Start Sifting: it decides what a new library sift loads.
-  const showIncludeSifted = isLibrary && reviewedCount > 0 && !canResumeInMemory && !canResumeFromSaved;
+  // Decides what a new library sift loads, from Start Sifting or Start Over.
+  const showIncludeSifted = isLibrary && reviewedCount > 0;
 
   return (
     <View style={styles.container}>

@@ -386,8 +386,8 @@ export function useMusicProvider() {
           // Leave out songs kept in earlier library sifts (#143), so a big
           // library gets through over many sittings. By id, like the removal
           // filter above. Skipped songs were never recorded, so they come
-          // back. Setup's "Include songs I've already sifted" and Start Over
-          // pass skipFiltering to bring them all back.
+          // back. Setup's "Include songs I've already sifted" switch passes
+          // skipFiltering to bring them all back.
           const reviewedIds = await loadReviewedIds(ledgerKey(state.provider, source));
           const beforeReviewedFilter = tracks.length;
           tracks = tracks.filter((t) => !reviewedIds.has(t.id));

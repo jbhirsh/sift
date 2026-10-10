@@ -65,6 +65,13 @@ describe('discardConfirmation', () => {
     expect(message).toContain('3 kept songs never reached "Workout Mix - Sifted" and would be lost.');
   });
 
+  test('leaving Done after Finish says the rest of the sift goes too (#142)', () => {
+    const finished = discardConfirmation('apple-music', library, counts, 'done', { unfinished: true }).message;
+    expect(finished.endsWith('Starting over clears this summary and its Restore buttons. You won’t be able to resume it.')).toBe(true);
+    const complete = discardConfirmation('apple-music', library, counts, 'done').message;
+    expect(complete).not.toContain('resume');
+  });
+
   test('starting over a playlist says what it empties', () => {
     const copy = discardConfirmation('apple-music', playlist, counts, 'start-over');
     expect(copy.title).toBe('Start Over?');
@@ -151,14 +158,14 @@ describe('Done copy (#142)', () => {
   test('doneHeadline: a sift ended early says how far it got', () => {
     expect(doneHeadline(library, 37, 2655)).toEqual({
       title: 'Finished for now.',
-      subtitle: 'You reviewed 37 of 2,655 songs in your library. 2,618 not reviewed.',
+      subtitle: 'You reviewed 37 of the 2,655 songs in this sift of your library. 2,618 not reviewed.',
     });
     expect(doneHeadline(playlist, 1, 1).title).toBe('All done.');
   });
 
   test('doneHeadline: a complete sift names what was sifted', () => {
-    expect(doneHeadline(library, 10, 10).subtitle).toBe('Your library has been sifted.');
-    expect(doneHeadline(playlist, 10, 10).subtitle).toBe('"Workout Mix" has been sifted.');
+    expect(doneHeadline(library, 10, 10).subtitle).toBe('You reviewed every song in this sift of your library.');
+    expect(doneHeadline(playlist, 10, 10).subtitle).toBe('You reviewed every song in this sift of "Workout Mix".');
   });
 
   test('keptDestination: only a playlist sift copies keeps anywhere', () => {

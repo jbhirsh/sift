@@ -366,6 +366,9 @@ export default function DoneScreen() {
           title="Continue sifting"
           testID="done-continue"
           size="large"
+          // Not while a sifted-playlist save runs: the sift's fresh hook
+          // doesn't know the playlist yet and a keep would create another.
+          disabled={startOverBlocked}
           onPress={() => dispatch({ type: 'CONTINUE_SIFTING' })}
         />
       )}
@@ -454,7 +457,7 @@ export default function DoneScreen() {
               resetToSetup();
               return;
             }
-            const copy = discardConfirmation(state.provider, state.source, counts, 'done');
+            const copy = discardConfirmation(state.provider, state.source, counts, 'done', { unfinished: remaining > 0 });
             Alert.alert(copy.title, copy.message, [
               { text: 'Cancel', style: 'cancel' },
               { text: copy.confirm, style: 'destructive', onPress: () => resetToSetup() },

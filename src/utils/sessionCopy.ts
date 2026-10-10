@@ -68,14 +68,15 @@ function plural(n: number, one: string, many = `${one}s`): string {
  *   its "- Sifted" companion and removal history);
  * - new-sift: starting another sift, which replaces the only saved session
  *   (`alsoEmpties` names a playlist whose re-sift also clears its companion);
- * - done: leaving a finished sift's Done screen.
+ * - done: leaving a finished sift's Done screen (`unfinished`: it was ended
+ *   early with Finish, so cards remain).
  */
 export function discardConfirmation(
   provider: MusicProvider,
   source: SiftSource,
   counts: DecisionCounts,
   kind: 'start-over' | 'new-sift' | 'done',
-  { alsoEmpties }: { alsoEmpties?: string } = {},
+  { alsoEmpties, unfinished }: { alsoEmpties?: string; unfinished?: boolean } = {},
 ): { title: string; message: string; confirm: string } {
   const name = source.type === 'playlist' ? `"${source.playlist.name}"` : 'your library';
   const n = (x: number) => x.toLocaleString('en-US');
@@ -101,6 +102,8 @@ export function discardConfirmation(
     'new-sift': 'Starting a new sift replaces it, and you won\u2019t be able to resume it.',
     done: 'Starting over clears this summary and its Restore buttons.',
   }[kind]);
+  // Done after Finish (#142): cards remain, and they go too.
+  if (kind === 'done' && unfinished) lines.push('You won\u2019t be able to resume it.');
   return {
     title: kind === 'new-sift' ? 'Discard your current sift?' : 'Start Over?',
     message: lines.join(' '),
@@ -176,12 +179,14 @@ export function doneHeadline(source: SiftSource, reviewed: number, total: number
   if (reviewed < total) {
     return {
       title: 'Finished for now.',
-      subtitle: `You reviewed ${n(reviewed)} of ${plural(total, 'song')} in ${sourceName(source)}. ${n(total - reviewed)} not reviewed.`,
+      // "This sift", not the source: songs filtered out (#139, #143) or a
+      // Review N skipped pass make the sift smaller than the source.
+      subtitle: `You reviewed ${n(reviewed)} of the ${plural(total, 'song')} in this sift of ${sourceName(source)}. ${n(total - reviewed)} not reviewed.`,
     };
   }
   return {
     title: 'All done.',
-    subtitle: source.type === 'playlist' ? `"${source.playlist.name}" has been sifted.` : 'Your library has been sifted.',
+    subtitle: `You reviewed every song in this sift of ${sourceName(source)}.`,
   };
 }
 

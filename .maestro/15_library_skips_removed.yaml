@@ -87,7 +87,7 @@ name: "Library Sift Skips Removed Songs"
 - extendedWaitUntil:
     visible:
       id: "reviewed-note"
-      text: "Songs you kept in earlier sifts are included\\."
+      text: "Songs you’ve already kept are included in new sifts\\."
     timeout: 10000
 
 - tapOn: "Start Sifting"
