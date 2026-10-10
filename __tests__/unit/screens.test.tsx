@@ -72,6 +72,15 @@ import SettingsScreen from '../../src/screens/SettingsScreen';
 import PlaylistPicker from '../../src/components/PlaylistPicker';
 
 describe('SetupScreen', () => {
+  // Start Sifting and Start Over read the saved session from disk before
+  // they decide whether to ask (#137), so a test's queued loadSession results
+  // must not spill into the next test.
+  beforeEach(() => {
+    const { loadSession } = require('../../src/services/SessionStore');
+    (loadSession as jest.Mock).mockReset();
+    (loadSession as jest.Mock).mockResolvedValue(null);
+  });
+
   test('renders brand text', async () => {
     const { getByTestId } = await renderWithProviders(<SetupScreen />);
     expect(getByTestId('setup-brand').props.children).toBe('sift.');
@@ -211,6 +220,183 @@ describe('SetupScreen', () => {
     // Should not throw
   });
 
+  test('Start Sifting with no unfinished sift starts without asking', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    (clearSession as jest.Mock).mockClear();
+    const { getByText } = await renderWithProviders(<SetupScreen />);
+    await act(async () => {
+      await fireEvent.press(getByText('Start Sifting'));
+    });
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(clearSession).toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  test('Start Sifting on another source asks before discarding an unfinished sift (#137)', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    (clearSession as jest.Mock).mockClear();
+    const { loadSession } = require('../../src/services/SessionStore');
+    const session = {
+      tracks: [mockTrackA, mockTrackB, mockTrackC],
+      cursor: 2,
+      kept: [mockTrackA],
+      removed: [mockTrackB],
+      skipped: [],
+      sortOrder: 'least-played',
+      savedAt: '2026-04-10T00:00:00.000Z',
+      provider: 'apple-music',
+      source: { type: 'playlist', playlist: { id: 'p1', name: 'Mix', trackCount: 3 } },
+    };
+    // Once for the mount check, once when Start Sifting looks again.
+    (loadSession as jest.Mock).mockResolvedValueOnce(session).mockResolvedValueOnce(session);
+    const { getByTestId, getByText } = await renderWithProviders(<SetupScreen />);
+    await act(async () => {});
+    // Dismiss the resume prompt and pick a different source.
+    await act(async () => {
+      await fireEvent.press(getByTestId('resume-modal-cancel'));
+    });
+    await act(async () => {
+      await fireEvent.press(getByTestId('source-library'));
+    });
+    await act(async () => {
+      await fireEvent.press(getByText('Start Sifting'));
+    });
+
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Discard your current sift?',
+      expect.stringContaining('2 decisions so far (1 kept, 1 removed, 0 skipped) in your sift of "Mix"'),
+      expect.arrayContaining([
+        expect.objectContaining({ text: 'Cancel', style: 'cancel' }),
+        expect.objectContaining({ text: 'Discard', style: 'destructive' }),
+      ]),
+    );
+    // Nothing is thrown away until the user confirms.
+    expect(clearSession).not.toHaveBeenCalled();
+    const buttons = (alertSpy.mock.calls[0][2] ?? []) as { style?: string; onPress?: () => void }[];
+    await act(async () => {
+      buttons.find((b) => b.style === 'destructive')?.onPress?.();
+    });
+    expect(clearSession).toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  test('library Start Over in the resume prompt asks first when there are decisions (#137)', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    (clearSession as jest.Mock).mockClear();
+    const { loadSession } = require('../../src/services/SessionStore');
+    const session = {
+      tracks: [mockTrackA, mockTrackB, mockTrackC],
+      cursor: 1,
+      kept: [mockTrackA],
+      removed: [],
+      skipped: [],
+      sortOrder: 'least-played',
+      savedAt: '2026-04-10T00:00:00.000Z',
+      provider: 'apple-music',
+      source: { type: 'library' },
+    };
+    // Once for the mount check, once when Start Over reads what it would discard.
+    (loadSession as jest.Mock).mockResolvedValueOnce(session).mockResolvedValueOnce(session);
+    const { getByTestId } = await renderWithProviders(<SetupScreen />);
+    await act(async () => {});
+    await act(async () => {
+      await fireEvent.press(getByTestId('resume-modal-start-over'));
+    });
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Start Over?',
+      expect.stringContaining('1 decision so far'),
+      expect.arrayContaining([expect.objectContaining({ text: 'Discard and Start Over', style: 'destructive' })]),
+    );
+    expect(clearSession).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  test('Re-sift of a playlist asks before replacing an unfinished sift of another source (#137)', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    (clearSession as jest.Mock).mockClear();
+    (clearHistoryForSource as jest.Mock).mockClear();
+    const { loadSession } = require('../../src/services/SessionStore');
+    const librarySift = {
+      tracks: [mockTrackA, mockTrackB, mockTrackC],
+      cursor: 2,
+      kept: [mockTrackA],
+      removed: [mockTrackB],
+      skipped: [],
+      sortOrder: 'least-played',
+      savedAt: '2026-04-10T00:00:00.000Z',
+      provider: 'apple-music',
+      source: { type: 'library' },
+    };
+    (loadSession as jest.Mock).mockResolvedValueOnce(librarySift).mockResolvedValueOnce(librarySift);
+    mockProvider.loadPlaylists.mockResolvedValue([
+      { id: 'p1', name: 'My Playlist', trackCount: 8 },
+      { id: 's1', name: 'My Playlist - Sifted', trackCount: 8 },
+    ]);
+    const { getByTestId, getByText } = await renderWithProviders(<SetupScreen />);
+    await act(async () => {});
+    await act(async () => {
+      await fireEvent.press(getByTestId('resume-modal-cancel'));
+    });
+    await act(async () => {
+      await fireEvent.press(getByTestId('source-playlist'));
+    });
+    await act(async () => {
+      await fireEvent.press(getByTestId('playlist-row-p1'));
+    });
+    await act(async () => {
+      await fireEvent.press(getByText('Re-sift Playlist'));
+    });
+
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Discard your current sift?',
+      expect.stringContaining('2 decisions so far (1 kept, 1 removed, 0 skipped) in your sift of your library.'),
+      expect.anything(),
+    );
+    const message = alertSpy.mock.calls[0][1] as string;
+    expect(message).toContain('Songs you removed stay in "Sift \u2014 Removed".');
+    expect(message).toContain('It also empties "My Playlist - Sifted"');
+    expect(clearSession).not.toHaveBeenCalled();
+    expect(clearHistoryForSource).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  test('the discard copy speaks for the sift\'s own provider, not the one now selected (#137)', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const { loadSession } = require('../../src/services/SessionStore');
+    const appleSift = {
+      tracks: [mockTrackA, mockTrackB, mockTrackC],
+      cursor: 1,
+      kept: [],
+      removed: [mockTrackA],
+      skipped: [],
+      sortOrder: 'least-played',
+      savedAt: '2026-04-10T00:00:00.000Z',
+      provider: 'apple-music',
+      source: { type: 'library' },
+    };
+    (loadSession as jest.Mock).mockResolvedValueOnce(appleSift).mockResolvedValueOnce(appleSift);
+    const { getByTestId, getByText } = await renderWithProviders(<SetupScreen />);
+    await act(async () => {});
+    await act(async () => {
+      await fireEvent.press(getByTestId('resume-modal-cancel'));
+    });
+    await act(async () => {
+      await fireEvent.press(getByText('Spotify'));
+    });
+    await act(async () => {
+      await fireEvent.press(getByText('Start Sifting'));
+    });
+    expect(alertSpy.mock.calls[0][1]).toContain('Songs you removed stay in "Sift \u2014 Removed".');
+    alertSpy.mockRestore();
+  });
+
+  test('the Setup footnote says what Remove does for the chosen source (#141)', async () => {
+    const { getByTestId } = await renderWithProviders(<SetupScreen />);
+    expect(getByTestId('remove-explanation').props.children).toBe(
+      'Removed songs are collected in "Sift \u2014 Removed" for you to delete in Music.',
+    );
+  });
+
   test('shows inline Resume Sifting button when saved session matches current source', async () => {
     const { loadSession } = require('../../src/services/SessionStore');
     (loadSession as jest.Mock).mockResolvedValueOnce({
@@ -259,6 +445,42 @@ describe('SetupScreen', () => {
     // The repair signal survives the kill/relaunch: Done's fallback save can
     // still fire for the buffered keep.
     expect(getByTestId('probe-pending').props.children).toBe(1);
+  });
+
+  test.each([
+    // Saved before failed removals were recorded by id: derived from the
+    // names, so the chip and Done still count the failure.
+    ['a legacy session (names only)', {}, 'b'],
+    // Saved with ids: taken as saved, not re-derived from names.
+    ['a session with ids', { failedRemovalIds: ['c'] }, 'c'],
+  ])('Resume restores failed removal ids from %s', async (_label, extra, expected) => {
+    function FailedIdsProbe() {
+      const { state } = useSift();
+      return <Text testID="probe-failed-ids">{state.failedRemovalIds.join(',')}</Text>;
+    }
+    const removedB = { ...mockTrackB, id: 'b' };
+    const removedC = { ...mockTrackC, id: 'c' };
+    const { loadSession } = require('../../src/services/SessionStore');
+    (loadSession as jest.Mock).mockResolvedValueOnce({
+      tracks: [mockTrackA, removedB, removedC],
+      cursor: 2,
+      kept: [],
+      removed: [removedB, removedC],
+      skipped: [],
+      sortOrder: 'least-played',
+      savedAt: '2026-04-10T00:00:00.000Z',
+      provider: 'apple-music',
+      source: { type: 'library' },
+      removalErrors: [mockTrackB.name],
+      ...extra,
+    });
+
+    const { getByTestId } = await renderWithProviders(<><SetupScreen /><FailedIdsProbe /></>);
+    await act(async () => {});
+    await act(async () => {
+      await fireEvent.press(getByTestId('resume-modal-resume'));
+    });
+    expect(getByTestId('probe-failed-ids').props.children).toBe(expected);
   });
 
   test('Resume restores the persisted siftedPlaylistId', async () => {
@@ -838,13 +1060,40 @@ describe('DoneScreen', () => {
     // Should not throw
   });
 
-  test('Start Over on a library source does not ask for confirmation', async () => {
+  test('Start Over on a library source with no decisions does not ask for confirmation', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const { getByText } = await renderWithProviders(<DoneScreen />, { initialTracks: tracks });
     await act(async () => {
       await fireEvent.press(getByText('Start Over'));
     });
     expect(alertSpy).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  test('Start Over on a library source with decisions asks first (#137)', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const DecidedOnce = () => {
+      const { decide, state } = useSift();
+      const decided = React.useRef(false);
+      React.useEffect(() => {
+        if (decided.current) return;
+        decided.current = true;
+        decide('keep');
+      }, [decide]);
+      return state.kept.length > 0 ? <DoneScreen /> : null;
+    };
+    const { getByText } = await renderWithProviders(<DecidedOnce />, { initialTracks: tracks });
+    await act(async () => {
+      await fireEvent.press(getByText('Start Over'));
+    });
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Start Over?',
+      expect.stringContaining('You made 1 decision (1 kept, 0 removed, 0 skipped) in your sift of your library.'),
+      expect.arrayContaining([
+        expect.objectContaining({ text: 'Cancel', style: 'cancel' }),
+        expect.objectContaining({ text: 'Discard and Start Over', style: 'destructive' }),
+      ]),
+    );
     alertSpy.mockRestore();
   });
 
@@ -1359,7 +1608,7 @@ describe('DoneScreen', () => {
       const { decide, dispatch, state } = useSift();
       React.useEffect(() => {
         decide('remove');
-        dispatch({ type: 'ADD_REMOVAL_ERROR', error: mockTrackA.name });
+        dispatch({ type: 'ADD_REMOVAL_ERROR', error: mockTrackA.name, failedRemovalId: mockTrackA.id });
       }, [decide, dispatch]);
       if (state.removed.length === 0) return null;
       return <DoneScreen />;
@@ -1372,9 +1621,12 @@ describe('DoneScreen', () => {
     // The warning block names the track whose removal failed…
     expect(getByTestId('removal-errors')).toBeTruthy();
     expect(getByTestId('removal-error-0').props.children).toBe(mockTrackA.name);
-    // …and the blanket "have been removed" claim is qualified.
+    // …and the blanket "have been removed" claim gives way to real counts
+    // (#141): this one removal failed, so none were moved.
     expect(queryByText('These tracks have been moved to "Sift — Removed" in Music.')).toBeNull();
-    expect(getByText(/but some could not be/)).toBeTruthy();
+    // The effect above re-fires: three tracks get removed and the error for
+    // Track A is recorded more than once. Only Track A's removal failed.
+    expect(getByText('2 of 3 have been moved to "Sift — Removed" in Music; 1 could not be.')).toBeTruthy();
   });
 
   test('a keep buffered during the fallback save re-fires the save for it', async () => {

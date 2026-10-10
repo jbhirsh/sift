@@ -1,6 +1,11 @@
 import * as Sentry from '@sentry/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { loadPreferences, savePreferences } from '../../src/services/PreferencesStore';
+import {
+  loadPreferences,
+  loadSeenRemoveNote,
+  markRemoveNoteSeen,
+  savePreferences,
+} from '../../src/services/PreferencesStore';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(),
@@ -59,5 +64,32 @@ describe('PreferencesStore', () => {
     mockSetItem.mockRejectedValue(new Error('disk full'));
     await expect(savePreferences({ startAtChorus: true })).resolves.toBeUndefined();
     expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'preferences-save' } });
+  });
+});
+
+describe('first-remove note flag', () => {
+  it('is unseen until marked, under its own key', async () => {
+    mockGetItem.mockResolvedValue(null);
+    await expect(loadSeenRemoveNote()).resolves.toBe(false);
+    expect(mockGetItem).toHaveBeenCalledWith('sift_seen_remove_note');
+
+    mockSetItem.mockResolvedValue(undefined);
+    await markRemoveNoteSeen();
+    expect(mockSetItem).toHaveBeenCalledWith('sift_seen_remove_note', '1');
+
+    mockGetItem.mockResolvedValue('1');
+    await expect(loadSeenRemoveNote()).resolves.toBe(true);
+  });
+
+  it('a failed read counts as seen, so the note never nags', async () => {
+    mockGetItem.mockRejectedValue(new Error('disk'));
+    await expect(loadSeenRemoveNote()).resolves.toBe(true);
+    expect(Sentry.captureException).toHaveBeenCalled();
+  });
+
+  it('a failed write is reported, not thrown', async () => {
+    mockSetItem.mockRejectedValue(new Error('disk'));
+    await expect(markRemoveNoteSeen()).resolves.toBeUndefined();
+    expect(Sentry.captureException).toHaveBeenCalled();
   });
 });

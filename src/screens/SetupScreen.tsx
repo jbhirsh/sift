@@ -8,6 +8,7 @@ import {
   ActionSheetIOS,
   Alert,
   InteractionManager,
+  ScrollView,
 } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { useSift } from '../context/SiftContext';
@@ -17,6 +18,8 @@ import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
 import PlaylistPicker from '../components/PlaylistPicker';
 import ResumeSessionModal from '../components/ResumeSessionModal';
+import { Button } from '../components/Button';
+import { decisionCounts, discardConfirmation, legacyFailedRemovalIds, removeExplanation } from '../utils/sessionCopy';
 import { loadSession } from '../services/SessionStore';
 import { clearArtworkCache } from '../hooks/useResolvedArtwork';
 import { clearHistoryForSource } from '../services/RemovalHistoryStore';
@@ -53,7 +56,7 @@ const SOURCE_DISPLAY: Record<typeof SOURCE_TYPES[number], string> = {
 };
 
 export default function SetupScreen() {
-  const { state, dispatch, startFresh } = useSift();
+  const { state, dispatch, startFresh, flushPendingSave } = useSift();
   const { colors, glass } = useTheme();
   const { loadPlaylists, clearSiftedPlaylist, warmCache } = useMusicProvider();
   const openSortPicker = () => {
@@ -202,6 +205,9 @@ export default function SetupScreen() {
         // Legacy sessions predate these fields — default to empty rather
         // than dropping the persisted repair signal on the floor.
         removalErrors: savedSession.removalErrors ?? [],
+        failedRemovalIds:
+          savedSession.failedRemovalIds ??
+          legacyFailedRemovalIds(savedSession.removed, savedSession.removalErrors ?? []),
         connectionStatus: state.connectionStatus,
         pendingKeeps: savedSession.pendingKeeps ?? [],
         skipFiltering: false,
@@ -246,7 +252,54 @@ export default function SetupScreen() {
     }
   };
 
-  const handleStartOver = () => {
+  // The unfinished sift a discard here would throw away, read from disk after
+  // flushing any debounced save, so its provider and source are its own, not
+  // whatever the pickers show now. Sift keeps one saved session for all
+  // sources, so starting anything new replaces it.
+  const sessionAtRisk = async () => {
+    flushPendingSave();
+    const saved = await loadSession();
+    if (!saved) return null;
+    const counts = decisionCounts(saved);
+    const unfinished = saved.cursor < saved.tracks.length || counts.pendingKeeps > 0;
+    if (!unfinished || counts.total === 0) return null;
+    return {
+      provider: saved.provider ?? state.provider,
+      source: saved.source ?? { type: 'library' as const },
+      counts,
+    };
+  };
+
+  // Guards the async look-up behind Start Sifting and Start Over, so a double
+  // tap can't raise two prompts or start twice.
+  const discardCheckRef = useRef(false);
+  const withDiscardCheck = async (run: () => Promise<void>) => {
+    if (discardCheckRef.current) return;
+    discardCheckRef.current = true;
+    try {
+      await run();
+    } finally {
+      discardCheckRef.current = false;
+    }
+  };
+
+  const confirmDiscard = (
+    copy: { title: string; message: string; confirm: string },
+    onConfirm: () => void,
+  ) => {
+    // Present it only after the resume modal's dismiss transition has
+    // actually finished: setShowResumeModal(false) merely schedules the
+    // dismissal, and presenting a UIAlertController while the sheet is still
+    // animating out can land the alert behind it or drop it entirely.
+    InteractionManager.runAfterInteractions(() => {
+      Alert.alert(copy.title, copy.message, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: copy.confirm, style: 'destructive', onPress: onConfirm },
+      ]);
+    });
+  };
+
+  const handleStartOver = () => withDiscardCheck(async () => {
     // Never start a clear while a sifted-playlist save is in flight (or a
     // previous clear is still running): the two would race each other on
     // the same remote playlist and could interleave adds after the clear.
@@ -255,30 +308,41 @@ export default function SetupScreen() {
     // before the confirmation so the two prompts never stack.
     setShowResumeModal(false);
     const source = state.source;
-    if (source.type !== 'playlist') {
-      // Library start-over destroys nothing remote — same as DoneScreen,
-      // it proceeds without a confirmation.
-      performStartOver();
+    const risk = await sessionAtRisk();
+    const start = () => { performStartOver(); };
+    // One tap must never silently erase decisions (#137), whichever source
+    // they belong to: Re-sift of one playlist replaces a library sift too.
+    if (risk && sourceMatches(source, risk.source)) {
+      confirmDiscard(discardConfirmation(risk.provider, source, risk.counts, 'start-over'), start);
+    } else if (risk) {
+      confirmDiscard(discardConfirmation(risk.provider, risk.source, risk.counts, 'new-sift', {
+        alsoEmpties: source.type === 'playlist' ? source.playlist.name : undefined,
+      }), start);
+    } else if (source.type === 'playlist') {
+      // No decisions to lose, but this empties "<name> - Sifted" and wipes
+      // the removal history, exactly like DoneScreen's Start Over.
+      confirmDiscard({
+        title: 'Start Over?',
+        message: `This will empty "${source.playlist.name} - Sifted" and clear the removal history for this playlist. This cannot be undone.`,
+        confirm: 'Start Over',
+      }, start);
+    } else {
+      // Nothing to lose: no decisions, and a library start-over clears
+      // nothing remote.
+      start();
+    }
+  });
+
+  // Starting a sift replaces the one saved session, whatever its source
+  // (#137). If that would throw away an unfinished sift's decisions, ask.
+  const handleStartSifting = () => withDiscardCheck(async () => {
+    const risk = await sessionAtRisk();
+    if (!risk) {
+      startFresh();
       return;
     }
-    // Destructive for playlists: this empties "<name> - Sifted" and wipes
-    // the removal history, exactly like DoneScreen's Start Over — use the
-    // same explicit confirmation. Present it only after the resume modal's
-    // dismiss transition has actually finished: setShowResumeModal(false)
-    // merely schedules the dismissal, and presenting a UIAlertController
-    // while the sheet is still animating out can land the alert behind it
-    // or drop it entirely.
-    InteractionManager.runAfterInteractions(() => {
-      Alert.alert(
-        'Start Over?',
-        `This will empty "${source.playlist.name} - Sifted" and clear the removal history for this playlist. This cannot be undone.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Start Over', style: 'destructive', onPress: () => { performStartOver(); } },
-        ],
-      );
-    });
-  };
+    confirmDiscard(discardConfirmation(risk.provider, risk.source, risk.counts, 'new-sift'), () => startFresh());
+  });
 
   const openPlaylistPicker = () => {
     // Opening the picker is an explicit source interaction too (reachable
@@ -296,7 +360,14 @@ export default function SetupScreen() {
     <View style={styles.container}>
       <GlassBackground phase="setup" />
 
-      <View style={styles.content}>
+      {/* Scrolls only when it must: on a small phone with an error, a
+          playlist and the resume buttons showing, the content can outgrow
+          the screen. flexGrow keeps it vertically centered otherwise. */}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={{ flex: 1 }} />
 
         {/* Brand */}
@@ -424,6 +495,10 @@ export default function SetupScreen() {
               </TouchableOpacity>
             </View>
           )}
+          {/* What Remove will do, before the first irreversible swipe (#141). */}
+          <Text testID="remove-explanation" style={[styles.footnote, { color: colors.textSecondary }]}>
+            {removeExplanation(state.provider, state.source)}
+          </Text>
         </View>
 
         {showPlaylistPicker && (
@@ -491,62 +566,51 @@ export default function SetupScreen() {
             if (canResumeInMemory || canResumeFromSaved) {
               return (
                 <>
-                  <TouchableOpacity
-                    style={[styles.primaryButton, { backgroundColor: colors.accentFill }]}
+                  <Button
+                    title="Resume Sifting"
+                    size="large"
                     onPress={canResumeInMemory
                       ? () => dispatch({ type: 'SET_PHASE', phase: 'sifting' })
                       : handleResume}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.primaryButtonText}>
-                      Resume Sifting
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
+                  />
+                  {/* Destructive: kept clear of Resume Sifting (#137). */}
+                  <View style={styles.startOverGap} />
+                  <Button
+                    title="Start Over"
                     testID="setup-start-over"
-                    style={[styles.secondaryButton, startOverBlocked && { opacity: 0.4 }]}
+                    size="large"
+                    variant="secondary"
+                    color={colors.removeText}
                     onPress={handleStartOver}
                     disabled={startOverBlocked}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.secondaryButtonText, { color: colors.textSecondary }]}>
-                      Start Over
-                    </Text>
-                  </TouchableOpacity>
+                  />
                 </>
               );
             }
             if (alreadySifted && state.source.type === 'playlist') {
               return (
-                <TouchableOpacity
+                <Button
+                  title="Re-sift Playlist"
                   testID="setup-resift"
-                  style={[styles.primaryButton, { backgroundColor: colors.accentFill }, startOverBlocked && { opacity: 0.4 }]}
+                  size="large"
                   onPress={handleStartOver}
                   disabled={startOverBlocked}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.primaryButtonText}>
-                    Re-sift Playlist
-                  </Text>
-                </TouchableOpacity>
+                />
               );
             }
             return (
-              <TouchableOpacity
-                style={[styles.primaryButton, { backgroundColor: colors.accentFill }]}
-                onPress={() => startFresh()}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.primaryButtonText}>
-                  Start Sifting
-                </Text>
-              </TouchableOpacity>
+              <Button
+                title="Start Sifting"
+                testID="setup-start-sifting"
+                size="large"
+                onPress={() => { handleStartSifting(); }}
+              />
             );
           })()}
         </View>
 
         <View style={{ flex: 1 }} />
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -555,8 +619,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
+  scroll: {
     flex: 1,
+  },
+  content: {
+    flexGrow: 1,
     paddingHorizontal: 40,
   },
   brandSection: {
@@ -626,27 +693,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: SPACING['2xl'],
   },
-  primaryButton: {
-    borderRadius: RADIUS.md,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    width: '100%',
-    alignItems: 'center',
+  startOverGap: {
+    height: SPACING.base,
   },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    width: '100%',
-    alignItems: 'center',
-  },
-  secondaryButtonText: {
-    fontSize: 15,
-    fontWeight: '500',
+  footnote: {
+    fontSize: 13,
+    marginTop: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
   },
   selectedPlaylist: {
     flexDirection: 'row',

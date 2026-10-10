@@ -157,6 +157,7 @@ describe('isSiftSession', () => {
       source: playlistSource,
       pendingKeeps: [track],
       removalErrors: ['failed'],
+      failedRemovalIds: ['t1'],
       siftedPlaylistId: 'sifted-1',
     };
     expect(isSiftSession(stored(full))).toBe(true);
@@ -183,6 +184,7 @@ describe('isSiftSession', () => {
     ['pendingKeeps not an array', { ...session, pendingKeeps: 'x' }],
     ['a malformed pending keep', { ...session, pendingKeeps: [{}] }],
     ['a non-string removal error', { ...session, removalErrors: [1] }],
+    ['a non-string failed removal id', { ...session, failedRemovalIds: [1] }],
     ['a numeric siftedPlaylistId', { ...session, siftedPlaylistId: 7 }],
   ])('rejects a session with %s', (_label, value) => {
     expect(isSiftSession(value)).toBe(false);

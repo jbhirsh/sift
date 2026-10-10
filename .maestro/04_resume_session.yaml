@@ -118,11 +118,22 @@ name: "Resume Session Modal"
 - assertNotVisible:
     id: "resume-session-modal"
 
-# Cancel discarded the saved session — a fresh sift is offered
+# Cancel dismissed the prompt — a fresh sift is offered
 - assertVisible: "Start Sifting"
 
 # ── Start Over from the modal wipes progress ──
 - tapOn: "Start Sifting"
+
+# The saved sift still has a decision on disk, so starting a new one asks
+# before discarding it (#137). Wait for the button, not just the title: an
+# alert's buttons can enter the accessibility tree a beat later.
+- extendedWaitUntil:
+    visible: "Discard your current sift?"
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "Discard"
+    timeout: 30000
+- tapOn: "Discard"
 
 - extendedWaitUntil:
     visible:
@@ -148,6 +159,17 @@ name: "Resume Session Modal"
 
 - tapOn:
     id: "resume-modal-start-over"
+
+# One kept song is a decision, so Start Over asks first (#137). Wait for the
+# button, not just the title: an alert's buttons can enter the accessibility
+# tree a beat later.
+- extendedWaitUntil:
+    visible: "Start Over?"
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "Discard and Start Over"
+    timeout: 30000
+- tapOn: "Discard and Start Over"
 
 # Start over reloads the source from scratch — no kept progress remains
 - extendedWaitUntil:

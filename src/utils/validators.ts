@@ -152,6 +152,7 @@ export function isSiftSession(value: unknown): value is SiftSession {
     (value.source === undefined || isSiftSource(value.source)) &&
     (value.pendingKeeps === undefined || isArrayOf(value.pendingKeeps, isTrack)) &&
     (value.removalErrors === undefined || isArrayOf(value.removalErrors, isString)) &&
+    (value.failedRemovalIds === undefined || isArrayOf(value.failedRemovalIds, isString)) &&
     (value.siftedPlaylistId === undefined ||
       value.siftedPlaylistId === null ||
       typeof value.siftedPlaylistId === 'string')

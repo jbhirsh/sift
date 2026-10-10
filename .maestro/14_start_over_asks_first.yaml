@@ -1,0 +1,68 @@
+appId: com.jessicahirsh.sift
+name: "Start Over Asks First"
+---
+
+# A library Start Over with decisions asks before discarding them, and
+# Cancel leaves the sift intact (#137).
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
+
+# The footnote says what Remove will do before the first swipe (#141).
+- assertVisible:
+    id: "remove-explanation"
+
+- tapOn: "Start Sifting"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000
+
+- tapOn: "Keep"
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "back-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "setup-start-over"
+    timeout: 30000
+
+- tapOn:
+    id: "setup-start-over"
+
+# Maestro matches text as a regex: an unescaped "?" would also match Setup's
+# own "Start Over" button, so the notVisible wait below could never pass.
+- extendedWaitUntil:
+    visible: "Start Over\\?"
+    timeout: 30000
+# Wait for the button, not just the title: an alert's buttons can enter the
+# accessibility tree a beat later.
+- extendedWaitUntil:
+    visible: "Cancel"
+    timeout: 30000
+- tapOn: "Cancel"
+
+# Let the alert close before touching what was behind it.
+- extendedWaitUntil:
+    notVisible: "Start Over\\?"
+    timeout: 30000
+
+# The sift is still there to resume, with its decision.
+- extendedWaitUntil:
+    visible: "Resume Sifting"
+    timeout: 30000
+- tapOn: "Resume Sifting"
+- extendedWaitUntil:
+    visible:
+      id: "stat-kept"
+      text: "1 kept"
+    timeout: 30000

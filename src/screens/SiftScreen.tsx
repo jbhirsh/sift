@@ -22,7 +22,9 @@ import GlassCard from '../components/GlassCard';
 import InteractiveCard from '../components/InteractiveCard';
 import PlayerControls from '../components/PlayerControls';
 import { COLORS, RADIUS, SHADOWS, SPACING } from '../theme';
-import { Decision } from '../types';
+import { Decision, PROVIDER_DISPLAY } from '../types';
+import { loadSeenRemoveNote, markRemoveNoteSeen } from '../services/PreferencesStore';
+import { FIRST_REMOVE_NOTE, unsyncedCount } from '../utils/sessionCopy';
 
 const SEGMENT_COUNT = 10;
 
@@ -67,6 +69,36 @@ export default function SiftScreen() {
     };
   }, []);
 
+  // One-time note on the first Apple Music library remove (#141): Apple
+  // doesn't let apps delete library songs, so say where they went. Inline
+  // under the stats, gone with the next decision. The ref starts as "seen"
+  // so nothing shows before the stored flag has loaded.
+  const removeNoteEligible = state.provider === 'apple-music' && state.source.type === 'library';
+  const seenRemoveNoteRef = useRef(true);
+  const [showRemoveNote, setShowRemoveNote] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    loadSeenRemoveNote().then((seen) => {
+      if (!cancelled) seenRemoveNoteRef.current = seen;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const afterDecision = useCallback((decision: Decision) => {
+    setShowRemoveNote(false);
+    if (decision === 'remove' && removeNoteEligible && !seenRemoveNoteRef.current) {
+      seenRemoveNoteRef.current = true;
+      setShowRemoveNote(true);
+      markRemoveNoteSeen();
+    }
+  }, [removeNoteEligible]);
+
+  // Failed removals and keeps parked after a failed add: changes that didn't
+  // reach the provider, shown during the sift rather than only on Done.
+  // Failed removals are counted the same way Done counts them.
+  const unsynced = unsyncedCount(state.removed, state.failedRemovalIds, state.pendingKeeps);
+
   const progress = state.tracks.length > 0
     ? state.cursor / state.tracks.length
     : 0;
@@ -82,6 +114,7 @@ export default function SiftScreen() {
 
     const onComplete = () => {
       decide(decision);
+      afterDecision(decision);
       if (track) {
         if (decision === 'remove') removeTrack(track);
         if (decision === 'keep') keepTrack(track);
@@ -107,14 +140,16 @@ export default function SiftScreen() {
     // could double-decide the still-current track.
     if (!beginDecision()) return;
     decide('skip');
+    afterDecision('skip');
     settleTimeoutRef.current = setTimeout(endDecision, 300);
-  }, [beginDecision, endDecision, decide]);
+  }, [beginDecision, endDecision, decide, afterDecision]);
 
   const handleCardDecide = useCallback(
     (decision: Decision) => {
       if (!beginDecision()) return;
       const track = currentTrack;
       decide(decision);
+      afterDecision(decision);
       if (track) {
         if (decision === 'remove') removeTrack(track);
         if (decision === 'keep') keepTrack(track);
@@ -123,7 +158,7 @@ export default function SiftScreen() {
       // press right after a swipe cannot decide the next card too.
       settleTimeoutRef.current = setTimeout(endDecision, 300);
     },
-    [beginDecision, endDecision, decide, currentTrack, removeTrack, keepTrack],
+    [beginDecision, endDecision, decide, afterDecision, currentTrack, removeTrack, keepTrack],
   );
 
   return (
@@ -211,6 +246,30 @@ export default function SiftScreen() {
             playsKnown={state.provider !== 'spotify'}
           />
         )}
+        {/* Over the top of the card, not in the layout: appearing mid-sift
+            must not shrink the card under the user's thumb. Touches pass
+            through to the card. */}
+        <View style={styles.cardOverlay} pointerEvents="none">
+          {unsynced > 0 && (
+            <Text
+              testID="unsynced-chip"
+              accessibilityLabel={`${unsynced} ${unsynced === 1 ? 'change' : 'changes'} didn't reach ${PROVIDER_DISPLAY[state.provider]}`}
+              // Opaque surface behind it: it sits over artwork of any color.
+              style={[styles.unsyncedChip, { color: colors.skipText, backgroundColor: colors.surface }]}
+            >
+              {`${unsynced} didn\u2019t sync`}
+            </Text>
+          )}
+          {showRemoveNote && (
+            <View style={styles.removeNote}>
+              <GlassCard intensity="thin" radius={RADIUS.md}>
+                <Text testID="first-remove-note" style={[styles.removeNoteText, { color: colors.textSecondary }]}>
+                  {FIRST_REMOVE_NOTE}
+                </Text>
+              </GlassCard>
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Player controls */}
@@ -369,6 +428,29 @@ const styles = StyleSheet.create({
   statsRowContainer: {
     paddingHorizontal: SPACING['2xl'],
     paddingBottom: SPACING.base,
+  },
+  cardOverlay: {
+    position: 'absolute',
+    top: SPACING.base,
+    left: SPACING['2xl'],
+    right: SPACING['2xl'],
+    alignItems: 'center',
+    gap: SPACING.base,
+  },
+  unsyncedChip: {
+    fontSize: 12,
+    fontWeight: '600',
+    paddingHorizontal: SPACING.base,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.sm,
+    overflow: 'hidden',
+  },
+  removeNote: {
+    alignSelf: 'stretch',
+  },
+  removeNoteText: {
+    fontSize: 13,
+    padding: SPACING.lg,
   },
   statsRow: {
     flexDirection: 'row',

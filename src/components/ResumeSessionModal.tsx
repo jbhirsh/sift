@@ -11,6 +11,7 @@ import type { SFSymbol } from 'sf-symbols-typescript';
 import { useTheme } from '../theme/ThemeContext';
 import { SPACING, RADIUS, COLORS } from '../theme';
 import GlassCard from './GlassCard';
+import { Button } from './Button';
 import type { SiftSession } from '../types';
 
 interface ResumeSessionModalProps {
@@ -111,25 +112,24 @@ export default function ResumeSessionModal({
             </View>
 
             <View style={styles.buttonSection}>
-              <TouchableOpacity
-                style={[styles.resumeButton, { backgroundColor: colors.accentFill }]}
+              <Button
+                title="Resume"
+                size="large"
                 onPress={onResume}
-                activeOpacity={0.8}
                 testID="resume-modal-resume"
-              >
-                <Text style={styles.resumeButtonText}>Resume</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.startOverButton, { borderColor: colors.accent }]}
+              />
+              {/* Destructive, and kept well clear of Resume: a thumb aimed at
+                  Resume must not land here (#137). It asks before
+                  discarding anything. */}
+              <View style={styles.startOverGap} />
+              <Button
+                title="Start Over"
+                size="large"
+                variant="secondary"
+                color={colors.removeText}
                 onPress={onStartOver}
-                activeOpacity={0.8}
                 testID="resume-modal-start-over"
-              >
-                <Text style={[styles.startOverButtonText, { color: colors.accent }]}>
-                  Start Over
-                </Text>
-              </TouchableOpacity>
+              />
             </View>
           </GlassCard>
         </View>
@@ -211,29 +211,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   buttonSection: {
-    gap: SPACING.lg,
     paddingHorizontal: SPACING['2xl'],
     paddingTop: SPACING.xl,
   },
-  resumeButton: {
-    // backgroundColor is theme-dependent (colors.accentFill) and applied inline.
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.xl,
-    alignItems: 'center',
-  },
-  resumeButtonText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  startOverButton: {
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.xl,
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  startOverButtonText: {
-    fontSize: 17,
-    fontWeight: '600',
+  startOverGap: {
+    height: SPACING['3xl'],
   },
 });
