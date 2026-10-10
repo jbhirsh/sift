@@ -16,7 +16,7 @@ const track = (i: number): Track => ({
 const trackList = fc.uniqueArray(fc.integer({ min: 0, max: 40 }), { minLength: 1, maxLength: 12 }).map((ids) => ids.map(track));
 
 const action = fc.oneof(
-  fc.constantFrom('keep', 'remove', 'skip').map((decision) => ({ type: 'DECIDE' as const, decision })),
+  fc.tuple(fc.constantFrom('keep', 'remove', 'skip'), fc.nat()).map(([decision, at]) => ({ type: 'DECIDE' as const, decision, at })),
   fc.constant({ type: 'FINISH' as const }),
   fc.constant({ type: 'CONTINUE_SIFTING' as const }),
   fc.constantFrom('least-played', 'most-played', 'oldest', 'newest').map((sortOrder) => ({ type: 'SET_SORT_ORDER' as const, sortOrder })),
@@ -25,6 +25,8 @@ const action = fc.oneof(
   fc.integer({ min: 0, max: 40 }).map((i) => ({ type: 'ADD_PENDING_KEEP' as const, track: track(i) })),
   fc.array(fc.integer({ min: 0, max: 40 })).map((ids) => ({ type: 'REMOVE_PENDING_KEEPS' as const, trackIds: ids.map((i) => `t${i}`) })),
   fc.integer({ min: 0, max: 40 }).map((i) => ({ type: 'ADD_REMOVAL_ERROR' as const, error: `Track ${i}`, failedRemovalId: `t${i}` })),
+  fc.constant({ type: 'UNDO_LAST' as const }),
+  fc.tuple(fc.integer({ min: 0, max: 40 }), fc.nat()).map(([i, at]) => ({ type: 'PENDING_SENT' as const, trackId: `t${i}`, at })),
   fc.constant({ type: 'START_FRESH' as const }),
   fc.constant({ type: 'RESET_TO_SETUP' as const }),
 );
@@ -35,7 +37,7 @@ const start = (tracks: Track[]): SiftState => ({
   loadProgress: 1, loadMessage: '', loadError: null, playbackPosition: 0, isPlaying: false,
   removalPlaylistCreated: false, removalPlaylistError: null, isCreatingPlaylist: false,
   removalErrors: [], failedRemovalIds: [], connectionStatus: 'connected', pendingKeeps: [],
-  skipFiltering: false, siftedPlaylistId: null, startAtChorus: false,
+  skipFiltering: false, siftedPlaylistId: null, startAtChorus: false, pending: null,
 });
 
 const ids = (list: readonly Track[]) => list.map((t) => t.id);
@@ -52,6 +54,11 @@ function checkInvariants(state: SiftState) {
   expect(new Set(decided)).toEqual(new Set(ids(state.tracks.slice(0, state.cursor))));
   // A buffered keep is listed once.
   expect(new Set(ids(state.pendingKeeps)).size).toBe(state.pendingKeeps.length);
+  // A held decision is the latest decided card's (#152).
+  if (state.pending) {
+    expect(state.cursor).toBeGreaterThan(0);
+    expect(state.tracks[state.cursor - 1].id).toBe(state.pending.trackId);
+  }
   // Sifting always has a card to show.
   if (state.phase === 'sifting' && state.tracks.length > 0) {
     expect(state.cursor).toBeLessThan(state.tracks.length);

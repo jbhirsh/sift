@@ -30,6 +30,7 @@ export interface CompactSession {
   removalErrors?: string[];
   failedRemovalIds?: string[];
   siftedPlaylistId?: string | null;
+  pending?: SiftSession['pending'];
 }
 
 export type TracksSlot = 'a' | 'b';
@@ -60,6 +61,7 @@ export function toCompact(
     removalErrors: session.removalErrors,
     failedRemovalIds: session.failedRemovalIds,
     siftedPlaylistId: session.siftedPlaylistId,
+    pending: session.pending,
   };
 }
 
@@ -102,5 +104,6 @@ export function fromCompact(compact: CompactSession, stored: StoredTracks): Sift
   if (compact.removalErrors !== undefined) session.removalErrors = compact.removalErrors;
   if (compact.failedRemovalIds !== undefined) session.failedRemovalIds = compact.failedRemovalIds;
   if (compact.siftedPlaylistId !== undefined) session.siftedPlaylistId = compact.siftedPlaylistId;
+  if (compact.pending !== undefined) session.pending = compact.pending;
   return session;
 }

@@ -8,6 +8,7 @@ import {
   failedRemovalCount,
   legacyFailedRemovalIds,
   decisionAnnouncement,
+  undoMessage,
   doneHeadline,
   keptDestination,
   nothingRemovedNote,
@@ -187,5 +188,13 @@ describe('decisionAnnouncement (#146)', () => {
     expect(decisionAnnouncement('Peaches', 'keep')).toBe('Peaches kept.');
     expect(decisionAnnouncement('Peaches', 'remove')).toBe('Peaches removed.');
     expect(decisionAnnouncement('Peaches', 'skip')).toBe('Peaches skipped.');
+  });
+});
+
+describe('undoMessage (#152)', () => {
+  test('says what Undo would take back', () => {
+    expect(undoMessage('Peaches', 'remove')).toBe('Removed Peaches');
+    expect(undoMessage('Peaches', 'keep')).toBe('Kept Peaches');
+    expect(undoMessage('Peaches', 'skip')).toBe('Skipped Peaches');
   });
 });

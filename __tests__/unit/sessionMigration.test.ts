@@ -9,6 +9,7 @@ import v4 from '../fixtures/sessions/v4-current.json';
 import spotify from '../fixtures/sessions/spotify-local-file.json';
 import v5State from '../fixtures/sessions/v5-compact-state.json';
 import v5Tracks from '../fixtures/sessions/v5-compact-tracks.json';
+import v6State from '../fixtures/sessions/v6-compact-pending-state.json';
 
 jest.mock('@sentry/react-native', () => ({
   captureException: jest.fn(),
@@ -80,6 +81,19 @@ describe('saved sessions from every build (#61)', () => {
     expect(state.kept.map((t) => t.name)).toEqual(['Peaches']);
     expect(state.removed.map((t) => t.name)).toEqual(['Stay']);
     expect(state.failedRemovalIds).toEqual(['b']);
+  });
+
+  test('with a held decision (#152): it comes back to be sent', async () => {
+    await AsyncStorage.setItem('sift_session_v2', JSON.stringify(v6State));
+    await AsyncStorage.setItem('sift_session_v2_tracks_b', JSON.stringify(v5Tracks));
+    const saved = await loadSession();
+    if (!saved) throw new Error('fixture did not load');
+    expect(resumeState(saved, { provider: 'apple-music', connectionStatus: 'connected' }).pending)
+      .toEqual({ trackId: 'c', decision: 'skip', at: 1760097600000 });
+  });
+
+  test('older shapes resume with nothing held', async () => {
+    expect((await resumeFrom(v4)).pending).toBeNull();
   });
 
   test('a finished session resumes to Done', async () => {

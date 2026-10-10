@@ -32,6 +32,9 @@ jest.mock('react-native-reanimated', () => ({
   withSpring: (val: number) => val,
   Easing: { in: (e: unknown) => e, ease: {} },
   interpolate: () => 0,
+  // The Undo pill's fade (#152): layout animations are a no-op here.
+  FadeIn: { duration: () => undefined },
+  FadeOut: { duration: () => undefined },
   runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 jest.mock('react-native-gesture-handler', () => ({

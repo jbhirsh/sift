@@ -17,18 +17,23 @@ import {
 } from 'react-native-reanimated';
 import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
-import { useMusicProvider } from '../hooks/useMusicProvider';
 import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
 import InteractiveCard from '../components/InteractiveCard';
 import PlayerControls from '../components/PlayerControls';
-import { COLORS, RADIUS, SHADOWS, SPACING } from '../theme';
-import { Decision, PROVIDER_DISPLAY, Track } from '../types';
+import { COLORS, RADIUS, SHADOWS, SPACING, UNDO_PILL } from '../theme';
+import { Decision, PendingDecision, PROVIDER_DISPLAY, Track } from '../types';
 import { loadSeenRemoveNote, markRemoveNoteSeen } from '../services/PreferencesStore';
-import { decisionAnnouncement, FIRST_REMOVE_NOTE, unsyncedCount } from '../utils/sessionCopy';
+import { decisionAnnouncement, FIRST_REMOVE_NOTE, undoMessage, unsyncedCount } from '../utils/sessionCopy';
+import { useHoldPendingDecision, useSendPending, wasSent } from '../hooks/usePendingDecision';
+import UndoPill from '../components/UndoPill';
 import { compactCount } from '../utils/compactCount';
 
 const SEGMENT_COUNT = 10;
+// The action buttons' bottom padding and label line height, which place the
+// Undo pill on the label row.
+const ACTIONS_BOTTOM_PADDING = SPACING['3xl'];
+const ACTION_LABEL_LINE_HEIGHT = 16;
 
 export default function SiftScreen() {
   const {
@@ -42,7 +47,14 @@ export default function SiftScreen() {
     flushPendingSave,
   } = useSift();
 
-  const { keepTrack, removeTrack } = useMusicProvider();
+  // Decisions reach the music service after the undo window (#152).
+  const sendPending = useSendPending();
+  useHoldPendingDecision(sendPending);
+  // The last card's decision goes now: Done has no Undo, and this screen's
+  // keep path still knows a "- Sifted" playlist it created moments ago.
+  const sendIfLast = useCallback((held: PendingDecision | null) => {
+    if (held && state.tracks[state.tracks.length - 1]?.id === held.trackId) sendPending(held);
+  }, [sendPending, state.tracks]);
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const [isAnimating, setIsAnimating] = useState(false);
@@ -109,6 +121,10 @@ export default function SiftScreen() {
   const [startCursor] = useState(state.cursor);
   const sessionDecisions = Math.max(0, state.cursor - startCursor);
 
+  const showUndo = state.pending != null
+    && state.tracks[state.cursor - 1]?.id === state.pending.trackId
+    && !wasSent(state.pending);
+
   const progress = state.tracks.length > 0
     ? state.cursor / state.tracks.length
     : 0;
@@ -123,12 +139,10 @@ export default function SiftScreen() {
     const direction = decision === 'keep' ? 500 : -500;
 
     const onComplete = () => {
-      decide(decision);
+      // The previous decision can't be undone any more: send it.
+      sendPending(state.pending);
+      sendIfLast(decide(decision));
       afterDecision(decision, track);
-      if (track) {
-        if (decision === 'remove') removeTrack(track);
-        if (decision === 'keep') keepTrack(track);
-      }
       programmaticOffset.value = 0;
       endDecision();
     };
@@ -149,26 +163,24 @@ export default function SiftScreen() {
     // alone lags a render behind the ref, so a skip tap racing a card swipe
     // could double-decide the still-current track.
     if (!beginDecision()) return;
-    decide('skip');
+    sendPending(state.pending);
+    sendIfLast(decide('skip'));
     afterDecision('skip', currentTrack);
     settleTimeoutRef.current = setTimeout(endDecision, 300);
-  }, [beginDecision, endDecision, decide, afterDecision, currentTrack]);
+  }, [beginDecision, endDecision, decide, afterDecision, currentTrack, sendPending, sendIfLast, state.pending]);
 
   const handleCardDecide = useCallback(
     (decision: Decision) => {
       if (!beginDecision()) return;
       const track = currentTrack;
-      decide(decision);
+      sendPending(state.pending);
+      sendIfLast(decide(decision));
       afterDecision(decision, track);
-      if (track) {
-        if (decision === 'remove') removeTrack(track);
-        if (decision === 'keep') keepTrack(track);
-      }
       // Hold the guard briefly while the swiped card settles so a button
       // press right after a swipe cannot decide the next card too.
       settleTimeoutRef.current = setTimeout(endDecision, 300);
     },
-    [beginDecision, endDecision, decide, afterDecision, currentTrack, removeTrack, keepTrack],
+    [beginDecision, endDecision, decide, afterDecision, currentTrack, sendPending, sendIfLast, state.pending],
   );
 
   return (
@@ -184,6 +196,8 @@ export default function SiftScreen() {
               // the autosave effect's cleanup would otherwise cancel them.
               flushPendingSave();
               dispatch({ type: 'SET_IS_PLAYING', isPlaying: false });
+              // Sent while this screen is still up (see sendIfLast).
+              sendPending(state.pending);
               dispatch({ type: 'SET_PHASE', phase: 'setup' });
             }}
             style={styles.backButton}
@@ -206,6 +220,7 @@ export default function SiftScreen() {
               // when it ends, and finishing first would drop that decision
               // or land it under Done.
               if (isAnimatingRef.current) return;
+              sendPending(state.pending);
               flushPendingSave();
               dispatch({ type: 'FINISH' });
             }}
@@ -330,6 +345,7 @@ export default function SiftScreen() {
       <View style={styles.actionsRow}>
         <ActionButton
           symbolName="xmark.circle.fill"
+          hideLabel={showUndo}
           label="Remove"
           color={COLORS.remove}
           labelColor={colors.textSecondary}
@@ -338,6 +354,7 @@ export default function SiftScreen() {
         />
         <ActionButton
           symbolName="arrow.right.circle"
+          hideLabel={showUndo}
           label="Skip"
           color={COLORS.skip}
           labelColor={colors.textSecondary}
@@ -346,12 +363,30 @@ export default function SiftScreen() {
         />
         <ActionButton
           symbolName="checkmark.circle.fill"
+          hideLabel={showUndo}
           label="Keep"
           color={COLORS.keep}
           labelColor={colors.textSecondary}
           onPress={() => animateDecision('keep')}
           disabled={isAnimating}
         />
+        {/* Undo the latest decision while it hasn't been sent (#152): in
+            thumb reach, over the buttons' label row, whose labels step aside
+            while it shows. No space of its own, so the card never shrinks or
+            jumps, and clear of the home indicator. After the buttons, so it's
+            drawn over the Skip button's label and takes the tap. */}
+        {showUndo && state.pending && (
+          <View style={styles.undoRow} pointerEvents="box-none">
+            <UndoPill
+              testID="undo-pill"
+              accessibilityLabel={`Undo: ${undoMessage(state.tracks[state.cursor - 1].name, state.pending.decision)}`}
+              onPress={() => {
+                if (isAnimatingRef.current) return;
+                dispatch({ type: 'UNDO_LAST' });
+              }}
+            />
+          </View>
+        )}
       </View>
     </View>
   );
@@ -413,6 +448,7 @@ function ActionButton({
   labelColor,
   onPress,
   disabled,
+  hideLabel,
 }: {
   symbolName: string;
   label: string;
@@ -420,6 +456,8 @@ function ActionButton({
   labelColor: string;
   onPress: () => void;
   disabled: boolean;
+  /** Hidden but still laid out, so the row doesn't move. */
+  hideLabel: boolean;
 }) {
   return (
     <TouchableOpacity
@@ -434,7 +472,7 @@ function ActionButton({
           <SymbolView name={symbolName as SFSymbol} size={28} tintColor={color} />
         </View>
       </GlassCard>
-      <Text style={[actionStyles.label, { color: labelColor }]}>{label.toUpperCase()}</Text>
+      <Text style={[actionStyles.label, { color: labelColor, opacity: hideLabel ? 0 : 1 }]}>{label.toUpperCase()}</Text>
     </TouchableOpacity>
   );
 }
@@ -452,6 +490,7 @@ const actionStyles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
+    lineHeight: ACTION_LABEL_LINE_HEIGHT,
     fontWeight: '600',
   },
 });
@@ -572,6 +611,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 40,
-    paddingBottom: 32,
+    paddingBottom: ACTIONS_BOTTOM_PADDING,
+  },
+  undoRow: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    // Centred on the label row, the last thing above the bottom padding.
+    bottom: ACTIONS_BOTTOM_PADDING + ACTION_LABEL_LINE_HEIGHT / 2 - UNDO_PILL.height / 2,
+    alignItems: 'center',
   },
 });
