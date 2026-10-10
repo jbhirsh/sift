@@ -21,6 +21,15 @@ export const SETTINGS_BUTTON = {
   top: SPACING.base,
 } as const;
 
+// The one content column for every screen but Sift (#149): full width on a
+// phone, centered and capped on iPad so buttons and lists don't stretch to
+// 1,100 points. Spread into a container's style.
+export const CONTENT_COLUMN = {
+  width: '100%',
+  maxWidth: 560,
+  alignSelf: 'center',
+} as const;
+
 // Corner radius scale
 export const RADIUS = {
   sm: 8,
