@@ -87,6 +87,21 @@ describe('ResumeSessionModal', () => {
     expect(getByText('0')).toBeTruthy();
   });
 
+  test('compacts a big count, keeping the exact number for VoiceOver (#142)', async () => {
+    const big = { ...session, tracks: Array.from({ length: 12_400 }, (_, i) => ({ ...session.tracks[0], id: `t${i}` })) };
+    const { getByTestId } = await render(
+      <ResumeSessionModal
+        session={big}
+        onResume={onResume}
+        onStartOver={onStartOver}
+        onCancel={onCancel}
+      />,
+    );
+    const remaining = getByTestId('resume-stat-remaining');
+    expect(within(remaining).getByText('12k')).toBeTruthy();
+    expect(remaining.props.accessibilityLabel).toBe('12397 remaining');
+  });
+
   test('a finished session reads as unsaved changes, not an unfinished sift', async () => {
     // Finished sessions reach this modal only when buffered keeps still
     // need saving (see SetupScreen) — the copy must not claim otherwise.

@@ -25,6 +25,7 @@ import { COLORS, RADIUS, SHADOWS, SPACING } from '../theme';
 import { Decision, PROVIDER_DISPLAY } from '../types';
 import { loadSeenRemoveNote, markRemoveNoteSeen } from '../services/PreferencesStore';
 import { FIRST_REMOVE_NOTE, unsyncedCount } from '../utils/sessionCopy';
+import { compactCount } from '../utils/compactCount';
 
 const SEGMENT_COUNT = 10;
 
@@ -98,6 +99,11 @@ export default function SiftScreen() {
   // reach the provider, shown during the sift rather than only on Done.
   // Failed removals are counted the same way Done counts them.
   const unsynced = unsyncedCount(state.removed, state.failedRemovalIds, state.pendingKeeps);
+
+  // Decisions since this screen mounted: one sitting. Finish then Continue
+  // sifting remounts it, which starts a new count.
+  const [startCursor] = useState(state.cursor);
+  const sessionDecisions = Math.max(0, state.cursor - startCursor);
 
   const progress = state.tracks.length > 0
     ? state.cursor / state.tracks.length
@@ -222,10 +228,11 @@ export default function SiftScreen() {
       <View style={styles.statsRowContainer}>
         <GlassCard intensity="thin" radius={RADIUS.lg}>
           <View style={styles.statsRow}>
+            {/* "left" leads: it's the number that answers "how much more?" */}
+            <StatBadge label="left" value={remaining} color={colors.textTertiary} textColor={colors.textSecondary} testID="remaining-count" />
             <StatBadge label="kept" value={state.kept.length} color={COLORS.keep} textColor={colors.textSecondary} testID="stat-kept" />
             <StatBadge label="removed" value={state.removed.length} color={COLORS.remove} textColor={colors.textSecondary} testID="stat-removed" />
             <StatBadge label="skipped" value={state.skipped.length} color={COLORS.skip} textColor={colors.textSecondary} testID="stat-skipped" />
-            <StatBadge label="left" value={remaining} color={colors.textTertiary} textColor={colors.textSecondary} testID="remaining-count" />
           </View>
         </GlassCard>
       </View>
@@ -250,6 +257,12 @@ export default function SiftScreen() {
           );
         })}
       </View>
+      {/* On a big library the segments barely move in one sitting, so count
+          what this sitting has done (#142). Always rendered, so the first
+          decision doesn't shift the card. */}
+      <Text style={[styles.sessionCount, { color: colors.textSecondary }]} testID="session-count">
+        This session: {compactCount(sessionDecisions)}
+      </Text>
 
       {/* Card stack. The back cards hide behind the front card at rest and
           show while it is dragged or flies off. */}
@@ -355,8 +368,13 @@ function StatBadge({
   return (
     <View style={statStyles.container}>
       <View style={[statStyles.dot, { backgroundColor: color }]} />
-      <Text style={[statStyles.text, { color: textColor }]} testID={testID}>
-        {value} {label}
+      <Text
+        style={[statStyles.text, { color: textColor }]}
+        testID={testID}
+        numberOfLines={1}
+        accessibilityLabel={`${value} ${label}`}
+      >
+        {compactCount(value)} {label}
       </Text>
     </View>
   );
@@ -367,6 +385,8 @@ const statStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    // Backstop for a narrow screen: shrink a badge rather than clip it.
+    flexShrink: 1,
   },
   dot: {
     width: 6,
@@ -375,6 +395,7 @@ const statStyles = StyleSheet.create({
   },
   text: {
     fontSize: 11,
+    flexShrink: 1,
   },
 });
 
@@ -502,7 +523,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 3,
     paddingHorizontal: 48,
-    paddingBottom: 16,
+    paddingBottom: SPACING.md,
+  },
+  sessionCount: {
+    fontSize: 11,
+    textAlign: 'center',
+    paddingBottom: SPACING.base,
   },
   progressSegment: {
     flex: 1,

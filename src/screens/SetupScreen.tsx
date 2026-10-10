@@ -18,6 +18,7 @@ import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
 import PlaylistPicker from '../components/PlaylistPicker';
 import ResumeSessionModal from '../components/ResumeSessionModal';
+import SessionStatRow from '../components/SessionStatRow';
 import { Button } from '../components/Button';
 import { decisionCounts, discardConfirmation, legacyFailedRemovalIds, removeExplanation } from '../utils/sessionCopy';
 import { loadSession } from '../services/SessionStore';
@@ -522,8 +523,18 @@ export default function SetupScreen() {
               && savedSession.cursor < savedSession.tracks.length;
 
             if (canResumeInMemory || canResumeFromSaved) {
+              // Same counts as the resume sheet, so the session being
+              // resumed (or finished) is visible here too (#142).
+              const counts = canResumeInMemory || savedSession == null ? state : savedSession;
               return (
                 <>
+                  <SessionStatRow
+                    kept={counts.kept.length}
+                    removed={counts.removed.length}
+                    skipped={counts.skipped.length}
+                    remaining={Math.max(0, counts.tracks.length - counts.cursor)}
+                    testIDPrefix="setup-stat"
+                  />
                   <Button
                     title="Resume Sifting"
                     size="large"
