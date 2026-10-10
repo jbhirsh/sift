@@ -1,0 +1,32 @@
+# Temporary: exports the SF Symbols the app uses, so web screenshot builds
+# can draw the real glyphs. Runs only on pushes to this tools branch.
+name: Export SF Symbols
+on:
+  push:
+    branches: [tools/sf-symbols-export]
+permissions:
+  contents: write
+jobs:
+  export:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - run: >-
+          swift export.swift
+          xmark.circle.fill checkmark.circle.fill arrow.right.circle chevron.backward
+          gearshape gobackward.15 goforward.15 play.fill pause.fill music.note
+          music.note.list music.mic arrow.clockwise exclamationmark.triangle.fill
+          questionmark.circle
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sf-symbols
+          path: out
+      - name: Publish to a branch
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          cd out
+          git init -q -b export
+          git add .
+          git -c user.name=github-actions -c user.email=github-actions@users.noreply.github.com commit -qm "SF Symbols export"
+          git push -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}" HEAD:refs/heads/pr-screenshots/sf-symbols
