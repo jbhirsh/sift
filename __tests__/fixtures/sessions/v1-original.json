@@ -1,0 +1,76 @@
+{
+  "tracks": [
+    {
+      "id": "a",
+      "name": "Peaches",
+      "artist": "Artist Peaches",
+      "album": "Album",
+      "duration": 200,
+      "playCount": 28,
+      "dateAdded": "2020-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "b",
+      "name": "Stay",
+      "artist": "Artist Stay",
+      "album": "Album",
+      "duration": 200,
+      "playCount": 31,
+      "dateAdded": "2020-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "c",
+      "name": "Intro",
+      "artist": "Artist Intro",
+      "album": "Album",
+      "duration": 200,
+      "playCount": 39,
+      "dateAdded": "2020-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "d",
+      "name": "Levitating",
+      "artist": "Artist Levitating",
+      "album": "Album",
+      "duration": 200,
+      "playCount": 40,
+      "dateAdded": "2020-01-01T00:00:00.000Z"
+    }
+  ],
+  "cursor": 3,
+  "kept": [
+    {
+      "id": "a",
+      "name": "Peaches",
+      "artist": "Artist Peaches",
+      "album": "Album",
+      "duration": 200,
+      "playCount": 28,
+      "dateAdded": "2020-01-01T00:00:00.000Z"
+    }
+  ],
+  "removed": [
+    {
+      "id": "b",
+      "name": "Stay",
+      "artist": "Artist Stay",
+      "album": "Album",
+      "duration": 200,
+      "playCount": 31,
+      "dateAdded": "2020-01-01T00:00:00.000Z"
+    }
+  ],
+  "skipped": [
+    {
+      "id": "c",
+      "name": "Intro",
+      "artist": "Artist Intro",
+      "album": "Album",
+      "duration": 200,
+      "playCount": 39,
+      "dateAdded": "2020-01-01T00:00:00.000Z"
+    }
+  ],
+  "sortOrder": "least-played",
+  "savedAt": "2026-07-18T12:00:00.000Z"
+}
