@@ -121,7 +121,7 @@ src/
                         FONTS, GLASS, GRADIENTS), ThemeContext
     types/              Track, Decision, AppPhase, SortOrder, MusicProvider,
                         SiftSession
-    utils/              formatTime, mockData, sorting, chorus
+    utils/              formatTime, mockData, sorting, chorus, musicKit
 modules/
   expo-musickit/        Custom Expo native module for MusicKit
 __tests__/
@@ -171,7 +171,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
   decision directly: send through `useSendPending`, which sends each once.
 - **Start at chorus** (Apple Music only): `ChorusFinder` picks each track's start
   from LRCLIB synced lyrics (the repeated block, `utils/chorus`), then from where
-  ShazamKit places Apple's preview clip in the track (native `previewOffset`), then
+  ShazamKit places Apple's preview clip in the track (`AppleMusicProvider.previewOffset`, native `shazamOffset`), then
   a ~20% estimate; results are cached per track. ShazamKit matching needs the
   ShazamKit App Service enabled on the App ID; without it that step just yields
   nothing.
@@ -179,6 +179,13 @@ Makefile                Dev commands (test, lint, typecheck, check)
   `ThemeContext` provides light/dark mode colors, glass material settings,
   and phase-specific gradients.
 - **Native modules**: `expo-musickit` in `modules/` bridges MusicKit for Apple Music access.
+  It is a thin bridge: each native function asks MusicKit, ShazamKit or the
+  player one thing and returns raw values. Every decision (defaults, lookup
+  order, catalog id pairing, batching, counting what landed, the "Sift —
+  Removed" policy, which preview to fingerprint) lives in TypeScript
+  (`utils/musicKit`, `AppleMusicProvider`), so it ships with an EAS Update
+  instead of a reinstall and is covered by Jest and Stryker. Add a primitive
+  in Swift; put the policy in TypeScript.
 
 ---
 
@@ -232,8 +239,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
   the job sets `EXPO_APPLE_TEAM_ID`. A newly registered iPhone needs a new
   build: run the workflow by hand with "Build a new preview app" ticked. The
   fingerprint must come out the same in the checkout and in the build's clean
-  copy, so build output the checkout holds (SwiftPM's `.build`) goes in
-  `.fingerprintignore`.
+  copy, so any build output the checkout holds goes in `.fingerprintignore`
+  (empty today).
 - Security/quality gates run per PR and sweep weekly (Mon 06:00 UTC):
   `gitleaks.yml` (secret scanning), `semgrep.yml` (SAST, `--config auto`), and
   `mutation.yml` (Stryker), alongside the weekly Dependabot bumps.

@@ -2,8 +2,8 @@ import { Track, SortOrder } from '../types';
 
 /**
  * Parse a track's dateAdded into epoch ms, or null when it is missing or
- * unparseable. Non-library playlist tracks come across the bridge with
- * `dateAdded: ""` (see trackToDictionary in ExpoMusicKitModule), and
+ * unparseable. Non-library playlist tracks have no date added, which
+ * toTrack (utils/musicKit) turns into `dateAdded: ""`, and
  * `new Date('').getTime()` is NaN — a NaN-returning comparator makes the
  * sort order undefined.
  */

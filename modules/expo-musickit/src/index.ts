@@ -1,5 +1,17 @@
 import { requireNativeModule } from 'expo';
-import type { MusicKitPlaylist, MusicKitTrack, PlaybackState } from './ExpoMusicKit.types';
+import type {
+  AddResult,
+  CachedKind,
+  CatalogSearchHit,
+  LibrarySongLookup,
+  MusicKitPlaylist,
+  MusicKitTrack,
+  PlaybackState,
+  PreviewInfo,
+} from './ExpoMusicKit.types';
+
+// A thin bridge: each function asks MusicKit, ShazamKit or the player one
+// thing. The decisions live in src/utils/musicKit and AppleMusicProvider.
 
 const ExpoMusicKit = requireNativeModule('ExpoMusicKit');
 
@@ -11,8 +23,39 @@ export function getAuthorizationStatus(): string {
   return ExpoMusicKit.getAuthorizationStatus();
 }
 
-export async function loadFullLibrary(): Promise<MusicKitTrack[]> {
-  return ExpoMusicKit.loadFullLibrary();
+/** One page of library songs. */
+export async function loadLibraryPage(offset: number, limit: number): Promise<MusicKitTrack[]> {
+  return ExpoMusicKit.loadLibraryPage(offset, limit);
+}
+
+/** One page of library playlists. */
+export async function loadPlaylistsPage(offset: number, limit: number): Promise<MusicKitPlaylist[]> {
+  return ExpoMusicKit.loadPlaylistsPage(offset, limit);
+}
+
+/** A playlist's entries, in order. */
+export async function loadPlaylistItems(playlistID: string): Promise<MusicKitTrack[]> {
+  return ExpoMusicKit.loadPlaylistItems(playlistID);
+}
+
+/** Each id looked up as a library song; one result per id, in order. */
+export async function lookupLibrarySongs(ids: string[]): Promise<LibrarySongLookup[]> {
+  return ExpoMusicKit.lookupLibrarySongs(ids);
+}
+
+/** One catalog request; every song the catalog answered with. */
+export async function lookupCatalogSongs(ids: string[]): Promise<MusicKitTrack[]> {
+  return ExpoMusicKit.lookupCatalogSongs(ids);
+}
+
+/** File the item cached under `fromID` under `toID` too. */
+export function aliasCachedItem(fromID: string, toID: string): boolean {
+  return ExpoMusicKit.aliasCachedItem(fromID, toID);
+}
+
+/** What is cached for each id. */
+export function cachedKinds(ids: string[]): CachedKind[] {
+  return ExpoMusicKit.cachedKinds(ids);
 }
 
 export async function play(trackID: string, position: number = 0): Promise<void> {
@@ -35,50 +78,59 @@ export function getPlaybackState(): PlaybackState {
   return ExpoMusicKit.getPlaybackState();
 }
 
-/** Returns the number of tracks actually included in the new playlist. */
-export async function createPlaylist(name: string, trackIDs: string[]): Promise<number> {
-  return ExpoMusicKit.createPlaylist(name, trackIDs);
+/** Create an empty playlist; resolves to its id. */
+export async function createEmptyPlaylist(name: string): Promise<string> {
+  return ExpoMusicKit.createEmptyPlaylist(name);
 }
 
-export async function loadPlaylists(): Promise<MusicKitPlaylist[]> {
-  return ExpoMusicKit.loadPlaylists();
+/** The id of the first playlist with exactly this name, or null. */
+export async function findPlaylistByName(name: string): Promise<string | null> {
+  return ExpoMusicKit.findPlaylistByName(name);
 }
 
-export async function loadPlaylistTracks(playlistID: string): Promise<MusicKitTrack[]> {
-  return ExpoMusicKit.loadPlaylistTracks(playlistID);
-}
-
-export async function removeFromLibrary(trackIDs: string[]): Promise<void> {
-  return ExpoMusicKit.removeFromLibrary(trackIDs);
+/** Add each cached item to the playlist; one result per id, in order. */
+export async function addEachToPlaylist(playlistID: string, ids: string[]): Promise<AddResult[]> {
+  return ExpoMusicKit.addEachToPlaylist(playlistID, ids);
 }
 
 export async function removeFromPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
   return ExpoMusicKit.removeFromPlaylist(playlistID, trackIDs);
 }
 
-export async function addToLibrary(trackIDs: string[]): Promise<void> {
-  return ExpoMusicKit.addToLibrary(trackIDs);
+/** Add each cached song to the library; one result per id, in order. */
+export async function addEachToLibrary(ids: string[]): Promise<AddResult[]> {
+  return ExpoMusicKit.addEachToLibrary(ids);
 }
 
-/** Returns the number of tracks actually added to the playlist. */
-export async function addToPlaylist(playlistID: string, trackIDs: string[]): Promise<number> {
-  return ExpoMusicKit.addToPlaylist(playlistID, trackIDs);
+/** What is known about a cached song's preview; null if it isn't a song. */
+export async function previewInfo(trackID: string): Promise<PreviewInfo | null> {
+  return ExpoMusicKit.previewInfo(trackID);
 }
 
-export async function warmSongCache(trackIDs: string[]): Promise<number> {
-  return ExpoMusicKit.warmSongCache(trackIDs);
+export async function catalogPreviewForISRC(isrc: string): Promise<string | null> {
+  return ExpoMusicKit.catalogPreviewForISRC(isrc);
 }
 
-/**
- * Where the track's Apple Music preview starts within the full track, in
- * seconds, found with ShazamKit; null when there is no preview or no match.
- */
-export async function previewOffset(trackID: string): Promise<number | null> {
-  return ExpoMusicKit.previewOffset(trackID);
+export async function searchCatalogSongs(term: string, limit: number): Promise<CatalogSearchHit[]> {
+  return ExpoMusicKit.searchCatalogSongs(term, limit);
+}
+
+/** Where the preview clip sits in its recording (ShazamKit), or null. */
+export async function shazamOffset(previewURL: string): Promise<number | null> {
+  return ExpoMusicKit.shazamOffset(previewURL);
 }
 
 export async function resolveArtworkURL(trackID: string, width: number, height: number): Promise<string | null> {
   return ExpoMusicKit.resolveArtworkURL(trackID, width, height);
 }
 
-export type { MusicKitPlaylist, MusicKitTrack, PlaybackState };
+export type {
+  AddResult,
+  CachedKind,
+  CatalogSearchHit,
+  LibrarySongLookup,
+  MusicKitPlaylist,
+  MusicKitTrack,
+  PlaybackState,
+  PreviewInfo,
+};

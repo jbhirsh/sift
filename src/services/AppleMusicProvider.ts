@@ -2,49 +2,38 @@ import { Platform } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import type { MusicProviderService } from './MusicProviderInterface';
 import type { Playlist, Track } from '../types';
+import { APPLE_REMOVED_PLAYLIST } from '../utils/libraryRemovals';
+import {
+  batches,
+  bestPreviewCandidate,
+  canonicalPairing,
+  collectPages,
+  countAdded,
+  countCached,
+  LIBRARY_PAGE_SIZE,
+  LOOKUP_BATCH_SIZE,
+  PLAYLISTS_PAGE_SIZE,
+  PREVIEW_SEARCH_LIMIT,
+  preferSongs,
+  toCandidate,
+  toPlaylist,
+  toTrack,
+  uniqueInOrder,
+  type CandidateSong,
+  type RawTrack,
+} from '../utils/musicKit';
 
-/**
- * Raw track shape returned by the native MusicKit module.
- * Maps to the app's Track type with minor differences (null vs undefined).
- */
-interface MusicKitTrack {
-  id: string;
-  name: string;
-  artist: string;
-  album: string;
-  duration: number;
-  playCount: number;
-  dateAdded: string;
-  artworkURL: string | null;
-}
+/** The native module's API, typed from its wrapper so the two can't drift. */
+type NativeMusicKit = typeof import('../../modules/expo-musickit/src/index');
 
-interface MusicKitPlaylist {
-  id: string;
-  name: string;
-  trackCount: number;
-  artworkURL: string | null;
-}
-
-/** Map a native MusicKitTrack to the app's Track type. */
-function mapTrack(raw: MusicKitTrack): Track {
-  return {
-    id: raw.id,
-    name: raw.name,
-    artist: raw.artist,
-    album: raw.album,
-    duration: raw.duration,
-    playCount: raw.playCount,
-    dateAdded: raw.dateAdded,
-    artworkURL: raw.artworkURL ?? undefined,
-  };
-}
+const NO_TRACKS_FOUND = 'No tracks found for the given IDs.';
 
 /**
  * Lazily load the native MusicKit module.
  * Throws a clear error when the module isn't available (Android, web, or
  * Expo Go where native modules aren't linked).
  */
-function getNativeModule() {
+function getNativeModule(): NativeMusicKit {
   if (Platform.OS !== 'ios') {
     throw new Error(
       'AppleMusicProvider is only available on iOS. ' +
@@ -60,30 +49,14 @@ function getNativeModule() {
         'Use a development build (EAS Build) to access native modules.'
     );
   }
-  return mod as {
-    requestAuthorization(): Promise<boolean>;
-    getAuthorizationStatus(): string;
-    loadFullLibrary(): Promise<MusicKitTrack[]>;
-    play(trackID: string, position?: number): Promise<void>;
-    pause(): Promise<void>;
-    resume(): Promise<void>;
-    seek(position: number): void;
-    getPlaybackState(): { position: number; isPlaying: boolean };
-    createPlaylist(name: string, trackIDs: string[]): Promise<number>;
-    removeFromLibrary(trackIDs: string[]): Promise<void>;
-    removeFromPlaylist(playlistID: string, trackIDs: string[]): Promise<void>;
-    addToLibrary(trackIDs: string[]): Promise<void>;
-    addToPlaylist(playlistID: string, trackIDs: string[]): Promise<number>;
-    loadPlaylists(): Promise<MusicKitPlaylist[]>;
-    loadPlaylistTracks(playlistID: string): Promise<MusicKitTrack[]>;
-    // Optional: development builds made before the cache-warming native
-    // function shipped don't expose it.
-    warmSongCache?(trackIDs: string[]): Promise<number>;
-    // Optional for the same reason (added with "Start at chorus").
-    previewOffset?(trackID: string): Promise<number | null>;
-  };
+  return mod as NativeMusicKit;
 }
 
+/**
+ * Apple Music through the thin native module: the native side asks MusicKit
+ * one thing per call, and the steps and decisions are here and in
+ * utils/musicKit, so they ship with an EAS Update.
+ */
 export class AppleMusicProvider implements MusicProviderService {
   private native = getNativeModule();
 
@@ -97,8 +70,8 @@ export class AppleMusicProvider implements MusicProviderService {
   }
 
   async loadLibrary(): Promise<Track[]> {
-    const raw = await this.native.loadFullLibrary();
-    return raw.map(mapTrack);
+    const raw = await collectPages((offset, limit) => this.native.loadLibraryPage(offset, limit), LIBRARY_PAGE_SIZE);
+    return raw.map(toTrack);
   }
 
   async play(trackID: string, position?: number): Promise<void> {
@@ -122,10 +95,17 @@ export class AppleMusicProvider implements MusicProviderService {
   }
 
   async createPlaylist(name: string, trackIDs: string[]): Promise<void> {
-    const included = await this.native.createPlaylist(name, trackIDs);
-    // The native module skips IDs it cannot resolve via library or catalog
-    // and reports how many tracks actually made it in. Surface any shortfall
-    // as an error so callers buffer/report instead of assuming success.
+    await this.resolveIntoCaches(trackIDs);
+    // Don't leave an empty playlist behind when nothing can be added.
+    if (countCached(this.native.cachedKinds(trackIDs)) === 0) throw new Error(NO_TRACKS_FOUND);
+    // Created empty, then filled one item at a time in caller order: a bulk
+    // create is all-or-nothing, and retrying one that failed after creating
+    // the playlist would make a second playlist of the same name.
+    const playlistID = await this.native.createEmptyPlaylist(name);
+    const included = countAdded(await this.native.addEachToPlaylist(playlistID, trackIDs));
+    // Items that couldn't be resolved or added are left out; surface the
+    // shortfall as an error so callers buffer/report instead of assuming
+    // success.
     if (included < trackIDs.length) {
       throw new Error(
         `${trackIDs.length - included} of ${trackIDs.length} tracks could not be resolved and were left out of "${name}"`,
@@ -133,8 +113,22 @@ export class AppleMusicProvider implements MusicProviderService {
     }
   }
 
+  /**
+   * A library Remove: Apple doesn't let apps delete library songs, so move
+   * them to the "Sift — Removed" playlist for the user to delete in Music.
+   */
   async removeFromLibrary(trackIDs: string[]): Promise<void> {
-    return this.native.removeFromLibrary(trackIDs);
+    await this.lookUpLibrarySongs(trackIDs);
+    const kinds = this.native.cachedKinds(trackIDs);
+    const songIDs = trackIDs.filter((_, i) => kinds[i] === 'song');
+    if (songIDs.length === 0) throw new Error(NO_TRACKS_FOUND);
+
+    const playlistID = (await this.native.findPlaylistByName(APPLE_REMOVED_PLAYLIST))
+      ?? (await this.native.createEmptyPlaylist(APPLE_REMOVED_PLAYLIST));
+    const moved = countAdded(await this.native.addEachToPlaylist(playlistID, songIDs));
+    if (moved < songIDs.length) {
+      throw new Error(`${songIDs.length - moved} of ${songIDs.length} songs could not be moved to "${APPLE_REMOVED_PLAYLIST}"`);
+    }
   }
 
   async removeFromPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
@@ -142,14 +136,22 @@ export class AppleMusicProvider implements MusicProviderService {
   }
 
   async addToLibrary(trackIDs: string[]): Promise<void> {
-    return this.native.addToLibrary(trackIDs);
+    await this.lookUpLibrarySongs(trackIDs);
+    // Ids with no library song are skipped; a song MusicKit refuses fails
+    // the call.
+    const results = await this.native.addEachToLibrary(trackIDs);
+    const failed = results.filter((result) => result === 'failed').length;
+    if (failed > 0) {
+      throw new Error(`${failed} of ${trackIDs.length} tracks could not be added to the library`);
+    }
   }
 
   async addToPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
-    const added = await this.native.addToPlaylist(playlistID, trackIDs);
-    // See createPlaylist: a shortfall means some tracks were unresolvable
-    // and silently skipped natively — turn that into a visible failure so
-    // keepTrack buffers the track via ADD_PENDING_KEEP.
+    await this.resolveIntoCaches(trackIDs);
+    const added = countAdded(await this.native.addEachToPlaylist(playlistID, trackIDs));
+    // See createPlaylist: a shortfall means some tracks couldn't be added;
+    // turn that into a visible failure so keepTrack buffers the track via
+    // ADD_PENDING_KEEP.
     if (added < trackIDs.length) {
       throw new Error(
         `${trackIDs.length - added} of ${trackIDs.length} tracks could not be added to the playlist`,
@@ -158,41 +160,112 @@ export class AppleMusicProvider implements MusicProviderService {
   }
 
   async loadPlaylists(): Promise<Playlist[]> {
-    const raw = await this.native.loadPlaylists();
-    return raw.map((p) => ({
-      id: p.id,
-      name: p.name,
-      trackCount: p.trackCount,
-      artworkURL: p.artworkURL ?? undefined,
-    }));
+    const raw = await collectPages((offset, limit) => this.native.loadPlaylistsPage(offset, limit), PLAYLISTS_PAGE_SIZE);
+    return raw.map(toPlaylist);
   }
 
   async loadPlaylistTracks(playlistID: string): Promise<Track[]> {
-    const raw = await this.native.loadPlaylistTracks(playlistID);
-    // Observability: tracks the native module could not resolve to a library
-    // Song fall back to bare Track metadata, which carries playCount 0 and
-    // dateAdded "" — silently mis-sorting least-played/oldest sifts. That
-    // signature (both fields defaulted together) is how a fallback presents
-    // in the payload; breadcrumb only, the tracks themselves are still fine.
-    const fellBack = raw.filter((t) => t.playCount === 0 && t.dateAdded === '').length;
-    if (fellBack > 0) {
+    const items = await this.native.loadPlaylistItems(playlistID);
+    // Library songs carry play counts and dates added; playlist entries
+    // don't. Use the library song where there is one. A failed lookup just
+    // keeps the entry.
+    const songs = new Map<string, RawTrack>();
+    for (const batch of batches(items.map((item) => item.id), LOOKUP_BATCH_SIZE)) {
+      for (const result of await this.native.lookupLibrarySongs(batch)) {
+        if (result.song) songs.set(result.id, result.song);
+      }
+    }
+    const merged = preferSongs(items, songs);
+    // Observability: entries with no library song have no play count or
+    // date added, which can misplace them in least-played/oldest sorts.
+    // Breadcrumb only; the tracks themselves are fine.
+    const entriesOnly = merged.filter((track) => track.kind === 'track').length;
+    if (entriesOnly > 0) {
       Sentry.addBreadcrumb({
         category: 'music-provider',
-        message: `loadPlaylistTracks: ${fellBack} of ${raw.length} tracks fell back to Track metadata (playCount 0 / dateAdded "") — least-played/oldest sorts may misplace them`,
+        message: `loadPlaylistTracks: ${entriesOnly} of ${merged.length} tracks have no library song (no play count or date added) — least-played/oldest sorts may misplace them`,
         level: 'warning',
       });
     }
-    return raw.map(mapTrack);
+    return merged.map(toTrack);
   }
 
   async warmSongCache(trackIDs: string[]): Promise<number> {
-    // Tolerate a native module that predates warmSongCache (stale dev
-    // build): resume then simply skips cache warming instead of throwing.
-    return (await this.native.warmSongCache?.(trackIDs)) ?? 0;
+    await this.resolveIntoCaches(trackIDs);
+    // How many of the requested ids can now be played or added, so a
+    // genuine shortfall can be breadcrumbed.
+    return countCached(this.native.cachedKinds(trackIDs));
   }
 
+  /**
+   * Where the track's preview clip starts within the full track ("Start at
+   * chorus"). Library songs usually carry no preview, so borrow the
+   * catalog's: by ISRC, else the closest-duration search hit with the same
+   * title and artist. Throws while the track isn't loaded yet, so the
+   * caller retries.
+   */
   async previewOffset(trackID: string): Promise<number | null> {
-    // A native module that predates previewOffset just has no hint to give.
-    return (await this.native.previewOffset?.(trackID)) ?? null;
+    const info = await this.native.previewInfo(trackID);
+    if (!info) return null;
+    let url = info.previewURL;
+    if (!url && info.isrc) url = await this.native.catalogPreviewForISRC(info.isrc);
+    if (!url) {
+      const hits = await this.native.searchCatalogSongs(`${info.title} ${info.artist}`, PREVIEW_SEARCH_LIMIT);
+      const song = { id: trackID, title: info.title, artist: info.artist, duration: info.duration };
+      url = bestPreviewCandidate(song, hits)?.previewURL ?? null;
+    }
+    return url ? this.native.shazamOffset(url) : null;
+  }
+
+  /**
+   * Cache a library song for every id that has none, failing the call if a
+   * lookup itself fails (a Remove or restore must not half-run on a
+   * transient error). Ids not in the library just stay without a song.
+   */
+  private async lookUpLibrarySongs(trackIDs: string[]): Promise<void> {
+    const kinds = this.native.cachedKinds(trackIDs);
+    const missing = uniqueInOrder(trackIDs.filter((_, i) => kinds[i] !== 'song'));
+    for (const batch of batches(missing, LOOKUP_BATCH_SIZE)) {
+      const failed = (await this.native.lookupLibrarySongs(batch)).filter((result) => result.failed).length;
+      if (failed > 0) throw new Error(`Library lookup failed for ${failed} of ${batch.length} songs`);
+    }
+  }
+
+  /**
+   * Cache something playable/addable for every id that has nothing: a
+   * library song, else the catalog's song. Lookup failures are tolerated;
+   * ids that stay unresolved show up in the callers' shortfall counts.
+   * `known` is the requested songs' metadata where the caller has it: it
+   * lets a catalog answer under a different id be filed under the
+   * requested one (see canonicalPairing). Without it, such an answer stays
+   * unpaired, the safe default.
+   */
+  private async resolveIntoCaches(trackIDs: string[], known?: ReadonlyMap<string, CandidateSong>): Promise<void> {
+    const kinds = this.native.cachedKinds(trackIDs);
+    const missing = uniqueInOrder(trackIDs.filter((_, i) => kinds[i] == null));
+    const notInLibrary: string[] = [];
+    for (const batch of batches(missing, LOOKUP_BATCH_SIZE)) {
+      for (const result of await this.native.lookupLibrarySongs(batch)) {
+        if (!result.song) notInLibrary.push(result.id);
+      }
+    }
+    for (const batch of batches(notInLibrary, LOOKUP_BATCH_SIZE)) {
+      let answers: RawTrack[];
+      try {
+        answers = await this.native.lookupCatalogSongs(batch);
+      } catch {
+        continue; // offline or no subscription: these stay unresolved
+      }
+      const requested = new Set(batch);
+      const batchKinds = this.native.cachedKinds(batch);
+      const unanswered = batch.filter((_, i) => batchKinds[i] == null);
+      const unmatched = answers.filter((answer) => !requested.has(answer.id)).map(toCandidate);
+      const pairing = canonicalPairing(
+        unanswered,
+        unmatched,
+        unanswered.length === 1 ? known?.get(unanswered[0]) : undefined,
+      );
+      if (pairing) this.native.aliasCachedItem(pairing.response.id, pairing.requestID);
+    }
   }
 }
