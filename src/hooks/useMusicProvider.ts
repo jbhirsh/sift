@@ -642,14 +642,14 @@ export function useMusicProvider() {
     [providerRef, state.source, state.provider, state.siftedPlaylistId, findSiftedPlaylistWithRetry, dispatch],
   );
 
-  const warmCache = useCallback(async (trackIDs: string[]): Promise<void> => {
+  const warmCache = useCallback(async (trackIDs: string[], playlistID?: string): Promise<void> => {
     try {
       const isAuth = await providerRef.current.isAuthorized();
       if (!isAuth) {
         const granted = await providerRef.current.requestAuthorization();
         if (!granted) return;
       }
-      const resolved = await providerRef.current.warmSongCache?.(trackIDs);
+      const resolved = await providerRef.current.warmSongCache?.(trackIDs, playlistID);
       // Observability: the native warm-up tolerates per-id failures, so a
       // shortfall here is otherwise invisible — those tracks degrade to no
       // playback/artwork until re-resolved. Breadcrumb only; not an error.

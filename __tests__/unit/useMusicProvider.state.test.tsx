@@ -1103,6 +1103,15 @@ describe('useMusicProvider — observable state', () => {
     });
   });
 
+  test('warmCache passes the session\'s playlist through (#54)', async () => {
+    mockProvider.warmSongCache.mockResolvedValueOnce(2);
+    await renderHarness([mockTrack]);
+    await act(async () => {
+      await api.warmCache(['1', '2'], 'pl-1');
+    });
+    expect(mockProvider.warmSongCache).toHaveBeenCalledWith(['1', '2'], 'pl-1');
+  });
+
   test('warmCache stays silent on full resolution or an unsupported provider', async () => {
     await renderHarness([mockTrack]);
 

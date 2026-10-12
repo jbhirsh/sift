@@ -550,6 +550,36 @@ describe('SetupScreen', () => {
     expect(getByTestId('probe-failed-ids').props.children).toBe(expected);
   });
 
+  test.each([
+    ['a playlist sift reloads its playlist (#54)', { type: 'playlist', playlist: { id: 'pl-9', name: 'Mix', trackCount: 3 } }, 'pl-9'],
+    ['a library sift has no playlist to reload', { type: 'library' }, undefined],
+  ])('Resume warms the cache: %s', async (_label, source, expectedPlaylist) => {
+    const warm = jest.fn().mockResolvedValue(3);
+    (mockProvider as { warmSongCache?: jest.Mock }).warmSongCache = warm;
+    try {
+      const { loadSession } = require('../../src/services/SessionStore');
+      (loadSession as jest.Mock).mockResolvedValueOnce({
+        tracks: [mockTrackA, mockTrackB, mockTrackC],
+        cursor: 1,
+        kept: [mockTrackA],
+        removed: [],
+        skipped: [],
+        sortOrder: 'least-played',
+        savedAt: '2026-04-10T00:00:00.000Z',
+        provider: 'apple-music',
+        source,
+      });
+      const { getByTestId } = await renderWithProviders(<SetupScreen />);
+      await act(async () => {});
+      await act(async () => {
+        await fireEvent.press(getByTestId('resume-modal-resume'));
+      });
+      expect(warm).toHaveBeenCalledWith([mockTrackA.id, mockTrackB.id, mockTrackC.id], expectedPlaylist);
+    } finally {
+      delete (mockProvider as { warmSongCache?: jest.Mock }).warmSongCache;
+    }
+  });
+
   test('Resume restores the persisted siftedPlaylistId', async () => {
     function SiftedIdProbe() {
       const { state } = useSift();

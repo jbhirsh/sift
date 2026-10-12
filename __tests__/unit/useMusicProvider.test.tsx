@@ -878,7 +878,8 @@ describe('useMusicProvider', () => {
     await act(async () => {
       await fireEvent.press(getByTestId('warm-cache'));
     });
-    expect(mockProvider.warmSongCache).toHaveBeenCalledWith(['1', '2']);
+    // No playlist given: nothing to reload first.
+    expect(mockProvider.warmSongCache).toHaveBeenCalledWith(['1', '2'], undefined);
   });
 
   test('warmCache requests authorization if needed', async () => {

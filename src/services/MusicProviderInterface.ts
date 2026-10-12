@@ -53,8 +53,13 @@ export interface MusicProviderService {
   /** Load all tracks from a specific playlist. */
   loadPlaylistTracks?(playlistID: string): Promise<Track[]>;
 
-  /** Warm the native song cache for a list of track IDs (used on session resume). */
-  warmSongCache?(trackIDs: string[]): Promise<number>;
+  /**
+   * Warm the native cache for a list of track IDs (used on session resume).
+   * `playlistID`: the playlist the session sifts, whose entries (music
+   * videos included) only a playlist load can bring back. Resolves to how
+   * many of the ids can now be played or added.
+   */
+  warmSongCache?(trackIDs: string[], playlistID?: string): Promise<number>;
 
   /**
    * Where the track's 30-second preview starts within the full track, in

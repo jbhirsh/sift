@@ -204,9 +204,12 @@ export default function SetupScreen() {
       }),
     });
 
-    // Warm the native song cache in the background for playback/artwork.
+    // Warm the native cache in the background for playback/artwork. A
+    // playlist sift reloads its playlist too: its music videos come back no
+    // other way (#54).
     const trackIDs = savedSession.tracks.map((t) => t.id);
-    await warmCache(trackIDs);
+    const source = savedSession.source;
+    await warmCache(trackIDs, source?.type === 'playlist' ? source.playlist.id : undefined);
   };
 
   const performStartOver = async () => {
