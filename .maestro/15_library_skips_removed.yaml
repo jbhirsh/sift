@@ -8,9 +8,9 @@ name: "Library Sift Skips Removed Songs"
 # Music.
 #
 # Default sort is Least Played: Peaches (playCount 28), drivers license
-# (31), Montero (39), ... The build fails the first removeFromLibrary of
-# each launch (see flow 11), so Peaches' removal fails and drivers
-# license's succeeds.
+# (31), Montero (39), ... The build fails the library removal of the first
+# song removed in each launch, retries included (see flow 11), so Peaches'
+# removal fails and drivers license's succeeds.
 - launchApp:
     clearState: true
 

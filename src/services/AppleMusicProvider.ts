@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import type { MusicProviderService } from './MusicProviderInterface';
-import type { Playlist, Track } from '../types';
+import type { Playlist, SiftSource, Track } from '../types';
 import { APPLE_REMOVED_PLAYLIST } from '../utils/libraryRemovals';
 import {
   batches,
@@ -133,6 +133,22 @@ export class AppleMusicProvider implements MusicProviderService {
 
   async removeFromPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
     return this.native.removeFromPlaylist(playlistID, trackIDs);
+  }
+
+  /**
+   * Whether removing the track from this source already took effect: a
+   * library song is in "Sift — Removed", a playlist entry is gone from the
+   * playlist.
+   */
+  async removalLanded(source: SiftSource, trackID: string): Promise<boolean> {
+    if (source.type === 'playlist') {
+      const items = await this.native.loadPlaylistItems(source.playlist.id);
+      return !items.some((item) => item.id === trackID);
+    }
+    const removedID = await this.native.findPlaylistByName(APPLE_REMOVED_PLAYLIST);
+    if (removedID == null) return false;
+    const items = await this.native.loadPlaylistItems(removedID);
+    return items.some((item) => item.id === trackID);
   }
 
   async addToLibrary(trackIDs: string[]): Promise<void> {

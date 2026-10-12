@@ -7,8 +7,9 @@ name: "Failed Removal Shows the Removal-Errors Warning"
 # their own).
 #
 # Injection: the e2e-simulator build bakes EXPO_PUBLIC_MOCK_FAIL_REMOVES=1
-# into the bundle (eas.json), which makes MockMusicProvider reject the FIRST
-# removeFromLibrary call of each app launch; later calls succeed. This is
+# into the bundle (eas.json), which makes MockMusicProvider fail the library
+# removal of the FIRST song removed in each app launch, retries included
+# (#151 retries failed removals); other songs' removals succeed. This is
 # only safe because of a flow audit (see the injection comment in
 # MockMusicProvider.ts): the only other flows that remove from the library
 # are 03, which never reaches Done and asserts only DECIDE-driven stats that
@@ -18,7 +19,7 @@ name: "Failed Removal Shows the Removal-Errors Warning"
 # on it.
 #
 # Default sort is Least Played, so the first card is "Peaches" (playCount
-# 28). Removing it consumes the injected failure: the decision itself still
+# 28). Removing it takes the injected failure: the decision itself still
 # counts (removal intent is always logged), but the native removal fails and
 # is queued into removalErrors for the Done screen's warning block.
 - launchApp:

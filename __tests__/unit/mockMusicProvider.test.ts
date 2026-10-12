@@ -373,14 +373,23 @@ describe('MockMusicProvider failure injection (EXPO_PUBLIC_MOCK_FAIL_ADDS / _REM
     await expect(second.addToPlaylist('p1', ['t4'])).resolves.toBeUndefined();
   });
 
-  test('FAIL_REMOVES=1 rejects the first removeFromLibrary launch-wide, then succeeds; playlist removes and adds are untouched', async () => {
+  test('FAIL_REMOVES=1 fails the first removed song launch-wide, retries included, then lets others through; playlist removes and adds are untouched', async () => {
     process.env[REMOVES_ENV_KEY] = '1';
     const Fresh = freshMockClass();
     const provider = new Fresh();
     await expect(provider.removeFromLibrary(['t1'])).rejects.toThrow(
       'Simulated remove failure (EXPO_PUBLIC_MOCK_FAIL_REMOVES)',
     );
+    // A retry of the same song can't heal the injected failure (#151)...
+    await expect(new Fresh().removeFromLibrary(['t1'])).rejects.toThrow('Simulated remove failure');
+    // ...and other songs go through.
     await expect(provider.removeFromLibrary(['t2'])).resolves.toBeUndefined();
+    await expect(provider.removeFromLibrary(['t3'])).resolves.toBeUndefined();
+    // Only the landed library removals show as landed.
+    await expect(provider.removalLanded({ type: 'library' }, 't2')).resolves.toBe(true);
+    await expect(provider.removalLanded({ type: 'library' }, 't1')).resolves.toBe(false);
+    const playlist = { type: 'playlist' as const, playlist: { id: 'p1', name: 'P', trackCount: 1 } };
+    await expect(provider.removalLanded(playlist, 't2')).resolves.toBe(false);
     // removeFromPlaylist is deliberately never injected (Start Over /
     // Re-sift clears depend on it), and adds have their own knob.
     await expect(provider.removeFromPlaylist('p1', ['t1'])).resolves.toBeUndefined();

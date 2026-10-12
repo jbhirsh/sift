@@ -126,6 +126,8 @@ type SiftAction =
   | { type: 'SET_PLAYLIST_ERROR'; error: string | null }
   | { type: 'SET_CREATING_PLAYLIST'; creating: boolean }
   | { type: 'ADD_REMOVAL_ERROR'; error: string; failedRemovalId?: string }
+  /** A failed removal landed on a retry (#151): it's no longer a failure. */
+  | { type: 'CLEAR_REMOVAL_FAILURE'; trackId: string; error: string }
   | { type: 'ADD_PENDING_KEEP'; track: Track }
   | { type: 'REMOVE_PENDING_KEEPS'; trackIds: string[] }
   | { type: 'SET_SIFTED_PLAYLIST_ID'; id: string | null }
@@ -293,6 +295,19 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
           failedRemovalIds: [...state.failedRemovalIds, action.failedRemovalId],
         }),
       };
+
+    case 'CLEAR_REMOVAL_FAILURE': {
+      if (!state.failedRemovalIds.includes(action.trackId)) return state;
+      // removalErrors holds names for display; drop one entry for this song.
+      const errorIndex = state.removalErrors.indexOf(action.error);
+      return {
+        ...state,
+        failedRemovalIds: state.failedRemovalIds.filter((id) => id !== action.trackId),
+        removalErrors: errorIndex < 0
+          ? state.removalErrors
+          : state.removalErrors.filter((_, i) => i !== errorIndex),
+      };
+    }
 
     case 'ADD_PENDING_KEEP': {
       if (state.pendingKeeps.some((t) => t.id === action.track.id)) return state;
