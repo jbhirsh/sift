@@ -68,6 +68,12 @@ jobs:
       - name: Dependency graph
         run: npx depcruise src
 
+      - name: Native bridge
+        # Keeps modules/expo-musickit thin: every native function is listed
+        # in native-api.json, Swift and TypeScript surfaces match, and size
+        # budgets hold (scripts/nativeBridge.ts).
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-bridge.mjs
+
       - name: Test with coverage
         run: npx jest --coverage
 
