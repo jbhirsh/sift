@@ -2,8 +2,8 @@ import type { MusicProvider, RemovalRecord } from '../types';
 
 /**
  * Where an Apple Music library Remove puts a song. MusicKit can't delete
- * from the library, so the native module collects removed songs in this
- * playlist for the user to delete in Music (ExpoMusicKitModule.swift).
+ * from the library, so AppleMusicProvider.removeFromLibrary collects
+ * removed songs in this playlist for the user to delete in Music.
  */
 export const APPLE_REMOVED_PLAYLIST = 'Sift — Removed';
 

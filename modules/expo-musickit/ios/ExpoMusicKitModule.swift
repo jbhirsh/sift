@@ -3,21 +3,33 @@ import ExpoModulesCore
 import MusicKit
 import ShazamKit
 
-// Pure decision logic (batch slicing, catalog pairing, createPlaylist
-// accounting, cache keying) lives in ../logic/Sources/MusicKitLogic — the
-// podspec's source_files glob compiles those files into this same target,
-// so the functions are called directly without an import. The SwiftPM
-// package at ../logic exists purely so `swift test` can exercise them.
+// A thin bridge: each function asks MusicKit, ShazamKit or the player one
+// thing and hands back raw values. Every decision (defaults, which artwork
+// to trust, lookup order, catalog id pairing, batching, counting what
+// landed, the "Sift — Removed" policy, which preview to fingerprint) lives
+// in TypeScript (src/utils/musicKit.ts, src/services/AppleMusicProvider.ts),
+// where it ships with an EAS Update instead of a reinstall and is covered by
+// Jest and mutation tests. Keep it that way: add a primitive here, put the
+// policy there.
+//
+// What has to stay here: MusicKit objects (Song, Track, Playlist) can't
+// cross the bridge, so the module caches them by id and later calls (play,
+// add to a playlist) refer to them by that id.
 
 public class ExpoMusicKitModule: Module {
-  /// Cached Song objects keyed by MusicItemID raw value.
-  /// Populated by loadFullLibrary and used for playback lookups.
-  private var songCache: [String: Song] = [:]
-  /// Cached Track objects for playlist tracks not in the user's library.
-  /// Used as a playback fallback when Song lookup fails.
-  private var trackCache: [String: Track] = [:]
+  // Locked: sync Functions run on the JS thread while AsyncFunctions run on
+  // Swift concurrency threads, and both read and write these.
+  /// Library or catalog Songs, keyed by the id callers use for them.
+  private let songCache = LockedCache<Song>()
+  /// Playlist entries that aren't library songs, keyed by id. Used when no
+  /// Song is cached under the same id.
+  private let trackCache = LockedCache<Track>()
+  /// Playlists created here, keyed by id: one created moments ago may not be
+  /// visible to a library request yet. Only a fallback, so edits never work
+  /// from an old copy of a playlist the library can still answer for.
+  private let createdPlaylists = LockedCache<MusicKit.Playlist>()
   /// Resolved artwork file paths keyed by track ID.
-  private var artworkCache: [String: String] = [:]
+  private let artworkCache = LockedCache<String>()
 
   private let dateFormatter: ISO8601DateFormatter = {
     let formatter = ISO8601DateFormatter()
@@ -50,146 +62,130 @@ public class ExpoMusicKitModule: Module {
       }
     }
 
-    // MARK: - Library
+    // MARK: - Loading
 
-    AsyncFunction("loadFullLibrary") { () -> [[String: Any]] in
-      guard MusicAuthorization.currentStatus == .authorized else {
-        throw MusicKitError.notAuthorized
-      }
-
-      var allSongs: [Song] = []
-      var offset = 0
-      let pageSize = 500
-
-      while true {
-        var request = MusicLibraryRequest<Song>()
-        request.limit = pageSize
-        request.offset = offset
-        let response = try await request.response()
-        let page = Array(response.items)
-        allSongs.append(contentsOf: page)
-        if page.count < pageSize { break }
-        offset += pageSize
-      }
-
-      var results: [[String: Any]] = []
-      for song in allSongs {
+    /// One page of the user's library songs (raw tracks), cached by id.
+    AsyncFunction("loadLibraryPage") { (offset: Int, limit: Int) -> [[String: Any]] in
+      try self.requireAuthorization()
+      var request = MusicLibraryRequest<Song>()
+      request.limit = limit
+      request.offset = offset
+      let response = try await request.response()
+      return response.items.map { song in
         self.songCache[song.id.rawValue] = song
-        results.append(self.songToDictionary(song))
+        return self.rawSong(song)
       }
-      return results
     }
 
-    // MARK: - Playlist Loading
-
-    AsyncFunction("loadPlaylists") { () -> [[String: Any]] in
-      guard MusicAuthorization.currentStatus == .authorized else {
-        throw MusicKitError.notAuthorized
-      }
-
-      var allPlaylists: [MusicKit.Playlist] = []
-      var offset = 0
-      let pageSize = 100
-
-      while true {
-        var request = MusicLibraryRequest<MusicKit.Playlist>()
-        request.limit = pageSize
-        request.offset = offset
-        let response = try await request.response()
-        let page = Array(response.items)
-        allPlaylists.append(contentsOf: page)
-        if page.count < pageSize { break }
-        offset += pageSize
-      }
-
+    /// One page of the user's playlists, each with its track count.
+    AsyncFunction("loadPlaylistsPage") { (offset: Int, limit: Int) -> [[String: Any]] in
+      try self.requireAuthorization()
+      var request = MusicLibraryRequest<MusicKit.Playlist>()
+      request.limit = limit
+      request.offset = offset
+      let response = try await request.response()
       var results: [[String: Any]] = []
-      for playlist in allPlaylists {
+      for playlist in response.items {
         let detailed = try await playlist.with([.tracks])
-        let trackCount = detailed.tracks?.count ?? 0
-
-        var dict: [String: Any] = [
+        results.append([
           "id": playlist.id.rawValue,
           "name": playlist.name,
-          "trackCount": trackCount,
-        ]
-
-        if let artwork = playlist.artwork, let url = artwork.url(width: 300, height: 300),
-           url.scheme == "https" || url.scheme == "http" {
-          dict["artworkURL"] = url.absoluteString
-        } else {
-          dict["artworkURL"] = NSNull()
-        }
-
-        results.append(dict)
+          "trackCount": detailed.tracks?.count ?? 0,
+          "artworkURL": nullable(playlist.artwork?.url(width: 300, height: 300)?.absoluteString),
+        ])
       }
       return results
     }
 
-    AsyncFunction("loadPlaylistTracks") { (playlistID: String) -> [[String: Any]] in
-      guard MusicAuthorization.currentStatus == .authorized else {
-        throw MusicKitError.notAuthorized
+    /// A playlist's entries as raw tracks, in playlist order, cached by id.
+    AsyncFunction("loadPlaylistItems") { (playlistID: String) -> [[String: Any]] in
+      try self.requireAuthorization()
+      let playlist = try await self.playlist(withID: playlistID)
+      let detailed = try await playlist.with([.tracks])
+      guard let tracks = detailed.tracks else { return [] }
+      return tracks.map { track in
+        self.trackCache[track.id.rawValue] = track
+        return self.rawTrack(track)
       }
+    }
 
-      var request = MusicLibraryRequest<MusicKit.Playlist>()
-      request.filter(matching: \.id, equalTo: MusicItemID(playlistID))
-      let response = try await request.response()
+    // MARK: - Lookups
 
-      guard let playlist = response.items.first else {
-        throw MusicKitError.noTracksFound
-      }
-
-      let detailedPlaylist = try await playlist.with([.tracks])
-
-      guard let tracks = detailedPlaylist.tracks else {
-        return []
-      }
-
-      // Fetch per-track Song lookups concurrently so large playlists
-      // don't stall on serial round-trips, but in batches of 100 so a huge
-      // playlist doesn't fan out unbounded concurrent requests.
-      // Preserve playlist order via index.
-      let tracksArray = Array(tracks)
-      let batchSize = 100
-      var songResults: [(Int, Track, Song?)] = []
-      for range in batchRanges(count: tracksArray.count, batchSize: batchSize) {
-        let batchResults = await withTaskGroup(of: (Int, Track, Song?).self) { group -> [(Int, Track, Song?)] in
-          for index in range {
-            let track = tracksArray[index]
-            group.addTask {
-              do {
-                var songRequest = MusicLibraryRequest<Song>()
-                songRequest.filter(matching: \.id, equalTo: track.id)
-                let songResponse = try await songRequest.response()
-                return (index, track, songResponse.items.first)
-              } catch {
-                // A transient per-track failure must not reject the whole
-                // call (discarding every already-resolved track). Treat it
-                // like a library miss: the Track-metadata fallback below
-                // still returns the track.
-                return (index, track, nil)
-              }
+    /// Look each id up as a library Song, concurrently. One result per id,
+    /// in order: the song (raw) or null, and whether the lookup itself
+    /// failed (as opposed to finding nothing). Found songs are cached under
+    /// the requested id and their own.
+    AsyncFunction("lookupLibrarySongs") { (ids: [String]) -> [[String: Any]] in
+      try self.requireAuthorization()
+      let found = await withTaskGroup(of: (Int, Song?, Bool).self) { group -> [(Int, Song?, Bool)] in
+        for (index, id) in ids.enumerated() {
+          group.addTask {
+            do {
+              var request = MusicLibraryRequest<Song>()
+              request.filter(matching: \.id, equalTo: MusicItemID(id))
+              let song = try await request.response().items.first
+              return (index, song, false)
+            } catch {
+              return (index, nil, true)
             }
           }
-          var out: [(Int, Track, Song?)] = []
-          for await r in group { out.append(r) }
-          return out
         }
-        songResults.append(contentsOf: batchResults)
+        var out: [(Int, Song?, Bool)] = []
+        for await result in group { out.append(result) }
+        return out.sorted { $0.0 < $1.0 }
       }
-      songResults.sort { $0.0 < $1.0 }
-
-      var results: [[String: Any]] = []
-      for (_, track, song) in songResults {
+      return found.map { index, song, failed -> [String: Any] in
+        let id = ids[index]
         if let song {
+          self.songCache[id] = song
           self.songCache[song.id.rawValue] = song
-          results.append(self.songToDictionary(song))
-        } else {
-          // Track not in library — use Track metadata directly
-          self.trackCache[track.id.rawValue] = track
-          results.append(self.trackToDictionary(track))
         }
+        return [
+          "id": id,
+          "song": song.map { self.rawSong($0) as Any } ?? NSNull(),
+          "failed": failed,
+        ]
       }
-      return results
+    }
+
+    /// One catalog request for these ids. Returns every song the catalog
+    /// answered with (raw, under its own id, which can differ from the
+    /// requested one), each cached under its own id. Throws when the request
+    /// fails (offline, no subscription).
+    AsyncFunction("lookupCatalogSongs") { (ids: [String]) -> [[String: Any]] in
+      try self.requireAuthorization()
+      let request = MusicCatalogResourceRequest<Song>(matching: \.id, memberOf: ids.map { MusicItemID($0) })
+      let response = try await request.response()
+      return response.items.map { song in
+        self.songCache.setIfAbsent(song, for: song.id.rawValue)
+        return self.rawSong(song)
+      }
+    }
+
+    /// Make the item cached under `fromID` answer to `toID` too, unless
+    /// something is already cached there. False when nothing is cached
+    /// under `fromID`.
+    Function("aliasCachedItem") { (fromID: String, toID: String) -> Bool in
+      if let song = self.songCache[fromID] {
+        self.songCache.setIfAbsent(song, for: toID)
+        return true
+      }
+      if let track = self.trackCache[fromID] {
+        self.trackCache.setIfAbsent(track, for: toID)
+        return true
+      }
+      return false
+    }
+
+    /// What is cached for each id: "song", "track" (a playlist entry that
+    /// isn't a library song) or null. A Song wins over a Track, as it does
+    /// for playback and adds.
+    Function("cachedKinds") { (ids: [String]) -> [Any] in
+      ids.map { id -> Any in
+        if self.songCache[id] != nil { return "song" }
+        if self.trackCache[id] != nil { return "track" }
+        return NSNull()
+      }
     }
 
     // MARK: - Playback
@@ -238,184 +234,144 @@ public class ExpoMusicKitModule: Module {
       ]
     }
 
-    // MARK: - Playlist
+    // MARK: - Playlists
 
-    AsyncFunction("createPlaylist") { (name: String, trackIDs: [String]) -> Int in
-      // Resolve cache misses via the library, then the catalog (same
-      // fallback as warmSongCache) so non-library tracks are not dropped.
-      await self.resolveTracksIntoCaches(trackIDs)
-
-      // Classify each requested id against the caches; the count accounting
-      // is pure logic (see MusicKitLogic). IDs that are still unresolvable
-      // (not in the library and not in the catalog) are skipped; the
-      // returned count lets the JS side surface the shortfall.
-      let resolutions = self.resolutions(for: trackIDs)
-      guard resolvableCount(resolutions) > 0 else {
-        throw MusicKitError.noTracksFound
-      }
-
-      // One path for every mix of library/non-library items: create the
-      // playlist empty, then add each item individually in caller order.
-      // A single bulk createPlaylist(name:items:) call is all-or-nothing —
-      // one unaddable item (revoked availability, transient MusicKit error)
-      // would fail the whole batch with no playlist and no count. And a
-      // bulk-then-retry fallback is unsafe: if the bulk call throws AFTER
-      // creating the playlist, the retry would create a same-named
-      // duplicate. Per-item adds keep caller order, survive individual
-      // failures (each is caught, counted as shortfall), and feed the
-      // returned count the JS buffer/report handling relies on.
+    /// Create an empty playlist; returns its id.
+    AsyncFunction("createEmptyPlaylist") { (name: String) -> String in
+      try self.requireAuthorization()
       let playlist = try await MusicLibrary.shared.createPlaylist(name: name)
-      let outcomes = await self.addEach(trackIDs, to: playlist)
-      return mixedAddedCount(resolutions: resolutions, outcomes: outcomes)
+      self.createdPlaylists[playlist.id.rawValue] = playlist
+      return playlist.id.rawValue
     }
 
-    // MARK: - Removal
-
-    AsyncFunction("removeFromLibrary") { (trackIDs: [String]) in
-      guard MusicAuthorization.currentStatus == .authorized else {
-        throw MusicKitError.notAuthorized
+    /// The id of a playlist with exactly this name, or null: one created
+    /// here (the library may not list it yet), else the library's first.
+    AsyncFunction("findPlaylistByName") { (name: String) -> String? in
+      try self.requireAuthorization()
+      if let created = self.createdPlaylists.values.first(where: { $0.name == name }) {
+        return created.id.rawValue
       }
-
-      var songs: [Song] = []
-      for id in trackIDs {
-        if let song = self.songCache[id] {
-          songs.append(song)
-        } else {
-          var request = MusicLibraryRequest<Song>()
-          request.filter(matching: \.id, equalTo: MusicItemID(id))
-          let response = try await request.response()
-          if let song = response.items.first {
-            songs.append(song)
-          }
-        }
-      }
-
-      guard !songs.isEmpty else {
-        throw MusicKitError.noTracksFound
-      }
-
-      // MusicKit does not support deleting from the library.
-      // Move tracks to a "Sift — Removed" playlist so the user can
-      // review and delete them manually in the Music app.
-      let playlistName = "Sift — Removed"
-      var playlistRequest = MusicLibraryRequest<MusicKit.Playlist>()
-      let allPlaylists = try await playlistRequest.response()
-      let existing = allPlaylists.items.first { $0.name == playlistName }
-
-      if let playlist = existing {
-        for song in songs {
-          _ = try await MusicLibrary.shared.add(song, to: playlist)
-        }
-      } else {
-        _ = try await MusicLibrary.shared.createPlaylist(name: playlistName, items: songs)
-      }
-    }
-
-    AsyncFunction("removeFromPlaylist") { (playlistID: String, trackIDs: [String]) in
-      guard MusicAuthorization.currentStatus == .authorized else {
-        throw MusicKitError.notAuthorized
-      }
-
-      var request = MusicLibraryRequest<MusicKit.Playlist>()
-      request.filter(matching: \.id, equalTo: MusicItemID(playlistID))
+      let request = MusicLibraryRequest<MusicKit.Playlist>()
       let response = try await request.response()
+      return response.items.first(where: { $0.name == name })?.id.rawValue
+    }
 
-      guard let playlist = response.items.first else {
-        throw MusicKitError.noTracksFound
+    /// Add each cached item to the playlist individually, in order. One
+    /// result per id: "added", "failed" (MusicKit refused it) or
+    /// "unresolved" (nothing cached under the id; no attempt made). Throws
+    /// only when the playlist itself can't be found.
+    AsyncFunction("addEachToPlaylist") { (playlistID: String, ids: [String]) -> [String] in
+      try self.requireAuthorization()
+      let playlist = try await self.playlist(withID: playlistID)
+      var results: [String] = []
+      for id in ids {
+        do {
+          if let song = self.songCache[id] {
+            _ = try await MusicLibrary.shared.add(song, to: playlist)
+            results.append("added")
+          } else if let track = self.trackCache[id] {
+            _ = try await MusicLibrary.shared.add(track, to: playlist)
+            results.append("added")
+          } else {
+            results.append("unresolved")
+          }
+        } catch {
+          results.append("failed")
+        }
       }
+      return results
+    }
 
+    /// Remove every entry with one of these ids from the playlist.
+    AsyncFunction("removeFromPlaylist") { (playlistID: String, trackIDs: [String]) in
+      try self.requireAuthorization()
+      let playlist = try await self.playlist(withID: playlistID)
       let detailedPlaylist = try await playlist.with([.tracks])
       guard let currentTracks = detailedPlaylist.tracks else { return }
-
       let idsToRemove = Set(trackIDs)
       let remaining = currentTracks.filter { !idsToRemove.contains($0.id.rawValue) }
-
       try await MusicLibrary.shared.edit(detailedPlaylist, items: remaining)
     }
 
-    AsyncFunction("addToLibrary") { (trackIDs: [String]) in
-      guard MusicAuthorization.currentStatus == .authorized else {
-        throw MusicKitError.notAuthorized
-      }
-
-      for id in trackIDs {
-        let song: Song
-        if let cached = self.songCache[id] {
-          song = cached
-        } else {
-          var request = MusicLibraryRequest<Song>()
-          request.filter(matching: \.id, equalTo: MusicItemID(id))
-          let response = try await request.response()
-          guard let found = response.items.first else { continue }
-          song = found
-          self.songCache[id] = song
+    /// Add each cached library Song to the library, in order. One result
+    /// per id: "added", "failed" or "unresolved" (no Song cached under it).
+    AsyncFunction("addEachToLibrary") { (ids: [String]) -> [String] in
+      try self.requireAuthorization()
+      var results: [String] = []
+      for id in ids {
+        guard let song = self.songCache[id] else {
+          results.append("unresolved")
+          continue
         }
-        try await MusicLibrary.shared.add(song)
+        do {
+          try await MusicLibrary.shared.add(song)
+          results.append("added")
+        } catch {
+          results.append("failed")
+        }
+      }
+      return results
+    }
+
+    // MARK: - Preview clips ("Start at chorus")
+
+    /// What is known about a cached song's preview: its own preview URL,
+    /// ISRC, title, artist and duration. Null for a cached item that isn't
+    /// a song (a music video has no preview to match). Throws when nothing
+    /// is cached yet (a resumed session still warming), so the caller
+    /// retries later instead of remembering "no answer".
+    AsyncFunction("previewInfo") { (trackID: String) -> [String: Any]? in
+      let song: Song
+      if let cached = self.songCache[trackID] {
+        song = cached
+      } else if let track = self.trackCache[trackID] {
+        guard case .song(let trackSong) = track else { return nil }
+        song = trackSong
+      } else {
+        throw MusicKitError.trackNotFound(trackID)
+      }
+      return [
+        "previewURL": nullable(song.previewAssets?.first?.url?.absoluteString),
+        "isrc": nullable(song.isrc),
+        "title": song.title,
+        "artist": song.artistName,
+        "duration": nullable(song.duration),
+      ]
+    }
+
+    /// The preview URL of the first catalog song with this ISRC, or null.
+    AsyncFunction("catalogPreviewForISRC") { (isrc: String) -> String? in
+      let request = MusicCatalogResourceRequest<Song>(matching: \.isrc, equalTo: isrc)
+      return try await request.response().items.first?.previewAssets?.first?.url?.absoluteString
+    }
+
+    /// Catalog search hits for a term: id, title, artist, duration and
+    /// preview URL of each.
+    AsyncFunction("searchCatalogSongs") { (term: String, limit: Int) -> [[String: Any]] in
+      var search = MusicCatalogSearchRequest(term: term, types: [Song.self])
+      search.limit = limit
+      let response = try await search.response()
+      return response.songs.map { song in
+        [
+          "id": song.id.rawValue,
+          "title": song.title,
+          "artist": song.artistName,
+          "duration": nullable(song.duration),
+          "previewURL": nullable(song.previewAssets?.first?.url?.absoluteString),
+        ]
       }
     }
 
-    AsyncFunction("addToPlaylist") { (playlistID: String, trackIDs: [String]) -> Int in
-      guard MusicAuthorization.currentStatus == .authorized else {
-        throw MusicKitError.notAuthorized
-      }
-
-      var request = MusicLibraryRequest<MusicKit.Playlist>()
-      request.filter(matching: \.id, equalTo: MusicItemID(playlistID))
-      let response = try await request.response()
-
-      guard let playlist = response.items.first else {
-        throw MusicKitError.noTracksFound
-      }
-
-      // Resolve cache misses via the library, then the catalog (same
-      // fallback as warmSongCache) so non-library tracks are not dropped.
-      await self.resolveTracksIntoCaches(trackIDs)
-
-      // Genuinely unresolvable IDs are skipped; the returned count lets the
-      // JS side detect the shortfall and buffer/report the missing tracks
-      // instead of treating the call as a silent success. Adds are per-item
-      // with per-item error tolerance (addEach) — same rationale as
-      // createPlaylist: a mid-loop throw must cost only its own item, never
-      // reject the call after earlier items already landed, or the JS side
-      // gets a raw error instead of the count its shortfall handling needs.
-      let resolutions = self.resolutions(for: trackIDs)
-      let outcomes = await self.addEach(trackIDs, to: playlist)
-      return mixedAddedCount(resolutions: resolutions, outcomes: outcomes)
+    /// Where a preview clip sits in its full recording, in seconds, found
+    /// with ShazamKit; null for no match. Throws when the download or
+    /// ShazamKit failed (for example the ShazamKit App Service isn't enabled
+    /// for this app ID), so the caller retries another time.
+    AsyncFunction("shazamOffset") { (previewURL: String) -> Double? in
+      guard let url = URL(string: previewURL) else { return nil }
+      return try await shazamOffset(ofPreviewAt: url)
     }
 
-    // MARK: - Cache Warming
-
-    AsyncFunction("warmSongCache") { (trackIDs: [String]) -> Int in
-      guard MusicAuthorization.currentStatus == .authorized else {
-        throw MusicKitError.notAuthorized
-      }
-
-      // Unified onto resolveTracksIntoCaches: identical library-then-catalog
-      // fallback, batching, and per-lookup error tolerance. Returns how many
-      // of the REQUESTED ids are now resolvable (already-cached ones
-      // included) so the JS side can breadcrumb a genuine shortfall.
-      await self.resolveTracksIntoCaches(trackIDs)
-      return trackIDs.filter { self.songCache[$0] != nil || self.trackCache[$0] != nil }.count
-    }
-
-    // MARK: - Artwork Resolution
-
-    // MARK: - Chorus hint
-
-    /// Where the track's Apple Music preview starts within the full track, in
-    /// seconds, or nil. Labels pick previews to start at "the good part", so
-    /// "Start at chorus" uses this when lyrics can't locate the chorus. The
-    /// preview (a DRM-free 30-second clip) is downloaded, fingerprinted with
-    /// ShazamKit and matched against Shazam's catalog: the match's offset is
-    /// where the clip sits in the recording. Returns nil when there is no
-    /// answer to find (no preview, no match); throws when the lookup failed
-    /// for now (track not loaded yet, offline, a ShazamKit error such as the
-    /// ShazamKit App Service not being enabled for this app ID), so the JS
-    /// side retries another time instead of remembering "no answer".
-    AsyncFunction("previewOffset") { (trackID: String) -> Double? in
-      guard let previewURL = try await self.previewURL(for: trackID) else { return nil }
-      return try await shazamOffset(ofPreviewAt: previewURL)
-    }
+    // MARK: - Artwork
 
     AsyncFunction("resolveArtworkURL") { (trackID: String, width: Int, height: Int) -> String? in
       // Return cached result immediately
@@ -460,259 +416,57 @@ public class ExpoMusicKitModule: Module {
 
   // MARK: - Helpers
 
-  /// How each requested id resolves against the caches, in caller order.
-  private func resolutions(for trackIDs: [String]) -> [PlaylistItemResolution] {
-    trackIDs.map { id in
-      if self.songCache[id] != nil { return .librarySong }
-      if self.trackCache[id] != nil { return .nonLibraryTrack }
-      return .unresolved
+  private func requireAuthorization() throws {
+    guard MusicAuthorization.currentStatus == .authorized else {
+      throw MusicKitError.notAuthorized
     }
   }
 
-  /// Add each resolvable id to the playlist individually, in caller order,
-  /// catching per-item errors. Returns one outcome per RESOLVABLE item
-  /// (unresolved ids get no attempt and no outcome slot) — exactly the
-  /// shape mixedAddedCount expects.
-  private func addEach(_ trackIDs: [String], to playlist: MusicKit.Playlist) async -> [Bool] {
-    var outcomes: [Bool] = []
-    for id in trackIDs {
-      do {
-        if let song = self.songCache[id] {
-          _ = try await MusicLibrary.shared.add(song, to: playlist)
-          outcomes.append(true)
-        } else if let track = self.trackCache[id] {
-          _ = try await MusicLibrary.shared.add(track, to: playlist)
-          outcomes.append(true)
-        }
-        // Unresolved ids: no attempt, no outcome slot.
-      } catch {
-        // Skipped — counted as shortfall by mixedAddedCount.
-        outcomes.append(false)
-      }
-    }
-    return outcomes
+  /// A playlist by id, fresh from the library; one created here only when
+  /// the library doesn't list it yet.
+  private func playlist(withID id: String) async throws -> MusicKit.Playlist {
+    var request = MusicLibraryRequest<MusicKit.Playlist>()
+    request.filter(matching: \.id, equalTo: MusicItemID(id))
+    if let playlist = try await request.response().items.first { return playlist }
+    if let created = self.createdPlaylists[id] { return created }
+    throw MusicKitError.noTracksFound
   }
 
-  /// Resolve any track IDs missing from both caches: first via the user's
-  /// library, then via the Apple Music catalog in batches (playlist tracks
-  /// that are not library items never resolve through MusicLibraryRequest).
-  /// Individual lookup failures and catalog failures (offline, no
-  /// subscription) are non-fatal; genuinely unresolvable IDs simply stay
-  /// uncached for the caller to skip and count. Returns how many songs were
-  /// newly cached.
-  @discardableResult
-  private func resolveTracksIntoCaches(_ trackIDs: [String]) async -> Int {
-    // De-duplicated: a repeated id must not spawn duplicate concurrent
-    // lookups or increment `resolved` once per occurrence — callers diff
-    // the count against distinct ids.
-    let missing = uniquePreservingOrder(
-      trackIDs.filter { self.songCache[$0] == nil && self.trackCache[$0] == nil }
-    )
-    guard !missing.isEmpty else { return 0 }
-
-    // Library lookups run concurrently in batches so a full playlist of
-    // cache misses doesn't stall on serial round-trips. Order doesn't matter
-    // here — this only populates the caches; callers rebuild their ordered
-    // lists afterwards. Per-task errors are caught so one transient failure
-    // routes that id into the catalog fallback / shortfall accounting
-    // instead of aborting the whole group.
-    let batchSize = 100
-    var resolved = 0
-    var stillMissing: [String] = []
-    for range in batchRanges(count: missing.count, batchSize: batchSize) {
-      let batch = Array(missing[range])
-      let batchResults = await withTaskGroup(of: (String, Song?).self) { group -> [(String, Song?)] in
-        for id in batch {
-          group.addTask {
-            do {
-              var request = MusicLibraryRequest<Song>()
-              request.filter(matching: \.id, equalTo: MusicItemID(id))
-              let response = try await request.response()
-              return (id, response.items.first)
-            } catch {
-              return (id, nil)
-            }
-          }
-        }
-        var results: [(String, Song?)] = []
-        for await result in group {
-          results.append(result)
-        }
-        return results
-      }
-      for (id, song) in batchResults {
-        if let song {
-          self.songCache[id] = song
-          resolved += 1
-        } else {
-          stillMissing.append(id)
-        }
-      }
-    }
-
-    guard !stillMissing.isEmpty else { return resolved }
-
-    for range in batchRanges(count: stillMissing.count, batchSize: batchSize) {
-      let batch = Array(stillMissing[range])
-      let catalogRequest = MusicCatalogResourceRequest<Song>(
-        matching: \.id,
-        memberOf: batch.map { MusicItemID($0) }
-      )
-      guard let catalogResponse = try? await catalogRequest.response() else { continue }
-
-      let requestedIDs = Set(batch)
-      var unmatchedResponses: [Song] = []
-      for song in catalogResponse.items {
-        if requestedIDs.contains(song.id.rawValue) {
-          if self.songCache[song.id.rawValue] == nil {
-            self.songCache[song.id.rawValue] = song
-            resolved += 1
-          }
-        } else {
-          unmatchedResponses.append(song)
-        }
-      }
-
-      // The catalog occasionally canonicalizes an id, answering with the
-      // same song under a different identifier. Callers look tracks up by
-      // the id they REQUESTED, so keying only by the response id would
-      // leave that id a permanent cache miss. The pairing decision is the
-      // pure canonicalPairing (MusicKitLogic): it requires the 1:1 count
-      // match AND that the requested song's known metadata (title/artist,
-      // duration within 1s when both known) matches the response —
-      // counting alone can mis-pair when one requested id genuinely failed
-      // and an unrelated extra item appeared.
-      //
-      // NOTE: an id reaches this fallback precisely because it missed both
-      // caches, so knownMetadata(for:) is nil here today (a concurrent call
-      // filling the cache mid-flight is the only exception) and the pairing
-      // stays unresolved — the safe shortfall path, which the JS side
-      // surfaces via error/pendingKeeps handling. Plumbing requested-side
-      // track metadata down from JS would light this up again without
-      // re-auditing safety.
-      let unansweredRequests = batch.filter {
-        self.songCache[$0] == nil && self.trackCache[$0] == nil
-      }
-      let unmatchedCandidates = unmatchedResponses.map {
-        CandidateSong(id: $0.id.rawValue, title: $0.title, artist: $0.artistName, duration: $0.duration)
-      }
-      let requestedMetadata = unansweredRequests.count == 1
-        ? self.knownMetadata(for: unansweredRequests[0])
-        : nil
-      if let pairing = canonicalPairing(
-        unansweredRequestIDs: unansweredRequests,
-        unmatchedResponses: unmatchedCandidates,
-        requestedMetadata: requestedMetadata
-      ), let song = unmatchedResponses.first(where: { $0.id.rawValue == pairing.response.id }) {
-        // Key under the requested id (what callers use) and the response id
-        // (what later catalog answers would use), so both resolve.
-        for key in cacheKeys(requestedID: pairing.requestID, responseID: song.id.rawValue)
-        where self.songCache[key] == nil {
-          self.songCache[key] = song
-        }
-        resolved += 1
-      }
-    }
-    return resolved
-  }
-
-  /// The preview clip URL for a track. Library songs usually carry no
-  /// previews, so fall back to the same song in the Apple Music catalog: by
-  /// ISRC when known, otherwise the closest-duration search hit for the same
-  /// title and artist.
-  private func previewURL(for trackID: String) async throws -> URL? {
-    let song: Song
-    if let cached = self.songCache[trackID] {
-      song = cached
-    } else if let track = self.trackCache[trackID] {
-      guard case .song(let trackSong) = track else { return nil }
-      song = trackSong
-    } else {
-      // Not loaded yet (e.g. a resumed session still warming the cache).
-      throw MusicKitError.trackNotFound(trackID)
-    }
-    if let url = song.previewAssets?.first?.url { return url }
-
-    if let isrc = song.isrc {
-      let request = MusicCatalogResourceRequest<Song>(matching: \.isrc, equalTo: isrc)
-      if let url = try await request.response().items.first?.previewAssets?.first?.url {
-        return url
-      }
-    }
-
-    var search = MusicCatalogSearchRequest(term: "\(song.title) \(song.artistName)", types: [Song.self])
-    search.limit = 10
-    let results = try await search.response().songs
-    let candidates = results.filter {
-      $0.title.lowercased() == song.title.lowercased()
-        && $0.artistName.lowercased() == song.artistName.lowercased()
-    }
-    let target = song.duration ?? 0
-    let best = candidates.min {
-      abs(($0.duration ?? 0) - target) < abs(($1.duration ?? 0) - target)
-    }
-    guard let best, abs((best.duration ?? 0) - target) <= 3 else { return nil }
-    return best.previewAssets?.first?.url
-  }
-
-  /// Metadata this module already knows for a track id, if any — used to
-  /// validate a canonicalized catalog pairing (see canonicalPairing).
-  private func knownMetadata(for id: String) -> CandidateSong? {
-    if let song = self.songCache[id] {
-      return CandidateSong(id: id, title: song.title, artist: song.artistName, duration: song.duration)
-    }
-    if let track = self.trackCache[id] {
-      return CandidateSong(id: id, title: track.title, artist: track.artistName, duration: track.duration)
-    }
-    return nil
-  }
-
-  private func trackToDictionary(_ track: Track) -> [String: Any] {
-    var dict: [String: Any] = [
-      "id": track.id.rawValue,
-      "name": track.title,
-      "artist": track.artistName,
-      "album": track.albumTitle ?? "",
-      "duration": track.duration ?? 0,
-      "playCount": 0,
-      "dateAdded": "",
-    ]
-
-    if let artwork = track.artwork, let url = artwork.url(width: 600, height: 600),
-       url.scheme == "https" || url.scheme == "http" {
-      dict["artworkURL"] = url.absoluteString
-    } else {
-      dict["artworkURL"] = NSNull()
-    }
-
-    return dict
-  }
-
-  private func songToDictionary(_ song: Song) -> [String: Any] {
-    var dict: [String: Any] = [
+  /// A library or catalog song as raw values; missing ones are null and
+  /// the artwork URL is passed on whatever its scheme (TypeScript decides).
+  private func rawSong(_ song: Song) -> [String: Any] {
+    [
       "id": song.id.rawValue,
       "name": song.title,
       "artist": song.artistName,
-      "album": song.albumTitle ?? "",
-      "duration": song.duration ?? 0,
-      "playCount": song.playCount ?? 0,
+      "album": nullable(song.albumTitle),
+      "duration": nullable(song.duration),
+      "playCount": nullable(song.playCount),
+      "dateAdded": nullable(song.libraryAddedDate.map { dateFormatter.string(from: $0) }),
+      "artworkURL": nullable(song.artwork?.url(width: 600, height: 600)?.absoluteString),
+      "kind": "song",
     ]
-
-    if let dateAdded = song.libraryAddedDate {
-      dict["dateAdded"] = dateFormatter.string(from: dateAdded)
-    } else {
-      dict["dateAdded"] = ""
-    }
-
-    if let artwork = song.artwork, let url = artwork.url(width: 600, height: 600),
-       url.scheme == "https" || url.scheme == "http" {
-      dict["artworkURL"] = url.absoluteString
-    } else {
-      dict["artworkURL"] = NSNull()
-    }
-
-    return dict
   }
+
+  /// A playlist entry as raw values (no play count or date added).
+  private func rawTrack(_ track: Track) -> [String: Any] {
+    [
+      "id": track.id.rawValue,
+      "name": track.title,
+      "artist": track.artistName,
+      "album": nullable(track.albumTitle),
+      "duration": nullable(track.duration),
+      "playCount": NSNull(),
+      "dateAdded": NSNull(),
+      "artworkURL": nullable(track.artwork?.url(width: 600, height: 600)?.absoluteString),
+      "kind": "track",
+    ]
+  }
+}
+
+/// A value for the bridge: the value itself, or an explicit null.
+private func nullable(_ value: Any?) -> Any {
+  value ?? NSNull()
 }
 
 // MARK: - ShazamKit
