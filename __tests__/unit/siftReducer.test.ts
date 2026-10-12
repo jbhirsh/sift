@@ -753,3 +753,12 @@ describe('CLEAR_REMOVAL_FAILURE', () => {
     expect(siftReducer(state, { type: 'CLEAR_REMOVAL_FAILURE', trackId: 'z', error: 'Other' })).toBe(state);
   });
 });
+
+describe('LOAD_TRACKS with a song listed twice (#56)', () => {
+  test('keeps one card per id, in order', () => {
+    const t1: Track = { ...trackA, id: 'one' };
+    const t2: Track = { ...trackA, id: 'two' };
+    const next = siftReducer(makeState(), { type: 'LOAD_TRACKS', tracks: [t1, t2, { ...t1 }] });
+    expect(next.tracks).toEqual([t1, t2]);
+  });
+});

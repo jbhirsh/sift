@@ -17,6 +17,7 @@ import { saveSession, clearSession } from '../services/SessionStore';
 import { MusicProviderHost } from './MusicProviderContext';
 import { loadPreferences, savePreferences } from '../services/PreferencesStore';
 import { sortTracks } from '../utils/sorting';
+import { uniqueTracks } from '../utils/trackIdentity';
 
 // ── State ──────────────────────────────────────────────
 
@@ -236,7 +237,8 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
     case 'LOAD_TRACKS':
       return {
         ...state,
-        tracks: action.tracks,
+        // One card per song: a playlist can list a song twice (#56).
+        tracks: uniqueTracks(action.tracks),
         cursor: 0,
         kept: [],
         removed: [],

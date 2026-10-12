@@ -1362,6 +1362,29 @@ describe('useMusicProvider', () => {
     expect(getByTestId('pending-keeps').props.children).toBe('');
   });
 
+  test('keepTrack recognizes a readback whose duration rounds to another second (#55)', async () => {
+    mockProvider.loadPlaylists.mockResolvedValue([
+      { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
+    ]);
+    // The library copy reports a slightly different duration that rounds
+    // the other way: a rounded key missed it and added the song again.
+    mockProvider.loadPlaylistTracks.mockResolvedValue([
+      { ...mockTrack, id: 'library-instance-42', duration: mockTrack.duration + 0.6 },
+    ]);
+    const { getByTestId } = await render(
+      <SiftProvider initialTracks={[{ ...mockTrack, duration: mockTrack.duration + 0.4 }]}>
+        <TestConsumerWithPlaylistActions />
+      </SiftProvider>
+    );
+    await act(async () => {
+      await fireEvent.press(getByTestId('set-source-playlist'));
+    });
+    await act(async () => {
+      await fireEvent.press(getByTestId('keep-track'));
+    });
+    expect(mockProvider.addToPlaylist).not.toHaveBeenCalled();
+  });
+
   test('saveSiftedPlaylist resolves the sifted playlist by id even after a rename', async () => {
     mockProvider.loadPlaylists.mockResolvedValue([
       // The companion was renamed, so no "<name> - Sifted" match exists —
