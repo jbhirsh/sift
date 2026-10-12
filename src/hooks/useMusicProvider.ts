@@ -5,7 +5,7 @@ import { useSift } from '../context/SiftContext';
 import { useMusicProviderService } from '../context/MusicProviderContext';
 import { logRemoval, loadHistory, removeFromHistory } from '../services/RemovalHistoryStore';
 import { sortTracks } from '../utils/sorting';
-import { trackIdentity } from '../utils/trackIdentity';
+import { TrackIndex } from '../utils/trackIdentity';
 import { APPLE_REMOVED_PLAYLIST, libraryRemovedIds } from '../utils/libraryRemovals';
 import { ledgerKey } from '../utils/reviewedLedger';
 import { loadReviewedIds, markReviewed } from '../services/ReviewedLedgerStore';
@@ -64,7 +64,7 @@ export function useMusicProvider() {
   // land; invalidated by clearSiftedPlaylist. A fresh sift (START_FRESH)
   // remounts the sifting screen, which discards this cache with the
   // instance.
-  const siftedContentsRef = useRef<Set<string> | null>(null);
+  const siftedContentsRef = useRef<TrackIndex | null>(null);
   const loadingInProgressRef = useRef(false);
   // Pending sifted-playlist retry delays, keyed by timer with the awaiting
   // promise's resolver as the value so unmount can settle the promise.
@@ -294,12 +294,9 @@ export function useMusicProvider() {
             // catalog id reads back from the sifted playlist under a fresh
             // library-instance id, and an id-only filter would re-offer it
             // on every re-sift.
-            const siftedIds = new Set(siftedTracks.map((t) => t.id));
-            const siftedIdentities = new Set(siftedTracks.map(trackIdentity));
+            const alreadySifted = new TrackIndex(siftedTracks);
             const beforeSiftedFilter = tracks.length;
-            tracks = tracks.filter(
-              (t) => !siftedIds.has(t.id) && !siftedIdentities.has(trackIdentity(t)),
-            );
+            tracks = tracks.filter((t) => !alreadySifted.has(t));
             filteredAsSifted = beforeSiftedFilter - tracks.length;
           }
 
@@ -552,15 +549,14 @@ export function useMusicProvider() {
 
         if (existing) {
           const existingTracks = await providerRef.current.loadPlaylistTracks?.(existing.id) ?? [];
-          const existingIds = new Set(existingTracks.map((t) => t.id));
           // Apple Music re-identifies a track when it lands in a playlist
           // (catalog id at keep-time vs library-instance id on readback), so
           // an id-only diff re-adds exactly those tracks. Fall back to the
           // shared name/artist/duration identity so an already-present track
           // is never added twice under a second id.
-          const existingIdentities = new Set(existingTracks.map(trackIdentity));
+          const present = new TrackIndex(existingTracks);
           const newTrackIDs = keptTracks
-            .filter((t) => !existingIds.has(t.id) && !existingIdentities.has(trackIdentity(t)))
+            .filter((t) => !present.has(t))
             .map((t) => t.id);
           if (newTrackIDs.length > 0) {
             // A provider without addToPlaylist cannot land these tracks.
@@ -599,10 +595,9 @@ export function useMusicProvider() {
             playlistsAfter.find((p) => p.name === siftedName);
           if (target) {
             const nowPresent = await providerRef.current.loadPlaylistTracks?.(target.id) ?? [];
-            const presentIds = new Set(nowPresent.map((t) => t.id));
-            const presentIdentities = new Set(nowPresent.map(trackIdentity));
+            const present = new TrackIndex(nowPresent);
             const landed = keptTracks
-              .filter((t) => presentIds.has(t.id) || presentIdentities.has(trackIdentity(t)))
+              .filter((t) => present.has(t))
               .map((t) => t.id);
             if (landed.length > 0) {
               dispatch({ type: 'REMOVE_PENDING_KEEPS', trackIds: landed });
@@ -684,7 +679,7 @@ export function useMusicProvider() {
                 // The playlist was just created with exactly this track —
                 // seed the contents cache so a later re-keep of it is a
                 // no-op instead of a readback plus a duplicate add.
-                siftedContentsRef.current = new Set([track.id, trackIdentity(track)]);
+                siftedContentsRef.current = new TrackIndex([track]);
                 siftedPlaylistIdRef.current = await findSiftedPlaylistWithRetry(siftedName);
                 if (siftedPlaylistIdRef.current != null) {
                   dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: siftedPlaylistIdRef.current });
@@ -708,12 +703,10 @@ export function useMusicProvider() {
             if (siftedContentsRef.current == null) {
               const existingTracks =
                 await providerRef.current.loadPlaylistTracks?.(siftedPlaylistIdRef.current) ?? [];
-              siftedContentsRef.current = new Set(
-                existingTracks.flatMap((t) => [t.id, trackIdentity(t)]),
-              );
+              siftedContentsRef.current = new TrackIndex(existingTracks);
             }
             const contents = siftedContentsRef.current;
-            if (!contents.has(track.id) && !contents.has(trackIdentity(track))) {
+            if (!contents.has(track)) {
               // Without addToPlaylist the keep cannot land — recording it in
               // the contents cache anyway would silently drop the track.
               // Throw into the normal failure path so it gets buffered and
@@ -722,8 +715,7 @@ export function useMusicProvider() {
                 throw new Error('This provider does not support adding to playlists');
               }
               await providerRef.current.addToPlaylist(siftedPlaylistIdRef.current, [track.id]);
-              contents.add(track.id);
-              contents.add(trackIdentity(track));
+              contents.add(track);
             }
           } else {
             // The sifted playlist could not be resolved within the retry
