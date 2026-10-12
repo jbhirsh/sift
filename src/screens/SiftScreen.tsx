@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  LayoutChangeEvent,
+  useWindowDimensions,
   View,
   Text,
   TouchableOpacity,
@@ -29,6 +31,7 @@ import { useHoldPendingDecision, useSendPending, wasSent } from '../hooks/usePen
 import { useRemovalRetry } from '../hooks/useRemovalRetry';
 import UndoPill from '../components/UndoPill';
 import { compactCount } from '../utils/compactCount';
+import { cardSize, flyOffDistance } from '../utils/cardLayout';
 
 const SEGMENT_COUNT = 10;
 // The action buttons' bottom padding and label line height, which place the
@@ -123,6 +126,17 @@ export default function SiftScreen() {
   const [startCursor] = useState(state.cursor);
   const sessionDecisions = Math.max(0, state.cursor - startCursor);
 
+  // The card's size for the space it gets (#149): the whole space on a
+  // phone; on iPad, clamped so square artwork isn't cropped to a strip.
+  // Until the first layout the stack just fills the area, as on a phone.
+  const { width: windowWidth } = useWindowDimensions();
+  const [cardStackSize, setCardStackSize] = useState<{ width: number; height: number } | null>(null);
+  const onCardAreaLayout = (event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    const next = cardSize(width - CARD_AREA_GUTTER * 2, height);
+    setCardStackSize((prev) => (prev?.width === next.width && prev.height === next.height ? prev : next));
+  };
+
   const showUndo = state.pending != null
     && state.tracks[state.cursor - 1]?.id === state.pending.trackId
     && !wasSent(state.pending);
@@ -138,7 +152,9 @@ export default function SiftScreen() {
     if (!beginDecision()) return;
 
     const track = currentTrack;
-    const direction = decision === 'keep' ? 500 : -500;
+    // Far enough to leave the window from its middle, on any width.
+    const distance = flyOffDistance(windowWidth);
+    const direction = decision === 'keep' ? distance : -distance;
 
     const onComplete = () => {
       // The previous decision can't be undone any more: send it.
@@ -290,51 +306,53 @@ export default function SiftScreen() {
 
       {/* Card stack. The back cards hide behind the front card at rest and
           show while it is dragged or flies off. */}
-      <View style={styles.cardArea}>
-        {nextNextTrack != null && (
-          <View style={[
-            styles.backCard,
-            styles.backCard2,
-            { backgroundColor: isDark ? colors.surface : colors.background },
-          ]} />
-        )}
-        {nextTrack != null && (
-          <View style={[
-            styles.backCard,
-            styles.backCard1,
-            { backgroundColor: isDark ? colors.surface : colors.background },
-          ]} />
-        )}
-        {currentTrack != null && (
-          <InteractiveCard
-            track={currentTrack}
-            onDecide={handleCardDecide}
-            programmaticOffset={programmaticOffset}
-          />
-        )}
-        {/* Over the top of the card, not in the layout: appearing mid-sift
-            must not shrink the card under the user's thumb. Touches pass
-            through to the card. */}
-        <View style={styles.cardOverlay} pointerEvents="none">
-          {unsynced > 0 && (
-            <Text
-              testID="unsynced-chip"
-              accessibilityLabel={`${unsynced} ${unsynced === 1 ? 'change' : 'changes'} didn't reach ${PROVIDER_DISPLAY[state.provider]}`}
-              // Opaque surface behind it: it sits over artwork of any color.
-              style={[styles.unsyncedChip, { color: colors.skipText, backgroundColor: colors.surface }]}
-            >
-              {`${unsynced} didn\u2019t sync`}
-            </Text>
+      <View style={styles.cardArea} onLayout={onCardAreaLayout} testID="card-area">
+        <View style={cardStackSize ?? styles.cardStackFill} testID="card-stack">
+          {nextNextTrack != null && (
+            <View style={[
+              styles.backCard,
+              styles.backCard2,
+              { backgroundColor: isDark ? colors.surface : colors.background },
+            ]} />
           )}
-          {showRemoveNote && (
-            <View style={styles.removeNote}>
-              <GlassCard intensity="thin" radius={RADIUS.md}>
-                <Text testID="first-remove-note" style={[styles.removeNoteText, { color: colors.textSecondary }]}>
-                  {FIRST_REMOVE_NOTE}
-                </Text>
-              </GlassCard>
-            </View>
+          {nextTrack != null && (
+            <View style={[
+              styles.backCard,
+              styles.backCard1,
+              { backgroundColor: isDark ? colors.surface : colors.background },
+            ]} />
           )}
+          {currentTrack != null && (
+            <InteractiveCard
+              track={currentTrack}
+              onDecide={handleCardDecide}
+              programmaticOffset={programmaticOffset}
+            />
+          )}
+          {/* Over the top of the card, not in the layout: appearing mid-sift
+              must not shrink the card under the user's thumb. Touches pass
+              through to the card. */}
+          <View style={styles.cardOverlay} pointerEvents="none">
+            {unsynced > 0 && (
+              <Text
+                testID="unsynced-chip"
+                accessibilityLabel={`${unsynced} ${unsynced === 1 ? 'change' : 'changes'} didn't reach ${PROVIDER_DISPLAY[state.provider]}`}
+                // Opaque surface behind it: it sits over artwork of any color.
+                style={[styles.unsyncedChip, { color: colors.skipText, backgroundColor: colors.surface }]}
+              >
+                {`${unsynced} didn\u2019t sync`}
+              </Text>
+            )}
+            {showRemoveNote && (
+              <View style={styles.removeNote}>
+                <GlassCard intensity="thin" radius={RADIUS.md}>
+                  <Text testID="first-remove-note" style={[styles.removeNoteText, { color: colors.textSecondary }]}>
+                    {FIRST_REMOVE_NOTE}
+                  </Text>
+                </GlassCard>
+              </View>
+            )}
+          </View>
         </View>
       </View>
 
@@ -499,6 +517,9 @@ const actionStyles = StyleSheet.create({
 
 // ── Main styles ────────────────────────────────────────
 
+/** The card area's side margins: the card's inset from the screen edge. */
+const CARD_AREA_GUTTER = SPACING.lg;
+
 const styles = StyleSheet.create({
   root: {
     flex: 1,
@@ -542,8 +563,8 @@ const styles = StyleSheet.create({
   cardOverlay: {
     position: 'absolute',
     top: SPACING.base,
-    left: SPACING['2xl'],
-    right: SPACING['2xl'],
+    left: SPACING['2xl'] - CARD_AREA_GUTTER,
+    right: SPACING['2xl'] - CARD_AREA_GUTTER,
     alignItems: 'center',
     gap: SPACING.base,
   },
@@ -586,12 +607,18 @@ const styles = StyleSheet.create({
   },
   cardArea: {
     flex: 1,
-    paddingHorizontal: 12,
+    paddingHorizontal: CARD_AREA_GUTTER,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardStackFill: {
+    flex: 1,
+    alignSelf: 'stretch',
   },
   backCard: {
     position: 'absolute',
-    left: 12,
-    right: 12,
+    left: 0,
+    right: 0,
     top: 0,
     bottom: 0,
     borderRadius: RADIUS.xl,
