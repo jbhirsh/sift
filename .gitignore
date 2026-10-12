@@ -58,3 +58,6 @@ fastlane/README.md
 # E2E build artifacts
 build/
 maestro-results/
+
+# XcodeGen output for the accessibility audit (scripts/run-a11y-audit.sh)
+e2e/a11y-audit/*.xcodeproj/
