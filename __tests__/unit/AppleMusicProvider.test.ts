@@ -281,6 +281,26 @@ describe('AppleMusicProvider', () => {
       expect(mockNative.lookupCatalogSongs.mock.calls.map(([b]) => b.length)).toEqual([100, 100, 50]);
     });
 
+    test('a playlist sift reloads its playlist, bringing back entries no lookup finds (#54)', async () => {
+      // A music video: in the playlist, neither a library nor a catalog song.
+      fake.playlists.set('pl', { name: 'Mix', items: ['video', 'lib'] });
+      fake.library.set('lib', rawSong('lib'));
+      await expect(provider.warmSongCache(['video', 'lib'])).resolves.toBe(1);
+      await expect(provider.warmSongCache(['video', 'lib'], 'pl')).resolves.toBe(2);
+      expect(mockNative.loadPlaylistItems).toHaveBeenCalledWith('pl');
+      expect(mockNative.cachedKinds(['video', 'lib'])).toEqual(['track', 'song']);
+    });
+
+    test('a playlist that is gone is breadcrumbed, and the lookups still run', async () => {
+      fake.library.set('lib', rawSong('lib'));
+      await expect(provider.warmSongCache(['lib'], 'gone')).resolves.toBe(1);
+      expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(expect.objectContaining({
+        category: 'music-provider',
+        level: 'warning',
+        message: 'warmSongCache: reloading the playlist failed (No tracks found for the given IDs.)',
+      }));
+    });
+
     test('a failed library lookup falls through to the catalog', async () => {
       fake.failLibraryLookups.add('x');
       fake.catalog.set('x', rawSong('x'));

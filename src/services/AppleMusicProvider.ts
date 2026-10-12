@@ -190,7 +190,23 @@ export class AppleMusicProvider implements MusicProviderService {
     return merged.map(toTrack);
   }
 
-  async warmSongCache(trackIDs: string[]): Promise<number> {
+  async warmSongCache(trackIDs: string[], playlistID?: string): Promise<number> {
+    // A playlist's entries come back only by loading the playlist: a music
+    // video in one is neither a library nor a catalog song, so the lookups
+    // below can't find it, and after a relaunch it couldn't be played or
+    // kept (#54). Reload it as the first session did; if it's gone, the
+    // lookups still resolve what they can.
+    if (playlistID != null) {
+      try {
+        await this.loadPlaylistTracks(playlistID);
+      } catch (err) {
+        Sentry.addBreadcrumb({
+          category: 'music-provider',
+          message: `warmSongCache: reloading the playlist failed (${err instanceof Error ? err.message : String(err)})`,
+          level: 'warning',
+        });
+      }
+    }
     await this.resolveIntoCaches(trackIDs);
     // How many of the requested ids can now be played or added, so a
     // genuine shortfall can be breadcrumbed.
