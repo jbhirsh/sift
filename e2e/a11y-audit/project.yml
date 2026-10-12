@@ -1,0 +1,29 @@
+# Xcode's accessibility audit for Sift (#146), run by
+# scripts/run-a11y-audit.sh. A UI-testing bundle with no target app: it
+# drives the e2e-simulator build already installed on the simulator by
+# bundle id, so nothing here touches the app's own native project.
+# Generated with XcodeGen (`xcodegen generate`); the .xcodeproj isn't
+# checked in.
+name: SiftAccessibilityAudit
+options:
+  bundleIdPrefix: com.jessicahirsh
+  deploymentTarget:
+    iOS: "17.0"
+targets:
+  SiftAccessibilityAudit:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [Tests]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: "5.0"
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+schemes:
+  SiftAccessibilityAudit:
+    build:
+      targets:
+        SiftAccessibilityAudit: [test]
+    test:
+      targets: [SiftAccessibilityAudit]

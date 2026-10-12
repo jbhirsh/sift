@@ -49,6 +49,10 @@ everything.
   otherwise. A new screen gets one of those tests. Don't make a container
   that holds Maestro-targeted text `accessible`: it hides the text's testID
   from XCUITest.
+- The E2E job also runs Xcode's accessibility audit
+  (`e2e/a11y-audit`, `scripts/run-a11y-audit.sh`) on Setup, Sift, Settings
+  and Done in light and dark: contrast, hit targets, clipped text, Dynamic
+  Type, as iOS renders them. It reports issues as warnings for now.
 - Tests are written alongside the implementation, not after the commit.
 
 ---
