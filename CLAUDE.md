@@ -22,7 +22,7 @@ npx expo start       # subsequent launches (use after first build)
 
 ```bash
 make test            # unit tests (Jest)
-make lint            # ESLint
+make lint            # ESLint + the native bridge check
 make typecheck       # TypeScript type checking
 make check           # lint + typecheck + tests (all three)
 ```
@@ -185,7 +185,11 @@ Makefile                Dev commands (test, lint, typecheck, check)
   Removed" policy, which preview to fingerprint) lives in TypeScript
   (`utils/musicKit`, `AppleMusicProvider`), so it ships with an EAS Update
   instead of a reinstall and is covered by Jest and Stryker. Add a primitive
-  in Swift; put the policy in TypeScript.
+  in Swift; put the policy in TypeScript. The "Native bridge" check
+  (`scripts/check-native-bridge.mjs`, in CI and pre-commit) holds this: every
+  native function needs an entry in `modules/expo-musickit/native-api.json`
+  saying the one thing it asks, the Swift and TypeScript surfaces must match,
+  and functions and the file stay under the size budgets there.
 
 ---
 

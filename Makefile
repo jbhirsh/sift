@@ -33,6 +33,7 @@ test-all: test test-e2e
 # Lint
 lint:
 	npx eslint src/ __tests__/
+	node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-bridge.mjs
 
 # Type check
 typecheck:
