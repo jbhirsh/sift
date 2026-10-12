@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text } from 'react-native';
+import { Dimensions, Text } from 'react-native';
 import { fireEvent, act } from '@testing-library/react-native';
 
 jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
@@ -12,6 +12,11 @@ jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 jest.mock('expo-symbols', () => ({ SymbolView: 'SymbolView' }));
 jest.mock('expo-image', () => ({ Image: 'Image' }));
 
+const mockWithTiming = jest.fn((val: number, _config: unknown, callback?: (finished: boolean) => void) => {
+  if (callback) callback(true);
+  return val;
+});
+
 jest.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: {
@@ -20,10 +25,8 @@ jest.mock('react-native-reanimated', () => ({
   },
   useSharedValue: (val: number) => ({ value: val }),
   useAnimatedStyle: (fn: () => unknown) => fn(),
-  withTiming: (val: number, _config: unknown, callback?: (finished: boolean) => void) => {
-    if (callback) callback(true);
-    return val;
-  },
+  withTiming: (val: number, config: unknown, callback?: (finished: boolean) => void) =>
+    mockWithTiming(val, config, callback),
   withSpring: (val: number) => val,
   Easing: { in: (e: unknown) => e, ease: {} },
   interpolate: (val: number, inputRange: number[], outputRange: number[]) => {
@@ -111,9 +114,52 @@ import { loadSeenRemoveNote, markRemoveNoteSeen } from '../../src/services/Prefe
 import { useSift } from '../../src/context/SiftContext';
 import SiftScreen from '../../src/screens/SiftScreen';
 import { a11yViolations } from '../helpers/a11yScan';
+import { flyOffDistance } from '../../src/utils/cardLayout';
 
 describe('SiftScreen', () => {
   const tracks = [mockTrackA, mockTrackB, mockTrackC];
+
+  describe('card size (#149)', () => {
+    const layout = (width: number, height: number) => ({ nativeEvent: { layout: { x: 0, y: 0, width, height } } });
+
+    test('fills the card area until it is measured', async () => {
+      const { getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+      expect(getByTestId('card-stack').props.style).toEqual({ flex: 1, alignSelf: 'stretch' });
+    });
+
+    test('a phone keeps the whole area, inside the 12pt gutters', async () => {
+      const { getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+      await fireEvent(getByTestId('card-area'), 'layout', layout(393, 470));
+      expect(getByTestId('card-stack').props.style).toEqual({ width: 369, height: 470 });
+    });
+
+    test('iPad landscape gets a square card, so the artwork isn\'t a strip', async () => {
+      const { getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+      await fireEvent(getByTestId('card-area'), 'layout', layout(1180, 494));
+      expect(getByTestId('card-stack').props.style).toEqual({ width: 494, height: 494 });
+      // A rotation re-measures.
+      await fireEvent(getByTestId('card-area'), 'layout', layout(820, 860));
+      expect(getByTestId('card-stack').props.style).toEqual({ width: 600, height: 780 });
+    });
+
+    test('the same size again keeps the same style object', async () => {
+      const { getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+      await fireEvent(getByTestId('card-area'), 'layout', layout(1180, 494));
+      const first = getByTestId('card-stack').props.style;
+      await fireEvent(getByTestId('card-area'), 'layout', layout(1180, 494));
+      expect(getByTestId('card-stack').props.style).toBe(first);
+    });
+
+    test('Keep and Remove fly the card a window width away, never less than 500', async () => {
+      const { getByLabelText } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+      const distance = flyOffDistance(Dimensions.get('window').width);
+      mockWithTiming.mockClear();
+      await fireEvent.press(getByLabelText('Keep'));
+      expect(mockWithTiming).toHaveBeenCalledWith(distance, expect.anything(), expect.any(Function));
+      await fireEvent.press(getByLabelText('Remove'));
+      expect(mockWithTiming).toHaveBeenCalledWith(-distance, expect.anything(), expect.any(Function));
+    });
+  });
 
   test('renders remaining count', async () => {
     const { getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
