@@ -25,6 +25,25 @@ const CLEAR_KEEP_QUEUE_TIMEOUT_MS = 15000;
 // Links in the chain never reject (keepTrack catches internally).
 let keepQueue: Promise<void> = Promise.resolve();
 
+// Failed removals are retried (#151) at most this many times per song per
+// launch, so a song that can't be removed doesn't retry forever.
+export const MAX_REMOVAL_RETRIES = 3;
+// Launch-wide, like the keep queue: retries run from whichever screen's hook
+// instance triggers them, and must not overlap or reset per screen.
+const removalRetryAttempts = new Map<string, number>();
+// The retry under way, if any. A Restore waits for it, so a retry's remove
+// can't land after the song was restored.
+let removalRetryInFlight: Promise<void> | null = null;
+// Songs a Restore is undoing right now: a retry leaves them alone.
+const restoringIds = new Set<string>();
+
+/** Forget the retry bookkeeping, as a fresh launch would. Exported for tests. */
+export function resetRemovalRetries(): void {
+  removalRetryAttempts.clear();
+  removalRetryInFlight = null;
+  restoringIds.clear();
+}
+
 /**
  * The music provider's operations, wired to SiftContext. The provider itself
  * and the playback poller are shared, owned by MusicProviderHost (#144).
@@ -51,6 +70,22 @@ export function useMusicProvider() {
   // promise's resolver as the value so unmount can settle the promise.
   const retryTimersRef = useRef<Map<ReturnType<typeof setTimeout>, () => void>>(new Map());
   const unmountedRef = useRef(false);
+  // What a removal retry needs, read when it runs rather than when it was
+  // scheduled. The source is the one the removed songs came from.
+  const removalStateRef = useRef({
+    failedRemovalIds: state.failedRemovalIds,
+    removed: state.removed,
+    source: state.activeSource ?? state.source,
+    provider: state.provider,
+  });
+  useEffect(() => {
+    removalStateRef.current = {
+      failedRemovalIds: state.failedRemovalIds,
+      removed: state.removed,
+      source: state.activeSource ?? state.source,
+      provider: state.provider,
+    };
+  });
 
   // Cancel any in-flight sifted-playlist retry delays on unmount so no timers
   // outlive the component (also keeps Jest workers from leaking timers).
@@ -350,6 +385,64 @@ export function useMusicProvider() {
     }
   }, [providerRef, dispatch, state.source, state.sortOrder, state.siftedPlaylistId, state.provider]);
 
+  /**
+   * Retry the removals that failed (#151). Each is checked first: a removal
+   * can fail after taking effect, and repeating a library Remove would put
+   * the song in "Sift — Removed" twice. One that landed (now or before) is
+   * cleared; one that fails again stays failed, up to MAX_REMOVAL_RETRIES.
+   */
+  const retryFailedRemovals = useCallback(async (): Promise<void> => {
+    if (removalRetryInFlight) return;
+    const { failedRemovalIds, removed, source, provider } = removalStateRef.current;
+    const service = providerRef.current;
+    const { removeFromPlaylist, removeFromLibrary } = service;
+    // Nothing to retry with: a missing call must not count as a removal.
+    let remove: ((id: string) => Promise<void>) | undefined;
+    if (source.type === 'playlist') {
+      if (removeFromPlaylist) remove = (id) => removeFromPlaylist.call(service, source.playlist.id, [id]);
+    } else if (removeFromLibrary) {
+      remove = (id) => removeFromLibrary.call(service, [id]);
+    }
+    if (!remove) return;
+    const due = removed.filter((track) =>
+      failedRemovalIds.includes(track.id) && (removalRetryAttempts.get(track.id) ?? 0) < MAX_REMOVAL_RETRIES);
+    if (due.length === 0) return;
+    // Still removed and still failed, read now: a Restore (or another
+    // screen's retry) may have settled it since this retry started.
+    const stillDue = (id: string) => !restoringIds.has(id)
+      && removalStateRef.current.failedRemovalIds.includes(id)
+      && removalStateRef.current.removed.some((t) => t.id === id);
+    const run = async () => {
+      for (const track of due) {
+        if (!stillDue(track.id)) continue;
+        const attempt = (removalRetryAttempts.get(track.id) ?? 0) + 1;
+        removalRetryAttempts.set(track.id, attempt);
+        try {
+          const landed = (await service.removalLanded?.(source, track.id)) ?? false;
+          if (!landed) await remove(track.id);
+          // The failed Apple library removal dropped its history record;
+          // now it has landed, record it again so later sifts leave it out.
+          if (source.type === 'library' && provider === 'apple-music') {
+            await logRemoval({ track, source, provider, removedAt: new Date().toISOString() });
+          }
+          dispatch({ type: 'CLEAR_REMOVAL_FAILURE', trackId: track.id, error: track.name });
+        } catch (err) {
+          Sentry.addBreadcrumb({
+            category: 'music-provider',
+            message: `retryFailedRemovals: ${track.id} still failing (attempt ${attempt} of ${MAX_REMOVAL_RETRIES}): ${err instanceof Error ? err.message : String(err)}`,
+            level: 'warning',
+          });
+        }
+      }
+    };
+    removalRetryInFlight = run();
+    try {
+      await removalRetryInFlight;
+    } finally {
+      removalRetryInFlight = null;
+    }
+  }, [providerRef, dispatch]);
+
   const removeTrack = useCallback(
     async (track: Track) => {
       const source = state.source;
@@ -379,14 +472,21 @@ export function useMusicProvider() {
         // out of "Sift — Removed": drop its record so the next library sift
         // offers it again rather than hiding it for good.
         if (appleLibrary) await removeFromHistory(track.id, source);
+        return;
       }
+      // This one landed, so the connection works: retry any that failed.
+      await retryFailedRemovals();
     },
-    [providerRef, dispatch, state.source, state.provider],
+    [providerRef, dispatch, state.source, state.provider, retryFailedRemovals],
   );
 
   const restoreTrack = useCallback(
     async (track: Track) => {
+      // A retry of this song's failed removal (#151) must not land after
+      // the restore: wait out one under way, and keep new ones off it.
+      restoringIds.add(track.id);
       try {
+        await removalRetryInFlight;
         const source = state.source;
         if (source.type === 'playlist') {
           await providerRef.current.addToPlaylist?.(source.playlist.id, [track.id]);
@@ -427,6 +527,8 @@ export function useMusicProvider() {
         Sentry.captureException(err, { tags: { flow: 'restore-track' } });
         const message = err instanceof Error ? err.message : 'Failed to restore track';
         dispatch({ type: 'ADD_REMOVAL_ERROR', error: `${track.name}: ${message}` });
+      } finally {
+        restoringIds.delete(track.id);
       }
     },
     [providerRef, dispatch, state.source, state.provider],
@@ -746,6 +848,7 @@ export function useMusicProvider() {
     saveSiftedPlaylist,
     keepTrack,
     removeTrack,
+    retryFailedRemovals,
     restoreTrack,
     warmCache,
     clearSiftedPlaylist,

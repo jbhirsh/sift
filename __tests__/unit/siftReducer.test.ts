@@ -737,3 +737,19 @@ describe('held-back decisions and Undo (#152)', () => {
     expect(siftReducer(held, action).pending).toBeNull();
   });
 });
+
+describe('CLEAR_REMOVAL_FAILURE', () => {
+  test('drops the id and one error entry for that song', () => {
+    const state = makeState({ failedRemovalIds: ['a', 'b'], removalErrors: ['Intro', 'Intro', 'Outro'] });
+    const next = siftReducer(state, { type: 'CLEAR_REMOVAL_FAILURE', trackId: 'a', error: 'Intro' });
+    expect(next.failedRemovalIds).toEqual(['b']);
+    expect(next.removalErrors).toEqual(['Intro', 'Outro']);
+  });
+
+  test('an error entry that isn\'t there is left alone; an id that isn\'t failed changes nothing', () => {
+    const state = makeState({ failedRemovalIds: ['a'], removalErrors: ['Other'] });
+    expect(siftReducer(state, { type: 'CLEAR_REMOVAL_FAILURE', trackId: 'a', error: 'Intro' }))
+      .toMatchObject({ failedRemovalIds: [], removalErrors: ['Other'] });
+    expect(siftReducer(state, { type: 'CLEAR_REMOVAL_FAILURE', trackId: 'z', error: 'Other' })).toBe(state);
+  });
+});

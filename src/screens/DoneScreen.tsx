@@ -18,6 +18,7 @@ import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
 import { useMusicProvider } from '../hooks/useMusicProvider';
 import { useSendPending } from '../hooks/usePendingDecision';
+import { useRemovalRetry } from '../hooks/useRemovalRetry';
 import { clearHistoryForSource } from '../services/RemovalHistoryStore';
 import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
@@ -41,6 +42,7 @@ export default function DoneScreen() {
   // A decision still held back (a session resumed straight to Done, #152)
   // has nothing left to undo it here: send it.
   const sendPending = useSendPending({ bufferPlaylistKeeps: true });
+  useRemovalRetry();
   useEffect(() => {
     sendPending(state.pending);
   }, [state.pending, sendPending]);

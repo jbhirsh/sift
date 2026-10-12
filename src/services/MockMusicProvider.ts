@@ -1,5 +1,5 @@
 import type { MusicProviderService } from './MusicProviderInterface';
-import type { Playlist, Track } from '../types';
+import type { Playlist, SiftSource, Track } from '../types';
 
 /**
  * Mock tracks matching the Swift SimulatorMusicService.
@@ -130,10 +130,12 @@ const MOCK_PLAYLISTS: Playlist[] = [
 //
 // EXPO_PUBLIC_MOCK_FAIL_ADDS=<n> makes the FIRST n addToPlaylist calls of
 // each app launch reject (each exactly once); later calls succeed.
-// EXPO_PUBLIC_MOCK_FAIL_REMOVES=<n> does the same for removeFromLibrary
-// (and ONLY removeFromLibrary — removeFromPlaylist is deliberately never
-// injected, see below). Unset or invalid → zero injected failures, i.e.
-// default behavior is unchanged.
+// EXPO_PUBLIC_MOCK_FAIL_REMOVES=<n> makes removeFromLibrary fail for the
+// first n songs it is asked to remove in each launch, and keep failing for
+// them, so retrying a failed removal (#151) can't heal the injected failure
+// the flows check (and ONLY removeFromLibrary — removeFromPlaylist is
+// deliberately never injected, see below). Unset or invalid → zero injected
+// failures, i.e. default behavior is unchanged.
 //
 // The counters are module-scoped, not per-instance: every useMusicProvider
 // hook instance constructs its own MockMusicProvider (keeps add through the
@@ -144,8 +146,8 @@ const MOCK_PLAYLISTS: Playlist[] = [
 //   add #1 (keepTrack)        rejects → the keep buffers as a pending keep
 //   add #2 (Done fallback)    rejects → failed-save error + Retry appear
 //   add #3 (Retry)            succeeds → success confirmation
-// With FAIL_REMOVES=1 a library sift's first Remove decision fails,
-// surfacing the removal-errors warning block on Done.
+// With FAIL_REMOVES=1 a library sift's first removed song can't be removed,
+// retries included, surfacing the removal-errors warning block on Done.
 //
 // EXPO_PUBLIC_* env is baked into the bundle at build time (see the
 // e2e-simulator profile in eas.json), so both knobs apply to every flow of
@@ -166,7 +168,10 @@ const MOCK_PLAYLISTS: Playlist[] = [
 //     a clear. Playlist-removal failure UI stays covered by unit tests
 //     until a launch-argument mechanism can scope injection per flow.
 let injectedAddFailures = 0;
-let injectedRemoveFailures = 0;
+/** Songs whose library removal always fails (FAIL_REMOVES). */
+const failingRemoveIds = new Set<string>();
+/** Songs whose library removal landed: "in Sift — Removed". */
+const landedRemoveIds = new Set<string>();
 
 function requestedFailures(raw: string | undefined): number {
   if (!raw) return 0;
@@ -244,12 +249,24 @@ export class MockMusicProvider implements MusicProviderService {
     await delay(500);
   }
 
-  async removeFromLibrary(_trackIDs: string[]): Promise<void> {
+  async removeFromLibrary(trackIDs: string[]): Promise<void> {
     await delay(200);
-    if (injectedRemoveFailures < requestedFailures(process.env.EXPO_PUBLIC_MOCK_FAIL_REMOVES)) {
-      injectedRemoveFailures += 1;
+    const requested = requestedFailures(process.env.EXPO_PUBLIC_MOCK_FAIL_REMOVES);
+    for (const id of trackIDs) {
+      if (!failingRemoveIds.has(id) && !landedRemoveIds.has(id) && failingRemoveIds.size < requested) {
+        failingRemoveIds.add(id);
+      }
+    }
+    if (trackIDs.some((id) => failingRemoveIds.has(id))) {
       throw new Error('Simulated remove failure (EXPO_PUBLIC_MOCK_FAIL_REMOVES)');
     }
+    trackIDs.forEach((id) => landedRemoveIds.add(id));
+  }
+
+  async removalLanded(source: SiftSource, trackID: string): Promise<boolean> {
+    await delay(100);
+    // Mock playlists never change, so a playlist removal never shows.
+    return source.type === 'library' && landedRemoveIds.has(trackID);
   }
 
   async removeFromPlaylist(_playlistID: string, _trackIDs: string[]): Promise<void> {

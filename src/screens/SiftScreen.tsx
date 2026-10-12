@@ -26,6 +26,7 @@ import { Decision, PendingDecision, PROVIDER_DISPLAY, Track } from '../types';
 import { loadSeenRemoveNote, markRemoveNoteSeen } from '../services/PreferencesStore';
 import { decisionAnnouncement, FIRST_REMOVE_NOTE, undoMessage, unsyncedCount } from '../utils/sessionCopy';
 import { useHoldPendingDecision, useSendPending, wasSent } from '../hooks/usePendingDecision';
+import { useRemovalRetry } from '../hooks/useRemovalRetry';
 import UndoPill from '../components/UndoPill';
 import { compactCount } from '../utils/compactCount';
 
@@ -50,6 +51,7 @@ export default function SiftScreen() {
   // Decisions reach the music service after the undo window (#152).
   const sendPending = useSendPending();
   useHoldPendingDecision(sendPending);
+  useRemovalRetry();
   // The last card's decision goes now: Done has no Undo, and this screen's
   // keep path still knows a "- Sifted" playlist it created moments ago.
   const sendIfLast = useCallback((held: PendingDecision | null) => {

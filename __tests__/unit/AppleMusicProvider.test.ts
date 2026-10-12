@@ -459,6 +459,28 @@ describe('AppleMusicProvider', () => {
     });
   });
 
+  describe('removalLanded (#151)', () => {
+    const playlist = { type: 'playlist' as const, playlist: { id: 'pl', name: 'Mix', trackCount: 2 } };
+
+    test('a library song landed once it is in "Sift — Removed"', async () => {
+      fake.playlists.set('other', { name: 'Gym', items: ['a'] });
+      await expect(provider.removalLanded({ type: 'library' }, 'a')).resolves.toBe(false);
+      fake.playlists.set('removed', { name: 'Sift — Removed', items: ['old'] });
+      await expect(provider.removalLanded({ type: 'library' }, 'a')).resolves.toBe(false);
+      fake.playlists.get('removed')?.items.push('a');
+      await expect(provider.removalLanded({ type: 'library' }, 'a')).resolves.toBe(true);
+      expect(mockNative.loadPlaylistItems).toHaveBeenLastCalledWith('removed');
+    });
+
+    test('a playlist entry landed once it is gone from the playlist', async () => {
+      fake.playlists.set('pl', { name: 'Mix', items: ['a', 'b'] });
+      await expect(provider.removalLanded(playlist, 'a')).resolves.toBe(false);
+      fake.playlists.set('pl', { name: 'Mix', items: ['b'] });
+      await expect(provider.removalLanded(playlist, 'a')).resolves.toBe(true);
+      expect(mockNative.findPlaylistByName).not.toHaveBeenCalled();
+    });
+  });
+
   describe('addToLibrary', () => {
     test('adds each library song; ids with none are skipped', async () => {
       fake.library.set('a', rawSong('a'));

@@ -1,4 +1,4 @@
-import { Playlist, Track } from '../types';
+import { Playlist, SiftSource, Track } from '../types';
 
 /**
  * Abstract interface for music provider services.
@@ -40,6 +40,14 @@ export interface MusicProviderService {
 
   /** Remove tracks from a playlist (does not delete from library). */
   removeFromPlaylist?(playlistID: string, trackIDs: string[]): Promise<void>;
+
+  /**
+   * Whether a removal from this source already landed, for retrying a
+   * failed one safely (#151): a removal can fail after taking effect, and
+   * repeating a library Remove would add the song to "Sift — Removed"
+   * twice.
+   */
+  removalLanded?(source: SiftSource, trackID: string): Promise<boolean>;
 
   /** Add tracks back to the user's music library. */
   addToLibrary?(trackIDs: string[]): Promise<void>;
