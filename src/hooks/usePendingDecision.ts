@@ -3,9 +3,13 @@ import { AppState } from 'react-native';
 import { useSift } from '../context/SiftContext';
 import { useMusicProvider } from './useMusicProvider';
 import type { PendingDecision } from '../types';
+import { undoWindowMs } from '../utils/undoWindow';
 
-/** How long Undo can take back the latest decision (#152). */
-export const UNDO_WINDOW_MS = 5000;
+/**
+ * How long Undo can take back the latest decision (#152): 5 s, except in
+ * the E2E build, which lengthens it (utils/undoWindow).
+ */
+export const UNDO_WINDOW_MS = undoWindowMs(process.env.EXPO_PUBLIC_UNDO_WINDOW_MS);
 
 // Decisions already sent, by track and time. A decision can be sent from
 // several places at once (the window running out, the next decision, the

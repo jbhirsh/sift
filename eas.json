@@ -22,7 +22,8 @@
       "env": {
         "EXPO_PUBLIC_USE_MOCK_PROVIDER": "1",
         "EXPO_PUBLIC_MOCK_FAIL_ADDS": "2",
-        "EXPO_PUBLIC_MOCK_FAIL_REMOVES": "1"
+        "EXPO_PUBLIC_MOCK_FAIL_REMOVES": "1",
+        "EXPO_PUBLIC_UNDO_WINDOW_MS": "30000"
       }
     },
     "preview": {

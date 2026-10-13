@@ -23,10 +23,12 @@ name: "Undo a Remove"
       text: "Peaches"
     timeout: 30000
 
-# Undo has to land inside the 5 s window. After a tap Maestro waits for the
-# screen to settle, and the playing song's seek bar never does, so cap that
-# wait: left to its default, it can eat the window on a slow runner. The
-# Undo tap waits for the pill itself.
+# Undo has to land inside the undo window. The app's is 5 s, which a slow
+# runner can spend just finding the pill (a run failed this way), so the
+# E2E build lengthens it to 30 s (eas.json EXPO_PUBLIC_UNDO_WINDOW_MS; unit
+# tests pin the 5 s). After a tap Maestro also waits for the screen to
+# settle, and the playing song's seek bar never does, so that wait is
+# capped. The Undo tap waits for the pill itself.
 - tapOn:
     text: "Remove"
     waitToSettleTimeoutMs: 500
