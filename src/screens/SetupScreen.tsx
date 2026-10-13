@@ -382,6 +382,9 @@ export default function SetupScreen() {
         <View style={styles.brandSection}>
           <Text
             testID="setup-brand"
+            // The wordmark reads "sift." on screen; VoiceOver says the name.
+            accessibilityLabel="Sift"
+            accessibilityRole="header"
             style={[styles.brandText, { color: colors.text }]}
           >
             sift.
