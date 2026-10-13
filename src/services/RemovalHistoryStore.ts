@@ -3,7 +3,34 @@ import { File, Paths } from 'expo-file-system';
 import { RemovalRecord, SiftSource } from '../types';
 import { isLegacyLocalFileRecord, isRemovalRecord } from '../utils/validators';
 
-const historyFile = new File(Paths.document, 'removal-history.json');
+const HISTORY_NAME = 'removal-history.json';
+// A rewrite goes here first and is moved over the history once it's
+// complete, so the app being killed mid-write can't leave the history cut
+// short (which reads as empty, and would offer every removed song again).
+const NEXT_NAME = 'removal-history.next.json';
+const historyFile = new File(Paths.document, HISTORY_NAME);
+
+async function writeHistory(records: RemovalRecord[]): Promise<void> {
+  const next = new File(Paths.document, NEXT_NAME);
+  next.write(JSON.stringify(records));
+  await next.move(new File(Paths.document, HISTORY_NAME), { overwrite: true });
+}
+
+/**
+ * The newer copy left by a rewrite the app was killed during, if it was
+ * written in full: the move replaces the history by deleting it first, so
+ * a kill between the two leaves only this copy.
+ */
+async function interruptedRewrite(): Promise<unknown[] | null> {
+  const next = new File(Paths.document, NEXT_NAME);
+  if (!next.exists) return null;
+  try {
+    const parsed: unknown = JSON.parse(await next.text());
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null; // cut short: the history itself is still the latest
+  }
+}
 
 type HistoryRead =
   | {
@@ -24,13 +51,15 @@ type HistoryRead =
  * rewriting it. I/O errors propagate: a failed read is not an empty history.
  */
 async function readHistory(): Promise<HistoryRead> {
-  if (!historyFile.exists) return { readable: true, records: [], dropped: 0, legacy: 0 };
-  const json = await historyFile.text();
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(json);
-  } catch (err) {
-    return { readable: false, error: err instanceof Error ? err : new Error(String(err)) };
+  let parsed: unknown = await interruptedRewrite();
+  if (parsed == null) {
+    if (!historyFile.exists) return { readable: true, records: [], dropped: 0, legacy: 0 };
+    const json = await historyFile.text();
+    try {
+      parsed = JSON.parse(json);
+    } catch (err) {
+      return { readable: false, error: err instanceof Error ? err : new Error(String(err)) };
+    }
   }
   if (!Array.isArray(parsed)) {
     return { readable: false, error: new Error('Removal history is not an array') };
@@ -112,7 +141,7 @@ export function logRemoval(record: RemovalRecord): Promise<void> {
     try {
       const { records: history } = await loadForMutation();
       history.push(record);
-      historyFile.write(JSON.stringify(history));
+      await writeHistory(history);
     } catch (err) {
       Sentry.captureException(err, { tags: { flow: 'removal-history-log' } });
     }
@@ -131,7 +160,7 @@ export function clearHistoryForSource(playlistId: string): Promise<boolean> {
       const filtered = history.filter(
         (r) => !(r.source.type === 'playlist' && r.source.playlist.id === playlistId),
       );
-      historyFile.write(JSON.stringify(filtered));
+      await writeHistory(filtered);
       return true;
     } catch (err) {
       Sentry.captureException(err, { tags: { flow: 'removal-history-clear' } });
@@ -174,7 +203,7 @@ export function removeFromHistory(trackId: string, source: SiftSource): Promise<
       // After a reset the file must be rewritten even when nothing matched,
       // or every later Restore would back the same file up again.
       if (reset || filtered.length !== history.length) {
-        historyFile.write(JSON.stringify(filtered));
+        await writeHistory(filtered);
       }
     } catch (err) {
       Sentry.captureException(err, { tags: { flow: 'removal-history-remove' } });

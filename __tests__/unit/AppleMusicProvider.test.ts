@@ -403,6 +403,75 @@ describe('AppleMusicProvider', () => {
     });
   });
 
+  describe('writes run one at a time', () => {
+    // A native playlist removal reads the playlist, then writes it back
+    // without the removed entries. The fake does the same, with a pause
+    // between the two, so overlapping removals would undo each other.
+    beforeEach(() => {
+      mockNative.removeFromPlaylist.mockImplementation(async (playlistID: string, ids: string[]) => {
+        const playlist = fake.playlists.get(playlistID);
+        if (!playlist) throw new Error('No tracks found for the given IDs.');
+        const remaining = playlist.items.filter((id) => !ids.includes(id));
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        playlist.items = remaining;
+      });
+    });
+    afterEach(() => mockNative.removeFromPlaylist.mockReset().mockResolvedValue(undefined));
+
+    test('removals from one playlist made back to back all land', async () => {
+      fake.playlists.set('pl', { name: 'Mix', items: ['a', 'b', 'c', 'd'] });
+      await Promise.all([
+        provider.removeFromPlaylist('pl', ['a']),
+        provider.removeFromPlaylist('pl', ['b']),
+        provider.removeFromPlaylist('pl', ['c']),
+      ]);
+      expect(fake.playlists.get('pl')?.items).toEqual(['d']);
+    });
+
+    test('a restore made while a removal is running lands after it', async () => {
+      fake.playlists.set('pl', { name: 'Mix', items: ['a', 'b'] });
+      fake.library.set('a', rawSong('a'));
+      await Promise.all([provider.removeFromPlaylist('pl', ['a']), provider.addToPlaylist('pl', ['a'])]);
+      expect(fake.playlists.get('pl')?.items).toEqual(['b', 'a']);
+    });
+
+    test('two first library Removes make one "Sift — Removed"', async () => {
+      fake.library.set('a', rawSong('a'));
+      fake.library.set('b', rawSong('b'));
+      await Promise.all([provider.removeFromLibrary(['a']), provider.removeFromLibrary(['b'])]);
+      expect(mockNative.createEmptyPlaylist).toHaveBeenCalledTimes(1);
+      expect(fake.playlists.get('new-1')).toEqual({ name: 'Sift — Removed', items: ['a', 'b'] });
+    });
+
+    test('a failed write doesn\'t hold up the next', async () => {
+      fake.playlists.set('pl', { name: 'Mix', items: ['a'] });
+      fake.library.set('a', rawSong('a'));
+      const failing = provider.addToPlaylist('nope', ['a']);
+      const next = provider.removeFromPlaylist('pl', ['a']);
+      await expect(failing).rejects.toThrow('No tracks found');
+      await next;
+      expect(fake.playlists.get('pl')?.items).toEqual([]);
+    });
+
+    test('creating a playlist and adding to the library take their turn too', async () => {
+      fake.library.set('a', rawSong('a'));
+      fake.playlists.set('pl', { name: 'Mix', items: ['a'] });
+      const order: string[] = [];
+      mockNative.createEmptyPlaylist.mockImplementationOnce(async (name: string) => {
+        order.push('create');
+        fake.playlists.set('new-9', { name, items: [] });
+        return 'new-9';
+      });
+      mockNative.addEachToLibrary.mockImplementationOnce(async (ids: string[]) => {
+        order.push('library');
+        return ids.map(() => 'added' as const);
+      });
+      const removal = provider.removeFromPlaylist('pl', ['a']).then(() => order.push('remove'));
+      await Promise.all([removal, provider.createPlaylist('Mix - Sifted', ['a']), provider.addToLibrary(['a'])]);
+      expect(order).toEqual(['remove', 'create', 'library']);
+    });
+  });
+
   describe('removeFromLibrary (moves to "Sift — Removed")', () => {
     test('creates the playlist the first time and moves the songs into it', async () => {
       fake.library.set('a', rawSong('a'));

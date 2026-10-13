@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { useSift } from '../context/SiftContext';
 import { useMusicProvider } from './useMusicProvider';
-import type { PendingDecision } from '../types';
+import type { PendingDecision, SiftSession } from '../types';
 import { undoWindowMs } from '../utils/undoWindow';
 
 /**
@@ -68,6 +68,31 @@ export function useSendPending(
 }
 
 /**
+ * Sends the decision a saved session was still holding when the app was
+ * killed, for a session about to be discarded (a new sift or a Start Over
+ * instead of Resume). Only Resume would send it otherwise: it would be lost,
+ * and the song offered again as if never decided. Its undo window is long
+ * over. Sent to that session's own source; nothing in state changes.
+ */
+export function useSendSavedPending(): (session: SiftSession | null) => void {
+  const { removeTrack, keepFromSavedSession } = useMusicProvider();
+  return useCallback((session: SiftSession | null) => {
+    const pending = session?.pending;
+    if (!session || !pending || !session.source || !session.provider) return;
+    const key = `${pending.trackId}@${pending.at}`;
+    if (sent.has(key)) return;
+    sent.add(key);
+    const track = session.tracks.find((t) => t.id === pending.trackId);
+    if (!track) return;
+    const from = { source: session.source, provider: session.provider };
+    if (pending.decision === 'remove') void removeTrack(track, from);
+    if (pending.decision === 'keep') {
+      void keepFromSavedSession(track, { ...from, siftedPlaylistId: session.siftedPlaylistId ?? null });
+    }
+  }, [removeTrack, keepFromSavedSession]);
+}
+
+/**
  * Holds the latest decision for the undo window, then sends it; sends it
  * straight away when the screen goes away or the app leaves the foreground.
  * For the Sift screen.
@@ -90,8 +115,12 @@ export function useHoldPendingDecision(sendPending: (pending: PendingDecision | 
   }, [state.pending, sendPending]);
 
   useEffect(() => {
+    // Only on leaving the app: pulling down Control Center or Notification
+    // Center, or a call banner, makes it 'inactive' for a moment, and Undo
+    // shouldn't vanish for that. (The session is saved on 'inactive', so a
+    // kill from there keeps the held decision for the next launch.)
     const subscription = AppState.addEventListener('change', (next) => {
-      if (next !== 'active') sendPending(pendingRef.current);
+      if (next === 'background') sendPending(pendingRef.current);
     });
     return () => {
       subscription.remove();

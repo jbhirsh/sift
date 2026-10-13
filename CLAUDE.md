@@ -171,9 +171,14 @@ Makefile                Dev commands (test, lint, typecheck, check)
 - **Undo** (#152): the latest decision is held in `state.pending` (persisted
   with the session) and reaches the music service only after a 5 s undo
   window, on the next decision, or when the Sift screen goes away or the app
-  leaves the foreground (`hooks/usePendingDecision`). `UNDO_LAST` takes it
+  goes to the background (`hooks/usePendingDecision`). `UNDO_LAST` takes it
   back while it's held. Nothing calls `removeTrack`/`keepTrack` for a
   decision directly: send through `useSendPending`, which sends each once.
+  A decision a killed app was holding goes out on Resume, or, if a new sift
+  replaces that session, through `useSendSavedPending` first.
+- **Library writes run one at a time.** `AppleMusicProvider` queues every
+  write (`utils/serialQueue`): a native playlist removal reads the playlist
+  and writes it back, so two at once would undo each other.
 - **Start at chorus** (Apple Music only): `ChorusFinder` picks each track's start
   from LRCLIB synced lyrics (the repeated block, `utils/chorus`), then from where
   ShazamKit places Apple's preview clip in the track (`AppleMusicProvider.previewOffset`, native `shazamOffset`), then

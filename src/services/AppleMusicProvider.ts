@@ -3,6 +3,7 @@ import * as Sentry from '@sentry/react-native';
 import type { MusicProviderService } from './MusicProviderInterface';
 import type { Playlist, SiftSource, Track } from '../types';
 import { APPLE_REMOVED_PLAYLIST } from '../utils/libraryRemovals';
+import { createSerialQueue } from '../utils/serialQueue';
 import {
   batches,
   bestPreviewCandidate,
@@ -27,6 +28,8 @@ import {
 type NativeMusicKit = typeof import('../../modules/expo-musickit/src/index');
 
 const NO_TRACKS_FOUND = 'No tracks found for the given IDs.';
+// How long a write that never settles holds up the next one.
+export const WRITE_STALL_MS = 30000;
 
 /**
  * Lazily load the native MusicKit module.
@@ -59,6 +62,11 @@ function getNativeModule(): NativeMusicKit {
  */
 export class AppleMusicProvider implements MusicProviderService {
   private native = getNativeModule();
+  // Every write to the library goes through here, one at a time. A playlist
+  // removal reads the playlist and writes it back without the removed
+  // entries, so two at once would each write back the other's entry; and
+  // two first library Removes would each create a "Sift — Removed".
+  private writes = createSerialQueue(WRITE_STALL_MS);
 
   async requestAuthorization(): Promise<boolean> {
     return this.native.requestAuthorization();
@@ -94,7 +102,11 @@ export class AppleMusicProvider implements MusicProviderService {
     return this.native.getPlaybackState();
   }
 
-  async createPlaylist(name: string, trackIDs: string[]): Promise<void> {
+  createPlaylist(name: string, trackIDs: string[]): Promise<void> {
+    return this.writes.run(() => this.createPlaylistNow(name, trackIDs));
+  }
+
+  private async createPlaylistNow(name: string, trackIDs: string[]): Promise<void> {
     await this.resolveIntoCaches(trackIDs);
     // Don't leave an empty playlist behind when nothing can be added.
     if (countCached(this.native.cachedKinds(trackIDs)) === 0) throw new Error(NO_TRACKS_FOUND);
@@ -117,7 +129,11 @@ export class AppleMusicProvider implements MusicProviderService {
    * A library Remove: Apple doesn't let apps delete library songs, so move
    * them to the "Sift — Removed" playlist for the user to delete in Music.
    */
-  async removeFromLibrary(trackIDs: string[]): Promise<void> {
+  removeFromLibrary(trackIDs: string[]): Promise<void> {
+    return this.writes.run(() => this.removeFromLibraryNow(trackIDs));
+  }
+
+  private async removeFromLibraryNow(trackIDs: string[]): Promise<void> {
     await this.lookUpLibrarySongs(trackIDs);
     const kinds = this.native.cachedKinds(trackIDs);
     const songIDs = trackIDs.filter((_, i) => kinds[i] === 'song');
@@ -131,8 +147,8 @@ export class AppleMusicProvider implements MusicProviderService {
     }
   }
 
-  async removeFromPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
-    return this.native.removeFromPlaylist(playlistID, trackIDs);
+  removeFromPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
+    return this.writes.run(() => this.native.removeFromPlaylist(playlistID, trackIDs));
   }
 
   /**
@@ -151,7 +167,11 @@ export class AppleMusicProvider implements MusicProviderService {
     return items.some((item) => item.id === trackID);
   }
 
-  async addToLibrary(trackIDs: string[]): Promise<void> {
+  addToLibrary(trackIDs: string[]): Promise<void> {
+    return this.writes.run(() => this.addToLibraryNow(trackIDs));
+  }
+
+  private async addToLibraryNow(trackIDs: string[]): Promise<void> {
     await this.lookUpLibrarySongs(trackIDs);
     // Ids with no library song are skipped; a song MusicKit refuses fails
     // the call.
@@ -162,7 +182,11 @@ export class AppleMusicProvider implements MusicProviderService {
     }
   }
 
-  async addToPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
+  addToPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
+    return this.writes.run(() => this.addToPlaylistNow(playlistID, trackIDs));
+  }
+
+  private async addToPlaylistNow(playlistID: string, trackIDs: string[]): Promise<void> {
     await this.resolveIntoCaches(trackIDs);
     const added = countAdded(await this.native.addEachToPlaylist(playlistID, trackIDs));
     // See createPlaylist: a shortfall means some tracks couldn't be added;
