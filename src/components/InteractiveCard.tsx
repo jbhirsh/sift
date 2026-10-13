@@ -20,10 +20,11 @@ import { SymbolView } from 'expo-symbols';
 import { Track, Decision } from '../types';
 import { RADIUS } from '../theme';
 import { formatTrackMeta } from '../utils/trackMeta';
+import { DRAG_THRESHOLD, swipeDecision } from '../utils/cardLayout';
 import { useTheme } from '../theme/ThemeContext';
 import { useResolvedArtwork } from '../hooks/useResolvedArtwork';
+import { thresholdHaptic } from '../services/haptics';
 
-const DRAG_THRESHOLD = 80;
 const CARD_ACTIONS = [
   { name: 'keep', label: 'Keep' },
   { name: 'remove', label: 'Remove' },
@@ -32,10 +33,19 @@ const CARD_ACTIONS = [
 
 interface InteractiveCardProps {
   track: Track;
+  /**
+   * A decision on this card. For a swipe, the card stays where it was let
+   * go: the caller flies it off (programmaticOffset) and shows the next
+   * card, which, keyed on its track, starts back at the middle.
+   */
   onDecide: (decision: Decision) => void;
   programmaticOffset?: SharedValue<number>;
   /** False for a provider without play counts, so 0 isn't shown as "Never played". */
   playsKnown?: boolean;
+  /** No dragging while a decision is under way. */
+  disabled?: boolean;
+  /** Retries an artwork lookup that found nothing (see useResolvedArtwork). */
+  artworkRetryKey?: number;
 }
 
 export default function InteractiveCard({
@@ -43,12 +53,17 @@ export default function InteractiveCard({
   onDecide,
   programmaticOffset,
   playsKnown = true,
+  disabled = false,
+  artworkRetryKey = 0,
 }: InteractiveCardProps) {
   const { colors, isDark } = useTheme();
   const meta = formatTrackMeta(track.playCount, track.dateAdded, { playsKnown });
-  const resolvedArtworkURL = useResolvedArtwork(track.id, track.artworkURL);
+  const resolvedArtworkURL = useResolvedArtwork(track.id, track.artworkURL, artworkRetryKey);
   const dragX = useSharedValue(0);
   const dragY = useSharedValue(0);
+  // Whether the drag is past the point where letting go decides, so
+  // crossing it, either way, gives one tick.
+  const pastThreshold = useSharedValue(false);
 
   const handleDecide = (decision: Decision) => {
     onDecide(decision);
@@ -56,16 +71,23 @@ export default function InteractiveCard({
 
   const panGesture = Gesture.Pan()
     .minDistance(10)
+    .enabled(!disabled)
     .onUpdate((event) => {
       dragX.value = event.translationX;
       dragY.value = event.translationY;
+      const past = Math.abs(event.translationX) > DRAG_THRESHOLD;
+      if (past !== pastThreshold.value) {
+        pastThreshold.value = past;
+        runOnJS(thresholdHaptic)();
+      }
     })
     .onEnd((event) => {
-      const translationX = event.translationX;
-      if (translationX > DRAG_THRESHOLD) {
-        runOnJS(handleDecide)('keep');
-      } else if (translationX < -DRAG_THRESHOLD) {
-        runOnJS(handleDecide)('remove');
+      pastThreshold.value = false;
+      const decision = swipeDecision(event.translationX, event.velocityX);
+      if (decision) {
+        // Left where it is: it flies off from here.
+        runOnJS(handleDecide)(decision);
+        return;
       }
       dragX.value = withSpring(0, { damping: 12, stiffness: 120 });
       dragY.value = withSpring(0, { damping: 12, stiffness: 120 });

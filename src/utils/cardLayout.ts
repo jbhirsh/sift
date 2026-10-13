@@ -39,3 +39,26 @@ export function cardSize(width: number, height: number): { width: number; height
 export function flyOffDistance(windowWidth: number): number {
   return Math.max(MIN_FLY_OFF, windowWidth);
 }
+
+/** How far (points) a dragged card must go for letting go to decide. */
+export const DRAG_THRESHOLD = 80;
+/** A flick at least this fast (points per second) decides short of that… */
+export const FLING_VELOCITY = 800;
+/** …once the card has moved this far, so a tap's jitter never does. */
+export const FLING_MIN_DISTANCE = 30;
+
+/**
+ * What letting go of a dragged card decides: Keep to the right, Remove to
+ * the left, for a drag past DRAG_THRESHOLD or a quick flick that way; else
+ * nothing, and the card springs back. Runs on the UI thread.
+ */
+export function swipeDecision(translationX: number, velocityX: number): 'keep' | 'remove' | null {
+  'worklet';
+  if (translationX > DRAG_THRESHOLD || (translationX > FLING_MIN_DISTANCE && velocityX > FLING_VELOCITY)) {
+    return 'keep';
+  }
+  if (translationX < -DRAG_THRESHOLD || (translationX < -FLING_MIN_DISTANCE && velocityX < -FLING_VELOCITY)) {
+    return 'remove';
+  }
+  return null;
+}

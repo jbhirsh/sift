@@ -28,6 +28,9 @@ export function removeExplanation(provider: MusicProvider, source: SiftSource): 
   return 'Removed songs are taken out of your library.';
 }
 
+/** The first card's one-time hint: nothing else says which way is which. */
+export const SWIPE_HINT = 'Swipe right to keep, left to remove.';
+
 /**
  * The one-time note on the first Apple Music library remove: Apple doesn't
  * let apps delete library songs, so Remove only collects them.

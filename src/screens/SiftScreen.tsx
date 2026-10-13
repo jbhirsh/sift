@@ -25,15 +25,18 @@ import InteractiveCard from '../components/InteractiveCard';
 import PlayerControls from '../components/PlayerControls';
 import { COLORS, RADIUS, SHADOWS, SPACING, UNDO_PILL } from '../theme';
 import { Decision, PendingDecision, PROVIDER_DISPLAY, Track } from '../types';
-import { loadSeenRemoveNote, markRemoveNoteSeen } from '../services/PreferencesStore';
-import { decisionAnnouncement, FIRST_REMOVE_NOTE, undoMessage, unsyncedCount } from '../utils/sessionCopy';
+import { loadSeenRemoveNote, loadSeenSwipeHint, markRemoveNoteSeen, markSwipeHintSeen } from '../services/PreferencesStore';
+import { decisionAnnouncement, FIRST_REMOVE_NOTE, SWIPE_HINT, undoMessage, unsyncedCount } from '../utils/sessionCopy';
 import { useHoldPendingDecision, useSendPending, wasSent } from '../hooks/usePendingDecision';
 import { useRemovalRetry } from '../hooks/useRemovalRetry';
 import UndoPill from '../components/UndoPill';
 import { compactCount } from '../utils/compactCount';
 import { cardSize, flyOffDistance } from '../utils/cardLayout';
+import { decisionHaptic, undoHaptic } from '../services/haptics';
 
 const SEGMENT_COUNT = 10;
+// How long after a swiped card has flown off before the next can be decided.
+const SWIPE_SETTLE_MS = 150;
 // The action buttons' bottom padding and label line height, which place the
 // Undo pill on the label row.
 const ACTIONS_BOTTOM_PADDING = SPACING['3xl'];
@@ -104,17 +107,34 @@ export default function SiftScreen() {
       cancelled = true;
     };
   }, []);
+  // One-time hint on the first card ever: nothing else tells a sighted user
+  // which way is Keep. Gone with the first decision, which marks it seen.
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    loadSeenSwipeHint().then((seen) => {
+      if (!cancelled && !seen) setShowSwipeHint(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const afterDecision = useCallback((decision: Decision, track: Track | undefined) => {
     // Say what happened: a swipe or button gives a sighted user motion,
     // VoiceOver nothing (#146).
     if (track) AccessibilityInfo.announceForAccessibility(decisionAnnouncement(track.name, decision));
+    if (showSwipeHint) {
+      setShowSwipeHint(false);
+      markSwipeHintSeen();
+    }
     setShowRemoveNote(false);
     if (decision === 'remove' && removeNoteEligible && !seenRemoveNoteRef.current) {
       seenRemoveNoteRef.current = true;
       setShowRemoveNote(true);
       markRemoveNoteSeen();
     }
-  }, [removeNoteEligible]);
+  }, [removeNoteEligible, showSwipeHint]);
 
   // Failed removals and keeps parked after a failed add: changes that didn't
   // reach the provider, shown during the sift rather than only on Done.
@@ -148,8 +168,11 @@ export default function SiftScreen() {
   // Plain function, not useCallback: the React Compiler (enabled in app.json)
   // memoizes it, and hook-argument freezing is what made the shared-value
   // write inside a useCallback an immutability violation.
-  const animateDecision = (decision: Decision) => {
+  // A swipe's card flies off from where it was let go, faster: it's
+  // already moving.
+  const animateDecision = (decision: Decision, { swiped = false } = {}) => {
     if (!beginDecision()) return;
+    decisionHaptic(decision);
 
     const track = currentTrack;
     // Far enough to leave the window from its middle, on any width.
@@ -162,12 +185,17 @@ export default function SiftScreen() {
       sendIfLast(decide(decision));
       afterDecision(decision, track);
       programmaticOffset.value = 0;
-      endDecision();
+      // After a swipe, hold the guard a moment longer as the next card
+      // lands, so a tap that was meant for the swiped card can't decide it.
+      if (swiped) settleTimeoutRef.current = setTimeout(endDecision, SWIPE_SETTLE_MS);
+      else endDecision();
     };
 
     programmaticOffset.value = withTiming(
       direction,
-      { duration: 300, easing: Easing.in(Easing.ease) },
+      swiped
+        ? { duration: 200, easing: Easing.out(Easing.ease) }
+        : { duration: 300, easing: Easing.in(Easing.ease) },
       (finished) => {
         if (finished) {
           runOnJS(onComplete)();
@@ -181,25 +209,19 @@ export default function SiftScreen() {
     // alone lags a render behind the ref, so a skip tap racing a card swipe
     // could double-decide the still-current track.
     if (!beginDecision()) return;
+    decisionHaptic('skip');
     sendPending(state.pending);
     sendIfLast(decide('skip'));
     afterDecision('skip', currentTrack);
     settleTimeoutRef.current = setTimeout(endDecision, 300);
   }, [beginDecision, endDecision, decide, afterDecision, currentTrack, sendPending, sendIfLast, state.pending]);
 
-  const handleCardDecide = useCallback(
-    (decision: Decision) => {
-      if (!beginDecision()) return;
-      const track = currentTrack;
-      sendPending(state.pending);
-      sendIfLast(decide(decision));
-      afterDecision(decision, track);
-      // Hold the guard briefly while the swiped card settles so a button
-      // press right after a swipe cannot decide the next card too.
-      settleTimeoutRef.current = setTimeout(endDecision, 300);
-    },
-    [beginDecision, endDecision, decide, afterDecision, currentTrack, sendPending, sendIfLast, state.pending],
-  );
+  // A swipe, or a VoiceOver action on the card: Skip as the button does,
+  // Keep and Remove fly the card off first.
+  const handleCardDecide = (decision: Decision) => {
+    if (decision === 'skip') handleSkip();
+    else animateDecision(decision, { swiped: true });
+  };
 
   return (
     <View style={styles.root}>
@@ -324,9 +346,14 @@ export default function SiftScreen() {
           )}
           {currentTrack != null && (
             <InteractiveCard
+              // A new card per song: it starts in the middle with its own
+              // artwork, never the last card's drag or picture.
+              key={currentTrack.id}
               track={currentTrack}
               onDecide={handleCardDecide}
               programmaticOffset={programmaticOffset}
+              disabled={isAnimating}
+              artworkRetryKey={state.songCacheGeneration}
             />
           )}
           {/* Over the top of the card, not in the layout: appearing mid-sift
@@ -341,6 +368,12 @@ export default function SiftScreen() {
                 style={[styles.unsyncedChip, { color: colors.skipText, backgroundColor: colors.surface }]}
               >
                 {`${unsynced} didn\u2019t sync`}
+              </Text>
+            )}
+            {showSwipeHint && (
+              // Opaque, like the sync chip: it sits over artwork of any color.
+              <Text testID="swipe-hint" style={[styles.swipeHint, { color: colors.text, backgroundColor: colors.surface }]}>
+                {SWIPE_HINT}
               </Text>
             )}
             {showRemoveNote && (
@@ -402,6 +435,7 @@ export default function SiftScreen() {
               accessibilityLabel={`Undo: ${undoMessage(state.tracks[state.cursor - 1].name, state.pending.decision)}`}
               onPress={() => {
                 if (isAnimatingRef.current) return;
+                undoHaptic();
                 dispatch({ type: 'UNDO_LAST' });
               }}
             />
@@ -578,6 +612,14 @@ const styles = StyleSheet.create({
   },
   removeNote: {
     alignSelf: 'stretch',
+  },
+  swipeHint: {
+    fontSize: 15,
+    fontWeight: '600',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.base,
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
   },
   removeNoteText: {
     fontSize: 13,

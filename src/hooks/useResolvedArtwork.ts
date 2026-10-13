@@ -24,10 +24,16 @@ const cache = new Map<string, string>();
  * - If undefined (local MusicKit track), calls the native module to
  *   resolve the musicKit:// URL to a file:// path.
  * - Returns `undefined` while loading or if artwork is unavailable.
+ *
+ * Keyed on the track: a caller showing one track after another remounts it
+ * per track (InteractiveCard is keyed), so one track's artwork never shows
+ * on the next while that one resolves.
  */
 export function useResolvedArtwork(
   trackID: string,
   artworkURL: string | undefined,
+  /** Changing it retries a lookup that found nothing (the song wasn't cached yet). */
+  retryKey = 0,
 ): string | undefined {
   // Synchronously resolve what we can without an effect
   const syncURL = useMemo(() => {
@@ -50,7 +56,7 @@ export function useResolvedArtwork(
     return () => {
       cancelled = true;
     };
-  }, [trackID, needsNativeResolve]);
+  }, [trackID, needsNativeResolve, retryKey]);
 
   return syncURL ?? nativeURL;
 }

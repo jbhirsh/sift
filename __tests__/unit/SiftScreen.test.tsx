@@ -28,7 +28,7 @@ jest.mock('react-native-reanimated', () => ({
   withTiming: (val: number, config: unknown, callback?: (finished: boolean) => void) =>
     mockWithTiming(val, config, callback),
   withSpring: (val: number) => val,
-  Easing: { in: (e: unknown) => e, ease: {} },
+  Easing: { in: (e: unknown) => e, out: (e: unknown) => e, ease: {} },
   interpolate: (val: number, inputRange: number[], outputRange: number[]) => {
     const ratio = (val - inputRange[0]) / (inputRange[1] - inputRange[0]);
     return outputRange[0] + ratio * (outputRange[1] - outputRange[0]);
@@ -43,7 +43,7 @@ jest.mock('react-native-gesture-handler', () => ({
   GestureDetector: ({ children }: { children: React.ReactNode }) => children,
   Gesture: {
     Pan: () => ({
-      minDistance: () => ({ onUpdate: () => ({ onEnd: () => ({}) }) }),
+      minDistance: () => ({ enabled: () => ({ onUpdate: () => ({ onEnd: () => ({}) }) }) }),
       onUpdate: () => ({}),
     }),
     Tap: () => ({ onEnd: () => ({}) }),
@@ -89,32 +89,48 @@ jest.mock('../../src/hooks/useResolvedArtwork', () => ({
 // Mock InteractiveCard to expose onDecide for testing handleCardDecide
 jest.mock('../../src/components/InteractiveCard', () => {
   const { TouchableOpacity, Text, View } = require('react-native');
-  return function MockInteractiveCard({ track, onDecide }: { track: { name: string; artist: string; album: string; playCount: number }; onDecide: (d: string) => void }) {
+  return function MockInteractiveCard({ track, onDecide, disabled, artworkRetryKey }: {
+    track: { name: string; artist: string; album: string; playCount: number };
+    onDecide: (d: string) => void;
+    disabled?: boolean;
+    artworkRetryKey?: number;
+  }) {
     return (
-      <View>
+      <View testID="mock-card" accessibilityState={{ disabled }} accessibilityHint={`artwork retry ${artworkRetryKey}`}>
         <Text testID="card-track-name">{track.name}</Text>
         <Text testID="card-artist-name">{track.artist}</Text>
         <Text testID="card-album-name">{track.album}</Text>
         <Text testID="card-play-count">{track.playCount}</Text>
         <TouchableOpacity testID="mock-card-keep" accessibilityRole="button" accessibilityLabel="Swipe keep" onPress={() => onDecide('keep')} />
         <TouchableOpacity testID="mock-card-remove" accessibilityRole="button" accessibilityLabel="Swipe remove" onPress={() => onDecide('remove')} />
+        <TouchableOpacity testID="mock-card-skip" accessibilityRole="button" accessibilityLabel="Action skip" onPress={() => onDecide('skip')} />
       </View>
     );
   };
 });
 
+jest.mock('../../src/services/haptics', () => ({
+  decisionHaptic: jest.fn(),
+  undoHaptic: jest.fn(),
+  thresholdHaptic: jest.fn(),
+}));
+
 jest.mock('../../src/services/PreferencesStore', () => ({
   ...jest.requireActual('../../src/services/PreferencesStore'),
   loadSeenRemoveNote: jest.fn().mockResolvedValue(false),
   markRemoveNoteSeen: jest.fn().mockResolvedValue(undefined),
+  // Seen, unless a test says otherwise: the hint sits over the card.
+  loadSeenSwipeHint: jest.fn().mockResolvedValue(true),
+  markSwipeHintSeen: jest.fn().mockResolvedValue(undefined),
 }));
 
 import { renderWithProviders, mockTrackA, mockTrackB, mockTrackC } from '../helpers/renderWithProviders';
-import { loadSeenRemoveNote, markRemoveNoteSeen } from '../../src/services/PreferencesStore';
+import { loadSeenRemoveNote, loadSeenSwipeHint, markRemoveNoteSeen, markSwipeHintSeen } from '../../src/services/PreferencesStore';
 import { useSift } from '../../src/context/SiftContext';
 import SiftScreen from '../../src/screens/SiftScreen';
 import { a11yViolations } from '../helpers/a11yScan';
 import { flyOffDistance } from '../../src/utils/cardLayout';
+import { decisionHaptic, undoHaptic } from '../../src/services/haptics';
 
 describe('SiftScreen', () => {
   const tracks = [mockTrackA, mockTrackB, mockTrackC];
@@ -406,6 +422,91 @@ describe('SiftScreen', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  describe('swipes and feel', () => {
+    test('a swiped card flies off faster, from where it was let go; a button\'s from the middle', async () => {
+      const { getByTestId, getByLabelText } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+      mockWithTiming.mockClear();
+      await fireEvent.press(getByTestId('mock-card-keep'));
+      expect(mockWithTiming).toHaveBeenCalledWith(flyOffDistance(Dimensions.get('window').width), expect.objectContaining({ duration: 200 }), expect.any(Function));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      });
+      mockWithTiming.mockClear();
+      await fireEvent.press(getByLabelText('Remove'));
+      expect(mockWithTiming).toHaveBeenCalledWith(-flyOffDistance(Dimensions.get('window').width), expect.objectContaining({ duration: 300 }), expect.any(Function));
+    });
+
+    test('Skip from the card (VoiceOver\'s action) skips, without a fly-off', async () => {
+      const { getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+      mockWithTiming.mockClear();
+      await fireEvent.press(getByTestId('mock-card-skip'));
+      expect(mockWithTiming).not.toHaveBeenCalled();
+      expect(getByTestId('stat-skipped').props.children).toEqual(['1', ' ', 'skipped']);
+      expect(getByTestId('card-track-name').props.children).toBe('Track B');
+    });
+
+    test('each decision, and Undo, is felt', async () => {
+      jest.useFakeTimers();
+      try {
+        (decisionHaptic as jest.Mock).mockClear();
+        const { getByTestId, getByLabelText } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+        await fireEvent.press(getByLabelText('Keep'));
+        expect(decisionHaptic).toHaveBeenLastCalledWith('keep');
+        await fireEvent.press(getByLabelText('Skip'));
+        expect(decisionHaptic).toHaveBeenLastCalledWith('skip');
+        await act(() => {
+          jest.advanceTimersByTime(400);
+        });
+        await fireEvent.press(getByTestId('undo-pill'));
+        expect(undoHaptic).toHaveBeenCalledTimes(1);
+        // A refused decision (one already under way) isn't felt.
+        (decisionHaptic as jest.Mock).mockClear();
+        await fireEvent.press(getByTestId('mock-card-remove'));
+        await fireEvent.press(getByLabelText('Keep'));
+        expect(decisionHaptic).toHaveBeenCalledTimes(1);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    test('the card can\'t be dragged while a decision is under way, and retries its artwork after a warm-up', async () => {
+      jest.useFakeTimers();
+      try {
+        const { getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+        expect(getByTestId('mock-card').props.accessibilityState).toEqual({ disabled: false });
+        expect(getByTestId('mock-card').props.accessibilityHint).toBe('artwork retry 0');
+        await fireEvent.press(getByTestId('mock-card-keep'));
+        expect(getByTestId('mock-card').props.accessibilityState).toEqual({ disabled: true });
+        await act(() => {
+          jest.advanceTimersByTime(150);
+        });
+        expect(getByTestId('mock-card').props.accessibilityState).toEqual({ disabled: false });
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
+
+  describe('first-card swipe hint', () => {
+    test('shows on the first card ever, until the first decision, which marks it seen', async () => {
+      (loadSeenSwipeHint as jest.Mock).mockResolvedValueOnce(false);
+      (markSwipeHintSeen as jest.Mock).mockClear();
+      const { getByLabelText, getByTestId, queryByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+      await act(async () => {});
+      expect(getByTestId('swipe-hint').props.children).toBe('Swipe right to keep, left to remove.');
+      expect(markSwipeHintSeen).not.toHaveBeenCalled();
+      await fireEvent.press(getByLabelText('Keep'));
+      expect(queryByTestId('swipe-hint')).toBeNull();
+      expect(markSwipeHintSeen).toHaveBeenCalledTimes(1);
+    });
+
+    test('not once it has been seen', async () => {
+      const { queryByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+      await act(async () => {});
+      expect(queryByTestId('swipe-hint')).toBeNull();
+    });
   });
 
   describe('first-remove note (#141)', () => {

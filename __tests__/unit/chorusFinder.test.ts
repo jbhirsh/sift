@@ -111,6 +111,19 @@ describe('ChorusFinder', () => {
     expect(lookupLyrics).toHaveBeenCalledTimes(2);
   });
 
+  it('forgetFailures lets a lookup that failed try again, but keeps what was found', async () => {
+    const { finder, lookupLyrics } = makeFinder(() => Promise.resolve({ status: 'not-found' }));
+    const preview = jest.fn().mockRejectedValueOnce(new Error('not cached yet')).mockResolvedValue(42);
+    await expect(finder.find(track, preview)).resolves.toEqual({ position: 40, source: 'estimate' });
+    finder.forgetFailures();
+    await expect(finder.find(track, preview)).resolves.toEqual({ position: 42, source: 'preview' });
+    expect(preview).toHaveBeenCalledTimes(2);
+    // A result worth keeping isn't forgotten.
+    finder.forgetFailures();
+    await expect(finder.find(track, preview)).resolves.toEqual({ position: 42, source: 'preview' });
+    expect(lookupLyrics).toHaveBeenCalledTimes(2);
+  });
+
   it('still uses the preview when LRCLIB is unreachable', async () => {
     const { finder, storage } = makeFinder(() => Promise.reject(new Error('offline')));
     await expect(finder.find(track, () => Promise.resolve(42))).resolves.toEqual({ position: 42, source: 'preview' });

@@ -25,6 +25,7 @@ import { decisionCounts, discardConfirmation, removeExplanation } from '../utils
 import { resumeState } from '../context/resumeSession';
 import { loadSession } from '../services/SessionStore';
 import { useSendSavedPending } from '../hooks/usePendingDecision';
+import { warmUpOrder } from '../utils/warmUpOrder';
 import { clearArtworkCache } from '../hooks/useResolvedArtwork';
 import { clearHistoryForSource } from '../services/RemovalHistoryStore';
 import { loadReviewedIds } from '../services/ReviewedLedgerStore';
@@ -199,6 +200,8 @@ export default function SetupScreen() {
     // this dispatch, leaving an unguarded await window where the user was
     // stuck on Setup with the modal gone; play/artwork degrade gracefully
     // while the cache warms, so restoring the session must not wait for it.
+    // Marked warming first: a play that fails meanwhile isn't reported.
+    dispatch({ type: 'SONG_CACHE_WARMING' });
     dispatch({
       type: 'RESUME_SESSION',
       session: resumeState(savedSession, {
@@ -208,12 +211,20 @@ export default function SetupScreen() {
       }),
     });
 
-    // Warm the native cache in the background for playback/artwork. A
+    // Warm the native cache in the background for playback/artwork: the
+    // cards up next first, which play, artwork and the chorus start then
+    // retry (songCacheGeneration), then the rest. Only the first warm-up
+    // holds back a failed play's message: the rest can take minutes on a
+    // big library, and a song that really won't play must say so. A
     // playlist sift reloads its playlist too: its music videos come back no
     // other way (#54).
-    const trackIDs = savedSession.tracks.map((t) => t.id);
+    const { upNext, rest } = warmUpOrder(savedSession.tracks.map((t) => t.id), savedSession.cursor);
     const source = savedSession.source;
-    await warmCache(trackIDs, source?.type === 'playlist' ? source.playlist.id : undefined);
+    await warmCache(upNext, source?.type === 'playlist' ? source.playlist.id : undefined);
+    dispatch({ type: 'SONG_CACHE_WARMED' });
+    if (rest.length === 0) return;
+    await warmCache(rest);
+    dispatch({ type: 'SONG_CACHE_WARMED' });
   };
 
   // A decision the saved session held when the app was killed goes out

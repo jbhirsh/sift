@@ -153,4 +153,19 @@ describe('useResolvedArtwork', () => {
 
     expect(mockResolveArtworkURL).toHaveBeenCalledWith('track-empty', 600, 600);
   });
+
+  it('a new retry key looks again for artwork that wasn\'t there; the same key doesn\'t', async () => {
+    mockResolveArtworkURL.mockResolvedValueOnce(null).mockResolvedValue('file:///art.jpg');
+    const { result, rerender } = await renderHook(
+      ({ retryKey }: { retryKey: number }) => useResolvedArtwork('track-9', undefined, retryKey),
+      { initialProps: { retryKey: 0 } },
+    );
+    await waitFor(() => expect(mockResolveArtworkURL).toHaveBeenCalledTimes(1));
+    expect(result.current).toBeUndefined();
+    await rerender({ retryKey: 0 });
+    expect(mockResolveArtworkURL).toHaveBeenCalledTimes(1);
+    await rerender({ retryKey: 1 });
+    await waitFor(() => expect(result.current).toBe('file:///art.jpg'));
+    expect(mockResolveArtworkURL).toHaveBeenCalledTimes(2);
+  });
 });

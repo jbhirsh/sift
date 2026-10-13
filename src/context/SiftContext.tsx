@@ -75,7 +75,22 @@ export interface SiftState {
   startAtChorus: boolean;
   /** The latest decision, not yet sent to the music service (#152). */
   pending: PendingDecision | null;
+  /** The track whose last play failed, so the player can say so. */
+  playbackFailedId: string | null;
+  /**
+   * The native song cache is being filled for a resumed session. A play
+   * that fails meanwhile may only be waiting for it, so it isn't reported.
+   */
+  songCacheWarming: boolean;
+  /**
+   * Counts the warm-ups finished. Play, artwork and the chorus start try
+   * again when it changes: a card shown before its song was cached got none.
+   */
+  songCacheGeneration: number;
 }
+
+/** State that lives for the app session only, never saved or resumed. */
+type TransientState = 'phase' | 'startAtChorus' | 'playbackFailedId' | 'songCacheWarming' | 'songCacheGeneration';
 
 const initialState: SiftState = {
   phase: 'setup',
@@ -104,6 +119,9 @@ const initialState: SiftState = {
   siftedPlaylistId: null,
   pending: null,
   startAtChorus: DEFAULT_PREFERENCES.startAtChorus,
+  playbackFailedId: null,
+  songCacheWarming: false,
+  songCacheGeneration: 0,
 };
 
 // ── Actions ────────────────────────────────────────────
@@ -135,7 +153,10 @@ type SiftAction =
   | { type: 'RESTORE_TRACK'; trackId: string }
   | { type: 'SET_SOURCE'; source: SiftSource }
   | { type: 'SET_START_AT_CHORUS'; enabled: boolean }
-  | { type: 'RESUME_SESSION'; session: Omit<SiftState, 'phase' | 'startAtChorus'> & { phase?: AppPhase } }
+  | { type: 'RESUME_SESSION'; session: Omit<SiftState, TransientState> & { phase?: AppPhase } }
+  | { type: 'SET_PLAYBACK_FAILED'; trackId: string | null }
+  | { type: 'SONG_CACHE_WARMING' }
+  | { type: 'SONG_CACHE_WARMED' }
   | { type: 'START_FRESH'; skipFiltering?: boolean }
   | { type: 'RESET_TO_SETUP' };
 
@@ -280,6 +301,15 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
     case 'SET_CONNECTION_STATUS':
       return { ...state, connectionStatus: action.status };
 
+    case 'SET_PLAYBACK_FAILED':
+      return state.playbackFailedId === action.trackId ? state : { ...state, playbackFailedId: action.trackId };
+
+    case 'SONG_CACHE_WARMING':
+      return { ...state, songCacheWarming: true };
+
+    case 'SONG_CACHE_WARMED':
+      return { ...state, songCacheWarming: false, songCacheGeneration: state.songCacheGeneration + 1 };
+
     case 'SET_PLAYLIST_CREATED':
       return { ...state, removalPlaylistCreated: action.created };
 
@@ -368,6 +398,7 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         activeSource: action.session.source ?? state.source,
         // A preference, not part of the session being resumed.
         startAtChorus: state.startAtChorus,
+        playbackFailedId: null,
       };
 
     case 'START_FRESH':
@@ -393,6 +424,8 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         pending: null,
         phase: 'loading',
         skipFiltering: action.skipFiltering ?? false,
+        // A resume's warm-up still running belongs to the sift left behind.
+        songCacheWarming: false,
         isPlaying: false,
         playbackPosition: 0,
         isCreatingPlaylist: false,
@@ -420,6 +453,7 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         pending: null,
         phase: 'setup',
         skipFiltering: false,
+        songCacheWarming: false,
         isPlaying: false,
         playbackPosition: 0,
         isCreatingPlaylist: false,

@@ -3,8 +3,12 @@ import { Track } from '../../src/types';
 import { CHORUS_WAIT_MS, useChorusStart } from '../../src/hooks/useChorusStart';
 
 const mockFind = jest.fn();
+const mockForgetFailures = jest.fn();
 jest.mock('../../src/services/ChorusFinder', () => ({
-  chorusFinder: { find: (...args: unknown[]) => mockFind(...args) },
+  chorusFinder: {
+    find: (...args: unknown[]) => mockFind(...args),
+    forgetFailures: () => mockForgetFailures(),
+  },
 }));
 
 const track = (id: string, duration = 200): Track => ({
@@ -13,7 +17,7 @@ const track = (id: string, duration = 200): Track => ({
 const [t1, t2, t3] = [track('t1'), track('t2'), track('t3')];
 
 const mockSift = {
-  state: { startAtChorus: true, provider: 'apple-music' as const },
+  state: { startAtChorus: true, provider: 'apple-music' as const, songCacheGeneration: 0 },
   currentTrack: t1 as Track | undefined,
   nextTrack: t2 as Track | undefined,
   nextNextTrack: t3 as Track | undefined,
@@ -27,7 +31,7 @@ const previewOffset = jest.fn();
 beforeEach(() => {
   jest.clearAllMocks();
   mockFind.mockResolvedValue({ position: 47, source: 'lyrics' });
-  mockSift.state = { startAtChorus: true, provider: 'apple-music' };
+  mockSift.state = { startAtChorus: true, provider: 'apple-music', songCacheGeneration: 0 };
   mockSift.currentTrack = t1;
   mockSift.nextTrack = t2;
   mockSift.nextNextTrack = t3;
@@ -41,6 +45,17 @@ describe('useChorusStart', () => {
     expect(mockFind).toHaveBeenCalledWith(t1, previewOffset);
   });
 
+  it('after a cache warm-up, forgets what failed, then looks for the cards again', async () => {
+    const { rerender } = await renderHook(() => useChorusStart(previewOffset));
+    expect(mockForgetFailures).not.toHaveBeenCalled();
+    mockFind.mockClear();
+    mockSift.state = { ...mockSift.state, songCacheGeneration: 1 };
+    await rerender({});
+    expect(mockForgetFailures).toHaveBeenCalledTimes(1);
+    expect(mockFind.mock.calls.map((c) => c[0].id)).toEqual(['t1', 't2', 't3']);
+    expect(mockForgetFailures.mock.invocationCallOrder[0]).toBeLessThan(mockFind.mock.invocationCallOrder[0]);
+  });
+
   it('skips missing upcoming cards', async () => {
     mockSift.nextNextTrack = undefined;
     mockSift.nextTrack = undefined;
@@ -49,7 +64,7 @@ describe('useChorusStart', () => {
   });
 
   it.each([
-    ['the setting is off', { startAtChorus: false, provider: 'apple-music' as const }],
+    ['the setting is off', { startAtChorus: false, provider: 'apple-music' as const, songCacheGeneration: 0 }],
   ])('is disabled, prefetches nothing and starts at 0 when %s', async (_, state) => {
     mockSift.state = state;
     const { result } = await renderHook(() => useChorusStart(previewOffset));

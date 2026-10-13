@@ -3,7 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   loadPreferences,
   loadSeenRemoveNote,
+  loadSeenSwipeHint,
   markRemoveNoteSeen,
+  markSwipeHintSeen,
   savePreferences,
 } from '../../src/services/PreferencesStore';
 
@@ -91,5 +93,29 @@ describe('first-remove note flag', () => {
     mockSetItem.mockRejectedValue(new Error('disk'));
     await expect(markRemoveNoteSeen()).resolves.toBeUndefined();
     expect(Sentry.captureException).toHaveBeenCalled();
+  });
+});
+
+describe('first-card swipe hint flag', () => {
+  it('is unseen until marked, under its own key', async () => {
+    mockGetItem.mockResolvedValue(null);
+    await expect(loadSeenSwipeHint()).resolves.toBe(false);
+    expect(mockGetItem).toHaveBeenCalledWith('sift_seen_swipe_hint');
+
+    mockSetItem.mockResolvedValue(undefined);
+    await markSwipeHintSeen();
+    expect(mockSetItem).toHaveBeenCalledWith('sift_seen_swipe_hint', '1');
+
+    mockGetItem.mockResolvedValue('1');
+    await expect(loadSeenSwipeHint()).resolves.toBe(true);
+  });
+
+  it('a failed read counts as seen; a failed write is reported', async () => {
+    mockGetItem.mockRejectedValue(new Error('disk'));
+    await expect(loadSeenSwipeHint()).resolves.toBe(true);
+    mockSetItem.mockRejectedValue(new Error('disk'));
+    await expect(markSwipeHintSeen()).resolves.toBeUndefined();
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'preferences-save' } });
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'preferences-load' } });
   });
 });

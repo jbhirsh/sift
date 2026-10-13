@@ -32,18 +32,24 @@ jest.mock('react-native-reanimated', () => ({
 type GestureCallback = (event: Record<string, unknown>) => void;
 let panOnUpdate: GestureCallback | undefined;
 let panOnEnd: GestureCallback | undefined;
+let panEnabled: boolean | undefined;
 
 jest.mock('react-native-gesture-handler', () => ({
   GestureDetector: ({ children }: { children: React.ReactNode }) => children,
   Gesture: {
     Pan: () => ({
       minDistance: () => ({
-        onUpdate: (fn: GestureCallback) => {
-          panOnUpdate = fn;
+        enabled: (enabled: boolean) => {
+          panEnabled = enabled;
           return {
-            onEnd: (fn: GestureCallback) => {
-              panOnEnd = fn;
-              return {};
+            onUpdate: (fn: GestureCallback) => {
+              panOnUpdate = fn;
+              return {
+                onEnd: (fn: GestureCallback) => {
+                  panOnEnd = fn;
+                  return {};
+                },
+              };
             },
           };
         },
@@ -51,6 +57,8 @@ jest.mock('react-native-gesture-handler', () => ({
     }),
   },
 }));
+
+jest.mock('../../src/services/haptics', () => ({ thresholdHaptic: jest.fn() }));
 
 jest.mock('../../src/hooks/useResolvedArtwork', () => ({
   useResolvedArtwork: jest.fn().mockReturnValue('https://example.com/art.jpg'),
@@ -143,6 +151,61 @@ describe('InteractiveCard', () => {
     await renderCard(mockTrack, onDecide);
     panOnEnd?.({ translationX: 30 });
     expect(onDecide).not.toHaveBeenCalled();
+  });
+
+  test('a quick flick decides short of the threshold; a slow one doesn\'t', async () => {
+    const onDecide = jest.fn();
+    await renderCard(mockTrack, onDecide);
+    panOnEnd?.({ translationX: 40, velocityX: 1200 });
+    expect(onDecide).toHaveBeenLastCalledWith('keep');
+    panOnEnd?.({ translationX: -40, velocityX: -1200 });
+    expect(onDecide).toHaveBeenLastCalledWith('remove');
+    onDecide.mockClear();
+    panOnEnd?.({ translationX: 40, velocityX: 200 });
+    expect(onDecide).not.toHaveBeenCalled();
+  });
+
+  test('crossing the threshold ticks once each way', async () => {
+    const { thresholdHaptic } = jest.requireMock('../../src/services/haptics');
+    (thresholdHaptic as jest.Mock).mockClear();
+    await renderCard();
+    panOnUpdate?.({ translationX: 40, translationY: 0 });
+    expect(thresholdHaptic).not.toHaveBeenCalled();
+    panOnUpdate?.({ translationX: 90, translationY: 0 });
+    panOnUpdate?.({ translationX: 120, translationY: 0 });
+    expect(thresholdHaptic).toHaveBeenCalledTimes(1);
+    panOnUpdate?.({ translationX: 60, translationY: 0 });
+    expect(thresholdHaptic).toHaveBeenCalledTimes(2);
+    panOnUpdate?.({ translationX: -90, translationY: 0 });
+    expect(thresholdHaptic).toHaveBeenCalledTimes(3);
+    // Letting go resets it: the next drag ticks again.
+    panOnEnd?.({ translationX: 0 });
+    panOnUpdate?.({ translationX: 90, translationY: 0 });
+    expect(thresholdHaptic).toHaveBeenCalledTimes(4);
+  });
+
+  test('can\'t be dragged while a decision is under way', async () => {
+    await renderCard();
+    expect(panEnabled).toBe(true);
+    await render(
+      <ThemeProvider>
+        <InteractiveCard track={mockTrack} onDecide={jest.fn()} disabled />
+      </ThemeProvider>
+    );
+    expect(panEnabled).toBe(false);
+  });
+
+  test('passes its artwork retry key on', async () => {
+    jest.mocked(useResolvedArtwork).mockClear();
+    await render(
+      <ThemeProvider>
+        <InteractiveCard track={mockTrack} onDecide={jest.fn()} artworkRetryKey={3} />
+      </ThemeProvider>
+    );
+    expect(useResolvedArtwork).toHaveBeenCalledWith('1', mockTrack.artworkURL, 3);
+    jest.mocked(useResolvedArtwork).mockClear();
+    await renderCard();
+    expect(useResolvedArtwork).toHaveBeenCalledWith('1', mockTrack.artworkURL, 0);
   });
 
   test('renders with programmaticOffset prop', async () => {

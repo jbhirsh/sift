@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import {
+  AccessibilityInfo,
   View,
   Text,
   TouchableOpacity,
@@ -19,7 +20,7 @@ import { useMusicProvider } from '../hooks/useMusicProvider';
 import { useChorusStart } from '../hooks/useChorusStart';
 import GlassCard from './GlassCard';
 import { formatTime } from '../utils/formatTime';
-import { RADIUS } from '../theme';
+import { RADIUS, SPACING } from '../theme';
 import { Track } from '../types';
 
 const SEEK_ACTIONS = [{ name: 'increment' }, { name: 'decrement' }];
@@ -81,10 +82,30 @@ export default function PlayerControls() {
     }
   }, [currentTrack, playFromStart]);
 
+  // A finished cache warm-up (a resume): a card that couldn't play because
+  // its song wasn't cached yet tries again, unless it's playing by now.
+  const generationRef = useRef(state.songCacheGeneration);
+  useEffect(() => {
+    if (state.songCacheGeneration === generationRef.current) return;
+    generationRef.current = state.songCacheGeneration;
+    if (!currentTrack || state.isPlaying || state.playbackPosition !== 0) return;
+    if (pendingStartRef.current === currentTrack.id) return;
+    playFromStart(currentTrack);
+  }, [state.songCacheGeneration, state.isPlaying, state.playbackPosition, currentTrack, playFromStart]);
+
   // Pause music when PlayerControls unmounts (session paused/done)
   useEffect(() => {
     return () => { pause(); };
   }, [pause]);
+
+  const playFailed = currentTrack != null
+    && state.playbackFailedId === currentTrack.id
+    && !state.songCacheWarming;
+
+  // VoiceOver hears it too: the row appears without any focus change.
+  useEffect(() => {
+    if (playFailed) AccessibilityInfo.announceForAccessibility('Can\u2019t play this song.');
+  }, [playFailed]);
 
   const duration = currentTrack?.duration ?? 0;
   const maxDuration = Math.max(duration, 1);
@@ -148,8 +169,27 @@ export default function PlayerControls() {
   return (
     <GlassCard intensity="regular" radius={RADIUS.lg}>
       <View style={styles.container}>
-        {/* Seek bar */}
-        {currentTrack != null && (
+        {/* Seek bar, or why there's nothing to seek: a song that won't
+            play said nothing before, and just sat at 0:00. (Not while a
+            resume is still caching songs: it retries when that's done.) */}
+        {currentTrack != null && playFailed && (
+          <View style={styles.failedRow} testID="playback-failed">
+            <SymbolView name="exclamationmark.triangle.fill" size={14} tintColor={colors.skipText} accessibilityElementsHidden />
+            <Text style={[styles.failedText, { color: colors.textSecondary }]} numberOfLines={2}>
+              Can{'\u2019'}t play this song.
+            </Text>
+            <TouchableOpacity
+              onPress={() => playFromStart(currentTrack)}
+              style={styles.retryButton}
+              testID="playback-retry"
+              accessibilityRole="button"
+              accessibilityLabel="Try playing again"
+            >
+              <Text style={[styles.retryText, { color: colors.accent }]}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {currentTrack != null && !playFailed && (
           <View style={styles.seekRow}>
             <Text style={[styles.timeText, { color: colors.textSecondary }]} testID="elapsed-time">
               {formatTime(state.playbackPosition)}
@@ -269,6 +309,24 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
+  },
+  failedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.base,
+  },
+  failedText: {
+    flex: 1,
+    fontSize: 13,
+  },
+  retryButton: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.sm,
+  },
+  retryText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   controlsRow: {
     flexDirection: 'row',
