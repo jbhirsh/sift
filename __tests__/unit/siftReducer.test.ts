@@ -815,3 +815,62 @@ describe('SET_FILTER', () => {
     expect(siftReducer(state, { type: 'RESUME_SESSION', session }).filter).toEqual(filter);
   });
 });
+
+describe('REVISE (changing a decided card)', () => {
+  const t = (id: string, name = id): Track => ({ ...trackA, id, name });
+  const [a, b, c, d] = [t('a'), t('b'), t('c'), t('d')];
+  const decided = (over: Partial<SiftState> = {}) => makeState({
+    tracks: [a, b, c, d], cursor: 3, kept: [a], removed: [b], skipped: [c], ...over,
+  });
+
+  test('moves a decided card to its new decision', () => {
+    const next = siftReducer(decided(), { type: 'REVISE', trackId: 'a', decision: 'remove' });
+    expect(next.kept).toEqual([]);
+    expect(next.removed).toEqual([b, a]);
+    expect(next.skipped).toEqual([c]);
+    expect(next.cursor).toBe(3);
+    const skipped = siftReducer(decided(), { type: 'REVISE', trackId: 'b', decision: 'skip' });
+    expect(skipped.removed).toEqual([]);
+    expect(skipped.skipped).toEqual([c, b]);
+    const kept = siftReducer(decided(), { type: 'REVISE', trackId: 'c', decision: 'keep' });
+    expect(kept.kept).toEqual([a, c]);
+    expect(kept.skipped).toEqual([]);
+  });
+
+  test('leaves undecided cards, unknown ones and an unchanged decision alone', () => {
+    const state = decided();
+    expect(siftReducer(state, { type: 'REVISE', trackId: 'd', decision: 'keep' })).toBe(state);
+    expect(siftReducer(state, { type: 'REVISE', trackId: 'zz', decision: 'keep' })).toBe(state);
+    expect(siftReducer(state, { type: 'REVISE', trackId: 'a', decision: 'keep' })).toBe(state);
+  });
+
+  test('a held decision changes with it, so the new one is what goes out', () => {
+    const state = decided({ pending: { trackId: 'c', decision: 'skip', at: 5 } });
+    expect(siftReducer(state, { type: 'REVISE', trackId: 'c', decision: 'remove' }).pending)
+      .toEqual({ trackId: 'c', decision: 'remove', at: 5 });
+    // Another card's change doesn't touch it.
+    expect(siftReducer(state, { type: 'REVISE', trackId: 'a', decision: 'skip' }).pending).toBe(state.pending);
+  });
+
+  test('a failed removal changed to something else is no longer owed', () => {
+    const state = decided({ failedRemovalIds: ['b'], removalErrors: ['x', 'b'] });
+    const next = siftReducer(state, { type: 'REVISE', trackId: 'b', decision: 'keep' });
+    expect(next.failedRemovalIds).toEqual([]);
+    expect(next.removalErrors).toEqual(['x']);
+    const other = siftReducer(decided({ failedRemovalIds: ['b'], removalErrors: ['b'] }), { type: 'REVISE', trackId: 'a', decision: 'skip' });
+    expect(other.failedRemovalIds).toEqual(['b']);
+    expect(other.removalErrors).toEqual(['b']);
+  });
+
+  test('a failure with no message left to drop just goes', () => {
+    const next = siftReducer(decided({ failedRemovalIds: ['b'], removalErrors: ['x'] }), { type: 'REVISE', trackId: 'b', decision: 'skip' });
+    expect(next.failedRemovalIds).toEqual([]);
+    expect(next.removalErrors).toEqual(['x']);
+  });
+
+  test('a buffered keep changed to something else is dropped; one kept stays', () => {
+    const state = decided({ pendingKeeps: [a] });
+    expect(siftReducer(state, { type: 'REVISE', trackId: 'a', decision: 'skip' }).pendingKeeps).toEqual([]);
+    expect(siftReducer(state, { type: 'REVISE', trackId: 'b', decision: 'keep' }).pendingKeeps).toEqual([a]);
+  });
+});

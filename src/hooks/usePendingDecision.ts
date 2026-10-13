@@ -16,9 +16,18 @@ export const UNDO_WINDOW_MS = undoWindowMs(process.env.EXPO_PUBLIC_UNDO_WINDOW_M
 // Sift screen unmounting while Done mounts); it must reach the service once.
 const sent = new Set<string>();
 
+/**
+ * A sent decision's key. With its decision: a change from the decisions
+ * list (useReviseDecision) can carry the same time as the decision it
+ * replaces, to the millisecond, and must still go out.
+ */
+function sentKey(pending: PendingDecision): string {
+  return `${pending.trackId}@${pending.at}:${pending.decision}`;
+}
+
 /** Whether this held decision already went to the service. */
 export function wasSent(pending: PendingDecision): boolean {
-  return sent.has(`${pending.trackId}@${pending.at}`);
+  return sent.has(sentKey(pending));
 }
 
 /**
@@ -46,7 +55,7 @@ export function useSendPending(
 
   return useCallback((pending: PendingDecision | null) => {
     if (!pending) return;
-    const key = `${pending.trackId}@${pending.at}`;
+    const key = sentKey(pending);
     const alreadySent = sent.has(key);
     sent.add(key);
     // On disk before it goes out, so a crash mid-call still knows of it.
@@ -79,7 +88,7 @@ export function useSendSavedPending(): (session: SiftSession | null) => void {
   return useCallback((session: SiftSession | null) => {
     const pending = session?.pending;
     if (!session || !pending || !session.source || !session.provider) return;
-    const key = `${pending.trackId}@${pending.at}`;
+    const key = sentKey(pending);
     if (sent.has(key)) return;
     sent.add(key);
     const track = session.tracks.find((t) => t.id === pending.trackId);

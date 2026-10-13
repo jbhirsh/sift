@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { mergeIntoLedger, parseLedger } from '../utils/reviewedLedger';
+import { mergeIntoLedger, parseLedger, removeFromLedger } from '../utils/reviewedLedger';
 
 const LEDGER_KEY = 'sift_reviewed_ledger';
 
@@ -11,28 +11,56 @@ const LEDGER_KEY = 'sift_reviewed_ledger';
 const pending = new Map<string, Set<string>>();
 // The batch a running write is storing, still visible to loads until it lands.
 let writing = new Map<string, Set<string>>();
+// The same for keeps taken back (a decision changed from Keep), which the
+// same writes take out of the ledger.
+const pendingRemovals = new Map<string, Set<string>>();
+let removing = new Map<string, Set<string>>();
 let flushing: Promise<void> | null = null;
+
+function idsIn(batches: Map<string, Set<string>>[], key: string): string[] {
+  return batches.flatMap((batch) => [...(batch.get(key) ?? [])]);
+}
+
+/** Move an id from one batch of pending changes to the other. */
+function queue(to: Map<string, Set<string>>, from: Map<string, Set<string>>, key: string, trackId: string): void {
+  const undone = from.get(key);
+  undone?.delete(trackId);
+  if (undone?.size === 0) from.delete(key);
+  const ids = to.get(key) ?? new Set<string>();
+  ids.add(trackId);
+  to.set(key, ids);
+}
 
 /**
  * The ids kept in earlier sifts of a source (#143). A failed read is an empty
  * ledger: the sift then offers songs again rather than not loading.
  */
 export async function loadReviewedIds(key: string): Promise<Set<string>> {
+  let stored: string[] = [];
   try {
-    const ledger = parseLedger(await AsyncStorage.getItem(LEDGER_KEY));
-    // Plus keeps not written yet, so one made just before counts too.
-    return new Set([...(ledger[key] ?? []), ...(pending.get(key) ?? []), ...(writing.get(key) ?? [])]);
+    stored = parseLedger(await AsyncStorage.getItem(LEDGER_KEY))[key] ?? [];
   } catch (err) {
     Sentry.captureException(err, { tags: { flow: 'reviewed-ledger-load' } });
-    return new Set([...(pending.get(key) ?? []), ...(writing.get(key) ?? [])]);
   }
+  // Plus keeps not written yet, so one made just before counts too, less
+  // ones taken back. A change waiting to be written is newer than one being
+  // written, so it decides.
+  const ids = new Set(stored);
+  for (const id of idsIn([writing], key)) ids.add(id);
+  for (const id of idsIn([removing], key)) ids.delete(id);
+  for (const id of idsIn([pending], key)) ids.add(id);
+  for (const id of idsIn([pendingRemovals], key)) ids.delete(id);
+  return ids;
 }
 
 async function flush(): Promise<void> {
-  while (pending.size > 0) {
+  while (pending.size > 0 || pendingRemovals.size > 0) {
     const batch = new Map(pending);
+    const removals = new Map(pendingRemovals);
     writing = batch;
+    removing = removals;
     pending.clear();
+    pendingRemovals.clear();
     try {
       let ledger;
       try {
@@ -45,6 +73,7 @@ async function flush(): Promise<void> {
         ledger = {};
       }
       for (const [key, ids] of batch) ledger = mergeIntoLedger(ledger, key, ids);
+      for (const [key, ids] of removals) ledger = removeFromLedger(ledger, key, ids);
       await AsyncStorage.setItem(LEDGER_KEY, JSON.stringify(ledger));
     } catch (err) {
       Sentry.captureException(err, { tags: { flow: 'reviewed-ledger-save' } });
@@ -53,6 +82,7 @@ async function flush(): Promise<void> {
   // In the same synchronous step as the empty check above, so a keep can't
   // land in between and be left waiting for the next one.
   writing = new Map();
+  removing = new Map();
   flushing = null;
 }
 
@@ -62,9 +92,17 @@ async function flush(): Promise<void> {
  * which is reported).
  */
 export function markReviewed(key: string, trackId: string): Promise<void> {
-  const ids = pending.get(key) ?? new Set<string>();
-  ids.add(trackId);
-  pending.set(key, ids);
+  queue(pending, pendingRemovals, key, trackId);
+  flushing ??= flush();
+  return flushing;
+}
+
+/**
+ * Take a kept song back out (its decision changed), so later sifts offer
+ * it again. Like markReviewed: never rejects, resolves once written.
+ */
+export function unmarkReviewed(key: string, trackId: string): Promise<void> {
+  queue(pendingRemovals, pending, key, trackId);
   flushing ??= flush();
   return flushing;
 }
