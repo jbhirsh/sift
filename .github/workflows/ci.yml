@@ -151,6 +151,35 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Booting takes 1.5-3 min, so it starts here and runs while the app
+      # is restored, fetched from ios-build or built; the job waits for it
+      # just before installing the app. On a native PR that's inside the
+      # ~17-min ios-build wait.
+      - name: Start booting the iOS Simulator
+        if: env.RUN_SUITE == 'true'
+        run: |
+          DEVICE=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          devices = json.load(sys.stdin)['devices']
+          for runtime, devs in devices.items():
+              if 'iOS' in runtime:
+                  for d in devs:
+                      if 'iPhone' in d['name']:
+                          print(d['udid'])
+                          sys.exit(0)
+          ")
+          echo "SIM_UDID=$DEVICE" >> "$GITHUB_ENV"
+          xcrun simctl boot "$DEVICE" 2>/dev/null || true
+
+      # Prints the resolved version so every run records which Maestro it
+      # tested with (previously never logged, so drift was undetectable).
+      - name: Install Maestro
+        if: env.RUN_SUITE == 'true'
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" --version
+
       - uses: actions/setup-node@v7
         with:
           node-version: 24
@@ -247,32 +276,12 @@ jobs:
           mkdir -p build/e2e
           tar -xzf build/Sift-e2e.tar.gz -C build/e2e
 
-      # Prints the resolved version so every run records which Maestro it
-      # tested with (previously never logged, so drift was undetectable).
-      - name: Install Maestro
+      # Block until SpringBoard is actually up (the boot started near the
+      # top of the job): attaching the XCUITest driver to a half-booted
+      # simulator is the main startup-flake source.
+      - name: Wait for the iOS Simulator to finish booting
         if: env.RUN_SUITE == 'true'
-        run: |
-          curl -Ls "https://get.maestro.mobile.dev" | bash
-          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
-          "$HOME/.maestro/bin/maestro" --version
-
-      - name: Boot iOS Simulator
-        if: env.RUN_SUITE == 'true'
-        run: |
-          DEVICE=$(xcrun simctl list devices available -j | python3 -c "
-          import json, sys
-          devices = json.load(sys.stdin)['devices']
-          for runtime, devs in devices.items():
-              if 'iOS' in runtime:
-                  for d in devs:
-                      if 'iPhone' in d['name']:
-                          print(d['udid'])
-                          sys.exit(0)
-          ")
-          xcrun simctl boot "$DEVICE" 2>/dev/null || true
-          # Block until SpringBoard is actually up — attaching the XCUITest
-          # driver to a half-booted simulator is the main startup-flake source.
-          xcrun simctl bootstatus "$DEVICE" -b
+        run: xcrun simctl bootstatus "$SIM_UDID" -b
 
       - name: Install app on simulator
         if: env.RUN_SUITE == 'true'
