@@ -9,8 +9,8 @@ import XCTest
 ///
 /// Each issue is printed as an `A11Y-AUDIT|` line, and each screen audited
 /// as an `A11Y-AUDITED|` line, which scripts/run-a11y-audit.sh turns into
-/// annotations (and a list of screens that were never reached). Issues are
-/// reported, not failed on, until the baseline is clean.
+/// annotations (and a list of screens that were never reached), and either
+/// fails the E2E job.
 final class AccessibilityAuditTests: XCTestCase {
   private let app = XCUIApplication(bundleIdentifier: "com.jessicahirsh.sift")
   private var appearance: String {
