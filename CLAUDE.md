@@ -22,15 +22,19 @@ npx expo start       # subsequent launches (use after first build)
 
 ```bash
 make test            # unit tests (Jest)
-make lint            # ESLint + the native bridge check
+make lint            # ESLint over the whole repo + the native bridge check
 make typecheck       # TypeScript type checking
-make check           # lint + typecheck + tests (all three)
+make check           # what CI's unit job runs: lint, typecheck, depcruise,
+                     # the native bridge check, tests with coverage
 ```
 
+`make check` is `npm run check`; `make lint` is `npm run lint` plus
+`npm run bridge`. Lint covers the whole repo (`eslint .`), as CI does.
+
 Git hooks (installed by the `prepare` script via `core.hooksPath`) run these
-automatically: **pre-commit** runs lint + typecheck; **pre-push** runs the
-unit-test suite under coverage. Both no-op when `$CI` is set. CI re-runs
-everything.
+automatically: **pre-commit** runs lint, typecheck, depcruise and the native
+bridge check; **pre-push** runs the unit-test suite under coverage. Both
+no-op when `$CI` is set. CI re-runs everything.
 
 **Testing pyramid:**
 
@@ -111,22 +115,28 @@ amend, rebase, or force-push `main`. Never use `--no-verify`.**
 src/
     App.tsx             Phase router + settings modal
     components/         Reusable UI (Button, GlassCard, GlassBackground,
-                        InteractiveCard, PlayerControls, PlaylistPicker)
+                        InteractiveCard, PlayerControls, PlaylistPicker,
+                        ResumeSessionModal, SessionStatRow, UndoPill,
+                        DecisionsSheet, ErrorBoundary)
     screens/            SetupScreen, LoadingScreen, SiftScreen,
                         DoneScreen, SettingsScreen
     context/            SiftContext (useReducer state management),
-                        MusicProviderContext (the one shared provider + poller)
+                        MusicProviderContext (the one shared provider + poller),
+                        resumeSession (a saved session's defaults)
     services/           MusicProviderInterface, AppleMusicProvider, MockMusicProvider,
                         SessionStore, RemovalHistoryStore, PreferencesStore,
-                        ReviewedLedgerStore,
+                        ReviewedLedgerStore, haptics,
                         ChorusFinder + LrclibClient ("Start at chorus")
-    hooks/              useMusicProvider, useResolvedArtwork,
-                        useChorusStart
+    hooks/              useMusicProvider, usePendingDecision (Undo),
+                        useReviseDecision, useRemovalRetry,
+                        useResolvedArtwork, useChorusStart
     theme/              Design tokens (SPACING, RADIUS, COLORS, SHADOWS,
-                        FONTS, GLASS, GRADIENTS), ThemeContext
-    types/              Track, Decision, AppPhase, SortOrder, MusicProvider,
-                        SiftSession
-    utils/              formatTime, mockData, sorting, chorus, musicKit
+                        FONTS, GLASS, GRADIENTS), ThemeContext, useThemeColors
+    types/              Track, Decision, AppPhase, SortOrder, TrackFilter,
+                        MusicProvider, SiftSession
+    utils/              Pure logic, each file named for what it does (sorting,
+                        trackFilter, trackIdentity, sessionFormat, musicKit,
+                        serialQueue, cardLayout, …); `ls src/utils`
 modules/
   expo-musickit/        Custom Expo native module for MusicKit
 __tests__/

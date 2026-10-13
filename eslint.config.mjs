@@ -5,7 +5,11 @@ import eslintComments from '@eslint-community/eslint-plugin-eslint-comments';
 
 export default tseslint.config(
   {
-    ignores: ['node_modules/', 'ios/', 'android/', '.expo/', '*.config.js', '.dependency-cruiser.cjs'],
+    ignores: [
+      'node_modules/', 'ios/', 'android/', '.expo/', '*.config.js', '.dependency-cruiser.cjs',
+      // Generated: test and mutation reports, a leftover Stryker sandbox, builds.
+      'coverage/', 'reports/', '.stryker-tmp/', 'build/', 'dist/',
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.strict,

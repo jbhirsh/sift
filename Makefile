@@ -30,10 +30,10 @@ test-e2e:
 # All tests
 test-all: test test-e2e
 
-# Lint
+# Lint (the whole repo, as CI does) and the native bridge check
 lint:
-	npx eslint src/ __tests__/
-	node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-bridge.mjs
+	npm run -s lint
+	npm run -s bridge
 
 # Type check
 typecheck:
@@ -43,11 +43,13 @@ typecheck:
 build-ios:
 	npx expo run:ios
 
-# Expo doctor
+# Expo doctor (needs the network; CI runs it as advisory)
 doctor:
 	npx expo-doctor@latest
 
-# Check everything (lint + types + tests with coverage + expo doctor)
-check: lint typecheck test-coverage doctor
+# Check everything CI's unit job does: lint, types, layering, the native
+# bridge and tests with coverage. The same steps as `npm run check`.
+check:
+	npm run -s check
 
 .PHONY: test test-coverage test-watch test-mutation build-e2e test-e2e test-all lint typecheck build-ios check doctor

@@ -113,9 +113,10 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
+          # The files stryker.config.json mutates: .tsx only in context.
           CHANGED=$(git diff --name-only --diff-filter=d "origin/${BASE_REF}"...HEAD -- \
               src/context src/services src/utils src/hooks \
-            | grep -E '\.(ts|tsx)$' \
+            | grep -E '^(src/context/.*\.tsx?|src/(services|utils|hooks)/.*\.ts)$' \
             | grep -Ev '(/index\.ts$|MusicProviderInterface\.ts$|mockData\.ts$|MockMusicProvider\.ts$)' \
             || true)
           if [ -z "$CHANGED" ]; then

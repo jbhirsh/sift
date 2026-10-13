@@ -20,8 +20,6 @@ xcuserdata/
 DerivedData/
 build/
 
-# SwiftPM (modules/expo-musickit/logic test package)
-.build/
 *.ipa
 *.pkg
 *.dSYM.zip
