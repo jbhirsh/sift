@@ -39,20 +39,42 @@ export async function savePreferences(preferences: Preferences): Promise<void> {
 // the Settings toggle and overwrite startAtChorus.
 const SEEN_REMOVE_NOTE_KEY = 'sift_seen_remove_note';
 
-/** True once the first-remove note was shown. A failed read counts as seen, so the note never nags. */
-export async function loadSeenRemoveNote(): Promise<boolean> {
+// Whether the one-time swipe hint on the first card has been shown, kept
+// apart for the same reason.
+const SEEN_SWIPE_HINT_KEY = 'sift_seen_swipe_hint';
+
+/** A one-time note's flag. A failed read counts as seen, so the note never nags. */
+async function loadSeen(key: string): Promise<boolean> {
   try {
-    return (await AsyncStorage.getItem(SEEN_REMOVE_NOTE_KEY)) === '1';
+    return (await AsyncStorage.getItem(key)) === '1';
   } catch (err) {
     Sentry.captureException(err, { tags: { flow: 'preferences-load' } });
     return true;
   }
 }
 
-export async function markRemoveNoteSeen(): Promise<void> {
+async function markSeen(key: string): Promise<void> {
   try {
-    await AsyncStorage.setItem(SEEN_REMOVE_NOTE_KEY, '1');
+    await AsyncStorage.setItem(key, '1');
   } catch (err) {
     Sentry.captureException(err, { tags: { flow: 'preferences-save' } });
   }
+}
+
+/** True once the first-remove note was shown. */
+export function loadSeenRemoveNote(): Promise<boolean> {
+  return loadSeen(SEEN_REMOVE_NOTE_KEY);
+}
+
+export function markRemoveNoteSeen(): Promise<void> {
+  return markSeen(SEEN_REMOVE_NOTE_KEY);
+}
+
+/** True once the first card's swipe hint was shown. */
+export function loadSeenSwipeHint(): Promise<boolean> {
+  return loadSeen(SEEN_SWIPE_HINT_KEY);
+}
+
+export function markSwipeHintSeen(): Promise<void> {
+  return markSeen(SEEN_SWIPE_HINT_KEY);
 }

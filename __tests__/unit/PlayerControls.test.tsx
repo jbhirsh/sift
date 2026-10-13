@@ -1,4 +1,5 @@
 import React from 'react';
+import { AccessibilityInfo } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 import { Track } from '../../src/types';
 
@@ -89,6 +90,9 @@ const mockState = {
   removalPlaylistCreated: false,
   removalPlaylistError: null,
   isCreatingPlaylist: false,
+  playbackFailedId: null as string | null,
+  songCacheWarming: false,
+  songCacheGeneration: 0,
 };
 
 jest.mock('../../src/context/SiftContext', () => ({
@@ -120,6 +124,73 @@ describe('PlayerControls', () => {
     panOnUpdate = undefined;
     mockState.isPlaying = false;
     mockState.playbackPosition = 30;
+    mockState.playbackFailedId = null;
+    mockState.songCacheWarming = false;
+    mockState.songCacheGeneration = 0;
+  });
+
+  describe('a song that won\'t play', () => {
+    test('says so in place of the seek bar, offers Try Again, and tells VoiceOver', async () => {
+      const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+      mockState.playbackPosition = 0;
+      mockState.playbackFailedId = '1';
+      const { getByTestId, getByText, queryByTestId } = await render(<PlayerControls />);
+      expect(getByTestId('playback-failed')).toBeTruthy();
+      expect(getByText('Can\u2019t play this song.')).toBeTruthy();
+      expect(queryByTestId('seek-bar')).toBeNull();
+      expect(announce).toHaveBeenCalledWith('Can\u2019t play this song.');
+      mockPlay.mockClear();
+      const retry = getByTestId('playback-retry');
+      expect(retry.props.accessibilityRole).toBe('button');
+      await fireEvent.press(retry);
+      expect(mockPlay).toHaveBeenCalledWith('1');
+      announce.mockRestore();
+    });
+
+    test('not while a resume is still caching songs, or for another card', async () => {
+      mockState.playbackFailedId = '1';
+      mockState.songCacheWarming = true;
+      const { queryByTestId, rerender } = await render(<PlayerControls />);
+      expect(queryByTestId('playback-failed')).toBeNull();
+      expect(queryByTestId('seek-bar')).toBeTruthy();
+      mockState.songCacheWarming = false;
+      mockState.playbackFailedId = 'another';
+      await rerender(<PlayerControls />);
+      expect(queryByTestId('playback-failed')).toBeNull();
+    });
+  });
+
+  describe('when a cache warm-up finishes', () => {
+    test('a card that never started plays', async () => {
+      mockState.playbackPosition = 0;
+      const { rerender } = await render(<PlayerControls />);
+      mockPlay.mockClear();
+      mockState.songCacheGeneration = 1;
+      await rerender(<PlayerControls />);
+      expect(mockPlay).toHaveBeenCalledWith('1');
+    });
+
+    test('one already playing, or moved on from 0:00, is left alone', async () => {
+      mockState.playbackPosition = 0;
+      mockState.isPlaying = true;
+      const { rerender } = await render(<PlayerControls />);
+      mockPlay.mockClear();
+      mockState.songCacheGeneration = 1;
+      await rerender(<PlayerControls />);
+      mockState.isPlaying = false;
+      mockState.playbackPosition = 12;
+      mockState.songCacheGeneration = 2;
+      await rerender(<PlayerControls />);
+      expect(mockPlay).not.toHaveBeenCalled();
+    });
+
+    test('nothing happens without a new warm-up', async () => {
+      mockState.playbackPosition = 0;
+      const { rerender } = await render(<PlayerControls />);
+      mockPlay.mockClear();
+      await rerender(<PlayerControls />);
+      expect(mockPlay).not.toHaveBeenCalled();
+    });
   });
 
   test('renders elapsed and duration time', async () => {

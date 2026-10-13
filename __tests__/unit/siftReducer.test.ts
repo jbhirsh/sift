@@ -29,6 +29,9 @@ function makeState(overrides: Partial<SiftState> = {}): SiftState {
     siftedPlaylistId: null,
     startAtChorus: false,
     pending: null,
+    playbackFailedId: null,
+    songCacheWarming: false,
+    songCacheGeneration: 0,
     ...overrides,
   };
 }
@@ -760,5 +763,43 @@ describe('LOAD_TRACKS with a song listed twice (#56)', () => {
     const t2: Track = { ...trackA, id: 'two' };
     const next = siftReducer(makeState(), { type: 'LOAD_TRACKS', tracks: [t1, t2, { ...t1 }] });
     expect(next.tracks).toEqual([t1, t2]);
+  });
+});
+
+describe('playback failures and the song cache', () => {
+  test('SET_PLAYBACK_FAILED names the track that failed, and clears it', () => {
+    const failed = siftReducer(makeState(), { type: 'SET_PLAYBACK_FAILED', trackId: '1' });
+    expect(failed.playbackFailedId).toBe('1');
+    expect(siftReducer(failed, { type: 'SET_PLAYBACK_FAILED', trackId: null }).playbackFailedId).toBeNull();
+  });
+
+  test('SET_PLAYBACK_FAILED with no change keeps the same state', () => {
+    const state = makeState();
+    expect(siftReducer(state, { type: 'SET_PLAYBACK_FAILED', trackId: null })).toBe(state);
+  });
+
+  test('a warm-up marks the cache warming, then counts itself finished', () => {
+    const warming = siftReducer(makeState({ songCacheGeneration: 2 }), { type: 'SONG_CACHE_WARMING' });
+    expect(warming.songCacheWarming).toBe(true);
+    expect(warming.songCacheGeneration).toBe(2);
+    const warmed = siftReducer(warming, { type: 'SONG_CACHE_WARMED' });
+    expect(warmed.songCacheWarming).toBe(false);
+    expect(warmed.songCacheGeneration).toBe(3);
+  });
+
+  test('a new sift or going back to Setup isn\'t held up by an old warm-up', () => {
+    const warming = makeState({ songCacheWarming: true });
+    expect(siftReducer(warming, { type: 'START_FRESH' }).songCacheWarming).toBe(false);
+    expect(siftReducer(warming, { type: 'RESET_TO_SETUP' }).songCacheWarming).toBe(false);
+  });
+
+  test('a resumed session starts with no playback failure', () => {
+    const { phase: _phase, startAtChorus: _chorus, playbackFailedId: _failed, songCacheWarming: _warming,
+      songCacheGeneration: _generation, ...session } = makeState();
+    const resumed = siftReducer(makeState({ playbackFailedId: 'old', songCacheGeneration: 4 }), {
+      type: 'RESUME_SESSION', session,
+    });
+    expect(resumed.playbackFailedId).toBeNull();
+    expect(resumed.songCacheGeneration).toBe(4);
   });
 });

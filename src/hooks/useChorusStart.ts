@@ -23,13 +23,20 @@ export const CHORUS_WAIT_MS = 2500;
 export function useChorusStart(previewOffset?: PreviewOffsetLookup) {
   const { state, currentTrack, nextTrack, nextNextTrack } = useSift();
   const enabled = state.startAtChorus && state.provider === 'apple-music';
+  const generation = state.songCacheGeneration;
+
+  // A finished cache warm-up: what failed before it may work now. Before
+  // the prefetch below, which then looks again.
+  useEffect(() => {
+    if (generation > 0) chorusFinder.forgetFailures();
+  }, [generation]);
 
   useEffect(() => {
     if (!enabled) return;
     for (const track of [currentTrack, nextTrack, nextNextTrack]) {
       if (track) void chorusFinder.find(track, previewOffset);
     }
-  }, [enabled, currentTrack, nextTrack, nextNextTrack, previewOffset]);
+  }, [enabled, currentTrack, nextTrack, nextNextTrack, previewOffset, generation]);
 
   const startPositionFor = useCallback(
     async (track: Track): Promise<number> => {

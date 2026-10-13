@@ -93,6 +93,16 @@ export class ChorusFinder {
   ) {}
 
   /**
+   * Forget the estimates that stood in for a lookup that failed, so the
+   * next find tries again: after a resume, a song asked for before the
+   * native cache had it couldn't be matched, and would keep the estimate
+   * for the rest of the session.
+   */
+  forgetFailures(): void {
+    this.sessionOnly.clear();
+  }
+
+  /**
    * The chorus start for a track. Never rejects: the estimate is the floor.
    * `urgent` marks the card on screen, whose lookup jumps the queue.
    */

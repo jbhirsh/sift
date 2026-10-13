@@ -283,6 +283,12 @@ describe('useMusicProvider — observable state', () => {
     });
     expect(sift.state.isPlaying).toBe(false);
     expect(sift.state.playbackPosition).toBe(0);
+    // It says which track failed, for the player to say so.
+    expect(sift.state.playbackFailedId).toBe('1');
+    await act(async () => {
+      await api.play('1');
+    });
+    expect(sift.state.playbackFailedId).toBeNull();
   });
 
   test('pause and resume flip isPlaying only when the provider call succeeds', async () => {

@@ -55,6 +55,12 @@ jest.mock('../../src/services/RemovalHistoryStore', () => ({
   clearHistoryForSource: jest.fn(() => Promise.resolve(true)),
 }));
 
+// The app's config, as the running app gets it: Settings shows its version.
+jest.mock('expo-constants', () => ({
+  __esModule: true,
+  default: { expoConfig: { version: jest.requireActual('../../app.json').expo.version } },
+}));
+
 jest.mock('../../src/hooks/useResolvedArtwork', () => ({
   useResolvedArtwork: jest.fn().mockReturnValue(null),
   clearArtworkCache: jest.fn(),
@@ -665,7 +671,48 @@ describe('SetupScreen', () => {
       await act(async () => {
         await fireEvent.press(getByTestId('resume-modal-resume'));
       });
-      expect(warm).toHaveBeenCalledWith([mockTrackA.id, mockTrackB.id, mockTrackC.id], expectedPlaylist);
+      // From the card it resumes on: the cards up next (with the playlist
+      // reload), then the rest, the decided ones last.
+      expect(warm).toHaveBeenNthCalledWith(1, [mockTrackB.id, mockTrackC.id], expectedPlaylist);
+      expect(warm).toHaveBeenNthCalledWith(2, [mockTrackA.id], undefined);
+    } finally {
+      delete (mockProvider as { warmSongCache?: jest.Mock }).warmSongCache;
+    }
+  });
+
+  test('Resume marks the cache warming until each warm-up is done, so the card can retry', async () => {
+    function CacheProbe() {
+      const { state } = useSift();
+      return <Text testID="probe-cache">{`${state.songCacheWarming}:${state.songCacheGeneration}`}</Text>;
+    }
+    let finishFirst!: () => void;
+    const warm = jest.fn()
+      .mockImplementationOnce(() => new Promise<number>((resolve) => { finishFirst = () => resolve(2); }))
+      .mockResolvedValue(1);
+    (mockProvider as { warmSongCache?: jest.Mock }).warmSongCache = warm;
+    try {
+      const { loadSession } = require('../../src/services/SessionStore');
+      (loadSession as jest.Mock).mockResolvedValueOnce({
+        tracks: [mockTrackA, mockTrackB, mockTrackC],
+        cursor: 1,
+        kept: [mockTrackA],
+        removed: [],
+        skipped: [],
+        sortOrder: 'least-played',
+        savedAt: '2026-04-10T00:00:00.000Z',
+        provider: 'apple-music',
+        source: { type: 'library' },
+      });
+      const { getByTestId } = await renderWithProviders(<><SetupScreen /><CacheProbe /></>);
+      await act(async () => {});
+      await act(async () => {
+        await fireEvent.press(getByTestId('resume-modal-resume'));
+      });
+      expect(getByTestId('probe-cache').props.children).toBe('true:0');
+      await act(async () => {
+        finishFirst();
+      });
+      expect(getByTestId('probe-cache').props.children).toBe('false:2');
     } finally {
       delete (mockProvider as { warmSongCache?: jest.Mock }).warmSongCache;
     }
@@ -2174,6 +2221,26 @@ describe('SettingsScreen', () => {
   test('renders version text', async () => {
     const { getByText } = await renderWithProviders(<SettingsScreen />);
     expect(getByText('Version 1.0.0')).toBeTruthy();
+  });
+
+  test('once access is refused, says how to turn it on and opens Settings', async () => {
+    const { Linking } = require('react-native');
+    const openSettings = jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
+    mockProvider.isAuthorized.mockResolvedValueOnce(false);
+    mockProvider.requestAuthorization.mockResolvedValueOnce(false);
+    const { getByTestId, queryByTestId } = await renderWithProviders(<SettingsScreen />);
+    expect(queryByTestId('open-settings-button')).toBeNull();
+    await act(async () => {
+      await fireEvent.press(getByTestId('check-connection-button'));
+    });
+    expect(getByTestId('connection-help').props.children).toBe(
+      'Turn on Media & Apple Music for Sift in Settings, then check again.',
+    );
+    const button = getByTestId('open-settings-button');
+    expect(button.props.accessibilityRole).toBe('button');
+    await fireEvent.press(button);
+    expect(openSettings).toHaveBeenCalledTimes(1);
+    openSettings.mockRestore();
   });
 
   test('renders connection status', async () => {

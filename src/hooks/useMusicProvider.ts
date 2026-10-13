@@ -164,10 +164,13 @@ export function useMusicProvider() {
     async (trackID: string, position?: number) => {
       try {
         await providerRef.current.play(trackID, position);
+        dispatch({ type: 'SET_PLAYBACK_FAILED', trackId: null });
         dispatch({ type: 'SET_IS_PLAYING', isPlaying: true });
         dispatch({ type: 'SET_PLAYBACK_POSITION', position: position ?? 0 });
       } catch (err) {
         Sentry.addBreadcrumb({ category: 'playback', message: `Play failed: ${err}`, level: 'warning' });
+        // The player says so, rather than sitting at 0:00.
+        dispatch({ type: 'SET_PLAYBACK_FAILED', trackId: trackID });
       }
     },
     [providerRef, dispatch]

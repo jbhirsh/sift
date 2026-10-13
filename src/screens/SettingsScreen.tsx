@@ -4,9 +4,11 @@ import {
   Text,
   TouchableOpacity,
   ActivityIndicator,
+  Linking,
   StyleSheet,
   Switch,
 } from 'react-native';
+import Constants from 'expo-constants';
 import { SymbolView } from 'expo-symbols';
 import type { SFSymbol } from 'sf-symbols-typescript';
 import { useSift } from '../context/SiftContext';
@@ -15,6 +17,9 @@ import { useMusicProvider } from '../hooks/useMusicProvider';
 import GlassCard from '../components/GlassCard';
 import { COLORS, RADIUS, SPACING } from '../theme';
 import { PROVIDER_DISPLAY } from '../types';
+
+// The running app's version (an update carries its own config).
+const appVersion = Constants.expoConfig?.version ?? null;
 
 const PROVIDER_SYMBOLS: Record<string, string> = {
   'apple-music': 'music.note.list',
@@ -106,9 +111,11 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           Settings
         </Text>
-        <Text style={[styles.headerVersion, { color: colors.textSecondary }]}>
-          Version 1.0.0
-        </Text>
+        {appVersion != null && (
+          <Text style={[styles.headerVersion, { color: colors.textSecondary }]} testID="settings-version">
+            Version {appVersion}
+          </Text>
+        )}
         {onClose && (
           <TouchableOpacity
             testID="settings-done-button"
@@ -168,6 +175,32 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
               </View>
             </TouchableOpacity>
           </GlassCard>
+
+          {/* Once access is refused iOS won't ask again, so Check Connection
+              alone is a dead end: only Settings can turn it back on. */}
+          {state.connectionStatus === 'disconnected' && (
+            <>
+              <Text style={[styles.settingDescription, { color: colors.textSecondary }]} testID="connection-help">
+                {'Turn on Media & Apple Music for Sift in Settings, then check again.'}
+              </Text>
+              <GlassCard intensity="thin" radius={RADIUS.sm}>
+                <TouchableOpacity
+                  testID="open-settings-button"
+                  accessibilityRole="button"
+                  style={styles.checkButton}
+                  onPress={() => { void Linking.openSettings(); }}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <SymbolView name="gearshape" size={16} tintColor={colors.accent} />
+                    <Text style={[styles.checkButtonText, { color: colors.accent }]}>
+                      Open Settings
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </GlassCard>
+            </>
+          )}
         </View>
       </GlassCard>
 

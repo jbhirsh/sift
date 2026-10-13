@@ -1,4 +1,7 @@
-import { cardSize, flyOffDistance, MAX_CARD_ASPECT, MAX_CARD_WIDTH, MIN_FLY_OFF, PHONE_MAX_AREA_WIDTH } from '../../src/utils/cardLayout';
+import {
+  cardSize, DRAG_THRESHOLD, FLING_MIN_DISTANCE, FLING_VELOCITY, flyOffDistance, MAX_CARD_ASPECT, MAX_CARD_WIDTH, MIN_FLY_OFF,
+  PHONE_MAX_AREA_WIDTH, swipeDecision,
+} from '../../src/utils/cardLayout';
 
 describe('cardSize (#149)', () => {
   test('constants', () => {
@@ -49,5 +52,37 @@ describe('flyOffDistance (#149)', () => {
     expect(flyOffDistance(393)).toBe(500);
     expect(flyOffDistance(500)).toBe(500);
     expect(flyOffDistance(1180)).toBe(1180);
+  });
+});
+
+describe('swipeDecision', () => {
+  test('a drag past the threshold decides, at any speed', () => {
+    expect(swipeDecision(DRAG_THRESHOLD + 1, 0)).toBe('keep');
+    expect(swipeDecision(-DRAG_THRESHOLD - 1, 0)).toBe('remove');
+    // Even dragged back a little as it's let go.
+    expect(swipeDecision(DRAG_THRESHOLD + 1, -FLING_VELOCITY * 2)).toBe('keep');
+  });
+
+  test('a slow drag short of it springs back', () => {
+    expect(swipeDecision(DRAG_THRESHOLD, 0)).toBeNull();
+    expect(swipeDecision(-DRAG_THRESHOLD, 0)).toBeNull();
+    expect(swipeDecision(DRAG_THRESHOLD - 1, FLING_VELOCITY)).toBeNull();
+  });
+
+  test('a quick flick decides short of it', () => {
+    expect(swipeDecision(FLING_MIN_DISTANCE + 1, FLING_VELOCITY + 1)).toBe('keep');
+    expect(swipeDecision(-FLING_MIN_DISTANCE - 1, -FLING_VELOCITY - 1)).toBe('remove');
+  });
+
+  test('but not a jitter, nor a flick against the drag', () => {
+    expect(swipeDecision(FLING_MIN_DISTANCE, FLING_VELOCITY * 3)).toBeNull();
+    expect(swipeDecision(-FLING_MIN_DISTANCE, -FLING_VELOCITY * 3)).toBeNull();
+    expect(swipeDecision(FLING_MIN_DISTANCE + 10, -FLING_VELOCITY * 3)).toBeNull();
+    expect(swipeDecision(-FLING_MIN_DISTANCE - 10, FLING_VELOCITY * 3)).toBeNull();
+    expect(swipeDecision(FLING_MIN_DISTANCE + 10, FLING_VELOCITY)).toBeNull();
+  });
+
+  test('the numbers', () => {
+    expect([DRAG_THRESHOLD, FLING_VELOCITY, FLING_MIN_DISTANCE]).toEqual([80, 800, 30]);
   });
 });
