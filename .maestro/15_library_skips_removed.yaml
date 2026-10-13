@@ -29,8 +29,11 @@ name: "Library Sift Skips Removed Songs"
       text: "Peaches"
     timeout: 30000
 
-- tapOn: "Remove"
-- waitForAnimationToEnd
+- tapOn:
+    text: "Remove"
+    waitToSettleTimeoutMs: 500
+- waitForAnimationToEnd:
+    timeout: 1500
 
 - extendedWaitUntil:
     visible:
@@ -38,14 +41,24 @@ name: "Library Sift Skips Removed Songs"
       text: "drivers license"
     timeout: 30000
 
-- tapOn: "Remove"
-- waitForAnimationToEnd
+- tapOn:
+    text: "Remove"
+    waitToSettleTimeoutMs: 500
+- waitForAnimationToEnd:
+    timeout: 1500
 
+# The playing song's seek bar keeps the screen from ever "settling", so
+# Maestro's settle and animation waits would each run to their limit (about
+# 6 s per card). Capped: the card flies off in 300 ms, and each tap still
+# leaves 2 s before the next.
 - repeat:
     times: 8
     commands:
-      - tapOn: "Keep"
-      - waitForAnimationToEnd
+      - tapOn:
+          text: "Keep"
+          waitToSettleTimeoutMs: 500
+      - waitForAnimationToEnd:
+          timeout: 1500
 
 - extendedWaitUntil:
     visible:
