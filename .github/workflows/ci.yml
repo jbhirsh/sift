@@ -144,9 +144,6 @@ jobs:
 
       - run: npm ci
 
-      - name: Setup EAS CLI
-        run: npm install -g eas-cli
-
       - name: Compute project fingerprint
         id: fingerprint
         run: |
@@ -214,6 +211,12 @@ jobs:
             echo "hit=false" >> "$GITHUB_OUTPUT"
             echo "No reusable ios-build artifact for this sha — building."
           fi
+
+      # Only a build needs the EAS CLI (about 30 s to install): a cache hit
+      # or a reused ios-build artifact skips both.
+      - name: Setup EAS CLI
+        if: steps.build-cache.outputs.cache-hit != 'true' && steps.reuse.outputs.hit != 'true'
+        run: npm install -g eas-cli
 
       - name: Build simulator app
         if: steps.build-cache.outputs.cache-hit != 'true' && steps.reuse.outputs.hit != 'true'

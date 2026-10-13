@@ -24,11 +24,18 @@ name: "Complete All Tracks"
     timeout: 30000
 
 # Sift through all 10 tracks (keep them all for simplicity)
+# The playing song's seek bar keeps the screen from ever "settling", so
+# Maestro's settle and animation waits would each run to their limit (about
+# 6 s per card). Capped: the card flies off in 300 ms, and each tap still
+# leaves 2 s before the next.
 - repeat:
     times: 10
     commands:
-      - tapOn: "Keep"
-      - waitForAnimationToEnd
+      - tapOn:
+          text: "Keep"
+          waitToSettleTimeoutMs: 500
+      - waitForAnimationToEnd:
+          timeout: 1500
 
 # Verify done screen — sifting → done is a screen transition, so wait for it
 - extendedWaitUntil:
