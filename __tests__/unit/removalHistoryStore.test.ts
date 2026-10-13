@@ -5,6 +5,12 @@ const mockText = jest.fn();
 const mockWrite = jest.fn();
 const mockCopy = jest.fn();
 
+const mockMove = jest.fn();
+// The copy a rewrite writes first, then moves over the history. Absent
+// unless a test leaves one behind, as a rewrite cut short would.
+const mockNextExists = jest.fn(() => false);
+const mockNextText = jest.fn();
+
 const mockFileInstance = {
   get exists() { return mockExists(); },
   text: () => mockText(),
@@ -12,8 +18,18 @@ const mockFileInstance = {
   copy: (destination: unknown) => mockCopy(destination),
 };
 
+const mockNextInstance = {
+  get exists() { return mockNextExists(); },
+  text: () => mockNextText(),
+  // Shares the history's write mock: what a rewrite writes is what the
+  // history holds once the move lands.
+  write: mockWrite,
+  move: (destination: unknown, options: unknown) => mockMove(destination, options),
+};
+
 jest.mock('expo-file-system', () => ({
-  File: jest.fn(() => mockFileInstance),
+  File: jest.fn((_dir: string, name: string) =>
+    name === 'removal-history.next.json' ? mockNextInstance : mockFileInstance),
   Paths: { document: '/mock/documents/' },
 }));
 
@@ -44,6 +60,8 @@ const record: RemovalRecord = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockNextExists.mockReturnValue(false);
+  mockMove.mockResolvedValue(undefined);
 });
 
 describe('loadHistory', () => {
@@ -485,7 +503,11 @@ describe('malformed history on disk', () => {
 
     // The corrupt file is copied aside under a distinct name…
     expect(mockCopy).toHaveBeenCalledTimes(1);
-    const backupName = File.mock.calls.at(-1)?.[1];
+    // (The one file named for neither the history nor its rewrite.)
+    const others = File.mock.calls.map((call: string[]) => call[1])
+      .filter((name: string) => name !== 'removal-history.json' && name !== 'removal-history.next.json');
+    expect(others).toHaveLength(1);
+    const backupName = others[0];
     expect(backupName).toMatch(/^removal-history\.corrupt-\d+\.json$/);
     // …the copy lands before the original is overwritten…
     expect(mockCopy.mock.invocationCallOrder[0]).toBeLessThan(mockWrite.mock.invocationCallOrder[0]);
@@ -549,5 +571,76 @@ describe('malformed history on disk', () => {
     expect(mockCopy).not.toHaveBeenCalled();
     expect(Sentry.captureException).not.toHaveBeenCalled();
     expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([validRecord, record]));
+  });
+});
+
+describe('rewrites the app is killed during', () => {
+  const recordB: RemovalRecord = { ...record, track: { ...record.track, id: 'track-2' } };
+
+  test('a rewrite lands whole: written aside, then moved over the history', async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([record]));
+    mockMove.mockResolvedValue(undefined);
+
+    await logRemoval(recordB);
+
+    expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([record, recordB]));
+    expect(mockMove).toHaveBeenCalledTimes(1);
+    expect(mockMove).toHaveBeenCalledWith(mockFileInstance, { overwrite: true });
+    // Written in full before the history is replaced.
+    expect(mockWrite.mock.invocationCallOrder[0]).toBeLessThan(mockMove.mock.invocationCallOrder[0]);
+  });
+
+  test('a rewrite written in full but never moved is the latest history', async () => {
+    // Killed after the old history was deleted for the move: only the
+    // rewrite is left.
+    mockExists.mockReturnValue(false);
+    mockNextExists.mockReturnValue(true);
+    mockNextText.mockResolvedValue(JSON.stringify([record, recordB]));
+
+    await expect(loadHistory()).resolves.toEqual([record, recordB]);
+  });
+
+  test('a rewrite cut short is ignored in favour of the history', async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([record]));
+    mockNextExists.mockReturnValue(true);
+    mockNextText.mockResolvedValue('[{"track":{"id":"tr');
+
+    await expect(loadHistory()).resolves.toEqual([record]);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  test('a rewrite that is not a list is ignored too', async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([record]));
+    mockNextExists.mockReturnValue(true);
+    mockNextText.mockResolvedValue('{}');
+
+    await expect(loadHistory()).resolves.toEqual([record]);
+  });
+
+  test('the next mutation builds on a recovered rewrite', async () => {
+    mockExists.mockReturnValue(false);
+    mockNextExists.mockReturnValue(true);
+    mockNextText.mockResolvedValue(JSON.stringify([record]));
+    mockMove.mockResolvedValue(undefined);
+
+    await removeFromHistory('track-1', { type: 'library' });
+
+    expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([]));
+    expect(mockMove).toHaveBeenCalledTimes(1);
+  });
+
+  test('a failed move is reported, like a failed write', async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([record]));
+    mockMove.mockRejectedValueOnce(new Error('move failed'));
+
+    await expect(clearHistoryForSource('pl')).resolves.toBe(false);
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      { tags: { flow: 'removal-history-clear' } },
+    );
   });
 });

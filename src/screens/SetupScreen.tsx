@@ -24,6 +24,7 @@ import { Button } from '../components/Button';
 import { decisionCounts, discardConfirmation, removeExplanation } from '../utils/sessionCopy';
 import { resumeState } from '../context/resumeSession';
 import { loadSession } from '../services/SessionStore';
+import { useSendSavedPending } from '../hooks/usePendingDecision';
 import { clearArtworkCache } from '../hooks/useResolvedArtwork';
 import { clearHistoryForSource } from '../services/RemovalHistoryStore';
 import { loadReviewedIds } from '../services/ReviewedLedgerStore';
@@ -60,7 +61,7 @@ const SOURCE_DISPLAY: Record<typeof SOURCE_TYPES[number], string> = {
 export default function SetupScreen() {
   const { state, dispatch, startFresh, flushPendingSave } = useSift();
   const { colors, glass } = useTheme();
-  const { loadPlaylists, clearSiftedPlaylist, warmCache } = useMusicProvider();
+  const { loadPlaylists, clearSiftedPlaylist, warmCache, ensureAccess } = useMusicProvider();
   const openSortPicker = () => {
     if (Platform.OS !== 'ios') return;
     const options = [...SORT_ORDERS.map((o) => SORT_ORDER_DISPLAY[o]), 'Cancel'];
@@ -187,6 +188,9 @@ export default function SetupScreen() {
   const handleResume = async ({ finish = false }: { finish?: boolean } = {}) => {
     if (!savedSession) return;
     setShowResumeModal(false);
+    // Access can be revoked between launches (iOS ends the app when it is).
+    // Sifting without it would play nothing and fail every Remove, quietly.
+    if (!(await ensureAccess())) return;
 
     // Clear stale artwork URLs from the previous session synchronously…
     clearArtworkCache();
@@ -212,10 +216,21 @@ export default function SetupScreen() {
     await warmCache(trackIDs, source?.type === 'playlist' ? source.playlist.id : undefined);
   };
 
+  // A decision the saved session held when the app was killed goes out
+  // before the session is replaced (useSendSavedPending).
+  const sendSavedPending = useSendSavedPending();
+  const replaceSavedSession = async (skipFiltering: boolean) => {
+    sendSavedPending(await loadSession());
+    startFresh(skipFiltering);
+  };
+
   const performStartOver = async () => {
     setIsStartingOver(true);
     try {
       const source = state.source;
+      // First, so a held keep lands (the clear below waits for keeps)
+      // before "<name> - Sifted" is emptied.
+      sendSavedPending(await loadSession());
       if (source.type === 'playlist') {
         // Only proceed once each clear actually landed — wiping the local
         // removal history (or discarding the saved session) after a failed
@@ -334,10 +349,12 @@ export default function SetupScreen() {
     const includeReviewed = isLibrary && includeSifted;
     const risk = await sessionAtRisk();
     if (!risk) {
-      startFresh(includeReviewed);
+      await replaceSavedSession(includeReviewed);
       return;
     }
-    confirmDiscard(discardConfirmation(risk.provider, risk.source, risk.counts, 'new-sift'), () => startFresh(includeReviewed));
+    confirmDiscard(discardConfirmation(risk.provider, risk.source, risk.counts, 'new-sift'), () => {
+      void replaceSavedSession(includeReviewed);
+    });
   });
 
   const openPlaylistPicker = () => {

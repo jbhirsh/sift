@@ -355,6 +355,38 @@ describe('SetupScreen', () => {
     alertSpy.mockRestore();
   });
 
+  test('Start Over first sends the decision the saved session was holding', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const { loadSession } = require('../../src/services/SessionStore');
+    const { logRemoval } = require('../../src/services/RemovalHistoryStore');
+    (logRemoval as jest.Mock).mockClear();
+    const session = {
+      tracks: [mockTrackA, mockTrackB, mockTrackC],
+      cursor: 2,
+      kept: [mockTrackA],
+      removed: [mockTrackB],
+      skipped: [],
+      sortOrder: 'least-played',
+      savedAt: '2026-04-10T00:00:00.000Z',
+      provider: 'apple-music',
+      source: { type: 'library' },
+      pending: { trackId: mockTrackB.id, decision: 'remove', at: 515151 },
+    };
+    (loadSession as jest.Mock).mockResolvedValue(session);
+    const { getByTestId } = await renderWithProviders(<SetupScreen />);
+    await act(async () => {});
+    await act(async () => {
+      await fireEvent.press(getByTestId('resume-modal-start-over'));
+    });
+    const buttons = alertSpy.mock.calls[0][2] as { text: string; onPress?: () => void }[];
+    await act(async () => {
+      buttons.find((b) => b.text === 'Discard and Start Over')?.onPress?.();
+    });
+    expect(logRemoval).toHaveBeenCalledWith(expect.objectContaining({ track: mockTrackB, source: { type: 'library' } }));
+    expect(clearSession).toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
   test('the Setup footnote says what Remove does for the chosen source (#141)', async () => {
     const { getByTestId } = await renderWithProviders(<SetupScreen />);
     expect(getByTestId('remove-explanation').props.children).toBe(
@@ -512,6 +544,65 @@ describe('SetupScreen', () => {
     // The repair signal survives the kill/relaunch: Done's fallback save can
     // still fire for the buffered keep.
     expect(getByTestId('probe-pending').props.children).toBe(1);
+  });
+
+  test('Resume asks for Music access first, and stays on Setup without it', async () => {
+    function PhaseProbe() {
+      const { state } = useSift();
+      return <Text testID="probe-phase">{state.phase}</Text>;
+    }
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockProvider.isAuthorized.mockResolvedValueOnce(false);
+    mockProvider.requestAuthorization.mockResolvedValueOnce(false);
+    const { loadSession } = require('../../src/services/SessionStore');
+    (loadSession as jest.Mock).mockResolvedValueOnce({
+      tracks: [mockTrackA, mockTrackB],
+      cursor: 1,
+      kept: [mockTrackA],
+      removed: [],
+      skipped: [],
+      sortOrder: 'least-played',
+      savedAt: '2026-04-10T00:00:00.000Z',
+      provider: 'apple-music',
+      source: { type: 'library' },
+    });
+    const { getByTestId } = await renderWithProviders(<><SetupScreen /><PhaseProbe /></>);
+    await act(async () => {});
+    await act(async () => {
+      await fireEvent.press(getByTestId('resume-modal-resume'));
+    });
+    expect(alertSpy).toHaveBeenCalledWith('Music Access Required', expect.any(String), expect.any(Array));
+    expect(getByTestId('probe-phase').props.children).toBe('setup');
+    alertSpy.mockRestore();
+  });
+
+  test('a new sift first sends the decision the saved session was holding', async () => {
+    const { loadSession } = require('../../src/services/SessionStore');
+    const { logRemoval } = require('../../src/services/RemovalHistoryStore');
+    (logRemoval as jest.Mock).mockClear();
+    mockProvider.removeFromPlaylist.mockClear();
+    const mix = { type: 'playlist', playlist: { id: 'p9', name: 'Old Mix', trackCount: 3 } };
+    // Finished but for its last card's decision, which never went out.
+    const session = {
+      tracks: [mockTrackA, mockTrackB],
+      cursor: 2,
+      kept: [mockTrackA],
+      removed: [mockTrackB],
+      skipped: [],
+      sortOrder: 'least-played',
+      savedAt: '2026-04-10T00:00:00.000Z',
+      provider: 'apple-music',
+      source: mix,
+      pending: { trackId: mockTrackB.id, decision: 'remove', at: 424242 },
+    };
+    (loadSession as jest.Mock).mockResolvedValue(session);
+    const { getByText } = await renderWithProviders(<SetupScreen />);
+    await act(async () => {
+      await fireEvent.press(getByText('Start Sifting'));
+    });
+    expect(logRemoval).toHaveBeenCalledWith(expect.objectContaining({ track: mockTrackB, source: mix }));
+    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('p9', [mockTrackB.id]);
+    expect(clearSession).toHaveBeenCalled();
   });
 
   test.each([

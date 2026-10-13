@@ -9,7 +9,7 @@ import { TrackIndex } from '../utils/trackIdentity';
 import { APPLE_REMOVED_PLAYLIST, libraryRemovedIds } from '../utils/libraryRemovals';
 import { ledgerKey } from '../utils/reviewedLedger';
 import { loadReviewedIds, markReviewed } from '../services/ReviewedLedgerStore';
-import { Playlist, Track } from '../types';
+import type { MusicProvider, Playlist, SiftSource, Track } from '../types';
 
 const SKIP_SECONDS = 15;
 // Upper bound on how long clearSiftedPlaylist waits for in-flight keeps to
@@ -36,12 +36,17 @@ const removalRetryAttempts = new Map<string, number>();
 let removalRetryInFlight: Promise<void> | null = null;
 // Songs a Restore is undoing right now: a retry leaves them alone.
 const restoringIds = new Set<string>();
+// Removals under way, by song. A Restore of the song waits for its removal
+// to finish first: the last card's Remove is still running when Done
+// appears, and a Restore landing before it would be undone by it.
+const removalsInFlight = new Map<string, Promise<void>>();
 
 /** Forget the retry bookkeeping, as a fresh launch would. Exported for tests. */
 export function resetRemovalRetries(): void {
   removalRetryAttempts.clear();
   removalRetryInFlight = null;
   restoringIds.clear();
+  removalsInFlight.clear();
 }
 
 /**
@@ -133,6 +138,26 @@ export function useMusicProvider() {
       dispatch({ type: 'SET_CONNECTION_STATUS', status: 'disconnected' });
       return false;
     }
+  }, [providerRef, dispatch]);
+
+  /**
+   * Make sure Sift can reach the music library, asking if it hasn't yet.
+   * When access is refused, say so and offer Settings: iOS asks only once,
+   * so after that Settings is the only way to grant it.
+   */
+  const ensureAccess = useCallback(async (): Promise<boolean> => {
+    if (await providerRef.current.isAuthorized()) return true;
+    if (await providerRef.current.requestAuthorization()) return true;
+    dispatch({ type: 'SET_CONNECTION_STATUS', status: 'disconnected' });
+    Alert.alert(
+      'Music Access Required',
+      'Sift needs access to your music library. Please enable it in Settings.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Settings', onPress: () => Linking.openSettings() },
+      ],
+    );
+    return false;
   }, [providerRef, dispatch]);
 
   const play = useCallback(
@@ -246,21 +271,9 @@ export function useMusicProvider() {
     dispatch({ type: 'SET_PHASE', phase: 'loading' });
 
     try {
-      const isAuth = await providerRef.current.isAuthorized();
-      if (!isAuth) {
-        const granted = await providerRef.current.requestAuthorization();
-        if (!granted) {
-          dispatch({ type: 'SET_LOAD_ERROR', error: 'Music library access is required to use Sift.' });
-          Alert.alert(
-            'Music Access Required',
-            'Sift needs access to your music library. Please enable it in Settings.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Open Settings', onPress: () => Linking.openSettings() },
-            ],
-          );
-          return;
-        }
+      if (!(await ensureAccess())) {
+        dispatch({ type: 'SET_LOAD_ERROR', error: 'Music library access is required to use Sift.' });
+        return;
       }
 
       dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0.3, message: 'Fetching tracks…' });
@@ -380,7 +393,7 @@ export function useMusicProvider() {
     } finally {
       loadingInProgressRef.current = false;
     }
-  }, [providerRef, dispatch, state.source, state.sortOrder, state.siftedPlaylistId, state.provider]);
+  }, [providerRef, dispatch, ensureAccess, state.source, state.sortOrder, state.siftedPlaylistId, state.provider]);
 
   /**
    * Retry the removals that failed (#151). Each is checked first: a removal
@@ -440,20 +453,21 @@ export function useMusicProvider() {
     }
   }, [providerRef, dispatch]);
 
-  const removeTrack = useCallback(
-    async (track: Track) => {
-      const source = state.source;
-      const appleLibrary = source.type === 'library' && state.provider === 'apple-music';
+  const removeNow = useCallback(
+    // report: whether this removal belongs to the sift in state, whose
+    // failures it shows and retries.
+    async (track: Track, source: SiftSource, provider: MusicProvider, report: boolean) => {
+      const appleLibrary = source.type === 'library' && provider === 'apple-music';
       // An Apple Music song removed in an earlier library sift is already
       // recorded and already in "Sift — Removed"; removing it again (if a
       // sift offers it anyway) would add a duplicate there (#139).
-      if (appleLibrary && libraryRemovedIds(await loadHistory(), state.provider).has(track.id)) return;
+      if (appleLibrary && libraryRemovedIds(await loadHistory(), provider).has(track.id)) return;
       // Log the removal before attempting it — the user's intent is what
       // matters, and a playlist's failed removal stays filtered out.
       await logRemoval({
         track,
         source,
-        provider: state.provider,
+        provider,
         removedAt: new Date().toISOString(),
       });
       try {
@@ -464,7 +478,7 @@ export function useMusicProvider() {
         }
       } catch (err) {
         Sentry.captureException(err, { tags: { flow: 'remove-track' } });
-        dispatch({ type: 'ADD_REMOVAL_ERROR', error: track.name, failedRemovalId: track.id });
+        if (report) dispatch({ type: 'ADD_REMOVAL_ERROR', error: track.name, failedRemovalId: track.id });
         // A failed Apple library removal left the song in the library and
         // out of "Sift — Removed": drop its record so the next library sift
         // offers it again rather than hiding it for good.
@@ -472,9 +486,28 @@ export function useMusicProvider() {
         return;
       }
       // This one landed, so the connection works: retry any that failed.
-      await retryFailedRemovals();
+      if (report) await retryFailedRemovals();
     },
-    [providerRef, dispatch, state.source, state.provider, retryFailedRemovals],
+    [providerRef, dispatch, retryFailedRemovals],
+  );
+
+  /**
+   * Remove the song from the source being sifted, or from `from`: a saved
+   * session's source and provider, for a session being discarded, whose
+   * failure is reported to Sentry only.
+   */
+  const removeTrack = useCallback(
+    (track: Track, from?: { source: SiftSource; provider: MusicProvider }): Promise<void> => {
+      const run = from
+        ? removeNow(track, from.source, from.provider, false)
+        : removeNow(track, state.source, state.provider, true);
+      const settled = run.finally(() => {
+        if (removalsInFlight.get(track.id) === settled) removalsInFlight.delete(track.id);
+      });
+      removalsInFlight.set(track.id, settled);
+      return settled;
+    },
+    [removeNow, state.source, state.provider],
   );
 
   const restoreTrack = useCallback(
@@ -484,9 +517,20 @@ export function useMusicProvider() {
       restoringIds.add(track.id);
       try {
         await removalRetryInFlight;
+        await removalsInFlight.get(track.id);
         const source = state.source;
+        // A playlist removal that failed may never have taken effect: then
+        // the song is still in the playlist, and adding it back would make
+        // a second copy, so restoring it is only forgetting the removal.
+        // Asked rather than read from failedRemovalIds: one can fail after
+        // taking effect, and a failure that just came in may not be in this
+        // screen's state yet. (Taking a library song out of "Sift — Removed"
+        // is harmless when it never went in.)
+        const service = providerRef.current;
+        const stillThere = source.type === 'playlist' && service.removalLanded != null
+          && !(await service.removalLanded(source, track.id));
         if (source.type === 'playlist') {
-          await providerRef.current.addToPlaylist?.(source.playlist.id, [track.id]);
+          if (!stillThere) await service.addToPlaylist?.(source.playlist.id, [track.id]);
         } else if (state.provider === 'apple-music') {
           // An Apple Music library Remove never took the song out of the
           // library: it put it in "Sift — Removed". Restoring means taking it
@@ -519,6 +563,8 @@ export function useMusicProvider() {
         // Purge the removal-history record so the restored track is offered
         // again on the next sift of this source instead of being filtered out.
         await removeFromHistory(track.id, source);
+        // Nothing left to retry: the song is back where it was.
+        dispatch({ type: 'CLEAR_REMOVAL_FAILURE', trackId: track.id, error: track.name });
         dispatch({ type: 'RESTORE_TRACK', trackId: track.id });
       } catch (err) {
         Sentry.captureException(err, { tags: { flow: 'restore-track' } });
@@ -736,6 +782,40 @@ export function useMusicProvider() {
     [providerRef, state.source, state.provider, state.siftedPlaylistId, findSiftedPlaylistWithRetry, dispatch],
   );
 
+  /**
+   * Keep a song for a saved session being discarded (its held decision,
+   * #152): to that session's source, without touching the sift in state.
+   * Queued with the keeps; a failure is reported to Sentry only.
+   */
+  const keepFromSavedSession = useCallback(
+    (track: Track, from: { source: SiftSource; provider: MusicProvider; siftedPlaylistId: string | null }): Promise<void> => {
+      const { source, provider, siftedPlaylistId } = from;
+      if (source.type !== 'playlist') return markReviewed(ledgerKey(provider, source), track.id);
+      const siftedName = `${source.playlist.name} - Sifted`;
+      const next = keepQueue.then(async () => {
+        try {
+          const service = providerRef.current;
+          const playlists = await service.loadPlaylists?.() ?? [];
+          const sifted =
+            (siftedPlaylistId != null ? playlists.find((p) => p.id === siftedPlaylistId) : undefined) ??
+            playlists.find((p) => p.name === siftedName);
+          if (!sifted) {
+            await service.createPlaylist(siftedName, [track.id]);
+            return;
+          }
+          // It may have landed before the app was killed.
+          const present = new TrackIndex(await service.loadPlaylistTracks?.(sifted.id) ?? []);
+          if (!present.has(track)) await service.addToPlaylist?.(sifted.id, [track.id]);
+        } catch (err) {
+          Sentry.captureException(err, { tags: { flow: 'keep-saved-session' } });
+        }
+      });
+      keepQueue = next;
+      return next;
+    },
+    [providerRef],
+  );
+
   const warmCache = useCallback(async (trackIDs: string[], playlistID?: string): Promise<void> => {
     try {
       const isAuth = await providerRef.current.isAuthorized();
@@ -827,6 +907,7 @@ export function useMusicProvider() {
   return {
     authorize,
     isAuthorized,
+    ensureAccess,
     loadPlaylists,
     loadTracks,
     play,
@@ -839,6 +920,7 @@ export function useMusicProvider() {
     skipBackward,
     saveSiftedPlaylist,
     keepTrack,
+    keepFromSavedSession,
     removeTrack,
     retryFailedRemovals,
     restoreTrack,

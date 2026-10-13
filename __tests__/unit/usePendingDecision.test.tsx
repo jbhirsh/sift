@@ -13,12 +13,17 @@ const mockSift = {
   dispatch: jest.fn(),
   flushPendingSave: jest.fn(),
 };
-const mockProvider = { keepTrack: jest.fn(() => Promise.resolve()), removeTrack: jest.fn(() => Promise.resolve()) };
+const mockProvider = {
+  keepTrack: jest.fn(() => Promise.resolve()),
+  removeTrack: jest.fn(() => Promise.resolve()),
+  keepFromSavedSession: jest.fn(() => Promise.resolve()),
+};
 
 jest.mock('../../src/context/SiftContext', () => ({ useSift: () => mockSift }));
 jest.mock('../../src/hooks/useMusicProvider', () => ({ useMusicProvider: () => mockProvider }));
 
-import { useHoldPendingDecision, useSendPending, wasSent, UNDO_WINDOW_MS } from '../../src/hooks/usePendingDecision';
+import { useHoldPendingDecision, useSendPending, useSendSavedPending, wasSent, UNDO_WINDOW_MS } from '../../src/hooks/usePendingDecision';
+import type { SiftSession } from '../../src/types';
 
 // Each test uses its own times: the sent set lives for the module.
 let clock = 1_000;
@@ -145,11 +150,74 @@ describe('useHoldPendingDecision', () => {
     const { unmount } = await renderHook(() => useHoldPendingDecision(send));
     await act(async () => listeners.forEach((l) => l('active')));
     expect(send).not.toHaveBeenCalled();
+    // Control Center, Notification Center or a call banner: still here.
+    await act(async () => listeners.forEach((l) => l('inactive')));
+    expect(send).not.toHaveBeenCalled();
     await act(async () => listeners.forEach((l) => l('background')));
     expect(send).toHaveBeenCalledWith(pending);
     send.mockClear();
     await unmount();
     expect(send).toHaveBeenCalledWith(pending);
     add.mockRestore();
+  });
+});
+
+describe('useSendSavedPending', () => {
+  const playlist: SiftSource = { type: 'playlist', playlist: { id: 'p', name: 'Mix', trackCount: 2 } };
+  const saved = (pending: PendingDecision | null, over: Partial<SiftSession> = {}): SiftSession => ({
+    tracks: [track('a'), track('b')], cursor: 1, kept: [], removed: [], skipped: [], sortOrder: 'random',
+    savedAt: '2026-01-01T00:00:00.000Z', provider: 'apple-music', source: playlist, siftedPlaylistId: 'sp', pending,
+    ...over,
+  });
+
+  test('sends a held Remove to the saved session\'s own source, leaving state alone', async () => {
+    const { result } = await renderHook(() => useSendSavedPending());
+    const pending = held('b', 'remove');
+    await act(async () => result.current(saved(pending)));
+    expect(mockProvider.removeTrack).toHaveBeenCalledWith(track('b'), { source: playlist, provider: 'apple-music' });
+    expect(mockSift.dispatch).not.toHaveBeenCalled();
+    expect(wasSent(pending)).toBe(true);
+  });
+
+  test('sends a held Keep with the session\'s sifted playlist', async () => {
+    const { result } = await renderHook(() => useSendSavedPending());
+    await act(async () => result.current(saved(held('a', 'keep'))));
+    expect(mockProvider.keepFromSavedSession).toHaveBeenCalledWith(
+      track('a'), { source: playlist, provider: 'apple-music', siftedPlaylistId: 'sp' });
+    jest.clearAllMocks();
+    await act(async () => result.current(saved(held('b', 'keep'), { siftedPlaylistId: undefined })));
+    expect(mockProvider.keepFromSavedSession).toHaveBeenCalledWith(
+      track('b'), { source: playlist, provider: 'apple-music', siftedPlaylistId: null });
+  });
+
+  test('sends it once, even if Resume or another discard gets to it too', async () => {
+    const { result } = await renderHook(() => useSendSavedPending());
+    const pending = held('a', 'remove');
+    await act(async () => {
+      result.current(saved(pending));
+      result.current(saved(pending));
+    });
+    expect(mockProvider.removeTrack).toHaveBeenCalledTimes(1);
+    // A decision the screen already sent isn't sent again.
+    const { result: screen } = await renderHook(() => useSendPending());
+    const onScreen = held('b', 'remove');
+    await act(async () => screen.current(onScreen));
+    jest.clearAllMocks();
+    await act(async () => result.current(saved(onScreen)));
+    expect(mockProvider.removeTrack).not.toHaveBeenCalled();
+  });
+
+  test('nothing to send: no session, nothing held, a Skip, an unknown track, or a session too old to say where', async () => {
+    const { result } = await renderHook(() => useSendSavedPending());
+    await act(async () => {
+      result.current(null);
+      result.current(saved(null));
+      result.current(saved(held('a', 'skip')));
+      result.current(saved(held('zz', 'remove')));
+      result.current(saved(held('a', 'remove'), { source: undefined }));
+      result.current(saved(held('a', 'remove'), { provider: undefined }));
+    });
+    expect(mockProvider.removeTrack).not.toHaveBeenCalled();
+    expect(mockProvider.keepFromSavedSession).not.toHaveBeenCalled();
   });
 });
