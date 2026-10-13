@@ -112,11 +112,11 @@ jobs:
     runs-on: macos-26
     # Worst case: ~10 min setup + the 30-min ios-build wait + the build's
     # 40-min cap + ~3 min simulator prep + the Maestro step's 40-min cap +
-    # the accessibility audit's 20-min cap. The
+    # the accessibility audit's 10-min cap. The
     # step caps must expire before this one: a JOB timeout counts as
     # cancellation, which skips the failure()/!cancelled() diagnostics and
     # upload steps and loses all evidence.
-    timeout-minutes: 155
+    timeout-minutes: 145
     # actions: read for the ios-build run lookup and artifact download (the
     # repo default token may not grant it, and the steps fail quietly).
     permissions:
@@ -354,13 +354,12 @@ jobs:
       # Xcode's accessibility audit (#146) on Setup, Sift, Settings and Done,
       # light and dark: contrast, hit targets, clipped text, Dynamic Type,
       # descriptions and traits, as iOS renders them (the Jest scan only sees
-      # props). Runs after the suite so it can't disturb it. Report-only for
-      # now: issues are warning annotations and a step-summary table, and the
-      # step can't fail the job until the baseline is clean.
-      - name: Accessibility audit (report-only)
+      # props). Runs after the suite so it can't disturb it. Any issue, or a
+      # screen the pass never reached, fails the job: each is an error
+      # annotation and a row in the step summary. A pass takes about 30 s.
+      - name: Accessibility audit
         if: ${{ !cancelled() && env.RUN_SUITE == 'true' }}
-        continue-on-error: true
-        timeout-minutes: 20
+        timeout-minutes: 10
         run: scripts/run-a11y-audit.sh "$(ls -d build/e2e/*.app | head -1)"
 
       - name: Upload accessibility audit

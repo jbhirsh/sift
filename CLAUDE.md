@@ -52,7 +52,8 @@ everything.
 - The E2E job also runs Xcode's accessibility audit
   (`e2e/a11y-audit`, `scripts/run-a11y-audit.sh`) on Setup, Sift, Settings
   and Done in light and dark: contrast, hit targets, clipped text, Dynamic
-  Type, as iOS renders them. It reports issues as warnings for now.
+  Type, as iOS renders them. Any issue fails the job, as does a screen the
+  pass never reached.
 - Tests are written alongside the implementation, not after the commit.
 
 ---

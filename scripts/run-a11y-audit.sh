@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Runs Xcode's accessibility audit (e2e/a11y-audit, #146) against the
 # e2e-simulator app on the booted simulator, in light and dark appearance,
-# and reports each issue as a GitHub warning annotation and in the step
-# summary. Usage: scripts/run-a11y-audit.sh <path to Sift.app>
+# and reports each issue as a GitHub error annotation and in the step
+# summary. Any issue, or a screen never audited, fails the script.
+# Usage: scripts/run-a11y-audit.sh <path to Sift.app>
 set -euo pipefail
 
 APP_PATH=${1:?usage: run-a11y-audit.sh <path to .app>}
@@ -84,8 +85,9 @@ count=$(wc -l < "$OUT_DIR/issues.txt" | tr -d ' ')
   fi
 } >> "${GITHUB_STEP_SUMMARY:-/dev/stdout}"
 while IFS='|' read -r _ screen appearance type description element; do
-  echo "::warning title=$(escape_property "Accessibility audit ($screen, $appearance)")::$(escape_data "$type: $description ($element)")"
+  echo "::error title=$(escape_property "Accessibility audit ($screen, $appearance)")::$(escape_data "$type: $description ($element)")"
 done < "$OUT_DIR/issues.txt"
+if [ "$count" -gt 0 ] && [ "$status" -eq 0 ]; then status=1; fi
 if [ "${#missing[@]}" -gt 0 ]; then
   echo "::error title=Accessibility audit::$(escape_data "Not audited: $missing_list")"
   [ "$status" -ne 0 ] || status=1
