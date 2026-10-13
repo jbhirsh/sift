@@ -2167,6 +2167,16 @@ describe('SettingsScreen', () => {
 });
 
 describe('VoiceOver scan (#146)', () => {
+  test('the wordmark reads as the app\'s name, a heading, not "sift period"', async () => {
+    // Xcode's accessibility audit flagged "sift." as a label that isn't
+    // human-readable.
+    const { getByTestId } = await renderWithProviders(<SetupScreen />);
+    const brand = getByTestId('setup-brand');
+    expect(brand.props.accessibilityLabel).toBe('Sift');
+    expect(brand.props.accessibilityRole).toBe('header');
+    expect(brand.props.children).toBe('sift.');
+  });
+
   test('Setup, with a playlist picked and the resume block showing', async () => {
     const Backed = () => {
       const { dispatch, decide } = useSift();
