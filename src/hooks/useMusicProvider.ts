@@ -8,6 +8,7 @@ import { sortTracks } from '../utils/sorting';
 import { TrackIndex } from '../utils/trackIdentity';
 import { APPLE_REMOVED_PLAYLIST, libraryRemovedIds } from '../utils/libraryRemovals';
 import { ledgerKey } from '../utils/reviewedLedger';
+import { isFiltering, matchesFilter } from '../utils/trackFilter';
 import { loadReviewedIds, markReviewed } from '../services/ReviewedLedgerStore';
 import type { MusicProvider, Playlist, SiftSource, Track } from '../types';
 
@@ -267,6 +268,7 @@ export function useMusicProvider() {
 
     const shouldFilter = !options?.skipFiltering;
     const source = state.source;
+    const filter = state.filter;
     const knownSiftedId = state.siftedPlaylistId;
     const label = source.type === 'playlist' ? `"${source.playlist.name}"` : 'library';
 
@@ -356,6 +358,16 @@ export function useMusicProvider() {
         }
       }
 
+      // Setup's Plays and Added limits, after the rest: the messages below
+      // blame these only for what they themselves left out.
+      let filteredByLimits = 0;
+      if (isFiltering(filter)) {
+        const now = new Date();
+        const beforeLimits = tracks.length;
+        tracks = tracks.filter((t) => matchesFilter(t, filter, now));
+        filteredByLimits = beforeLimits - tracks.length;
+      }
+
       Sentry.addBreadcrumb({
         category: 'music-provider',
         // Not the playlist's name (#147).
@@ -369,8 +381,9 @@ export function useMusicProvider() {
       // which filter actually emptied it: blaming the sifted filter for
       // tracks that were removed (not kept) would be a false claim.
       if (tracks.length === 0) {
-        const error =
-          source.type === 'playlist' && shouldFilter && unfilteredCount > 0
+        const error = filteredByLimits > 0
+          ? `No songs ${source.type === 'playlist' ? 'in this playlist ' : ''}match your Plays and Added choices.`
+          : source.type === 'playlist' && shouldFilter && unfilteredCount > 0
             ? filteredAsRemoved === 0
               ? 'All tracks in this playlist have already been sifted.'
               : filteredAsSifted === 0
@@ -396,7 +409,7 @@ export function useMusicProvider() {
     } finally {
       loadingInProgressRef.current = false;
     }
-  }, [providerRef, dispatch, ensureAccess, state.source, state.sortOrder, state.siftedPlaylistId, state.provider]);
+  }, [providerRef, dispatch, ensureAccess, state.source, state.sortOrder, state.siftedPlaylistId, state.provider, state.filter]);
 
   /**
    * Retry the removals that failed (#151). Each is checked first: a removal
