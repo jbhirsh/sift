@@ -26,6 +26,7 @@ import { resumeState } from '../context/resumeSession';
 import { loadSession } from '../services/SessionStore';
 import { useSendSavedPending } from '../hooks/usePendingDecision';
 import { warmUpOrder } from '../utils/warmUpOrder';
+import { ADDED_AGES, addedAgeLabel, PLAY_LIMITS, playLimitLabel } from '../utils/trackFilter';
 import { clearArtworkCache } from '../hooks/useResolvedArtwork';
 import { clearHistoryForSource } from '../services/RemovalHistoryStore';
 import { loadReviewedIds } from '../services/ReviewedLedgerStore';
@@ -75,6 +76,23 @@ export default function SetupScreen() {
       },
     );
   };
+  // Plays and Added: which songs the sift takes, picked like the sort.
+  const pickFrom = <T,>(choices: readonly T[], label: (choice: T) => string, onPick: (choice: T) => void) => {
+    if (Platform.OS !== 'ios') return;
+    const options = [...choices.map(label), 'Cancel'];
+    ActionSheetIOS.showActionSheetWithOptions(
+      { options, cancelButtonIndex: options.length - 1 },
+      (index) => {
+        if (index < choices.length) onPick(choices[index]);
+      },
+    );
+  };
+  const openPlaysPicker = () => pickFrom(PLAY_LIMITS, playLimitLabel, (maxPlays) => {
+    dispatch({ type: 'SET_FILTER', filter: { ...state.filter, maxPlays } });
+  });
+  const openAddedPicker = () => pickFrom(ADDED_AGES, addedAgeLabel, (addedYearsAgo) => {
+    dispatch({ type: 'SET_FILTER', filter: { ...state.filter, addedYearsAgo } });
+  });
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
   const [showPlaylistPicker, setShowPlaylistPicker] = useState(false);
@@ -566,6 +584,43 @@ export default function SetupScreen() {
           </View>
         </GlassCard>
 
+        {/* Which songs to go through: the least played, or the oldest. */}
+        <GlassCard intensity="thin" radius={RADIUS.md}>
+          <View style={styles.filterRow}>
+            <Text style={[styles.sectionLabel, { color: colors.text }]}>Plays</Text>
+            <View style={{ flex: 1 }} />
+            <TouchableOpacity
+              testID="filter-plays"
+              onPress={openPlaysPicker}
+              style={styles.sortButton}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityHint="Only songs played at most this often"
+            >
+              <Text style={[styles.sortButtonText, { color: colors.accent }]}>
+                {playLimitLabel(state.filter.maxPlays)}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <View style={[styles.filterDivider, { backgroundColor: colors.separator }]} />
+          <View style={styles.filterRow}>
+            <Text style={[styles.sectionLabel, { color: colors.text }]}>Added</Text>
+            <View style={{ flex: 1 }} />
+            <TouchableOpacity
+              testID="filter-added"
+              onPress={openAddedPicker}
+              style={styles.sortButton}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityHint="Only songs added to your library at least this long ago"
+            >
+              <Text style={[styles.sortButtonText, { color: colors.accent }]}>
+                {addedAgeLabel(state.filter.addedYearsAgo)}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </GlassCard>
+
         {showResumeModal && savedSession && (
           <ResumeSessionModal
             session={savedSession}
@@ -724,6 +779,16 @@ const styles = StyleSheet.create({
   sortButton: {
     paddingVertical: 4,
     paddingHorizontal: 8,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  filterDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 16,
   },
   sortButtonText: {
     fontSize: 17,

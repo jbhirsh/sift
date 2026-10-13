@@ -39,6 +39,7 @@ const start = (tracks: Track[]): SiftState => ({
   removalErrors: [], failedRemovalIds: [], connectionStatus: 'connected', pendingKeeps: [],
   skipFiltering: false, siftedPlaylistId: null, startAtChorus: false, pending: null,
   playbackFailedId: null, songCacheWarming: false, songCacheGeneration: 0,
+  filter: { maxPlays: null, addedYearsAgo: null },
 });
 
 const ids = (list: readonly Track[]) => list.map((t) => t.id);

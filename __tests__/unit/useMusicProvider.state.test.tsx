@@ -504,6 +504,75 @@ describe('useMusicProvider — observable state', () => {
     expect(Alert.alert).not.toHaveBeenCalled();
   });
 
+  describe('Plays and Added (filters)', () => {
+    const now = new Date();
+    const yearsAgo = (years: number) => {
+      const at = new Date(now);
+      at.setFullYear(at.getFullYear() - years);
+      return at.toISOString();
+    };
+    const old = { ...mockTrack, id: 'old', name: 'Old', playCount: 2, dateAdded: yearsAgo(4) };
+    const loved = { ...mockTrack, id: 'loved', name: 'Loved', playCount: 90, dateAdded: yearsAgo(4) };
+    const fresh = { ...mockTrack, id: 'fresh', name: 'Fresh', playCount: 0, dateAdded: yearsAgo(0) };
+
+    test('a library sift takes only the songs that match', async () => {
+      mockProvider.loadLibrary.mockResolvedValueOnce([old, loved, fresh]);
+      await renderHarness([]);
+      await act(async () => {
+        sift.dispatch({ type: 'SET_FILTER', filter: { maxPlays: 5, addedYearsAgo: 3 } });
+      });
+      await act(async () => {
+        await api.loadTracks();
+      });
+      expect(sift.state.tracks.map((t) => t.id)).toEqual(['old']);
+      expect(sift.state.phase).toBe('sifting');
+    });
+
+    test('so does a playlist sift', async () => {
+      mockProvider.loadPlaylistTracks.mockResolvedValueOnce([old, loved, fresh]);
+      await renderHarness([]);
+      await setPlaylistSource();
+      await act(async () => {
+        sift.dispatch({ type: 'SET_FILTER', filter: { maxPlays: 0, addedYearsAgo: null } });
+      });
+      await act(async () => {
+        await api.loadTracks();
+      });
+      expect(sift.state.tracks.map((t) => t.id)).toEqual(['fresh']);
+    });
+
+    test('nothing matching says so, rather than blaming earlier sifts', async () => {
+      mockProvider.loadLibrary.mockResolvedValueOnce([loved, fresh]);
+      await renderHarness([]);
+      await act(async () => {
+        sift.dispatch({ type: 'SET_FILTER', filter: { maxPlays: 5, addedYearsAgo: 3 } });
+      });
+      await act(async () => {
+        await api.loadTracks();
+      });
+      expect(sift.state.phase).toBe('setup');
+      expect(sift.state.loadError).toBe('No songs match your Plays and Added choices.');
+      mockProvider.loadPlaylistTracks.mockResolvedValueOnce([loved]);
+      await setPlaylistSource();
+      await act(async () => {
+        await api.loadTracks();
+      });
+      expect(sift.state.loadError).toBe('No songs in this playlist match your Plays and Added choices.');
+    });
+
+    test('a source already empty before the filters keeps its own message', async () => {
+      mockProvider.loadLibrary.mockResolvedValueOnce([]);
+      await renderHarness([]);
+      await act(async () => {
+        sift.dispatch({ type: 'SET_FILTER', filter: { maxPlays: 5, addedYearsAgo: null } });
+      });
+      await act(async () => {
+        await api.loadTracks();
+      });
+      expect(sift.state.loadError).toBe('Your library has no tracks to sift.');
+    });
+  });
+
   test('loadTracks surfaces a clear error when the provider cannot load playlists', async () => {
     mockProvider.loadPlaylistTracks.mockResolvedValueOnce(undefined);
     await renderHarness([]);

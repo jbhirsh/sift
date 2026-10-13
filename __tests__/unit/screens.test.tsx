@@ -139,6 +139,41 @@ describe('SetupScreen', () => {
     spy.mockRestore();
   });
 
+  test('Plays and Added pick which songs the sift takes; Cancel leaves them', async () => {
+    function FilterProbe() {
+      const { state } = useSift();
+      return <Text testID="probe-filter">{JSON.stringify(state.filter)}</Text>;
+    }
+    let pick = 0;
+    const spy = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation((_opts, cb) => { cb(pick); });
+    const { getByTestId } = await renderWithProviders(<><SetupScreen /><FilterProbe /></>);
+    expect(getByTestId('filter-plays')).toHaveTextContent('Any');
+    expect(getByTestId('filter-added')).toHaveTextContent('Any time');
+
+    pick = 1;
+    await fireEvent.press(getByTestId('filter-plays'));
+    expect(spy).toHaveBeenLastCalledWith(
+      { options: ['Any', 'Never played', '5 or fewer', '20 or fewer', 'Cancel'], cancelButtonIndex: 4 },
+      expect.any(Function),
+    );
+    expect(getByTestId('filter-plays')).toHaveTextContent('Never played');
+
+    pick = 2;
+    await fireEvent.press(getByTestId('filter-added'));
+    expect(spy).toHaveBeenLastCalledWith(
+      { options: ['Any time', 'Over a year ago', 'Over 3 years ago', 'Over 5 years ago', 'Cancel'], cancelButtonIndex: 4 },
+      expect.any(Function),
+    );
+    expect(getByTestId('filter-added')).toHaveTextContent('Over 3 years ago');
+    expect(JSON.parse(getByTestId('probe-filter').props.children)).toEqual({ maxPlays: 0, addedYearsAgo: 3 });
+
+    pick = 4; // Cancel
+    await fireEvent.press(getByTestId('filter-plays'));
+    expect(JSON.parse(getByTestId('probe-filter').props.children)).toEqual({ maxPlays: 0, addedYearsAgo: 3 });
+    expect(getByTestId('filter-plays').props.accessibilityRole).toBe('button');
+    spy.mockRestore();
+  });
+
   test('renders source picker with Library and Playlist options', async () => {
     const { getByText } = await renderWithProviders(<SetupScreen />);
     expect(getByText('Sift source')).toBeTruthy();

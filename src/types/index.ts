@@ -85,6 +85,19 @@ export interface RemovalRecord {
   removedAt: string; // ISO 8601
 }
 
+/**
+ * Which songs a sift takes, chosen on Setup: by plays and by when they were
+ * added. Null is no limit.
+ */
+export interface TrackFilter {
+  /** At most this many plays (0: never played). */
+  maxPlays: number | null;
+  /** Added at least this many years ago. */
+  addedYearsAgo: number | null;
+}
+
+export const NO_FILTER: TrackFilter = { maxPlays: null, addedYearsAgo: null };
+
 export const SORT_ORDER_DISPLAY: Record<SortOrder, string> = {
   'least-played': 'Least Played',
   'most-played': 'Most Played',

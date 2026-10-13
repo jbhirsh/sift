@@ -32,6 +32,7 @@ function makeState(overrides: Partial<SiftState> = {}): SiftState {
     playbackFailedId: null,
     songCacheWarming: false,
     songCacheGeneration: 0,
+    filter: { maxPlays: null, addedYearsAgo: null },
     ...overrides,
   };
 }
@@ -795,11 +796,22 @@ describe('playback failures and the song cache', () => {
 
   test('a resumed session starts with no playback failure', () => {
     const { phase: _phase, startAtChorus: _chorus, playbackFailedId: _failed, songCacheWarming: _warming,
-      songCacheGeneration: _generation, ...session } = makeState();
+      songCacheGeneration: _generation, filter: _filter, ...session } = makeState();
     const resumed = siftReducer(makeState({ playbackFailedId: 'old', songCacheGeneration: 4 }), {
       type: 'RESUME_SESSION', session,
     });
     expect(resumed.playbackFailedId).toBeNull();
     expect(resumed.songCacheGeneration).toBe(4);
+  });
+});
+
+describe('SET_FILTER', () => {
+  test('sets the next load\'s filter, and a resume keeps it', () => {
+    const filter = { maxPlays: 5, addedYearsAgo: 3 };
+    const state = siftReducer(makeState(), { type: 'SET_FILTER', filter });
+    expect(state.filter).toEqual(filter);
+    const { phase: _p, startAtChorus: _c, playbackFailedId: _f, songCacheWarming: _w, songCacheGeneration: _g,
+      filter: _filter, ...session } = makeState();
+    expect(siftReducer(state, { type: 'RESUME_SESSION', session }).filter).toEqual(filter);
   });
 });

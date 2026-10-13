@@ -12,6 +12,8 @@ import {
   SiftSource,
   PendingDecision,
   DEFAULT_PREFERENCES,
+  NO_FILTER,
+  TrackFilter,
 } from '../types';
 import { saveSession, clearSession } from '../services/SessionStore';
 import { MusicProviderHost } from './MusicProviderContext';
@@ -87,10 +89,16 @@ export interface SiftState {
    * again when it changes: a card shown before its song was cached got none.
    */
   songCacheGeneration: number;
+  /**
+   * Which songs the next sift loads (Setup's Plays and Added). A choice for
+   * the next load, like the source: a loaded sift's tracks already carry it.
+   */
+  filter: TrackFilter;
 }
 
 /** State that lives for the app session only, never saved or resumed. */
-type TransientState = 'phase' | 'startAtChorus' | 'playbackFailedId' | 'songCacheWarming' | 'songCacheGeneration';
+type TransientState =
+  | 'phase' | 'startAtChorus' | 'playbackFailedId' | 'songCacheWarming' | 'songCacheGeneration' | 'filter';
 
 const initialState: SiftState = {
   phase: 'setup',
@@ -122,6 +130,7 @@ const initialState: SiftState = {
   playbackFailedId: null,
   songCacheWarming: false,
   songCacheGeneration: 0,
+  filter: NO_FILTER,
 };
 
 // ── Actions ────────────────────────────────────────────
@@ -157,6 +166,7 @@ type SiftAction =
   | { type: 'SET_PLAYBACK_FAILED'; trackId: string | null }
   | { type: 'SONG_CACHE_WARMING' }
   | { type: 'SONG_CACHE_WARMED' }
+  | { type: 'SET_FILTER'; filter: TrackFilter }
   | { type: 'START_FRESH'; skipFiltering?: boolean }
   | { type: 'RESET_TO_SETUP' };
 
@@ -306,6 +316,9 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
 
     case 'SONG_CACHE_WARMING':
       return { ...state, songCacheWarming: true };
+
+    case 'SET_FILTER':
+      return { ...state, filter: action.filter };
 
     case 'SONG_CACHE_WARMED':
       return { ...state, songCacheWarming: false, songCacheGeneration: state.songCacheGeneration + 1 };

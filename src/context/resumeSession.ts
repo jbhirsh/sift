@@ -17,7 +17,7 @@ export function resumeState(
     /** End the sift where it left off: resume straight to Done (#142). */
     finish?: boolean;
   },
-): Omit<SiftState, 'startAtChorus' | 'playbackFailedId' | 'songCacheWarming' | 'songCacheGeneration'> {
+): Omit<SiftState, 'startAtChorus' | 'playbackFailedId' | 'songCacheWarming' | 'songCacheGeneration' | 'filter'> {
   const source = saved.source ?? { type: 'library' as const };
   return {
     tracks: saved.tracks,
