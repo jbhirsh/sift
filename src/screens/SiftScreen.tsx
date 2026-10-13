@@ -23,13 +23,16 @@ import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
 import InteractiveCard from '../components/InteractiveCard';
 import PlayerControls from '../components/PlayerControls';
-import { COLORS, RADIUS, SHADOWS, SPACING, UNDO_PILL } from '../theme';
+import { COLORS, RADIUS, SETTINGS_BUTTON, SHADOWS, SPACING, UNDO_PILL } from '../theme';
 import { Decision, PendingDecision, PROVIDER_DISPLAY, Track } from '../types';
 import { loadSeenRemoveNote, loadSeenSwipeHint, markRemoveNoteSeen, markSwipeHintSeen } from '../services/PreferencesStore';
 import { decisionAnnouncement, FIRST_REMOVE_NOTE, SWIPE_HINT, undoMessage, unsyncedCount } from '../utils/sessionCopy';
 import { useHoldPendingDecision, useSendPending, wasSent } from '../hooks/usePendingDecision';
 import { useRemovalRetry } from '../hooks/useRemovalRetry';
 import UndoPill from '../components/UndoPill';
+import DecisionsSheet from '../components/DecisionsSheet';
+import { useReviseDecision } from '../hooks/useReviseDecision';
+import { decidedLatestFirst, decisionFor } from '../utils/decisions';
 import { compactCount } from '../utils/compactCount';
 import { cardSize, flyOffDistance } from '../utils/cardLayout';
 import { decisionHaptic, undoHaptic } from '../services/haptics';
@@ -58,6 +61,13 @@ export default function SiftScreen() {
   const sendPending = useSendPending();
   useHoldPendingDecision(sendPending);
   useRemovalRetry();
+  // Every decision so far, changeable (beyond Undo's last one).
+  const revise = useReviseDecision(sendPending);
+  const [showDecisions, setShowDecisions] = useState(false);
+  const decisionOf = useCallback(
+    (trackId: string) => decisionFor(trackId, { kept: state.kept, removed: state.removed, skipped: state.skipped }),
+    [state.kept, state.removed, state.skipped],
+  );
   // The last card's decision goes now: Done has no Undo, and this screen's
   // keep path still knows a "- Sifted" playlist it created moments ago.
   const sendIfLast = useCallback((held: PendingDecision | null) => {
@@ -276,6 +286,26 @@ export default function SiftScreen() {
           </TouchableOpacity>
         </GlassCard>
 
+        <View style={{ flex: 1 }} />
+        {state.cursor > 0 && (
+          <GlassCard intensity="thin" radius={20}>
+            <TouchableOpacity
+              onPress={() => setShowDecisions(true)}
+              disabled={isAnimating}
+              style={styles.backButton}
+              testID="decisions-button"
+              accessibilityRole="button"
+              accessibilityLabel="Your decisions"
+              accessibilityHint="Lists this sift's decisions, to change any of them"
+            >
+              <SymbolView name="clock.arrow.circlepath" size={18} tintColor={colors.textSecondary} />
+            </TouchableOpacity>
+          </GlassCard>
+        )}
+        {/* The app's floating Settings gear (App.tsx) sits here, in line
+            with the header: keep its place clear. */}
+        <View style={{ width: SETTINGS_BUTTON.size }} />
+
         {/* Centered on the screen, not between the header's buttons. */}
         <Text
           style={[styles.title, { color: colors.text, top: insets.top + 8 }]}
@@ -442,6 +472,15 @@ export default function SiftScreen() {
           </View>
         )}
       </View>
+
+      {showDecisions && (
+        <DecisionsSheet
+          tracks={decidedLatestFirst(state.tracks, state.cursor)}
+          decisionFor={decisionOf}
+          onRevise={revise}
+          onClose={() => setShowDecisions(false)}
+        />
+      )}
     </View>
   );
 }

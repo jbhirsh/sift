@@ -167,6 +167,8 @@ type SiftAction =
   | { type: 'SONG_CACHE_WARMING' }
   | { type: 'SONG_CACHE_WARMED' }
   | { type: 'SET_FILTER'; filter: TrackFilter }
+  /** A decided card's decision changed (the decisions list). */
+  | { type: 'REVISE'; trackId: string; decision: Decision }
   | { type: 'START_FRESH'; skipFiltering?: boolean }
   | { type: 'RESET_TO_SETUP' };
 
@@ -319,6 +321,32 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
 
     case 'SET_FILTER':
       return { ...state, filter: action.filter };
+
+    case 'REVISE': {
+      // Only a decided card, and only to another decision.
+      const index = state.tracks.findIndex((t) => t.id === action.trackId);
+      if (index < 0 || index >= state.cursor) return state;
+      const track = state.tracks[index];
+      const without = (list: Track[]) => list.filter((t) => t.id !== track.id);
+      const lists = { kept: without(state.kept), removed: without(state.removed), skipped: without(state.skipped) };
+      const target = action.decision === 'keep' ? 'kept' : action.decision === 'remove' ? 'removed' : 'skipped';
+      if (lists[target].length < state[target].length) return state;
+      lists[target] = [...lists[target], track];
+      // A removal that failed is no longer owed once it isn't a removal,
+      // nor a buffered keep once it isn't a keep.
+      const wasFailed = state.failedRemovalIds.includes(track.id) && action.decision !== 'remove';
+      const errorIndex = wasFailed ? state.removalErrors.indexOf(track.name) : -1;
+      return {
+        ...state,
+        ...lists,
+        // Still held (not sent; useReviseDecision clears a sent one first):
+        // it goes out as the new decision.
+        pending: state.pending?.trackId === track.id ? { ...state.pending, decision: action.decision } : state.pending,
+        failedRemovalIds: wasFailed ? state.failedRemovalIds.filter((id) => id !== track.id) : state.failedRemovalIds,
+        removalErrors: errorIndex < 0 ? state.removalErrors : state.removalErrors.filter((_, i) => i !== errorIndex),
+        pendingKeeps: action.decision === 'keep' ? state.pendingKeeps : without(state.pendingKeeps),
+      };
+    }
 
     case 'SONG_CACHE_WARMED':
       return { ...state, songCacheWarming: false, songCacheGeneration: state.songCacheGeneration + 1 };

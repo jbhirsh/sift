@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { loadReviewedIds, markReviewed } from '../../src/services/ReviewedLedgerStore';
+import { loadReviewedIds, markReviewed, unmarkReviewed } from '../../src/services/ReviewedLedgerStore';
 
 jest.mock('@sentry/react-native', () => ({
   captureException: jest.fn(),
@@ -90,5 +90,64 @@ describe('ReviewedLedgerStore', () => {
     getItem.mockRejectedValueOnce(new Error('disk'));
     await expect(loadReviewedIds('k')).resolves.toEqual(new Set());
     expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'reviewed-ledger-load' } });
+  });
+
+  describe('taking a keep back (a changed decision)', () => {
+    test('a song taken back is offered again; others stay', async () => {
+      await markReviewed('k', 'a');
+      await markReviewed('k', 'b');
+      await unmarkReviewed('k', 'a');
+      await expect(loadReviewedIds('k')).resolves.toEqual(new Set(['b']));
+      expect(JSON.parse(setItem.mock.calls.at(-1)?.[1] ?? '{}')).toEqual({ k: ['b'] });
+    });
+
+    test('a keep taken back before it was written is never written', async () => {
+      let release: (() => void) | undefined;
+      setItem.mockImplementationOnce(async (key: string, value: string) => {
+        await new Promise<void>((resolve) => { release = resolve; });
+        return AsyncStorage.setItem(key, value);
+      });
+      const first = markReviewed('k', 'a');
+      await new Promise<void>((resolve) => { setImmediate(() => resolve()); });
+      const second = markReviewed('k', 'b');
+      const third = unmarkReviewed('k', 'b');
+      await expect(loadReviewedIds('k')).resolves.toEqual(new Set(['a']));
+      release?.();
+      await Promise.all([first, second, third]);
+      await expect(loadReviewedIds('k')).resolves.toEqual(new Set(['a']));
+      // No write ever held it.
+      expect(setItem.mock.calls.map((call) => JSON.parse(call[1]))).not.toContainEqual({ k: ['a', 'b'] });
+      expect(JSON.parse(setItem.mock.calls.at(-1)?.[1] ?? '{}')).toEqual({ k: ['a'] });
+    });
+
+    test('taken back while it is being written: it comes out right after', async () => {
+      let release: (() => void) | undefined;
+      setItem.mockImplementationOnce(async (key: string, value: string) => {
+        await new Promise<void>((resolve) => { release = resolve; });
+        return AsyncStorage.setItem(key, value);
+      });
+      const first = markReviewed('k', 'a');
+      await new Promise<void>((resolve) => { setImmediate(() => resolve()); });
+      const second = unmarkReviewed('k', 'a');
+      await expect(loadReviewedIds('k')).resolves.toEqual(new Set());
+      release?.();
+      await Promise.all([first, second]);
+      await expect(loadReviewedIds('k')).resolves.toEqual(new Set());
+    });
+
+    test('kept again after being taken back: kept', async () => {
+      await markReviewed('k', 'a');
+      const out = unmarkReviewed('k', 'a');
+      const back = markReviewed('k', 'a');
+      await Promise.all([out, back]);
+      await expect(loadReviewedIds('k')).resolves.toEqual(new Set(['a']));
+    });
+
+    test('taking back the last kept song of a source drops its entry', async () => {
+      await markReviewed('k', 'a');
+      await markReviewed('other', 'x');
+      await unmarkReviewed('k', 'a');
+      expect(JSON.parse(setItem.mock.calls.at(-1)?.[1] ?? '{}')).toEqual({ other: ['x'] });
+    });
   });
 });

@@ -176,6 +176,12 @@ Makefile                Dev commands (test, lint, typecheck, check)
   decision directly: send through `useSendPending`, which sends each once.
   A decision a killed app was holding goes out on Resume, or, if a new sift
   replaces that session, through `useSendSavedPending` first.
+- **Changing an older decision**: the decisions list (`DecisionsSheet`, from
+  the Sift header and Done) changes any decided card through
+  `useReviseDecision`: a held decision just changes (`REVISE`); a sent one
+  is taken back first (`restoreTrack`, or `unkeepTrack`: out of the
+  reviewed ledger or "<name> - Sifted"), then the new one is sent through
+  the screen's `useSendPending`. If taking it back fails, nothing changes.
 - **Library writes run one at a time.** `AppleMusicProvider` queues every
   write (`utils/serialQueue`): a native playlist removal reads the playlist
   and writes it back, so two at once would undo each other.

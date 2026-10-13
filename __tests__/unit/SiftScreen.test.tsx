@@ -489,6 +489,34 @@ describe('SiftScreen', () => {
     });
   });
 
+  describe('your decisions', () => {
+    test('a header button, once there is a decision, opens the list to change one', async () => {
+      jest.useFakeTimers();
+      try {
+        const { getByLabelText, getByTestId, queryByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+        expect(queryByTestId('decisions-button')).toBeNull();
+        await fireEvent.press(getByLabelText('Skip'));
+        await act(() => {
+          jest.advanceTimersByTime(400);
+        });
+        const button = getByTestId('decisions-button');
+        expect(button.props.accessibilityLabel).toBe('Your decisions');
+        await fireEvent.press(button);
+        expect(getByTestId('decisions-sheet')).toBeTruthy();
+        // The held Skip changes to Keep, here and on the stats.
+        await act(async () => {
+          await fireEvent.press(getByTestId('decision-keep-1'));
+        });
+        expect(getByTestId('stat-kept').props.children).toEqual(['1', ' ', 'kept']);
+        expect(getByTestId('stat-skipped').props.children).toEqual(['0', ' ', 'skipped']);
+        await fireEvent.press(getByTestId('decisions-done'));
+        expect(queryByTestId('decisions-sheet')).toBeNull();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
+
   describe('first-card swipe hint', () => {
     test('shows on the first card ever, until the first decision, which marks it seen', async () => {
       (loadSeenSwipeHint as jest.Mock).mockResolvedValueOnce(false);

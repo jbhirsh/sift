@@ -26,6 +26,7 @@ const action = fc.oneof(
   fc.array(fc.integer({ min: 0, max: 40 })).map((ids) => ({ type: 'REMOVE_PENDING_KEEPS' as const, trackIds: ids.map((i) => `t${i}`) })),
   fc.integer({ min: 0, max: 40 }).map((i) => ({ type: 'ADD_REMOVAL_ERROR' as const, error: `Track ${i}`, failedRemovalId: `t${i}` })),
   fc.constant({ type: 'UNDO_LAST' as const }),
+  fc.tuple(fc.integer({ min: 0, max: 40 }), fc.constantFrom('keep', 'remove', 'skip')).map(([i, decision]) => ({ type: 'REVISE' as const, trackId: `t${i}`, decision })),
   fc.tuple(fc.integer({ min: 0, max: 40 }), fc.nat()).map(([i, at]) => ({ type: 'PENDING_SENT' as const, trackId: `t${i}`, at })),
   fc.constant({ type: 'START_FRESH' as const }),
   fc.constant({ type: 'RESET_TO_SETUP' as const }),

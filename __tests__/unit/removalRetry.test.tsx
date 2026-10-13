@@ -205,7 +205,7 @@ describe('retryFailedRemovals', () => {
     mockProvider.removalLanded?.mockImplementationOnce(() => new Promise((resolve) => { landedCheck = resolve; }));
     (logRemoval as jest.Mock).mockClear();
     let retry!: Promise<void>;
-    let restore!: Promise<void>;
+    let restore!: Promise<boolean>;
     await act(async () => {
       retry = api.retryFailedRemovals();
       restore = api.restoreTrack(trackA);
@@ -231,7 +231,7 @@ describe('retryFailedRemovals', () => {
     let playlistsLoaded!: (lists: unknown[]) => void;
     mockProvider.loadPlaylists.mockImplementationOnce(() => new Promise((resolve) => { playlistsLoaded = resolve; }));
     mockProvider.removeFromLibrary.mockClear();
-    let restore!: Promise<void>;
+    let restore!: Promise<boolean>;
     await act(async () => {
       restore = api.restoreTrack(trackA);
     });

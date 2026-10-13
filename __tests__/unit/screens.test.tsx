@@ -2106,6 +2106,47 @@ describe('DoneScreen: Finish, Continue, Review skipped (#142)', () => {
     expect(getByTestId('probe-phase').props.children).toBe('sifting');
   });
 
+  test('Change a decision opens the list of this sift\'s decisions, changeable', async () => {
+    const { getByTestId, getAllByTestId, queryByTestId } = await renderWithProviders(
+      <DoneAfter decisions={['skip', 'skip']} />,
+      { initialTracks: tracks },
+    );
+    await act(async () => {});
+    const link = getByTestId('done-change-decisions');
+    expect(link.props.accessibilityRole).toBe('button');
+    await fireEvent.press(link);
+    // The latest first.
+    expect(getAllByTestId(/^decision-row-/).map((row) => row.props.testID)).toEqual(['decision-row-2', 'decision-row-1']);
+    await act(async () => {
+      await fireEvent.press(getByTestId('decision-keep-1'));
+    });
+    expect(getByTestId('summary-count-kept').props.children).toBe(1);
+    await fireEvent.press(getByTestId('decisions-done'));
+    expect(queryByTestId('decisions-sheet')).toBeNull();
+  });
+
+  test('not while a save runs: a playlist keep taken back then would still land', async () => {
+    function Saving() {
+      const { dispatch } = useSift();
+      React.useEffect(() => {
+        dispatch({ type: 'SET_CREATING_PLAYLIST', creating: true });
+      }, [dispatch]);
+      return null;
+    }
+    const { getByTestId } = await renderWithProviders(
+      <><DoneAfter decisions={['skip']} /><Saving /></>,
+      { initialTracks: tracks },
+    );
+    await act(async () => {});
+    expect(getByTestId('done-change-decisions').props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+  });
+
+  test('no decisions, no link', async () => {
+    const { queryByTestId } = await renderWithProviders(<DoneAfter decisions={[]} />, { initialTracks: tracks });
+    await act(async () => {});
+    expect(queryByTestId('done-change-decisions')).toBeNull();
+  });
+
   test('Continue sifting waits for a sifted-playlist save in flight', async () => {
     function Saving() {
       const { dispatch } = useSift();

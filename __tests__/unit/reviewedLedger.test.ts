@@ -1,4 +1,4 @@
-import { ledgerKey, mergeIntoLedger, parseLedger, reviewedNote } from '../../src/utils/reviewedLedger';
+import { ledgerKey, mergeIntoLedger, parseLedger, removeFromLedger, reviewedNote } from '../../src/utils/reviewedLedger';
 
 describe('reviewedLedger', () => {
   test('keys by provider and source', () => {
@@ -29,6 +29,14 @@ describe('reviewedLedger', () => {
     expect(merged).toEqual({ 'apple-music:library': ['a', 'b'], other: ['z'] });
     expect(ledger['apple-music:library']).toEqual(['a']);
     expect(mergeIntoLedger({}, 'k', new Set(['x']))).toEqual({ k: ['x'] });
+  });
+
+  test('removes ids from one source, dropping an entry left empty', () => {
+    const ledger = { k: ['a', 'b', 'c'], other: ['a'] };
+    expect(removeFromLedger(ledger, 'k', ['a', 'c', 'zz'])).toEqual({ k: ['b'], other: ['a'] });
+    expect(ledger.k).toEqual(['a', 'b', 'c']);
+    expect(removeFromLedger({ k: ['a'], other: ['x'] }, 'k', new Set(['a']))).toEqual({ other: ['x'] });
+    expect(removeFromLedger({ other: ['x'] }, 'k', ['a'])).toEqual({ other: ['x'] });
   });
 
   test('footnote copy', () => {

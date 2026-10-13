@@ -9,7 +9,7 @@ import { TrackIndex } from '../utils/trackIdentity';
 import { APPLE_REMOVED_PLAYLIST, libraryRemovedIds } from '../utils/libraryRemovals';
 import { ledgerKey } from '../utils/reviewedLedger';
 import { isFiltering, matchesFilter } from '../utils/trackFilter';
-import { loadReviewedIds, markReviewed } from '../services/ReviewedLedgerStore';
+import { loadReviewedIds, markReviewed, unmarkReviewed } from '../services/ReviewedLedgerStore';
 import type { MusicProvider, Playlist, SiftSource, Track } from '../types';
 
 const SKIP_SECONDS = 15;
@@ -25,6 +25,10 @@ const CLEAR_KEEP_QUEUE_TIMEOUT_MS = 15000;
 // playlist, instead of racing an add that would land after the "clear".
 // Links in the chain never reject (keepTrack catches internally).
 let keepQueue: Promise<void> = Promise.resolve();
+// Bumped when a keep is taken back out of a "- Sifted" playlist. Each hook
+// instance's readback of that playlist (siftedContentsRef) is dropped when
+// it falls behind, so a song taken out and kept again is added again.
+let siftedContentsVersion = 0;
 
 // Failed removals are retried (#151) at most this many times per song per
 // launch, so a song that can't be removed doesn't retry forever.
@@ -41,6 +45,10 @@ const restoringIds = new Set<string>();
 // to finish first: the last card's Remove is still running when Done
 // appears, and a Restore landing before it would be undone by it.
 const removalsInFlight = new Map<string, Promise<void>>();
+// Restores under way, by song: a second Restore of the same song (Done's
+// button, then the decisions list) joins the first instead of adding the
+// song back twice.
+const restoresInFlight = new Map<string, Promise<boolean>>();
 
 /** Forget the retry bookkeeping, as a fresh launch would. Exported for tests. */
 export function resetRemovalRetries(): void {
@@ -48,6 +56,7 @@ export function resetRemovalRetries(): void {
   removalRetryInFlight = null;
   restoringIds.clear();
   removalsInFlight.clear();
+  restoresInFlight.clear();
 }
 
 /**
@@ -71,6 +80,7 @@ export function useMusicProvider() {
   // remounts the sifting screen, which discards this cache with the
   // instance.
   const siftedContentsRef = useRef<TrackIndex | null>(null);
+  const siftedContentsVersionRef = useRef(siftedContentsVersion);
   const loadingInProgressRef = useRef(false);
   // Pending sifted-playlist retry delays, keyed by timer with the awaiting
   // promise's resolver as the value so unmount can settle the promise.
@@ -526,8 +536,9 @@ export function useMusicProvider() {
     [removeNow, state.source, state.provider],
   );
 
-  const restoreTrack = useCallback(
-    async (track: Track) => {
+  /** Undo a song's removal. Resolves to whether it worked; a failure is shown as a removal error. */
+  const restoreNow = useCallback(
+    async (track: Track): Promise<boolean> => {
       // A retry of this song's failed removal (#151) must not land after
       // the restore: wait out one under way, and keep new ones off it.
       restoringIds.add(track.id);
@@ -582,15 +593,28 @@ export function useMusicProvider() {
         // Nothing left to retry: the song is back where it was.
         dispatch({ type: 'CLEAR_REMOVAL_FAILURE', trackId: track.id, error: track.name });
         dispatch({ type: 'RESTORE_TRACK', trackId: track.id });
+        return true;
       } catch (err) {
         Sentry.captureException(err, { tags: { flow: 'restore-track' } });
         const message = err instanceof Error ? err.message : 'Failed to restore track';
         dispatch({ type: 'ADD_REMOVAL_ERROR', error: `${track.name}: ${message}` });
+        return false;
       } finally {
         restoringIds.delete(track.id);
       }
     },
     [providerRef, dispatch, state.source, state.provider],
+  );
+
+  const restoreTrack = useCallback(
+    (track: Track): Promise<boolean> => {
+      const running = restoresInFlight.get(track.id);
+      if (running) return running;
+      const run = restoreNow(track).finally(() => restoresInFlight.delete(track.id));
+      restoresInFlight.set(track.id, run);
+      return run;
+    },
+    [restoreNow],
   );
 
   const saveSiftedPlaylist = useCallback(
@@ -762,6 +786,10 @@ export function useMusicProvider() {
             // is already present — under the same id, or under the fresh
             // library-instance id Apple Music assigns on landing — must not
             // add it a second time.
+            if (siftedContentsVersionRef.current !== siftedContentsVersion) {
+              siftedContentsVersionRef.current = siftedContentsVersion;
+              siftedContentsRef.current = null;
+            }
             if (siftedContentsRef.current == null) {
               const existingTracks =
                 await providerRef.current.loadPlaylistTracks?.(siftedPlaylistIdRef.current) ?? [];
@@ -796,6 +824,57 @@ export function useMusicProvider() {
       return next;
     },
     [providerRef, state.source, state.provider, state.siftedPlaylistId, findSiftedPlaylistWithRetry, dispatch],
+  );
+
+  /**
+   * Take back a keep that was sent (its decision changed): a library keep
+   * comes out of the reviewed ledger, so later sifts offer the song again;
+   * a playlist keep comes out of "<name> - Sifted", or out of the buffer if
+   * it never got there. Resolves to whether it worked.
+   */
+  const unkeepTrack = useCallback(
+    async (track: Track): Promise<boolean> => {
+      const source = state.source;
+      if (source.type !== 'playlist') {
+        await unmarkReviewed(ledgerKey(state.provider, source), track.id);
+        return true;
+      }
+      if (state.pendingKeeps.some((t) => t.id === track.id)) {
+        dispatch({ type: 'REMOVE_PENDING_KEEPS', trackIds: [track.id] });
+        return true;
+      }
+      const siftedName = `${source.playlist.name} - Sifted`;
+      const knownSiftedId = state.siftedPlaylistId;
+      // After the keeps: one still landing would come back after this.
+      const run = keepQueue.then(async (): Promise<boolean> => {
+        try {
+          const service = providerRef.current;
+          let siftedId = knownSiftedId;
+          if (siftedId == null) {
+            const playlists = await service.loadPlaylists?.() ?? [];
+            siftedId = playlists.find((p) => p.name === siftedName)?.id ?? null;
+          }
+          // No sifted playlist: the keep never landed, so there's nothing to take out.
+          if (siftedId == null) return true;
+          // Apple Music files a kept song under its library id in the
+          // playlist, so match the entries by song, not only by id.
+          const song = new TrackIndex([track]);
+          const entries = (await service.loadPlaylistTracks?.(siftedId) ?? []).filter((t) => song.has(t));
+          if (entries.length > 0) {
+            if (!service.removeFromPlaylist) throw new Error('This provider does not support removing from playlists');
+            await service.removeFromPlaylist(siftedId, entries.map((t) => t.id));
+            siftedContentsVersion += 1;
+          }
+          return true;
+        } catch (err) {
+          Sentry.captureException(err, { tags: { flow: 'unkeep-track' } });
+          return false;
+        }
+      });
+      keepQueue = run.then(() => undefined);
+      return run;
+    },
+    [providerRef, dispatch, state.source, state.provider, state.pendingKeeps, state.siftedPlaylistId],
   );
 
   /**
@@ -936,6 +1015,7 @@ export function useMusicProvider() {
     skipBackward,
     saveSiftedPlaylist,
     keepTrack,
+    unkeepTrack,
     keepFromSavedSession,
     removeTrack,
     retryFailedRemovals,

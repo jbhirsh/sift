@@ -19,6 +19,9 @@ import { useTheme } from '../theme/ThemeContext';
 import { useMusicProvider } from '../hooks/useMusicProvider';
 import { useSendPending } from '../hooks/usePendingDecision';
 import { useRemovalRetry } from '../hooks/useRemovalRetry';
+import { useReviseDecision } from '../hooks/useReviseDecision';
+import DecisionsSheet from '../components/DecisionsSheet';
+import { decidedLatestFirst, decisionFor } from '../utils/decisions';
 import { clearHistoryForSource } from '../services/RemovalHistoryStore';
 import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
@@ -43,6 +46,13 @@ export default function DoneScreen() {
   // has nothing left to undo it here: send it.
   const sendPending = useSendPending({ bufferPlaylistKeeps: true });
   useRemovalRetry();
+  // Every decision of the sift, changeable here too.
+  const revise = useReviseDecision(sendPending);
+  const [showDecisions, setShowDecisions] = useState(false);
+  const decisionOf = useCallback(
+    (trackId: string) => decisionFor(trackId, { kept: state.kept, removed: state.removed, skipped: state.skipped }),
+    [state.kept, state.removed, state.skipped],
+  );
   useEffect(() => {
     sendPending(state.pending);
   }, [state.pending, sendPending]);
@@ -371,6 +381,19 @@ export default function DoneScreen() {
         </Text>
       )}
 
+      {state.cursor > 0 && (
+        <TouchableOpacity
+          testID="done-change-decisions"
+          style={[styles.changeDecisions, startOverBlocked && { opacity: 0.4 }]}
+          disabled={startOverBlocked}
+          onPress={() => setShowDecisions(true)}
+          accessibilityRole="button"
+          accessibilityHint="Lists this sift's decisions, to change any of them"
+        >
+          <Text style={[styles.changeDecisionsText, { color: colors.accent }]}>Change a decision</Text>
+        </TouchableOpacity>
+      )}
+
       {remaining > 0 && (
         <Button
           title="Continue sifting"
@@ -492,6 +515,16 @@ export default function DoneScreen() {
         ListHeaderComponent={listHeader}
         ListFooterComponent={listFooter}
       />
+      {showDecisions && (
+        <DecisionsSheet
+          tracks={decidedLatestFirst(state.tracks, state.cursor)}
+          decisionFor={decisionOf}
+          onRevise={revise}
+          onClose={() => setShowDecisions(false)}
+          // A playlist keep taken back while the save runs would still land.
+          disabled={startOverBlocked}
+        />
+      )}
     </View>
   );
 }
@@ -545,6 +578,15 @@ const summaryStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  changeDecisions: {
+    minHeight: 44,
+    justifyContent: 'center',
+    alignSelf: 'center',
+    paddingHorizontal: SPACING.lg,
+  },
+  changeDecisionsText: {
+    fontSize: 17,
+  },
   root: {
     flex: 1,
   },

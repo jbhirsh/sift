@@ -124,7 +124,7 @@ describe('Restore while the removal is still running', () => {
     const removal = deferred();
     mockProvider.removeFromPlaylist.mockReturnValueOnce(removal.promise);
     let removing!: Promise<void>;
-    let restoring!: Promise<void>;
+    let restoring!: Promise<boolean>;
     await act(async () => {
       removing = api.removeTrack(trackA);
       restoring = api.restoreTrack(trackA);
@@ -181,6 +181,35 @@ describe('Restore while the removal is still running', () => {
   });
 });
 
+describe('two Restores of one song', () => {
+  test('the second joins the first: the song is added back once', async () => {
+    await renderSift(mix);
+    await act(async () => {
+      sift.decide('remove');
+    });
+    const removal = deferred();
+    mockProvider.removeFromPlaylist.mockReturnValueOnce(removal.promise);
+    let first!: Promise<boolean>;
+    let second!: Promise<boolean>;
+    await act(async () => {
+      void api.removeTrack(trackA);
+      first = api.restoreTrack(trackA);
+      second = api.restoreTrack(trackA);
+    });
+    expect(second).toBe(first);
+    await act(async () => {
+      removal.resolve();
+      await Promise.all([first, second]);
+    });
+    expect(mockProvider.addToPlaylist).toHaveBeenCalledTimes(1);
+    // Once it's done, a later Restore runs again.
+    await act(async () => {
+      await api.restoreTrack(trackA);
+    });
+    expect(mockProvider.addToPlaylist).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('Restore after a removal that failed', () => {
   async function failRemoval() {
     await act(async () => {
@@ -229,7 +258,7 @@ describe('Restore after a removal that failed', () => {
     const removal = deferred();
     mockProvider.removeFromPlaylist.mockReturnValueOnce(removal.promise);
     mockProvider.removalLanded.mockResolvedValueOnce(false);
-    let restoring!: Promise<void>;
+    let restoring!: Promise<boolean>;
     await act(async () => {
       void api.removeTrack(trackA);
       restoring = api.restoreTrack(trackA);
