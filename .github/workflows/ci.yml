@@ -22,11 +22,12 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-    # Expose whether any non-docs file changed so the expensive macOS `e2e`
-    # job below can skip docs-only PRs. Kept as a step in this existing job
+    # Expose whether anything that can affect the app or the E2E job changed,
+    # so the expensive macOS `e2e` job below can skip PRs that only touch
+    # docs or repo tooling. Kept as a step in this existing job
     # (not a separate job) so it adds no extra status check — and because
     # `check` itself always runs, the required check is never left pending on a
-    # docs-only PR the way a workflow-level `paths-ignore` did.
+    # skipped PR the way a workflow-level `paths-ignore` did.
     outputs:
       code: ${{ steps.filter.outputs.code }}
 
@@ -41,16 +42,27 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: .github/scripts/check-commits.sh
 
+      # `every`: a file counts as code only if it matches every pattern, so
+      # each `!` pattern excludes. (The default, `some`, lets '**' match
+      # everything, which made the exclusions dead.) Excluded: docs, repo
+      # config, and tooling that can't change the app or this job: other
+      # workflows (ci.yml is this job; E2E reuses ios-build's app), the
+      # commit check, and scripts/ apart from the two E2E runners.
       - uses: dorny/paths-filter@v4
         id: filter
         with:
+          predicate-quantifier: 'every'
           filters: |
             code:
               - '**'
-              - '!*.md'
+              - '!**/*.md'
               - '!docs/**'
-              - '!.github/**/*.md'
               - '!LICENSE'
+              - '!.github/*'
+              - '!.github/scripts/**'
+              - '!.github/workflows/!(ci|ios-build).yml'
+              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh)'
+              - '!stryker.config.json'
 
       - uses: actions/setup-node@v7
         with:
@@ -93,8 +105,10 @@ jobs:
   e2e:
     name: E2E Tests (Maestro)
     needs: check
-    # Skip the ~30-min macOS build on docs-only changes (the required `check`
-    # still runs and gates the merge). Always runs on manual dispatch.
+    # Skip the macOS job when only docs or repo tooling changed (see the
+    # `code` filter in `check`; the required `check` still runs and gates the
+    # merge, and a skipped job counts as passing). Always runs on manual
+    # dispatch.
     if: needs.check.outputs.code == 'true' || github.event_name == 'workflow_dispatch'
     # Runs on GitHub-hosted macOS (free on public repos) on every PR. On push
     # to main it only builds and caches the app (see RUN_SUITE below). A cold

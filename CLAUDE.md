@@ -203,8 +203,12 @@ Makefile                Dev commands (test, lint, typecheck, check)
   typecheck, dependency-cruiser, Jest with coverage and a production
   dependency audit on Ubuntu on every PR. The audit gates at critical, not
   high: Expo's build tooling carries high advisories only Expo can fix.
-  The Maestro iOS E2E job (macOS) also runs on every PR, with
-  `workflow_dispatch` available for manual runs. Its app build is cached on
+  The Maestro iOS E2E job (macOS) also runs on every PR that can affect the
+  app or the job, with `workflow_dispatch` available for manual runs. It
+  skips PRs that only touch docs or repo tooling (other workflows, the
+  commit check, `scripts/` apart from its two runners, `stryker.config.json`;
+  the `code` filter in `ci.yml`, with `predicate-quantifier: 'every'` so its
+  `!` patterns exclude). Its app build is cached on
   the native fingerprint plus a hash of the bundle's inputs (`src/`,
   `index.ts`, `metro.config.js`; tests and flows don't count),
   and on a native PR it waits for ios-build's identical build instead of
