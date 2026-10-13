@@ -38,7 +38,7 @@ everything.
 |-------|--------------|-------|-------------|
 | Unit tests (`make test`) | Reducers, utils, hooks, services | Seconds | Every push + CI |
 | E2E tests (`make test-e2e`) | Full app flows | Minutes | PR time (Maestro flows in `.maestro/`) |
-| Mutation tests (`make test-mutation`) | Assertion depth of unit tests (Stryker) | Minutes–hour | PR time (changed files) + weekly full sweep (`mutation.yml`) |
+| Mutation tests (`make test-mutation`) | Assertion depth of unit tests (Stryker) | Minutes–hour | PR time (changed files, incremental) + weekly full sweep (`mutation.yml`) |
 
 **Test coverage requirements:**
 - Every new reducer action, service function, or utility must have a unit test in `__tests__/unit/`.
@@ -252,7 +252,11 @@ Makefile                Dev commands (test, lint, typecheck, check)
   (empty today).
 - Security/quality gates run per PR and sweep weekly (Mon 06:00 UTC):
   `gitleaks.yml` (secret scanning), `semgrep.yml` (SAST, `--config auto`), and
-  `mutation.yml` (Stryker), alongside the weekly Dependabot bumps.
+  `mutation.yml` (Stryker), alongside the weekly Dependabot bumps. PR mutation
+  runs are incremental: they reuse the PR's last results (or the last weekly
+  sweep's, from the Actions cache) and re-test only mutants whose code or
+  tests changed. The weekly sweep tests everything and refreshes that
+  baseline.
 - **Required status checks.** The `main` branch rule requires these job names
   (from GitHub Actions, whichever workflow file they live in), so renaming a
   job's `name:` silently un-gates it. Update the rule in the same PR as any

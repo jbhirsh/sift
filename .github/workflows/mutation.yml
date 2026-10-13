@@ -10,6 +10,13 @@ name: Mutation Testing
 #   - Weekly schedule (+ manual dispatch): full sweep as a drift sensor,
 #     catching erosion from changes that didn't trip the PR-scoped run.
 #
+# PR runs are incremental: Stryker reuses the results of the PR's previous
+# push, or of the latest weekly sweep on main for a PR's first push, and
+# re-tests only mutants whose code or covering tests changed. Its change
+# detection can miss an indirect change (a config or mock edit), which the
+# weekly sweep catches: that run tests every mutant (--force) and saves the
+# baseline PRs start from.
+#
 # Gate: stryker.config.json sets thresholds.break=80 (a global floor), and
 # scripts/check-mutation-threshold.mjs enforces the stricter per-file bar —
 # EVERY mutated file must score >= 80%. MockMusicProvider.ts is excluded from
@@ -119,15 +126,40 @@ jobs:
             echo "mutate=$(echo "$CHANGED" | paste -sd, -)" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Run Stryker (changed files)
+      # The incremental baseline: this PR's last run, else main's last
+      # sweep. Caches saved on main are readable from PRs; a PR's own are
+      # visible to that PR alone.
+      - name: Restore incremental results
+        if: github.event_name == 'pull_request'
+        uses: actions/cache/restore@v6
+        with:
+          path: reports/stryker-incremental.json
+          key: stryker-incremental-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            stryker-incremental-pr-${{ github.event.pull_request.number }}-
+            stryker-incremental-main-
+
+      - name: Run Stryker (changed files, incremental)
         if: github.event_name == 'pull_request'
         env:
           MUTATE_SCOPE: ${{ steps.scope.outputs.mutate }}
-        run: npx stryker run --mutate "$MUTATE_SCOPE"
+        run: npx stryker run --incremental --mutate "$MUTATE_SCOPE"
 
+      # --force tests every mutant (no reuse) but still writes the results
+      # file, which becomes the baseline PRs start from.
       - name: Run Stryker (full sweep)
         if: github.event_name != 'pull_request'
-        run: npx stryker run
+        run: npx stryker run --incremental --force
+
+      # Saved even when the per-file gate below fails: the results are still
+      # right, and the next push only re-tests what it changes. Not after a
+      # cancel, which may leave only the restored, older file behind.
+      - name: Save incremental results
+        if: ${{ !cancelled() && hashFiles('reports/stryker-incremental.json') != '' }}
+        uses: actions/cache/save@v6
+        with:
+          path: reports/stryker-incremental.json
+          key: ${{ github.event_name == 'pull_request' && format('stryker-incremental-pr-{0}-{1}-{2}', github.event.pull_request.number, github.run_id, github.run_attempt) || format('stryker-incremental-main-{0}-{1}', github.run_id, github.run_attempt) }}
 
       # Per-file gate: Stryker's break only enforces the global aggregate, so
       # this fails the build if any individual mutated file is below 80% even
