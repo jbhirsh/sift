@@ -19,4 +19,4 @@ npm run typecheck
 echo "▶ pre-commit: depcruise"
 npm run depcruise
 echo "▶ pre-commit: native bridge"
-node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-bridge.mjs
+npm run -s bridge

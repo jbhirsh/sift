@@ -1,0 +1,52 @@
+appId: com.jessicahirsh.sift
+name: "Plays and Added Filters"
+---
+
+# Setup's Plays and Added pick which songs a sift takes. Every song in the
+# mock library has been played more than 20 times, so "20 or fewer" leaves
+# none, and Setup says so instead of starting an empty sift.
+- launchApp:
+    clearState: true
+
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
+
+- assertVisible:
+    id: "filter-plays"
+    text: "Any"
+
+- tapOn:
+    id: "filter-plays"
+
+- tapOn: "20 or fewer"
+
+- extendedWaitUntil:
+    visible:
+      id: "filter-plays"
+      text: "20 or fewer"
+    timeout: 10000
+
+- tapOn: "Start Sifting"
+
+- extendedWaitUntil:
+    visible:
+      id: "setup-error"
+      text: "No songs match your Plays and Added choices\\."
+    timeout: 30000
+
+# Back to any number of plays: the sift starts.
+- tapOn:
+    id: "filter-plays"
+
+- tapOn: "Any"
+
+- tapOn: "Start Sifting"
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000

@@ -5,14 +5,14 @@
   "scripts": {
     "start": "expo start",
     "ios": "expo run:ios",
-    "web": "expo start --web",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "lint": "eslint src/ __tests__/",
+    "lint": "eslint .",
     "typecheck": "node node_modules/@typescript/native/bin/tsc --noEmit",
     "depcruise": "depcruise src",
-    "check": "npm run lint && npm run typecheck && npm run depcruise && npm run test:coverage",
+    "bridge": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-bridge.mjs",
+    "check": "npm run lint && npm run typecheck && npm run depcruise && npm run bridge && npm run test:coverage",
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {

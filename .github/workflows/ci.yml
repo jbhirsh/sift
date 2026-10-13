@@ -18,6 +18,8 @@ jobs:
   check:
     name: Lint, Typecheck & Unit Test
     runs-on: ubuntu-latest
+    # A hung step fails in minutes, not after GitHub's six-hour default.
+    timeout-minutes: 20
     # pull-requests: read for paths-filter and the commit-message check.
     permissions:
       contents: read
@@ -71,20 +73,21 @@ jobs:
 
       - run: npm ci
 
+      # The package scripts, so a clean pre-commit hook means a clean CI.
       - name: Lint
-        run: npx eslint .
+        run: npm run lint
 
       - name: Typecheck
         run: npm run typecheck
 
       - name: Dependency graph
-        run: npx depcruise src
+        run: npm run depcruise
 
       - name: Native bridge
         # Keeps modules/expo-musickit thin: every native function is listed
         # in native-api.json, Swift and TypeScript surfaces match, and size
         # budgets hold (scripts/nativeBridge.ts).
-        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-bridge.mjs
+        run: npm run bridge
 
       - name: Test with coverage
         run: npx jest --coverage

@@ -24,7 +24,7 @@ Settings: the optional **Start at chorus** switch (Apple Music).
 ## Highlights
 
 - **Custom native Expo module (`modules/expo-musickit`)** — a thin, hand-written Swift module bridging Apple's **MusicKit** into React Native via the Expo Modules API. It exposes primitives: authorization, library and playlist reads and edits, in-app playback through `ApplicationMusicPlayer`, and on-device artwork resolution with a file cache. The decisions live in TypeScript (`src/utils/musicKit.ts`, `src/services/AppleMusicProvider.ts`), so they ship over the air: paging, batching, lookup fallbacks, and the `Sift — Removed` policy (MusicKit can't delete library items, so removals are rerouted into that playlist for the user to clear). A CI check keeps the bridge thin. See [`modules/expo-musickit/ios/ExpoMusicKitModule.swift`](modules/expo-musickit/ios/ExpoMusicKitModule.swift).
-- **A music backend behind one interface** — Apple Music (native MusicKit) implements `MusicProviderService`, so another service can be added behind it (a Spotify provider was removed in [#140](https://github.com/jbhirsh/sift/issues/140)). A factory picks it at runtime and falls back to an in-memory mock when no native module is present (Expo Go, web, CI).
+- **A music backend behind one interface** — Apple Music (native MusicKit) implements `MusicProviderService`, so another service can be added behind it (a Spotify provider was removed in [#140](https://github.com/jbhirsh/sift/issues/140)). A factory picks it at runtime and falls back to an in-memory mock when no native module is present (Expo Go, CI).
 - **Gesture-driven swipe deck** — the card stack is built on `react-native-gesture-handler` + `react-native-reanimated` worklets, with drag rotation, spring-back, and threshold-based Keep/Remove overlays.
 - **"Liquid glass" UI** — a reusable blur/material design system (`GlassCard`, `GlassBackground`) with centralized design tokens and automatic light/dark theming.
 - **Start at chorus** — an optional setting that starts each song at its most recognizable part. The chorus is found from timed lyrics ([LRCLIB](https://lrclib.net)): the block of lines a song repeats. When that fails, ShazamKit locates Apple Music's preview clip (which labels start at "the good part") inside the full track. Results are cached per song, and the next cards are resolved ahead of time so swiping stays instant.
@@ -102,12 +102,12 @@ Configuration lives in environment variables — see [`.env.example`](.env.examp
 |---------|--------------|
 | `npm start` | Start the Expo dev server |
 | `npm run ios` | Build & run on iOS (compiles native modules) |
-| `npm run web` | Run in the browser (Expo Web) |
 | `npm test` | Unit tests (Jest) |
 | `npm run test:coverage` | Unit tests with coverage (80% threshold) |
-| `npm run lint` | ESLint |
+| `npm run lint` | ESLint (the whole repo, as CI) |
 | `npm run typecheck` | TypeScript 7 type check (`@typescript/native`, `--noEmit`) |
-| `npm run check` | Lint + typecheck + tests |
+| `npm run bridge` | Native bridge check (`modules/expo-musickit` stays thin) |
+| `npm run check` | Lint + typecheck + layering + bridge + tests with coverage |
 
 A `Makefile` mirrors these (`make test`, `make lint`, `make typecheck`, `make check`) and adds native E2E targets (`make build-e2e`, `make test-e2e`).
 
