@@ -194,10 +194,13 @@ jobs:
         id: fingerprint
         run: |
           NATIVE=$(npx expo-updates fingerprint:generate --platform ios 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['hash'])")
-          # The bundle's inputs only (src/, the entry point, the Metro config):
-          # tests and Maestro flows aren't in the app, so a test-only change
-          # mustn't force a rebuild.
-          SOURCE=$( (find src -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \) -print0; printf '%s\0' index.ts metro.config.js) | sort -z | xargs -0 shasum -a 256 | shasum -a 256 | cut -d' ' -f1)
+          # The bundle's inputs: src/, the entry point, the Metro config, the
+          # lockfile (a JavaScript-only package isn't in the native
+          # fingerprint, and a bump of one must rebuild, not test main's old
+          # bundle), .env (its EXPO_UNSTABLE_* flags change the bundle) and
+          # the bundled assets. Tests and Maestro flows aren't in the app, so
+          # a test-only change mustn't force a rebuild.
+          SOURCE=$( (find src -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \) -print0; find assets -type f -print0; printf '%s\0' index.ts metro.config.js package-lock.json .env) | sort -z | xargs -0 shasum -a 256 | shasum -a 256 | cut -d' ' -f1)
           FINGERPRINT="${NATIVE}-${SOURCE}"
           echo "hash=$FINGERPRINT" >> "$GITHUB_OUTPUT"
           echo "Fingerprint: $FINGERPRINT"

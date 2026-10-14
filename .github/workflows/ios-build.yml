@@ -60,6 +60,9 @@ jobs:
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.result == 'failure' || needs.changes.outputs.native == 'true') }}
     # Pinned to the same image as ci.yml's e2e job, which reuses this build.
     runs-on: macos-26
+    # A cold build takes about 30 minutes; without a limit a stuck one would
+    # hold a macOS runner for GitHub's 6-hour default.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v7
 
