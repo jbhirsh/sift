@@ -332,7 +332,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
 - **A flaky E2E flow is a bug: diagnose it and fix it at the root, never
   re-run CI to get past it.** Read the run's `maestro-results` artifact
   first: the app's trace (`trace.txt`: every touch with where it landed
-  and how late JavaScript saw it, every screen and sheet, every app action,
+  and how late JavaScript saw it, every screen and sheet (when it started
+  rendering and when it was up), every app action,
   each decision-guard check and any JavaScript stall; `services/trace`,
   written only by the E2E build), Maestro's log, each command's result and
   the view hierarchy at the failure (`suite-debug/`), the system log for
