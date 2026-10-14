@@ -269,7 +269,9 @@ jobs:
 
       - name: Build simulator app
         if: steps.build-cache.outputs.cache-hit != 'true' && steps.reuse.outputs.hit != 'true'
-        timeout-minutes: 40
+        # A cold build takes about 30 minutes and ran past 40 on a slow runner
+        # (#168): the same cap as ios-build's build job.
+        timeout-minutes: 60
         run: eas build --profile e2e-simulator --platform ios --local --non-interactive --output build/Sift-e2e.tar.gz
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -293,18 +295,6 @@ jobs:
         if: env.RUN_SUITE == 'true'
         run: xcrun simctl install booted build/e2e/*.app
 
-      # Warm the app before the suite runs. A plain
-      # launch + settle + terminate loads the baked JS bundle and warms the
-      # dyld/simulator caches, cutting the cold-start latency the flake
-      # clusters on. Best effort — a warmup hiccup must never fail the job,
-      # and the first real flow's clearState wipes any residual state.
-      - name: Warm up the app (prime caches before the suite)
-        if: env.RUN_SUITE == 'true'
-        run: |
-          xcrun simctl launch booted com.jessicahirsh.sift || true
-          sleep 25
-          xcrun simctl terminate booted com.jessicahirsh.sift || true
-
       # The E2E trace (src/services/trace.ts): the test build writes a line
       # to the system log for every touch, screen, app action and decision-
       # guard check, and for any stall of the JavaScript thread, so a tap
@@ -320,6 +310,40 @@ jobs:
             --predicate 'subsystem == "com.facebook.react.log" AND eventMessage CONTAINS "[sift-trace]"' \
             > maestro-results/trace.txt 2> maestro-results/trace-stream.err &
           echo $! > "$RUNNER_TEMP/trace-stream.pid"
+
+      # Warm the app before the suite runs: a launch loads the baked JS
+      # bundle and warms the dyld/simulator caches, cutting the cold-start
+      # latency the first flow would otherwise pay. It waits for the app to
+      # say Setup is up (its trace line, persisted by the step above) instead
+      # of a fixed 25 s sleep, up to a minute, then lets it settle 3 s more.
+      # This launch's lines lead trace.txt (their #1, #2... restart with flow
+      # 01's launch). Best effort: a warm-up hiccup must never fail the job,
+      # and the first flow's clearState wipes any residual state.
+      - name: Warm up the app (prime caches before the suite)
+        if: env.RUN_SUITE == 'true'
+        timeout-minutes: 3
+        continue-on-error: true
+        run: |
+          xcrun simctl launch booted com.jessicahirsh.sift || true
+          start=$SECONDS
+          ready=""
+          while [ $((SECONDS - start)) -lt 60 ]; do
+            # The log store, not the stream's file: the stream may write in blocks.
+            if xcrun simctl spawn booted log show --info --last 2m --style compact \
+              --predicate 'subsystem == "com.facebook.react.log" AND eventMessage CONTAINS "screen name=setup at=up"' 2>/dev/null \
+              | grep -q 'screen name=setup at=up'; then
+              ready=$((SECONDS - start))
+              break
+            fi
+            sleep 1
+          done
+          if [ -n "$ready" ]; then
+            echo "Setup was up within ${ready}s"
+            sleep 3
+          else
+            echo "::warning::The warm-up launch never reported Setup (no trace line in 60 s)."
+          fi
+          xcrun simctl terminate booted com.jessicahirsh.sift || true
 
       - name: Run Maestro tests
         if: env.RUN_SUITE == 'true'

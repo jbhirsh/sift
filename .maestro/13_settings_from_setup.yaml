@@ -14,28 +14,21 @@ name: "Settings From Setup"
       id: "setup-brand"
     timeout: 30000
 
-# This flow runs first in the suite, on the coldest app and driver: a tap
-# landing right after launch can be lost (flow 05 hit the same). Wait for
-# the gear itself, and tap again (up to 3 times) only while the sheet
-# hasn't opened. A sheet that opens without the switch still fails below.
+# Wait for the gear itself, then tap it once. If the sheet doesn't open,
+# the trace (maestro-results/trace.txt) says whether the tap reached the
+# app: fix that, don't tap again.
 - extendedWaitUntil:
     visible:
       id: "settings-button"
     timeout: 30000
 
-- repeat:
-    times: 3
-    while:
-      notVisible:
-        id: "settings-done-button"
-    commands:
-      - tapOn:
-          id: "settings-button"
-      - extendedWaitUntil:
-          visible:
-            id: "settings-done-button"
-          timeout: 10000
-          optional: true
+- tapOn:
+    id: "settings-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "settings-done-button"
+    timeout: 10000
 
 - extendedWaitUntil:
     visible:

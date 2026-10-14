@@ -9,6 +9,9 @@ export default tseslint.config(
       'node_modules/', 'ios/', 'android/', '.expo/', '*.config.js', '.dependency-cruiser.cjs',
       // Generated: test and mutation reports, a leftover Stryker sandbox, builds.
       'coverage/', 'reports/', '.stryker-tmp/', 'build/', 'dist/',
+      // Other checkouts of this repo (agent worktrees): jest.config.js skips
+      // them too, and their own tsconfig would confuse the type-aware rules.
+      '.claude/',
     ],
   },
   eslint.configs.recommended,

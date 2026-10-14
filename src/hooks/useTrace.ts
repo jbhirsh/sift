@@ -1,10 +1,17 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import type { GestureResponderEvent } from 'react-native';
 import { currentScreen, enterScreen, trace, traceTouch, tracing } from '../services/trace';
 import { STALL_TICK_MS, stallGap } from '../utils/trace';
 
-/** A screen or sheet in the trace: `screen name=… at=up|down`, and the name touches carry while it's on top. */
+/**
+ * A screen or sheet in the trace: `screen name=… at=render|up|down`, and the
+ * name touches carry while it's on top. `render` is when React started
+ * drawing it (once per mount), `up` when it's on screen: a slow screen shows
+ * as the gap between them, a busy thread before it as the gap from the tap
+ * to `render`.
+ */
 export function useTraceScreen(name: string): void {
+  useState(() => trace('screen', { name, at: 'render' }));
   useEffect(() => {
     trace('screen', { name, at: 'up' });
     const leave = enterScreen(name);
