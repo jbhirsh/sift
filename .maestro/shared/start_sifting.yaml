@@ -1,0 +1,19 @@
+appId: com.jessicahirsh.sift
+---
+# Tap Start Sifting on Setup and check that the tap took effect. The caller
+# then waits for the first card (or the error it expects).
+#
+# A tap that reaches Start Sifting either leaves Setup or shows an error
+# there, within a fraction of a second. Flow 05 (2026-09-30) and flow 02
+# (PR #164) once failed with Setup still up 30 s later: no error, no
+# Loading. Failing here, at the tap, rather than at the card says which
+# of the two it was; the run's maestro-results artifact then has Maestro's
+# log, the tap's coordinates and the view hierarchy (suite-debug/), and
+# the app's own log (app-log.txt), to find out why.
+- tapOn:
+    id: "setup-start-sifting"
+
+- extendedWaitUntil:
+    notVisible:
+      id: "setup-start-sifting"
+    timeout: 10000

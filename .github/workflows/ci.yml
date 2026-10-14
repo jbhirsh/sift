@@ -343,6 +343,9 @@ jobs:
             ls -la maestro-results 2>/dev/null || true
           } 2>&1 | tee maestro-results/diagnostics.txt || true
           xcrun simctl spawn booted log show --style compact --last 10m 2>/dev/null | tail -300 > maestro-results/simulator-log-tail.txt || true
+          # The app's own lines across the suite: the tail above is mostly
+          # other processes by the time this step runs.
+          xcrun simctl spawn booted log show --style compact --last 45m --predicate 'process == "Sift"' 2>/dev/null | tail -3000 > maestro-results/app-log.txt || true
           # Which SCREEN was up when the wait timed out? Everything above proves
           # the app is alive but not WHERE it was — a 30s card-wait timeout
           # looks identical whether we stalled on Loading (a real stall) or were

@@ -13,7 +13,7 @@ name: "Sift Decisions - Keep, Remove, Skip"
       id: "setup-brand"
     timeout: 30000
 
-- tapOn: "Start Sifting"
+- runFlow: shared/start_sifting.yaml
 
 - extendedWaitUntil:
     visible:

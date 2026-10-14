@@ -41,7 +41,7 @@ name: "Playlist Source - Select and Sift"
 - assertVisible: "Change"
 
 # Start sifting with the selected playlist
-- tapOn: "Start Sifting"
+- runFlow: shared/start_sifting.yaml
 
 # Wait for sift screen to appear
 - extendedWaitUntil:

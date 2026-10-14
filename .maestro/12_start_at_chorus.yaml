@@ -17,7 +17,7 @@ name: "Start at Chorus Setting"
       id: "setup-brand"
     timeout: 30000
 
-- tapOn: "Start Sifting"
+- runFlow: shared/start_sifting.yaml
 
 - waitForAnimationToEnd
 

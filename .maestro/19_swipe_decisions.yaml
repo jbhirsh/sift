@@ -15,7 +15,7 @@ name: "Swipe to Keep and Remove"
       id: "setup-brand"
     timeout: 30000
 
-- tapOn: "Start Sifting"
+- runFlow: shared/start_sifting.yaml
 
 - extendedWaitUntil:
     visible:

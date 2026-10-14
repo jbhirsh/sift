@@ -18,7 +18,7 @@ name: "Start Over Asks First"
 - assertVisible:
     id: "remove-explanation"
 
-- tapOn: "Start Sifting"
+- runFlow: shared/start_sifting.yaml
 
 - extendedWaitUntil:
     visible:

@@ -39,7 +39,7 @@ name: "Sort Picker - Action Sheet Changes Track Order"
 - assertVisible: "Most Played"
 
 # Start a library sift and verify the order took effect
-- tapOn: "Start Sifting"
+- runFlow: shared/start_sifting.yaml
 
 - extendedWaitUntil:
     visible:
