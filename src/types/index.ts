@@ -83,6 +83,12 @@ export interface RemovalRecord {
   source: SiftSource;
   provider: MusicProvider;
   removedAt: string; // ISO 8601
+  /**
+   * A playlist removal that put the song in "Sift — Removed" (a library one
+   * always does). Missing on playlist removals from before, which never
+   * took effect (utils/libraryRemovals).
+   */
+  collected?: boolean;
 }
 
 /**

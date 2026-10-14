@@ -35,17 +35,32 @@ export interface MusicProviderService {
   /** Create a playlist with the given name containing the specified tracks. */
   createPlaylist(name: string, trackIDs: string[]): Promise<void>;
 
-  /** Delete tracks from the user's music library entirely. */
+  /**
+   * Remove tracks from the user's library. Apple Music can't delete library
+   * songs, so it collects them in "Sift — Removed" instead, for library and
+   * playlist sifts alike (utils/libraryRemovals).
+   */
   removeFromLibrary?(trackIDs: string[]): Promise<void>;
 
-  /** Remove tracks from a playlist (does not delete from library). */
-  removeFromPlaylist?(playlistID: string, trackIDs: string[]): Promise<void>;
+  /**
+   * Remove tracks from a playlist (does not delete from library); resolves
+   * to how many entries came out. Apple Music edits only playlists Sift
+   * created.
+   */
+  removeFromPlaylist?(playlistID: string, trackIDs: string[]): Promise<number>;
+
+  /**
+   * Take tracks back out of "Sift — Removed" (a Restore); resolves to how
+   * many entries came out, 0 when the playlist isn't there.
+   */
+  restoreRemoved?(trackIDs: string[]): Promise<number>;
 
   /**
    * Whether a removal from this source already landed, for retrying a
    * failed one safely (#151): a removal can fail after taking effect, and
-   * repeating a library Remove would add the song to "Sift — Removed"
-   * twice.
+   * repeating a Remove would add the song to "Sift — Removed" twice. For a
+   * provider that collects removals, it's whether the song is there,
+   * whatever the source.
    */
   removalLanded?(source: SiftSource, trackID: string): Promise<boolean>;
 

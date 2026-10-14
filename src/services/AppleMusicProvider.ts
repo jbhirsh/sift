@@ -30,6 +30,10 @@ type NativeMusicKit = typeof import('../../modules/expo-musickit/src/index');
 const NO_TRACKS_FOUND = 'No tracks found for the given IDs.';
 // How long a write that never settles holds up the next one.
 export const WRITE_STALL_MS = 30000;
+// How long a playlist created here counts when the library doesn't list it
+// yet. Long enough for the library to catch up, short enough that one the
+// user has since deleted in Music isn't used again.
+export const RECENT_PLAYLIST_SECONDS = 60;
 
 /**
  * Lazily load the native MusicKit module.
@@ -67,6 +71,10 @@ export class AppleMusicProvider implements MusicProviderService {
   // entries, so two at once would each write back the other's entry; and
   // two first library Removes would each create a "Sift — Removed".
   private writes = createSerialQueue(WRITE_STALL_MS);
+  // Whether this launch made a "Sift — Removed". When every one found
+  // refuses a song, another is made only if not: a failure that isn't the
+  // playlist's (no network) mustn't leave a trail of empty copies.
+  private madeRemovedPlaylist = false;
 
   async requestAuthorization(): Promise<boolean> {
     return this.native.requestAuthorization();
@@ -126,8 +134,9 @@ export class AppleMusicProvider implements MusicProviderService {
   }
 
   /**
-   * A library Remove: Apple doesn't let apps delete library songs, so move
-   * them to the "Sift — Removed" playlist for the user to delete in Music.
+   * A Remove, from a library or a playlist sift: Apple doesn't let apps
+   * delete library songs, or edit a playlist they didn't create, so collect
+   * them in the "Sift — Removed" playlist for the user to delete in Music.
    */
   removeFromLibrary(trackIDs: string[]): Promise<void> {
     return this.writes.run(() => this.removeFromLibraryNow(trackIDs));
@@ -136,35 +145,66 @@ export class AppleMusicProvider implements MusicProviderService {
   private async removeFromLibraryNow(trackIDs: string[]): Promise<void> {
     await this.lookUpLibrarySongs(trackIDs);
     const kinds = this.native.cachedKinds(trackIDs);
-    const songIDs = trackIDs.filter((_, i) => kinds[i] === 'song');
+    // A library song, or a playlist entry that isn't one (a music video, or
+    // a song added with Music's playlist-songs-to-library setting off): it
+    // goes on the list too, for the user to take out of the playlist.
+    const songIDs = trackIDs.filter((_, i) => kinds[i] != null);
     if (songIDs.length === 0) throw new Error(NO_TRACKS_FOUND);
 
-    const playlistID = (await this.native.findPlaylistByName(APPLE_REMOVED_PLAYLIST))
-      ?? (await this.native.createEmptyPlaylist(APPLE_REMOVED_PLAYLIST));
-    const moved = countAdded(await this.native.addEachToPlaylist(playlistID, songIDs));
+    // MusicKit edits only playlists Sift made, and one the user made by this
+    // name takes nothing: try each in turn, and make one when none takes a
+    // song.
+    let moved = 0;
+    const found = await this.native.findPlaylistsByName(APPLE_REMOVED_PLAYLIST, RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE);
+    for (const id of found) {
+      moved = countAdded(await this.native.addEachToPlaylist(id, songIDs));
+      if (moved > 0) break;
+    }
+    if (moved === 0 && (found.length === 0 || !this.madeRemovedPlaylist)) {
+      this.madeRemovedPlaylist = true;
+      const playlistID = await this.native.createEmptyPlaylist(APPLE_REMOVED_PLAYLIST);
+      moved = countAdded(await this.native.addEachToPlaylist(playlistID, songIDs));
+    }
     if (moved < songIDs.length) {
       throw new Error(`${songIDs.length - moved} of ${songIDs.length} songs could not be moved to "${APPLE_REMOVED_PLAYLIST}"`);
     }
   }
 
-  removeFromPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
+  removeFromPlaylist(playlistID: string, trackIDs: string[]): Promise<number> {
     return this.writes.run(() => this.native.removeFromPlaylist(playlistID, trackIDs));
   }
 
   /**
-   * Whether removing the track from this source already took effect: a
-   * library song is in "Sift — Removed", a playlist entry is gone from the
-   * playlist.
+   * Out of every "Sift — Removed": a lookup that missed a just-created one
+   * can make a second. One the user made by that name can't be edited
+   * (MusicKit edits only playlists Sift created): it's skipped, and only
+   * fails the Restore when nothing came out anywhere.
    */
-  async removalLanded(source: SiftSource, trackID: string): Promise<boolean> {
-    if (source.type === 'playlist') {
-      const items = await this.native.loadPlaylistItems(source.playlist.id);
-      return !items.some((item) => item.id === trackID);
+  restoreRemoved(trackIDs: string[]): Promise<number> {
+    return this.writes.run(async () => {
+      let out = 0;
+      let failure: unknown = null;
+      for (const id of await this.native.findPlaylistsByName(APPLE_REMOVED_PLAYLIST, RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE)) {
+        try {
+          out += await this.native.removeFromPlaylist(id, trackIDs);
+        } catch (err) {
+          failure ??= err;
+        }
+      }
+      if (out === 0 && failure != null) throw failure;
+      return out;
+    });
+  }
+
+  /**
+   * Whether removing the track already took effect: whatever the sift, a
+   * removed song is in a "Sift — Removed".
+   */
+  async removalLanded(_source: SiftSource, trackID: string): Promise<boolean> {
+    for (const id of await this.native.findPlaylistsByName(APPLE_REMOVED_PLAYLIST, RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE)) {
+      if ((await this.native.loadPlaylistItems(id)).some((item) => item.id === trackID)) return true;
     }
-    const removedID = await this.native.findPlaylistByName(APPLE_REMOVED_PLAYLIST);
-    if (removedID == null) return false;
-    const items = await this.native.loadPlaylistItems(removedID);
-    return items.some((item) => item.id === trackID);
+    return false;
   }
 
   addToLibrary(trackIDs: string[]): Promise<void> {

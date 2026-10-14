@@ -83,9 +83,13 @@ export async function createEmptyPlaylist(name: string): Promise<string> {
   return ExpoMusicKit.createEmptyPlaylist(name);
 }
 
-/** The id of the first playlist with exactly this name, or null. */
-export async function findPlaylistByName(name: string): Promise<string | null> {
-  return ExpoMusicKit.findPlaylistByName(name);
+/**
+ * The ids of every library playlist with exactly this name (read `pageSize`
+ * at a time), then any created here within the last `recentSeconds` that the
+ * library doesn't list yet.
+ */
+export async function findPlaylistsByName(name: string, recentSeconds: number, pageSize: number): Promise<string[]> {
+  return ExpoMusicKit.findPlaylistsByName(name, recentSeconds, pageSize);
 }
 
 /** Add each cached item to the playlist; one result per id, in order. */
@@ -93,7 +97,8 @@ export async function addEachToPlaylist(playlistID: string, ids: string[]): Prom
   return ExpoMusicKit.addEachToPlaylist(playlistID, ids);
 }
 
-export async function removeFromPlaylist(playlistID: string, trackIDs: string[]): Promise<void> {
+/** Remove entries from a playlist this app created; resolves to how many came out. */
+export async function removeFromPlaylist(playlistID: string, trackIDs: string[]): Promise<number> {
   return ExpoMusicKit.removeFromPlaylist(playlistID, trackIDs);
 }
 

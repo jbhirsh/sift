@@ -1,5 +1,5 @@
 import type { Decision, MusicProvider, SiftSource, Track } from '../types';
-import { APPLE_REMOVED_PLAYLIST } from './libraryRemovals';
+import { APPLE_REMOVED_PLAYLIST, collectsRemovals } from './libraryRemovals';
 
 // What Remove and Keep actually do, said the same way everywhere: the Setup
 // footnote, the first-remove note, the discard confirmation and Done. One
@@ -13,30 +13,43 @@ export function siftedPlaylistName(playlistName: string): string {
   return `${playlistName} - Sifted`;
 }
 
-function isAppleLibrary(provider: MusicProvider, source: SiftSource): boolean {
-  return provider === 'apple-music' && source.type === 'library';
-}
-
 /** One line under Setup's source picker, before the first irreversible swipe. */
 export function removeExplanation(provider: MusicProvider, source: SiftSource): string {
-  if (source.type === 'playlist') {
-    return `Removed songs leave this playlist; kept songs are collected in "${siftedPlaylistName(source.playlist.name)}".`;
-  }
-  if (isAppleLibrary(provider, source)) {
-    return `Removed songs are collected in "${APPLE_REMOVED_PLAYLIST}" for you to delete in Music.`;
-  }
-  return 'Removed songs are taken out of your library.';
+  const removed = collectsRemovals(provider)
+    ? `Removed songs are collected in "${APPLE_REMOVED_PLAYLIST}" for you to delete from your library in Music`
+    : source.type === 'playlist'
+      ? 'Removed songs leave this playlist'
+      : 'Removed songs are taken out of your library';
+  return source.type === 'playlist'
+    ? `${removed}; kept songs are collected in "${siftedPlaylistName(source.playlist.name)}".`
+    : `${removed}.`;
 }
 
 /** The first card's one-time hint: nothing else says which way is which. */
 export const SWIPE_HINT = 'Swipe right to keep, left to remove.';
 
 /**
- * The one-time note on the first Apple Music library remove: Apple doesn't
- * let apps delete library songs, so Remove only collects them.
+ * The one-time note on the first Apple Music remove: Apple doesn't let apps
+ * delete library songs or edit your playlists, so Remove only collects them.
  */
 export const FIRST_REMOVE_NOTE =
-  `Removed songs stay in your library for now: they're collected in "${APPLE_REMOVED_PLAYLIST}" so you can delete them in Music.`;
+  `Removed songs stay where they are for now: they're collected in "${APPLE_REMOVED_PLAYLIST}" so you can delete them from your library in Music.`;
+
+/**
+ * How to finish a Remove in Music, under Done's removed list. Apple Music's
+ * "Add & Delete Playlist Songs" setting (which Sift can't read) decides
+ * whether deleting from the library also empties the user's playlists.
+ */
+export const DELETE_IN_MUSIC_HINT =
+  `To finish, delete the songs in "${APPLE_REMOVED_PLAYLIST}" from your library in Music. With Add & Delete Playlist Songs on (in Settings, under Music), that also takes them out of your playlists. A song that isn't in your library has to be removed from its playlist instead.`;
+
+/** The confirmation before a playlist's Start Over or Re-sift from Setup or Done. */
+export function playlistStartOverMessage(provider: MusicProvider, playlistName: string): string {
+  const sifted = `"${siftedPlaylistName(playlistName)}"`;
+  return collectsRemovals(provider)
+    ? `This will empty ${sifted}. Songs you removed stay in "${APPLE_REMOVED_PLAYLIST}". This cannot be undone.`
+    : `This will empty ${sifted} and clear the removal history for this playlist. This cannot be undone.`;
+}
 
 export interface DecisionCounts {
   kept: number;
@@ -68,7 +81,8 @@ function plural(n: number, one: string, many = `${one}s`): string {
  * `source` and `provider` are the session's own, not whatever Setup has
  * selected now. `kind` says what discards it:
  * - start-over: starting this source over (for a playlist that also empties
- *   its "- Sifted" companion and removal history);
+ *   its "- Sifted" companion, and clears its removal history except songs
+ *   waiting in "Sift — Removed");
  * - new-sift: starting another sift, which replaces the only saved session
  *   (`alsoEmpties` names a playlist whose re-sift also clears its companion);
  * - done: leaving a finished sift's Done screen (`unfinished`: it was ended
@@ -87,18 +101,24 @@ export function discardConfirmation(
   const lines = [kind === 'done'
     ? `You made ${plural(counts.total, 'decision')} ${breakdown} in your sift of ${name}.`
     : `You have ${plural(counts.total, 'decision')} so far ${breakdown} in your sift of ${name}.`];
+  const collecting = collectsRemovals(provider);
   if (kind === 'start-over' && source.type === 'playlist') {
-    lines.push(`Starting over empties "${siftedPlaylistName(source.playlist.name)}" and clears this playlist's removal history.`);
-  } else if (isAppleLibrary(provider, source) && counts.removed > 0) {
+    lines.push(collecting
+      ? `Starting over empties "${siftedPlaylistName(source.playlist.name)}".`
+      : `Starting over empties "${siftedPlaylistName(source.playlist.name)}" and clears this playlist's removal history.`);
+  }
+  if (collecting && counts.removed > 0) {
     lines.push(`Songs you removed stay in "${APPLE_REMOVED_PLAYLIST}".`);
-  } else if (counts.removed > 0) {
+  } else if (counts.removed > 0 && !(kind === 'start-over' && source.type === 'playlist')) {
     lines.push('Songs you removed stay removed.');
   }
   if (counts.pendingKeeps > 0 && source.type === 'playlist') {
     lines.push(`${plural(counts.pendingKeeps, 'kept song')} never reached "${siftedPlaylistName(source.playlist.name)}" and would be lost.`);
   }
   if (alsoEmpties) {
-    lines.push(`It also empties "${siftedPlaylistName(alsoEmpties)}" and clears that playlist's removal history.`);
+    lines.push(collecting
+      ? `It also empties "${siftedPlaylistName(alsoEmpties)}".`
+      : `It also empties "${siftedPlaylistName(alsoEmpties)}" and clears that playlist's removal history.`);
   }
   lines.push({
     'start-over': 'You won\u2019t be able to resume it.',
@@ -156,8 +176,8 @@ export function removedListSubtitle(
   // A track can fail more than once (retries); never claim more failures
   // than removals.
   const failedCount = Math.min(failures, removedCount);
-  const where = isAppleLibrary(provider, source)
-    ? `moved to "${APPLE_REMOVED_PLAYLIST}" in Music`
+  const where = collectsRemovals(provider)
+    ? `added to "${APPLE_REMOVED_PLAYLIST}" in Music`
     : `removed from ${source.type === 'playlist' ? `"${source.playlist.name}"` : 'your library'}`;
   if (failedCount === 0) return `These tracks have been ${where}.`;
   if (failedCount >= removedCount) {

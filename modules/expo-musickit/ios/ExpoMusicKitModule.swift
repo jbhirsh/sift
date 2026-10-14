@@ -28,6 +28,9 @@ public class ExpoMusicKitModule: Module {
   /// visible to a library request yet. Only a fallback, so edits never work
   /// from an old copy of a playlist the library can still answer for.
   private let createdPlaylists = LockedCache<MusicKit.Playlist>()
+  /// When each of those was created, so a lookup can ignore old ones (the
+  /// user may have deleted the playlist in Music since).
+  private let createdAt = LockedCache<Date>()
   /// Resolved artwork file paths keyed by track ID.
   private let artworkCache = LockedCache<String>()
 
@@ -101,9 +104,8 @@ public class ExpoMusicKitModule: Module {
     AsyncFunction("loadPlaylistItems") { (playlistID: String) -> [[String: Any]] in
       try self.requireAuthorization()
       let playlist = try await self.playlist(withID: playlistID)
-      let detailed = try await playlist.with([.tracks])
-      guard let tracks = detailed.tracks else { return [] }
-      return tracks.map { track in
+      guard let read = try await self.allEntries(of: playlist) else { return [] }
+      return read.entries.map { track in
         self.trackCache[track.id.rawValue] = track
         return self.rawTrack(track)
       }
@@ -241,19 +243,30 @@ public class ExpoMusicKitModule: Module {
       try self.requireAuthorization()
       let playlist = try await MusicLibrary.shared.createPlaylist(name: name)
       self.createdPlaylists[playlist.id.rawValue] = playlist
+      self.createdAt[playlist.id.rawValue] = Date()
       return playlist.id.rawValue
     }
 
-    /// The id of a playlist with exactly this name, or null: one created
-    /// here (the library may not list it yet), else the library's first.
-    AsyncFunction("findPlaylistByName") { (name: String) -> String? in
+    /// The ids of every library playlist with exactly this name, in library
+    /// order (read `pageSize` at a time), then any created here within the
+    /// last `recentSeconds` that the library doesn't list yet.
+    AsyncFunction("findPlaylistsByName") { (name: String, recentSeconds: Double, pageSize: Int) -> [String] in
       try self.requireAuthorization()
-      if let created = self.createdPlaylists.values.first(where: { $0.name == name }) {
-        return created.id.rawValue
+      var ids: [String] = []
+      var request = MusicLibraryRequest<MusicKit.Playlist>()
+      request.limit = pageSize
+      while true {
+        let items = try await request.response().items
+        ids += items.filter { $0.name == name }.map { $0.id.rawValue }
+        if items.count < pageSize { break }
+        request.offset += items.count
       }
-      let request = MusicLibraryRequest<MusicKit.Playlist>()
-      let response = try await request.response()
-      return response.items.first(where: { $0.name == name })?.id.rawValue
+      for playlist in self.createdPlaylists.values where playlist.name == name && !ids.contains(playlist.id.rawValue) {
+        if let created = self.createdAt[playlist.id.rawValue], -created.timeIntervalSinceNow <= recentSeconds {
+          ids.append(playlist.id.rawValue)
+        }
+      }
+      return ids
     }
 
     /// Add each cached item to the playlist individually, in order. One
@@ -282,15 +295,18 @@ public class ExpoMusicKitModule: Module {
       return results
     }
 
-    /// Remove every entry with one of these ids from the playlist.
-    AsyncFunction("removeFromPlaylist") { (playlistID: String, trackIDs: [String]) in
+    /// Remove every entry with one of these ids from a playlist this app
+    /// created (MusicKit edits no other); returns how many came out. Reads
+    /// every page first: the edit replaces the whole list.
+    AsyncFunction("removeFromPlaylist") { (playlistID: String, trackIDs: [String]) -> Int in
       try self.requireAuthorization()
       let playlist = try await self.playlist(withID: playlistID)
-      let detailedPlaylist = try await playlist.with([.tracks])
-      guard let currentTracks = detailedPlaylist.tracks else { return }
+      guard let read = try await self.allEntries(of: playlist) else { return 0 }
       let idsToRemove = Set(trackIDs)
-      let remaining = currentTracks.filter { !idsToRemove.contains($0.id.rawValue) }
-      try await MusicLibrary.shared.edit(detailedPlaylist, items: remaining)
+      let remaining = read.entries.filter { !idsToRemove.contains($0.id.rawValue) }
+      if remaining.count == read.entries.count { return 0 }
+      try await MusicLibrary.shared.edit(read.playlist, items: remaining)
+      return read.entries.count - remaining.count
     }
 
     /// Add each cached library Song to the library, in order. One result
@@ -422,6 +438,21 @@ public class ExpoMusicKitModule: Module {
     }
   }
 
+  /// A playlist's entries, every page of them, with the playlist they were
+  /// read from; nil when MusicKit returns no entries relationship. Throws
+  /// rather than return a partial list.
+  private func allEntries(of playlist: MusicKit.Playlist) async throws -> (playlist: MusicKit.Playlist, entries: [Track])? {
+    let detailed = try await playlist.with([.tracks])
+    guard var page = detailed.tracks else { return nil }
+    var entries = Array(page)
+    while page.hasNextBatch {
+      guard let next = try await page.nextBatch() else { throw MusicKitError.incompleteRead }
+      entries += next
+      page = next
+    }
+    return (playlist: detailed, entries: entries)
+  }
+
   /// A playlist by id, fresh from the library; one created here only when
   /// the library doesn't list it yet.
   private func playlist(withID id: String) async throws -> MusicKit.Playlist {
@@ -504,6 +535,7 @@ enum MusicKitError: Error, LocalizedError {
   case trackNotFound(String)
   case noTracksFound
   case previewDownloadFailed(Int)
+  case incompleteRead
 
   var errorDescription: String? {
     switch self {
@@ -515,6 +547,8 @@ enum MusicKitError: Error, LocalizedError {
       return "No tracks found for the given IDs."
     case .previewDownloadFailed(let status):
       return "Preview download failed (HTTP \(status))."
+    case .incompleteRead:
+      return "Couldn't read the whole playlist."
     }
   }
 }

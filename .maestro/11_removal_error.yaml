@@ -11,10 +11,11 @@ name: "Failed Removal Shows the Removal-Errors Warning"
 # removal of the FIRST song removed in each app launch, retries included
 # (#151 retries failed removals); other songs' removals succeed. This is
 # only safe because of a flow audit (see the injection comment in
-# MockMusicProvider.ts): the only other flows that remove from the library
-# are 03, which never reaches Done and asserts only DECIDE-driven stats that
-# a silently-failed native removal does not change, and 15, which relies on
-# its first remove failing. removeFromPlaylist is
+# MockMusicProvider.ts): every Remove goes through that removal, from a
+# library or a playlist sift; 03 never reaches Done and asserts only
+# DECIDE-driven stats that a silently-failed native removal does not
+# change, and 15 and 24 rely on their first remove failing; the other
+# flows that Remove assert nothing it changes. removeFromPlaylist is
 # deliberately NOT injectable — the Start Over clears in flows 08/09 depend
 # on it.
 #
@@ -81,4 +82,4 @@ name: "Failed Removal Shows the Removal-Errors Warning"
 - assertVisible:
     id: "removal-error-0"
     text: "Peaches"
-- assertVisible: "1 of 1 could not be moved.*"
+- assertVisible: '1 of 1 could not be added to "Sift — Removed" in Music; it is still in place\.'

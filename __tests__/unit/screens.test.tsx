@@ -40,6 +40,8 @@ const mockProvider = {
   loadPlaylists: jest.fn().mockResolvedValue([]),
   loadPlaylistTracks: jest.fn().mockResolvedValue([]),
   removeFromPlaylist: jest.fn().mockResolvedValue(undefined),
+  restoreRemoved: jest.fn().mockResolvedValue(1),
+  removeFromLibrary: jest.fn().mockResolvedValue(undefined),
   addToPlaylist: jest.fn().mockResolvedValue(1),
 };
 
@@ -52,6 +54,7 @@ jest.mock('../../src/services/RemovalHistoryStore', () => ({
   logRemoval: jest.fn(() => Promise.resolve()),
   loadHistory: jest.fn(() => Promise.resolve([])),
   removeFromHistory: jest.fn(() => Promise.resolve()),
+  forgetRemovals: jest.fn(() => Promise.resolve()),
   clearHistoryForSource: jest.fn(() => Promise.resolve(true)),
 }));
 
@@ -431,7 +434,7 @@ describe('SetupScreen', () => {
   test('the Setup footnote says what Remove does for the chosen source (#141)', async () => {
     const { getByTestId } = await renderWithProviders(<SetupScreen />);
     expect(getByTestId('remove-explanation').props.children).toBe(
-      'Removed songs are collected in "Sift \u2014 Removed" for you to delete in Music.',
+      'Removed songs are collected in "Sift \u2014 Removed" for you to delete from your library in Music.',
     );
   });
 
@@ -621,6 +624,7 @@ describe('SetupScreen', () => {
     const { loadSession } = require('../../src/services/SessionStore');
     const { logRemoval } = require('../../src/services/RemovalHistoryStore');
     (logRemoval as jest.Mock).mockClear();
+    mockProvider.removeFromLibrary.mockClear();
     mockProvider.removeFromPlaylist.mockClear();
     const mix = { type: 'playlist', playlist: { id: 'p9', name: 'Old Mix', trackCount: 3 } };
     // Finished but for its last card's decision, which never went out.
@@ -642,7 +646,9 @@ describe('SetupScreen', () => {
       await fireEvent.press(getByText('Start Sifting'));
     });
     expect(logRemoval).toHaveBeenCalledWith(expect.objectContaining({ track: mockTrackB, source: mix }));
-    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('p9', [mockTrackB.id]);
+    // Collected in "Sift — Removed", like any Remove; the playlist isn't edited.
+    expect(mockProvider.removeFromLibrary).toHaveBeenCalledWith([mockTrackB.id]);
+    expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
     expect(clearSession).toHaveBeenCalled();
   });
 
@@ -872,6 +878,7 @@ describe('SetupScreen', () => {
     mockProvider.loadPlaylists.mockResolvedValue([
       { id: 'p1', name: 'My Playlist', trackCount: 8 },
       { id: 's1', name: 'My Playlist - Sifted', trackCount: 8 },
+      { id: 'r1', name: 'Sift \u2014 Removed', trackCount: 3 },
     ]);
     const { getByTestId, queryByTestId } = await renderWithProviders(<SetupScreen />);
     await act(async () => {
@@ -881,6 +888,8 @@ describe('SetupScreen', () => {
     // Companion playlists are sift outputs, not sources — offering one
     // would target "<x> - Sifted - Sifted".
     expect(queryByTestId('playlist-row-s1')).toBeNull();
+    // Nor "Sift — Removed": every song in it is already removed.
+    expect(queryByTestId('playlist-row-r1')).toBeNull();
   });
 
   test('start-over paths are disabled while a sifted-playlist save is in flight', async () => {
@@ -1754,14 +1763,14 @@ describe('DoneScreen', () => {
   });
 
   test('Start Over is disabled while a restore is in flight', async () => {
-    // A restore's removeFromHistory and Start Over's clearHistoryForSource
-    // mutate the same history file; a restore also re-adds the track
+    // A restore's history change and Start Over's clearHistoryForSource
+    // mutate the same history file; a restore also changes "Sift — Removed"
     // remotely. Letting Start Over run mid-restore would let the queued
-    // restore repopulate what the clear just wiped.
+    // restore change what the clear just settled.
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     let resolveRestore: (() => void) | undefined;
-    mockProvider.addToPlaylist.mockImplementationOnce(
-      () => new Promise<void>((res) => { resolveRestore = () => res(); }),
+    mockProvider.restoreRemoved.mockImplementationOnce(
+      () => new Promise<number>((res) => { resolveRestore = () => res(1); }),
     );
     const WithRemoved = () => {
       const { decide, dispatch } = useSift();
@@ -1794,7 +1803,7 @@ describe('DoneScreen', () => {
     expect(alertSpy).toHaveBeenCalledTimes(1);
     alertSpy.mockClear();
 
-    // Kick off a restore; it parks on the playlist re-add.
+    // Kick off a restore; it parks on taking the song out of "Sift — Removed".
     await act(async () => {
       // Not awaited, as in v13: the handler deliberately parks on a promise
       // this test settles later, so awaiting the press here never settles
@@ -1975,6 +1984,10 @@ describe('DoneScreen', () => {
   });
 
   test('failed removals are listed and the blanket removed claim is replaced', async () => {
+    // Done retries failed removals (#151): keep Track A's failing.
+    mockProvider.removeFromLibrary.mockImplementation(async (ids: string[]) => {
+      if (ids.includes(mockTrackA.id)) throw new Error('offline');
+    });
     const WithRemovalErrors = () => {
       const { decide, dispatch, state } = useSift();
       React.useEffect(() => {
@@ -1994,10 +2007,13 @@ describe('DoneScreen', () => {
     expect(getByTestId('removal-error-0').props.children).toBe(mockTrackA.name);
     // …and the blanket "have been removed" claim gives way to real counts
     // (#141): this one removal failed, so none were moved.
-    expect(queryByText('These tracks have been moved to "Sift — Removed" in Music.')).toBeNull();
+    expect(queryByText('These tracks have been added to "Sift — Removed" in Music.')).toBeNull();
     // The effect above re-fires: three tracks get removed and the error for
     // Track A is recorded more than once. Only Track A's removal failed.
-    expect(getByText('2 of 3 have been moved to "Sift — Removed" in Music; 1 could not be.')).toBeTruthy();
+    expect(getByText('2 of 3 have been added to "Sift — Removed" in Music; 1 could not be.')).toBeTruthy();
+    // Some landed, so Done says how to finish in Music.
+    expect(getByTestId('delete-in-music-hint')).toBeTruthy();
+    mockProvider.removeFromLibrary.mockReset().mockResolvedValue(undefined);
   });
 
   test('a keep buffered during the fallback save re-fires the save for it', async () => {

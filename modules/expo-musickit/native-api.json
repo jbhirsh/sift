@@ -1,7 +1,7 @@
 {
   "$comment": "Every Swift file and every function of the native module, with the one thing it asks MusicKit, ShazamKit or the player. Checked by scripts/check-native-bridge.mjs (CI, pre-commit). Adding an entry means adding native code, which needs a reinstall: put decisions in TypeScript (src/utils/musicKit.ts, AppleMusicProvider) instead. Budgets: raise one only with a reason in the PR.",
   "maxFunctionLines": 40,
-  "maxFileLines": 540,
+  "maxFileLines": 560,
   "files": {
     "ExpoMusicKitModule.swift": "The module: one primitive per exposed function, plus the raw-value conversions.",
     "LockedCache.swift": "A thread-safe dictionary for the module's caches of MusicKit objects."
@@ -11,7 +11,7 @@
     "getAuthorizationStatus": "Report the current Apple Music authorization status.",
     "loadLibraryPage": "Read one page of library songs.",
     "loadPlaylistsPage": "Read one page of library playlists with their track counts.",
-    "loadPlaylistItems": "Read a playlist's entries.",
+    "loadPlaylistItems": "Read every page of a playlist's entries.",
     "lookupLibrarySongs": "Look ids up as library songs.",
     "lookupCatalogSongs": "Look ids up in the Apple Music catalog (one request).",
     "aliasCachedItem": "File a cached MusicKit object under a second id.",
@@ -22,9 +22,9 @@
     "seek": "Move the player to a position.",
     "getPlaybackState": "Report the player's position and whether it is playing.",
     "createEmptyPlaylist": "Create an empty library playlist.",
-    "findPlaylistByName": "Find a library playlist by exact name.",
+    "findPlaylistsByName": "Find every library playlist with an exact name, plus ones created here within a given time.",
     "addEachToPlaylist": "Add cached items to a playlist one at a time, reporting each.",
-    "removeFromPlaylist": "Remove entries from a playlist.",
+    "removeFromPlaylist": "Remove entries from a playlist this app created, reporting how many came out.",
     "addEachToLibrary": "Add cached songs to the library one at a time, reporting each.",
     "previewInfo": "Read a cached song's preview URL, ISRC, title, artist and duration.",
     "catalogPreviewForISRC": "Look up a catalog song's preview URL by ISRC.",

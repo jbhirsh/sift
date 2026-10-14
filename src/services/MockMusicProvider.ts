@@ -156,12 +156,14 @@ const MOCK_PLAYLISTS: Playlist[] = [
 //     keepTrack; "Chill Vibes" has no companion, so its keeps buffer and
 //     the Done fallback goes through createPlaylist; flow 08's re-sift
 //     only clears). Only 09_save_failure_retry.yaml triggers adds.
-//   - removeFromLibrary: only flows 03, 11 and 15 tap Remove on a library
-//     sift. Flow 03 never reaches the Done screen and asserts only
-//     DECIDE-driven stats, which a silently-failing native removal does
-//     not change; flow 15 relies on its first remove failing (the failed
-//     song is offered again by the next library sift, the second is not);
-//     11_removal_error.yaml is the flow built around it.
+//   - removeFromLibrary: every Remove goes through it, from a library or a
+//     playlist sift, so each flow's first removed song fails. Flow 03 never
+//     reaches the Done screen and asserts only DECIDE-driven stats, which a
+//     silently-failing native removal does not change; flow 15 relies on
+//     its first remove failing (the failed song is offered again by the
+//     next library sift, the second is not); 11_removal_error.yaml is the
+//     flow built around it, and 24_playlist_remove.yaml counts on it too.
+//     The other flows that Remove assert nothing a failed removal changes.
 //   - removeFromPlaylist is NOT injectable on purpose: Start Over /
 //     Re-sift clears (flows 08 and 09) depend on it succeeding, and a
 //     launch-wide counter cannot distinguish a sift-decision remove from
@@ -263,14 +265,22 @@ export class MockMusicProvider implements MusicProviderService {
     trackIDs.forEach((id) => landedRemoveIds.add(id));
   }
 
-  async removalLanded(source: SiftSource, trackID: string): Promise<boolean> {
+  async removalLanded(_source: SiftSource, trackID: string): Promise<boolean> {
     await delay(100);
-    // Mock playlists never change, so a playlist removal never shows.
-    return source.type === 'library' && landedRemoveIds.has(trackID);
+    // Like Apple Music: a removed song from any sift is in "Sift — Removed".
+    return landedRemoveIds.has(trackID);
   }
 
-  async removeFromPlaylist(_playlistID: string, _trackIDs: string[]): Promise<void> {
+  async removeFromPlaylist(_playlistID: string, trackIDs: string[]): Promise<number> {
     await delay(200);
+    return trackIDs.length;
+  }
+
+  async restoreRemoved(trackIDs: string[]): Promise<number> {
+    await delay(200);
+    const out = trackIDs.filter((id) => landedRemoveIds.has(id));
+    out.forEach((id) => landedRemoveIds.delete(id));
+    return out.length;
   }
 
   async addToLibrary(_trackIDs: string[]): Promise<void> {

@@ -37,6 +37,8 @@ const fake = {
   playlists: new Map<string, { name: string; items: string[] }>(),
   failLibraryLookups: new Set<string>(),
   refuseAdds: new Set<string>(),
+  /** Playlists Sift didn't make: MusicKit refuses every add to them. */
+  foreignPlaylists: new Set<string>(),
   catalogDown: false,
   nextPlaylist: 1,
   reset() {
@@ -48,6 +50,7 @@ const fake = {
     this.playlists.clear();
     this.failLibraryLookups.clear();
     this.refuseAdds.clear();
+    this.foreignPlaylists.clear();
     this.catalogDown = false;
     this.nextPlaylist = 1;
   },
@@ -108,14 +111,14 @@ const mockNative = {
     fake.playlists.set(id, { name, items: [] });
     return id;
   }),
-  findPlaylistByName: jest.fn(async (name: string) =>
-    [...fake.playlists.entries()].find(([, p]) => p.name === name)?.[0] ?? null),
+  findPlaylistsByName: jest.fn(async (name: string, _recentSeconds: number, _pageSize: number) =>
+    [...fake.playlists.entries()].filter(([, p]) => p.name === name).map(([id]) => id)),
   addEachToPlaylist: jest.fn(async (playlistID: string, ids: string[]): Promise<AddResult[]> => {
     const playlist = fake.playlists.get(playlistID);
     if (!playlist) throw new Error('No tracks found for the given IDs.');
     return ids.map((id) => {
       if (!fake.songCache.has(id) && !fake.trackCache.has(id)) return 'unresolved';
-      if (fake.refuseAdds.has(id)) return 'failed';
+      if (fake.refuseAdds.has(id) || fake.foreignPlaylists.has(playlistID)) return 'failed';
       playlist.items.push(id);
       return 'added';
     });
@@ -148,7 +151,8 @@ afterAll(() => {
 });
 
 import * as Sentry from '@sentry/react-native';
-import { AppleMusicProvider } from '../../src/services/AppleMusicProvider';
+import { AppleMusicProvider, RECENT_PLAYLIST_SECONDS } from '../../src/services/AppleMusicProvider';
+import { PLAYLISTS_PAGE_SIZE } from '../../src/utils/musicKit';
 
 describe('AppleMusicProvider', () => {
   let provider: AppleMusicProvider;
@@ -181,8 +185,9 @@ describe('AppleMusicProvider', () => {
       expect(provider.getPlaybackState()).toEqual({ position: 42, isPlaying: true });
     });
 
-    test('removeFromPlaylist', async () => {
-      await provider.removeFromPlaylist('pl', ['a', 'b']);
+    test('removeFromPlaylist: how many came out', async () => {
+      mockNative.removeFromPlaylist.mockResolvedValueOnce(2);
+      await expect(provider.removeFromPlaylist('pl', ['a', 'b'])).resolves.toBe(2);
       expect(mockNative.removeFromPlaylist).toHaveBeenCalledWith('pl', ['a', 'b']);
     });
   });
@@ -476,7 +481,9 @@ describe('AppleMusicProvider', () => {
     test('creates the playlist the first time and moves the songs into it', async () => {
       fake.library.set('a', rawSong('a'));
       await provider.removeFromLibrary(['a']);
-      expect(mockNative.findPlaylistByName).toHaveBeenCalledWith('Sift — Removed');
+      // One created here counts only briefly: the user may delete it in Music.
+      expect(mockNative.findPlaylistsByName).toHaveBeenCalledWith('Sift — Removed', RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE);
+      expect(RECENT_PLAYLIST_SECONDS).toBe(60);
       expect(mockNative.createEmptyPlaylist).toHaveBeenCalledWith('Sift — Removed');
       expect(fake.playlists.get('new-1')).toEqual({ name: 'Sift — Removed', items: ['a'] });
     });
@@ -491,17 +498,20 @@ describe('AppleMusicProvider', () => {
       expect(fake.playlists.get('removed')?.items).toEqual(['old', 'a']);
     });
 
-    test('only library songs move; a playlist entry is looked up as one', async () => {
+    test('a playlist entry is looked up as a library song, and goes on the list either way', async () => {
+      // A music video, or a song added with Music's playlist-songs-to-library
+      // setting off, has no library song: the user takes it out of the
+      // playlist by hand, so it's listed too.
       fake.trackCache.set('entry', rawEntry('entry'));
       fake.library.set('a', rawSong('a'));
       await provider.removeFromLibrary(['entry', 'a']);
       expect(mockNative.lookupLibrarySongs).toHaveBeenCalledWith(['entry', 'a']);
-      expect(fake.playlists.get('new-1')?.items).toEqual(['a']);
+      expect(fake.playlists.get('new-1')?.items).toEqual(['entry', 'a']);
     });
 
     test('no library songs at all is an error, and nothing is created', async () => {
       await expect(provider.removeFromLibrary(['gone'])).rejects.toThrow('No tracks found for the given IDs.');
-      expect(mockNative.findPlaylistByName).not.toHaveBeenCalled();
+      expect(mockNative.findPlaylistsByName).not.toHaveBeenCalled();
     });
 
     test('looks each missing id up once, 100 at a time', async () => {
@@ -516,6 +526,49 @@ describe('AppleMusicProvider', () => {
       fake.failLibraryLookups.add('b');
       await expect(provider.removeFromLibrary(['a', 'b'])).rejects.toThrow('Library lookup failed for 1 of 2 songs');
       expect(mockNative.addEachToPlaylist).not.toHaveBeenCalled();
+    });
+
+    test('skips a "Sift — Removed" the user made for one Sift made', async () => {
+      fake.playlists.set('theirs', { name: 'Sift — Removed', items: ['x'] });
+      fake.foreignPlaylists.add('theirs');
+      fake.playlists.set('ours', { name: 'Sift — Removed', items: [] });
+      fake.library.set('a', rawSong('a'));
+      await provider.removeFromLibrary(['a']);
+      expect(mockNative.createEmptyPlaylist).not.toHaveBeenCalled();
+      expect(fake.playlists.get('theirs')?.items).toEqual(['x']);
+      expect(fake.playlists.get('ours')?.items).toEqual(['a']);
+    });
+
+    test('makes its own when the only "Sift — Removed" is the user\'s, then uses it', async () => {
+      fake.playlists.set('theirs', { name: 'Sift — Removed', items: ['x'] });
+      fake.foreignPlaylists.add('theirs');
+      fake.library.set('a', rawSong('a'));
+      fake.library.set('b', rawSong('b'));
+      await provider.removeFromLibrary(['a']);
+      await provider.removeFromLibrary(['b']);
+      expect(mockNative.createEmptyPlaylist).toHaveBeenCalledTimes(1);
+      expect(fake.playlists.get('theirs')?.items).toEqual(['x']);
+      expect(fake.playlists.get('new-1')?.items).toEqual(['a', 'b']);
+    });
+
+    test('one deleted in Music is made again, even later in the same launch', async () => {
+      fake.library.set('a', rawSong('a'));
+      fake.library.set('b', rawSong('b'));
+      await provider.removeFromLibrary(['a']);
+      fake.playlists.delete('new-1');
+      await provider.removeFromLibrary(['b']);
+      expect(fake.playlists.get('new-2')?.items).toEqual(['b']);
+    });
+
+    test('a song no playlist takes makes at most one more playlist per launch', async () => {
+      // Not the playlist's fault (no network, say): a second copy can't
+      // help, and every retry making one would leave empty copies behind.
+      fake.playlists.set('ours', { name: 'Sift — Removed', items: [] });
+      fake.library.set('a', rawSong('a'));
+      fake.refuseAdds.add('a');
+      await expect(provider.removeFromLibrary(['a'])).rejects.toThrow('1 of 1 songs could not be moved');
+      await expect(provider.removeFromLibrary(['a'])).rejects.toThrow('1 of 1 songs could not be moved');
+      expect(mockNative.createEmptyPlaylist).toHaveBeenCalledTimes(1);
     });
 
     test('a song MusicKit refuses fails the Remove, naming the count', async () => {
@@ -541,12 +594,72 @@ describe('AppleMusicProvider', () => {
       expect(mockNative.loadPlaylistItems).toHaveBeenLastCalledWith('removed');
     });
 
-    test('a playlist entry landed once it is gone from the playlist', async () => {
+    test('a song in a second "Sift — Removed" landed too', async () => {
+      fake.playlists.set('removed', { name: 'Sift — Removed', items: ['old'] });
+      fake.playlists.set('removed-2', { name: 'Sift — Removed', items: ['a'] });
+      await expect(provider.removalLanded({ type: 'library' }, 'a')).resolves.toBe(true);
+    });
+
+    test("a playlist sift's removal also landed once the song is in \"Sift — Removed\", wherever the playlist stands", async () => {
+      // Sift never edits the user's playlist: it stays as it was.
       fake.playlists.set('pl', { name: 'Mix', items: ['a', 'b'] });
       await expect(provider.removalLanded(playlist, 'a')).resolves.toBe(false);
-      fake.playlists.set('pl', { name: 'Mix', items: ['b'] });
+      fake.playlists.set('removed', { name: 'Sift — Removed', items: ['a'] });
       await expect(provider.removalLanded(playlist, 'a')).resolves.toBe(true);
-      expect(mockNative.findPlaylistByName).not.toHaveBeenCalled();
+      expect(mockNative.findPlaylistsByName).toHaveBeenLastCalledWith('Sift — Removed', RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE);
+      expect(mockNative.loadPlaylistItems).not.toHaveBeenCalledWith('pl');
+    });
+  });
+
+  describe('restoreRemoved', () => {
+    test('takes the songs out of "Sift — Removed", reporting how many came out', async () => {
+      fake.playlists.set('removed', { name: 'Sift — Removed', items: ['a', 'b'] });
+      mockNative.removeFromPlaylist.mockResolvedValueOnce(1);
+      await expect(provider.restoreRemoved(['a'])).resolves.toBe(1);
+      expect(mockNative.findPlaylistsByName).toHaveBeenCalledWith('Sift — Removed', RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE);
+      expect(mockNative.removeFromPlaylist).toHaveBeenCalledWith('removed', ['a']);
+    });
+
+    test('out of every "Sift — Removed", adding up what came out', async () => {
+      fake.playlists.set('removed', { name: 'Sift — Removed', items: ['a'] });
+      fake.playlists.set('removed-2', { name: 'Sift — Removed', items: ['a'] });
+      mockNative.removeFromPlaylist.mockResolvedValueOnce(1).mockResolvedValueOnce(1);
+      await expect(provider.restoreRemoved(['a'])).resolves.toBe(2);
+      expect(mockNative.removeFromPlaylist).toHaveBeenCalledWith('removed', ['a']);
+      expect(mockNative.removeFromPlaylist).toHaveBeenCalledWith('removed-2', ['a']);
+    });
+
+    test('one Sift can\'t edit (the user made it) is skipped when another gave the song back', async () => {
+      fake.playlists.set('mine', { name: 'Sift — Removed', items: ['a'] });
+      fake.playlists.set('removed', { name: 'Sift — Removed', items: ['a'] });
+      mockNative.removeFromPlaylist.mockRejectedValueOnce(new Error('not editable')).mockResolvedValueOnce(1);
+      await expect(provider.restoreRemoved(['a'])).resolves.toBe(1);
+    });
+
+    test('fails when nothing came out and one couldn\'t be edited', async () => {
+      fake.playlists.set('mine', { name: 'Sift — Removed', items: ['a'] });
+      mockNative.removeFromPlaylist.mockRejectedValueOnce(new Error('not editable'));
+      await expect(provider.restoreRemoved(['a'])).rejects.toThrow('not editable');
+    });
+
+    test('nothing comes out when there is no "Sift — Removed"', async () => {
+      await expect(provider.restoreRemoved(['a'])).resolves.toBe(0);
+      expect(mockNative.removeFromPlaylist).not.toHaveBeenCalled();
+    });
+
+    test('waits its turn behind other writes', async () => {
+      fake.playlists.set('removed', { name: 'Sift — Removed', items: [] });
+      fake.library.set('a', rawSong('a'));
+      const order: string[] = [];
+      mockNative.removeFromPlaylist.mockImplementationOnce(async () => {
+        order.push('restore');
+        return 1;
+      });
+      await Promise.all([
+        provider.removeFromLibrary(['a']).then(() => order.push('remove')),
+        provider.restoreRemoved(['a']),
+      ]);
+      expect(order).toEqual(['remove', 'restore']);
     });
   });
 

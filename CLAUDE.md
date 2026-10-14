@@ -203,6 +203,17 @@ Makefile                Dev commands (test, lint, typecheck, check)
   is taken back first (`restoreTrack`, or `unkeepTrack`: out of the
   reviewed ledger or "<name> - Sifted"), then the new one is sent through
   the screen's `useSendPending`. If taking it back fails, nothing changes.
+- **Remove collects; it never deletes or edits the user's playlists.**
+  MusicKit can't delete library songs and edits only playlists the app
+  created, so every Apple Music Remove, from a library or a playlist sift,
+  adds the song to "Sift — Removed" (`AppleMusicProvider.removeFromLibrary`)
+  for the user to delete from their library in Music; Done says how.
+  Removed songs are left out of every later sift (`collectedRemovalIds`, a
+  playlist record carries `collected: true`); Restore takes the song back
+  out (`restoreRemoved`) and forgets every record of it. Start Over clears
+  a playlist's other records but never un-removes. Sift edits only
+  playlists it created ("- Sifted", "Sift — Removed"): MusicKit's edit
+  throws on any other, so a "Sift — Removed" the user made is skipped.
 - **Library writes run one at a time.** `AppleMusicProvider` queues every
   write (`utils/serialQueue`): a native playlist removal reads the playlist
   and writes it back, so two at once would undo each other.

@@ -3,7 +3,7 @@ import { Text, TouchableOpacity } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
 import { useMusicProvider } from '../../src/hooks/useMusicProvider';
-import { removeFromHistory } from '../../src/services/RemovalHistoryStore';
+import { forgetRemovals } from '../../src/services/RemovalHistoryStore';
 import { loadReviewedIds, markReviewed } from '../../src/services/ReviewedLedgerStore';
 import { Track } from '../../src/types';
 
@@ -37,6 +37,7 @@ const mockProvider = {
   getPlaybackState: jest.fn().mockReturnValue({ position: 30, isPlaying: true }),
   createPlaylist: jest.fn().mockResolvedValue(undefined),
   removeFromPlaylist: jest.fn().mockResolvedValue(undefined),
+  restoreRemoved: jest.fn().mockResolvedValue(1),
   removeFromLibrary: jest.fn().mockResolvedValue(undefined),
   addToPlaylist: jest.fn().mockResolvedValue(undefined),
   addToLibrary: jest.fn().mockResolvedValue(undefined),
@@ -60,6 +61,7 @@ jest.mock('../../src/services/RemovalHistoryStore', () => ({
   logRemoval: jest.fn(() => Promise.resolve()),
   loadHistory: jest.fn(() => Promise.resolve([])),
   removeFromHistory: jest.fn(() => Promise.resolve()),
+  forgetRemovals: jest.fn(() => Promise.resolve()),
   clearHistoryForSource: jest.fn(() => Promise.resolve()),
 }));
 
@@ -482,10 +484,11 @@ describe('useMusicProvider', () => {
     expect(getByTestId('track-order').props.children).toBe('3,5,10');
   });
 
-  test('restoreTrack on a playlist re-adds to the playlist and purges the exclusion record', async () => {
-    // This is the user-facing fix: the playlist load path filters out tracks in
-    // removal history, so restoring must clear that record or the track stays
-    // hidden on the next sift of the playlist.
+  test('restoreTrack on a playlist takes the song out of "Sift — Removed" and purges every exclusion record', async () => {
+    // The playlist load path filters out tracks in removal history, so
+    // restoring must clear the record or the track stays hidden on the next
+    // sift of the playlist. A collected removal hides the song from every
+    // sift, so every record of it goes.
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
@@ -497,11 +500,9 @@ describe('useMusicProvider', () => {
     await act(async () => {
       await fireEvent.press(getByTestId('restore-pl'));
     });
-    expect(mockProvider.addToPlaylist).toHaveBeenCalledWith('p1', ['1']);
-    expect(removeFromHistory).toHaveBeenCalledWith('1', {
-      type: 'playlist',
-      playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 },
-    });
+    expect(mockProvider.restoreRemoved).toHaveBeenCalledWith(['1']);
+    expect(mockProvider.addToPlaylist).not.toHaveBeenCalled();
+    expect(forgetRemovals).toHaveBeenCalledWith('1', 'apple-music');
   });
 
   test('loadTracks filters out sifted and removed tracks for playlist source', async () => {
@@ -530,7 +531,7 @@ describe('useMusicProvider', () => {
     expect(mockProvider.loadPlaylistTracks).toHaveBeenCalledTimes(2);
   });
 
-  test('removeTrack calls removeFromPlaylist for playlist source', async () => {
+  test('removeTrack on a playlist source collects the song in "Sift — Removed", never editing the playlist', async () => {
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
@@ -542,11 +543,12 @@ describe('useMusicProvider', () => {
     await act(async () => {
       await fireEvent.press(getByTestId('remove-track'));
     });
-    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('p1', ['1']);
+    expect(mockProvider.removeFromLibrary).toHaveBeenCalledWith(['1']);
+    expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
   });
 
   test('removeTrack handles error gracefully', async () => {
-    mockProvider.removeFromPlaylist.mockRejectedValueOnce(new Error('fail'));
+    mockProvider.removeFromLibrary.mockRejectedValueOnce(new Error('fail'));
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
@@ -561,7 +563,7 @@ describe('useMusicProvider', () => {
     // Should not throw
   });
 
-  test('restoreTrack calls addToPlaylist for playlist source', async () => {
+  test('restoreTrack on a playlist source never adds to the playlist', async () => {
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
@@ -573,7 +575,8 @@ describe('useMusicProvider', () => {
     await act(async () => {
       await fireEvent.press(getByTestId('restore-track'));
     });
-    expect(mockProvider.addToPlaylist).toHaveBeenCalledWith('p1', ['1']);
+    expect(mockProvider.restoreRemoved).toHaveBeenCalledWith(['1']);
+    expect(mockProvider.addToPlaylist).not.toHaveBeenCalled();
   });
 
   test('restoreTrack handles error gracefully', async () => {
@@ -1143,9 +1146,64 @@ describe('useMusicProvider', () => {
         source: { type: 'playlist', playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 } },
         provider: 'apple-music',
         removedAt: '2026-04-08T12:00:00.000Z',
+        collected: true,
       },
     ]);
 
+    const { getByTestId } = await render(
+      <SiftProvider initialTracks={[]}>
+        <TestConsumerWithPlaylistActions />
+      </SiftProvider>
+    );
+    await act(async () => {
+      await fireEvent.press(getByTestId('set-source-playlist'));
+    });
+    await act(async () => {
+      await fireEvent.press(getByTestId('load-tracks'));
+    });
+    expect(getByTestId('phase').props.children).toBe('setup');
+    expect(getByTestId('load-error').props.children).toBe(
+      'All tracks in this playlist were removed in a previous sift.',
+    );
+  });
+
+  test('an older playlist removal, which never took effect, no longer hides the song', async () => {
+    mockProvider.loadPlaylistTracks.mockResolvedValueOnce([mockTrack]);
+    mockProvider.loadPlaylists.mockResolvedValue([]);
+    const { loadHistory } = require('../../src/services/RemovalHistoryStore');
+    (loadHistory as jest.Mock).mockResolvedValue([
+      {
+        track: mockTrack,
+        source: { type: 'playlist', playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 } },
+        provider: 'apple-music',
+        removedAt: '2026-04-08T12:00:00.000Z',
+      },
+    ]);
+    try {
+      const { getByTestId } = await render(
+        <SiftProvider initialTracks={[]}>
+          <TestConsumerWithPlaylistActions />
+        </SiftProvider>
+      );
+      await act(async () => {
+        await fireEvent.press(getByTestId('set-source-playlist'));
+      });
+      await act(async () => {
+        await fireEvent.press(getByTestId('load-tracks'));
+      });
+      expect(getByTestId('phase').props.children).toBe('sifting');
+    } finally {
+      (loadHistory as jest.Mock).mockResolvedValue([]);
+    }
+  });
+
+  test('a song removed in a library sift is left out of a playlist sift too', async () => {
+    mockProvider.loadPlaylistTracks.mockResolvedValueOnce([mockTrack]);
+    mockProvider.loadPlaylists.mockResolvedValue([]);
+    const { loadHistory } = require('../../src/services/RemovalHistoryStore');
+    (loadHistory as jest.Mock).mockResolvedValueOnce([
+      { track: mockTrack, source: { type: 'library' }, provider: 'apple-music', removedAt: '2026-04-08T12:00:00.000Z' },
+    ]);
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[]}>
         <TestConsumerWithPlaylistActions />
@@ -1177,6 +1235,7 @@ describe('useMusicProvider', () => {
         source: { type: 'playlist', playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 } },
         provider: 'apple-music',
         removedAt: '2026-04-08T12:00:00.000Z',
+        collected: true,
       },
     ]);
 
