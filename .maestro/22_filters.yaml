@@ -30,7 +30,10 @@ name: "Plays and Added Filters"
       text: "20 or fewer"
     timeout: 10000
 
-- tapOn: "Start Sifting"
+# Expected to stay on Setup with an error, so not the shared step (which
+# checks that Setup goes away); the error wait below checks the tap.
+- tapOn:
+    id: "setup-start-sifting"
 
 - extendedWaitUntil:
     visible:
@@ -44,7 +47,15 @@ name: "Plays and Added Filters"
 
 - tapOn: "Any"
 
-- tapOn: "Start Sifting"
+# The sheet closes before the choice lands: wait for it, so the tap below
+# doesn't land mid-dismissal.
+- extendedWaitUntil:
+    visible:
+      id: "filter-plays"
+      text: "Any"
+    timeout: 10000
+
+- runFlow: shared/start_sifting.yaml
 
 - extendedWaitUntil:
     visible:

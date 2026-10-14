@@ -55,8 +55,7 @@ name: "Library Sift Skips Kept Songs"
 - assertVisible:
     id: "include-sifted-switch"
 
-- tapOn:
-    id: "setup-start-sifting"
+- runFlow: shared/start_sifting.yaml
 
 - extendedWaitUntil:
     visible:

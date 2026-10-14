@@ -231,7 +231,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
   the `code` filter in `ci.yml`, with `predicate-quantifier: 'every'` so its
   `!` patterns exclude). Its app build is cached on
   the native fingerprint plus a hash of the bundle's inputs (`src/`,
-  `index.ts`, `metro.config.js`; tests and flows don't count),
+  `index.ts`, `metro.config.js`, `package-lock.json`, `.env`, `assets/`;
+  tests and flows don't count),
   and on a native PR it waits for ios-build's identical build instead of
   building in parallel. On push to main it builds and caches the app but
   skips the suite: only caches saved on main can be restored by PRs.
@@ -303,7 +304,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
   invocation per flow: restarting the driver per flow caused lost taps
   right after launch. A flow starts a sift through
   `.maestro/shared/start_sifting.yaml` (`runFlow`), which fails at the tap
-  if Setup doesn't go away. `shared/` holds subflows, not flows (Maestro
+  if Setup doesn't go away; only a tap meant to stay on Setup (an error, a
+  "Discard?" alert) taps `setup-start-sifting` itself. `shared/` holds subflows, not flows (Maestro
   runs only the top level of `.maestro/`).
 - **A flaky E2E flow is a bug: diagnose it and fix it at the root, never
   re-run CI to get past it.** Read the run's `maestro-results` artifact
