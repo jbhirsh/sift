@@ -28,13 +28,16 @@ import GlassCard from '../components/GlassCard';
 import { Button } from '../components/Button';
 import {
   decisionCounts,
+  DELETE_IN_MUSIC_HINT,
   discardConfirmation,
   doneHeadline,
   failedRemovalCount,
   keptDestination,
   nothingRemovedNote,
+  playlistStartOverMessage,
   removedListSubtitle,
 } from '../utils/sessionCopy';
+import { collectsRemovals } from '../utils/libraryRemovals';
 import { COLORS, CONTENT_COLUMN, RADIUS, SETTINGS_BUTTON, SPACING } from '../theme';
 import { useTraceScreen } from '../hooks/useTrace';
 
@@ -297,6 +300,12 @@ export default function DoneScreen() {
                     below names the tracks that are still in place. */}
                 {removedListSubtitle(state.provider, state.source, state.removed.length, failedRemovals)}
               </Text>
+              {/* Sift can only collect them: the deleting happens in Music. */}
+              {collectsRemovals(state.provider) && failedRemovals < state.removed.length && (
+                <Text testID="delete-in-music-hint" style={[styles.removedSubtitle, { color: colors.textSecondary }]}>
+                  {DELETE_IN_MUSIC_HINT}
+                </Text>
+              )}
             </View>
             <View style={styles.removedActions}>
               <TouchableOpacity
@@ -434,10 +443,11 @@ export default function DoneScreen() {
           if (state.source.type === 'playlist') {
             const playlist = state.source.playlist;
             // Destructive: this empties the just-built sifted playlist and
-            // wipes the removal history for this source. Confirm first.
+            // clears the removal history for this source (all but the songs
+            // waiting in "Sift — Removed"). Confirm first.
             Alert.alert(
               'Start Over?',
-              `This will empty "${playlist.name} - Sifted" and clear the removal history for this playlist. This cannot be undone.`,
+              playlistStartOverMessage(state.provider, playlist.name),
               [
                 { text: 'Cancel', style: 'cancel' },
                 {

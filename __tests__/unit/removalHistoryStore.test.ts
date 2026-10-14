@@ -39,7 +39,7 @@ jest.mock('@sentry/react-native', () => ({
 }));
 
 // Import after mocks are set up
-const { logRemoval, loadHistory, removeFromHistory, clearHistoryForSource } = require('../../src/services/RemovalHistoryStore');
+const { logRemoval, loadHistory, removeFromHistory, clearHistoryForSource, forgetRemovals } = require('../../src/services/RemovalHistoryStore');
 const Sentry = require('@sentry/react-native');
 const { File } = require('expo-file-system');
 
@@ -226,6 +226,53 @@ describe('removeFromHistory', () => {
   });
 });
 
+describe('forgetRemovals', () => {
+  const fromPlaylist: RemovalRecord = {
+    ...record,
+    source: { type: 'playlist', playlist: { id: 'p1', name: 'My Playlist', trackCount: 10 } },
+    collected: true,
+  };
+  const otherSong: RemovalRecord = { ...record, track: { ...record.track, id: 'track-2' } };
+
+  test("drops every record of the song with that provider, whatever sift made it", async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([record, fromPlaylist, otherSong]));
+
+    await forgetRemovals('track-1', 'apple-music');
+
+    expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([otherSong]));
+  });
+
+  test("keeps another provider's records of the song", async () => {
+    const other = { ...record, provider: 'spotify' };
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([record, other]));
+
+    await forgetRemovals('track-1', 'apple-music');
+
+    expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([other]));
+  });
+
+  test('does not rewrite the file when nothing matches', async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([otherSong]));
+
+    await forgetRemovals('track-1', 'apple-music');
+
+    expect(mockWrite).not.toHaveBeenCalled();
+  });
+
+  test('reports but never throws when the rewrite fails', async () => {
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([record]));
+    mockWrite.mockImplementationOnce(() => { throw new Error('disk full'); });
+
+    await expect(forgetRemovals('track-1', 'apple-music')).resolves.toBeUndefined();
+
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'removal-history-remove' } });
+  });
+});
+
 describe('clearHistoryForSource', () => {
   const playlistRecord: RemovalRecord = {
     track: record.track,
@@ -250,6 +297,16 @@ describe('clearHistoryForSource', () => {
     expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([record, otherPlaylistRecord]));
     // A successful rewrite reports success so callers proceed.
     expect(result).toBe(true);
+  });
+
+  test('keeps the collected ones: those songs wait in "Sift — Removed", and starting over un-removes nothing', async () => {
+    const collected = { ...playlistRecord, track: { ...record.track, id: 'track-3' }, collected: true };
+    mockExists.mockReturnValue(true);
+    mockText.mockResolvedValue(JSON.stringify([playlistRecord, collected]));
+
+    await expect(clearHistoryForSource('p1')).resolves.toBe(true);
+
+    expect(mockWrite).toHaveBeenCalledWith(JSON.stringify([collected]));
   });
 
   test('keeps all records when no match', async () => {

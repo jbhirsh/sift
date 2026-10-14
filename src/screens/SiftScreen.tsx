@@ -28,6 +28,7 @@ import { COLORS, RADIUS, SETTINGS_BUTTON, SHADOWS, SPACING, UNDO_PILL } from '..
 import { Decision, PendingDecision, PROVIDER_DISPLAY, Track } from '../types';
 import { loadSeenRemoveNote, loadSeenSwipeHint, markRemoveNoteSeen, markSwipeHintSeen } from '../services/PreferencesStore';
 import { decisionAnnouncement, FIRST_REMOVE_NOTE, SWIPE_HINT, undoMessage, unsyncedCount } from '../utils/sessionCopy';
+import { collectsRemovals } from '../utils/libraryRemovals';
 import { useHoldPendingDecision, useSendPending, wasSent } from '../hooks/usePendingDecision';
 import { useRemovalRetry } from '../hooks/useRemovalRetry';
 import UndoPill from '../components/UndoPill';
@@ -116,7 +117,7 @@ export default function SiftScreen() {
   // doesn't let apps delete library songs, so say where they went. Inline
   // under the stats, gone with the next decision. The ref starts as "seen"
   // so nothing shows before the stored flag has loaded.
-  const removeNoteEligible = state.provider === 'apple-music' && state.source.type === 'library';
+  const removeNoteEligible = collectsRemovals(state.provider);
   const seenRemoveNoteRef = useRef(true);
   const [showRemoveNote, setShowRemoveNote] = useState(false);
   useEffect(() => {

@@ -95,6 +95,7 @@ describe('isRemovalRecord', () => {
   test('accepts a well-formed record for each source type', () => {
     expect(isRemovalRecord(stored(record))).toBe(true);
     expect(isRemovalRecord(stored({ ...record, source: playlistSource, provider: 'apple-music' }))).toBe(true);
+    expect(isRemovalRecord(stored({ ...record, source: playlistSource, collected: true }))).toBe(true);
   });
 
   test('tolerates drift in fields the app never reads from history', () => {
@@ -121,6 +122,7 @@ describe('isRemovalRecord', () => {
     ['an unknown source type', { ...record, source: { type: 'album' } }],
     ['a playlist source without a playlist', { ...record, source: { type: 'playlist' } }],
     ['a playlist source with no id', { ...record, source: { type: 'playlist', playlist: { name: 'Mix' } } }],
+    ['a non-boolean collected', { ...record, source: playlistSource, collected: 'yes' }],
   ])('rejects %s', (_label, value) => {
     expect(isRemovalRecord(value)).toBe(false);
   });

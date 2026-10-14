@@ -5,7 +5,7 @@ import { SiftProvider, useSift } from '../../src/context/SiftContext';
 import { resetRemovalRetries, useMusicProvider } from '../../src/hooks/useMusicProvider';
 import { useSendPending } from '../../src/hooks/usePendingDecision';
 import { useReviseDecision } from '../../src/hooks/useReviseDecision';
-import { logRemoval, removeFromHistory } from '../../src/services/RemovalHistoryStore';
+import { forgetRemovals, logRemoval } from '../../src/services/RemovalHistoryStore';
 import { markReviewed, unmarkReviewed } from '../../src/services/ReviewedLedgerStore';
 import type { Decision, PendingDecision, SiftSource, Track } from '../../src/types';
 
@@ -30,6 +30,7 @@ jest.mock('../../src/services/RemovalHistoryStore', () => ({
   logRemoval: jest.fn(() => Promise.resolve()),
   loadHistory: jest.fn(() => Promise.resolve([])),
   removeFromHistory: jest.fn(() => Promise.resolve()),
+  forgetRemovals: jest.fn(() => Promise.resolve()),
   clearHistoryForSource: jest.fn(() => Promise.resolve()),
 }));
 
@@ -52,6 +53,7 @@ const mockProvider = {
   addToPlaylist: jest.fn().mockResolvedValue(undefined),
   removeFromLibrary: jest.fn().mockResolvedValue(undefined),
   removeFromPlaylist: jest.fn().mockResolvedValue(undefined),
+  restoreRemoved: jest.fn().mockResolvedValue(1),
   removalLanded: jest.fn().mockResolvedValue(true),
   loadPlaylists: jest.fn().mockResolvedValue([]),
   loadPlaylistTracks: jest.fn().mockResolvedValue([]),
@@ -142,13 +144,12 @@ describe('changing a decision', () => {
 
   test('a sent library Remove changed to Keep is restored, then kept', async () => {
     await renderSift();
-    mockProvider.loadPlaylists.mockResolvedValue([{ id: 'removed-pl', name: 'Sift — Removed', trackCount: 1 }]);
     await decideAndSend('remove');
     expect(mockProvider.removeFromLibrary).toHaveBeenCalledWith(['a']);
     await expect(change(trackA, 'keep')).resolves.toBe(true);
     // Out of "Sift — Removed", out of the history, into the ledger.
-    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('removed-pl', ['a']);
-    expect(removeFromHistory).toHaveBeenCalledWith('a', { type: 'library' });
+    expect(mockProvider.restoreRemoved).toHaveBeenCalledWith(['a']);
+    expect(forgetRemovals).toHaveBeenCalledWith('a', 'apple-music');
     expect(markReviewed).toHaveBeenCalledWith('apple-music:library', 'a');
     expect(sift.state.kept).toEqual([trackA]);
     expect(sift.state.removed).toEqual([]);
@@ -267,7 +268,9 @@ describe('changing a decision', () => {
     await expect(change(trackA, 'remove')).resolves.toBe(true);
     expect(sift.state.pendingKeeps).toEqual([]);
     expect(mockProvider.loadPlaylistTracks).not.toHaveBeenCalledWith('sp');
-    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('p1', ['a']);
+    // The new Remove is collected, like any Remove: the playlist isn't edited.
+    expect(mockProvider.removeFromLibrary).toHaveBeenCalledWith(['a']);
+    expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalledWith('p1', expect.anything());
   });
 
   test('with no "- Sifted" playlist, there is nothing to take out', async () => {
@@ -286,12 +289,32 @@ describe('changing a decision', () => {
   test('if the Remove can\'t be undone, nothing changes', async () => {
     await renderSift(mix);
     await decideAndSend('remove');
-    mockProvider.removalLanded.mockResolvedValueOnce(true);
-    mockProvider.addToPlaylist.mockRejectedValueOnce(new Error('offline'));
+    mockProvider.restoreRemoved.mockRejectedValueOnce(new Error('offline'));
     await expect(change(trackA, 'keep')).resolves.toBe(false);
     expect(sift.state.removed).toEqual([trackA]);
     expect(sift.state.kept).toEqual([]);
+    expect(forgetRemovals).not.toHaveBeenCalled();
     expect(mockProvider.loadPlaylists).not.toHaveBeenCalledWith();
+  });
+
+  test('a Restore that took nothing out while the song is still in "Sift — Removed" failed, so nothing changes', async () => {
+    await renderSift(mix);
+    await decideAndSend('remove');
+    // Filed there under an id the take-out didn't match.
+    mockProvider.restoreRemoved.mockResolvedValueOnce(0);
+    mockProvider.removalLanded.mockResolvedValueOnce(true);
+    await expect(change(trackA, 'keep')).resolves.toBe(false);
+    expect(sift.state.removed).toEqual([trackA]);
+    expect(forgetRemovals).not.toHaveBeenCalled();
+  });
+
+  test('nothing to take out because the removal never landed is a Restore all the same', async () => {
+    await renderSift(mix);
+    await decideAndSend('remove');
+    mockProvider.restoreRemoved.mockResolvedValueOnce(0);
+    mockProvider.removalLanded.mockResolvedValueOnce(false);
+    await expect(change(trackA, 'keep')).resolves.toBe(true);
+    expect(forgetRemovals).toHaveBeenCalledWith('a', 'apple-music');
   });
 
   test('if the Keep can\'t be taken back, nothing changes', async () => {

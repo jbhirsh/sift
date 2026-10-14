@@ -93,6 +93,7 @@ export function isRemovalRecord(value: unknown): value is RemovalRecord {
   if (!isObject(value) || !isObject(value.track) || typeof value.track.id !== 'string') {
     return false;
   }
+  if (value.collected !== undefined && typeof value.collected !== 'boolean') return false;
   const source = value.source;
   if (!isObject(source)) return false;
   if (source.type === 'library') return true;

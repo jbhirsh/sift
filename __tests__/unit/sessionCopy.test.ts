@@ -1,7 +1,10 @@
 import {
   APPLE_REMOVED_PLAYLIST,
   decisionCounts,
+  DELETE_IN_MUSIC_HINT,
   discardConfirmation,
+  FIRST_REMOVE_NOTE,
+  playlistStartOverMessage,
   removeExplanation,
   removedListSubtitle,
   unsyncedCount,
@@ -13,25 +16,60 @@ import {
   keptDestination,
   nothingRemovedNote,
 } from '../../src/utils/sessionCopy';
-import type { SiftSource, Track } from '../../src/types';
+import type { MusicProvider, SiftSource, Track } from '../../src/types';
 
 const library: SiftSource = { type: 'library' };
+// A provider whose Remove really deletes, or edits the playlist (none today:
+// Spotify was removed, #140), for the copy that isn't Apple Music's.
+const deleting = 'spotify' as unknown as MusicProvider;
 const playlist: SiftSource = { type: 'playlist', playlist: { id: 'p1', name: 'Workout Mix', trackCount: 10 } };
 const RESUME = 'You won’t be able to resume it.';
 
 describe('removeExplanation', () => {
   test('Apple Music library: removed songs are collected, not deleted', () => {
     expect(removeExplanation('apple-music', library)).toBe(
-      `Removed songs are collected in "${APPLE_REMOVED_PLAYLIST}" for you to delete in Music.`,
+      `Removed songs are collected in "${APPLE_REMOVED_PLAYLIST}" for you to delete from your library in Music.`,
     );
   });
 
-  test('a playlist names its "- Sifted" companion', () => {
+  test('an Apple Music playlist collects removed songs the same way, and names its "- Sifted" companion', () => {
     expect(removeExplanation('apple-music', playlist)).toBe(
+      `Removed songs are collected in "${APPLE_REMOVED_PLAYLIST}" for you to delete from your library in Music; `
+      + 'kept songs are collected in "Workout Mix - Sifted".',
+    );
+  });
+
+  test('a provider that deletes says so', () => {
+    expect(removeExplanation(deleting, library)).toBe('Removed songs are taken out of your library.');
+    expect(removeExplanation(deleting, playlist)).toBe(
       'Removed songs leave this playlist; kept songs are collected in "Workout Mix - Sifted".',
     );
   });
+});
 
+describe('finishing a Remove in Music', () => {
+  test('the first-remove note says the song stays put until deleted in Music', () => {
+    expect(FIRST_REMOVE_NOTE).toBe(
+      `Removed songs stay where they are for now: they're collected in "${APPLE_REMOVED_PLAYLIST}" so you can delete them from your library in Music.`,
+    );
+  });
+
+  test("Done's hint names the Apple Music setting that decides whether playlists empty too", () => {
+    expect(DELETE_IN_MUSIC_HINT).toBe(
+      `To finish, delete the songs in "${APPLE_REMOVED_PLAYLIST}" from your library in Music. `
+      + 'With Add & Delete Playlist Songs on (in Settings, under Music), that also takes them out of your playlists. '
+      + 'A song that isn\'t in your library has to be removed from its playlist instead.',
+    );
+  });
+
+  test("a playlist's Start Over: removed songs stay collected with Apple Music", () => {
+    expect(playlistStartOverMessage('apple-music', 'Mix')).toBe(
+      `This will empty "Mix - Sifted". Songs you removed stay in "${APPLE_REMOVED_PLAYLIST}". This cannot be undone.`,
+    );
+    expect(playlistStartOverMessage(deleting, 'Mix')).toBe(
+      'This will empty "Mix - Sifted" and clear the removal history for this playlist. This cannot be undone.',
+    );
+  });
 });
 
 describe('decisionCounts', () => {
@@ -59,7 +97,9 @@ describe('discardConfirmation', () => {
 
   test('re-sifting another playlist over a sift also says what it empties', () => {
     const message = discardConfirmation('apple-music', library, counts, 'new-sift', { alsoEmpties: 'Road Trip' }).message;
-    expect(message).toContain('It also empties "Road Trip - Sifted" and clears that playlist\'s removal history.');
+    expect(message).toContain(`Songs you removed stay in "${APPLE_REMOVED_PLAYLIST}". It also empties "Road Trip - Sifted". Starting`);
+    const deleted = discardConfirmation(deleting, library, counts, 'new-sift', { alsoEmpties: 'Road Trip' }).message;
+    expect(deleted).toContain('It also empties "Road Trip - Sifted" and clears that playlist\'s removal history.');
   });
 
   test('keeps that never reached the "- Sifted" playlist are called out', () => {
@@ -79,8 +119,19 @@ describe('discardConfirmation', () => {
     expect(copy.title).toBe('Start Over?');
     expect(copy.confirm).toBe('Discard and Start Over');
     expect(copy.message).toContain('in your sift of "Workout Mix".');
-    expect(copy.message).toContain('Starting over empties "Workout Mix - Sifted" and clears this playlist\'s removal history.');
+    // Apple Music: removed songs stay collected, so nothing about history.
+    expect(copy.message).toContain(
+      `Starting over empties "Workout Mix - Sifted". Songs you removed stay in "${APPLE_REMOVED_PLAYLIST}". ${RESUME}`,
+    );
+    const deleted = discardConfirmation(deleting, playlist, counts, 'start-over').message;
+    expect(deleted).toContain('Starting over empties "Workout Mix - Sifted" and clears this playlist\'s removal history. ');
+    expect(deleted).not.toContain('stay removed');
     expect(copy.message.endsWith(RESUME)).toBe(true);
+  });
+
+  test('a provider that deletes: removed songs stay removed', () => {
+    const message = discardConfirmation(deleting, library, counts, 'new-sift').message;
+    expect(message).toContain('Songs you removed stay removed.');
   });
 
   test('no removals: no line about removed songs, and one decision is singular', () => {
@@ -138,21 +189,25 @@ describe('unsyncedCount', () => {
 
 describe('removedListSubtitle', () => {
   test('all landed', () => {
-    expect(removedListSubtitle('apple-music', library, 5, 0)).toBe(`These tracks have been moved to "${APPLE_REMOVED_PLAYLIST}" in Music.`);
-    expect(removedListSubtitle('apple-music', playlist, 5, 0)).toBe('These tracks have been removed from "Workout Mix".');
+    expect(removedListSubtitle('apple-music', library, 5, 0)).toBe(`These tracks have been added to "${APPLE_REMOVED_PLAYLIST}" in Music.`);
+    // A playlist sift's removals are collected the same way.
+    expect(removedListSubtitle('apple-music', playlist, 5, 0)).toBe(`These tracks have been added to "${APPLE_REMOVED_PLAYLIST}" in Music.`);
+    expect(removedListSubtitle(deleting, playlist, 5, 0)).toBe('These tracks have been removed from "Workout Mix".');
+    expect(removedListSubtitle(deleting, library, 5, 0)).toBe('These tracks have been removed from your library.');
   });
 
   test('some failed: real counts, never "most"', () => {
-    expect(removedListSubtitle('apple-music', playlist, 1200, 3)).toBe('1,197 of 1,200 have been removed from "Workout Mix"; 3 could not be.');
+    expect(removedListSubtitle('apple-music', playlist, 1200, 3)).toBe(`1,197 of 1,200 have been added to "${APPLE_REMOVED_PLAYLIST}" in Music; 3 could not be.`);
+    expect(removedListSubtitle(deleting, playlist, 1200, 3)).toBe('1,197 of 1,200 have been removed from "Workout Mix"; 3 could not be.');
   });
 
   test('all failed', () => {
-    expect(removedListSubtitle('apple-music', library, 3, 3)).toBe(`3 of 3 could not be moved to "${APPLE_REMOVED_PLAYLIST}" in Music; they are still in place.`);
-    expect(removedListSubtitle('apple-music', library, 1, 1)).toBe(`1 of 1 could not be moved to "${APPLE_REMOVED_PLAYLIST}" in Music; it is still in place.`);
+    expect(removedListSubtitle('apple-music', library, 3, 3)).toBe(`3 of 3 could not be added to "${APPLE_REMOVED_PLAYLIST}" in Music; they are still in place.`);
+    expect(removedListSubtitle('apple-music', library, 1, 1)).toBe(`1 of 1 could not be added to "${APPLE_REMOVED_PLAYLIST}" in Music; it is still in place.`);
   });
 
   test('never claims more failures than removals', () => {
-    expect(removedListSubtitle('apple-music', library, 3, 4)).toBe(`3 of 3 could not be moved to "${APPLE_REMOVED_PLAYLIST}" in Music; they are still in place.`);
+    expect(removedListSubtitle('apple-music', library, 3, 4)).toBe(`3 of 3 could not be added to "${APPLE_REMOVED_PLAYLIST}" in Music; they are still in place.`);
   });
 });
 

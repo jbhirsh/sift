@@ -21,7 +21,7 @@ import PlaylistPicker from '../components/PlaylistPicker';
 import ResumeSessionModal from '../components/ResumeSessionModal';
 import SessionStatRow from '../components/SessionStatRow';
 import { Button } from '../components/Button';
-import { decisionCounts, discardConfirmation, removeExplanation } from '../utils/sessionCopy';
+import { APPLE_REMOVED_PLAYLIST, decisionCounts, discardConfirmation, playlistStartOverMessage, removeExplanation } from '../utils/sessionCopy';
 import { resumeState } from '../context/resumeSession';
 import { loadSession } from '../services/SessionStore';
 import { useSendSavedPending } from '../hooks/usePendingDecision';
@@ -363,7 +363,7 @@ export default function SetupScreen() {
       // the removal history, exactly like DoneScreen's Start Over.
       confirmDiscard({
         title: 'Start Over?',
-        message: `This will empty "${source.playlist.name} - Sifted" and clear the removal history for this playlist. This cannot be undone.`,
+        message: playlistStartOverMessage(state.provider, source.playlist.name),
         confirm: 'Start Over',
       }, start);
     } else {
@@ -547,11 +547,12 @@ export default function SetupScreen() {
 
         {showPlaylistPicker && (
           <PlaylistPicker
-            // Companion "- Sifted" playlists are outputs of sifting, not
-            // sources: offering them would let a sift target
-            // "<x> - Sifted - Sifted". The unfiltered list is kept in state
-            // because the already-sifted check below needs the companions.
-            playlists={playlists.filter((p) => !p.name.endsWith(' - Sifted'))}
+            // Companion "- Sifted" playlists and "Sift — Removed" are outputs
+            // of sifting, not sources: offering them would let a sift target
+            // "<x> - Sifted - Sifted", or songs already removed. The
+            // unfiltered list is kept in state because the already-sifted
+            // check below needs the companions.
+            playlists={playlists.filter((p) => !p.name.endsWith(' - Sifted') && p.name !== APPLE_REMOVED_PLAYLIST)}
             loading={loadingPlaylists}
             onSelect={(playlist) => {
               dispatch({ type: 'SET_SOURCE', source: { type: 'playlist', playlist } });

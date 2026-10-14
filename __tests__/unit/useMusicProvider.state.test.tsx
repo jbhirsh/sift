@@ -4,7 +4,7 @@ import { Alert, Linking } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
 import { useMusicProvider } from '../../src/hooks/useMusicProvider';
-import { loadHistory, logRemoval, removeFromHistory } from '../../src/services/RemovalHistoryStore';
+import { forgetRemovals, loadHistory, logRemoval, removeFromHistory } from '../../src/services/RemovalHistoryStore';
 import type { MusicProviderService } from '../../src/services/MusicProviderInterface';
 import { Playlist, Track } from '../../src/types';
 
@@ -40,6 +40,7 @@ const mockProvider = {
   getPlaybackState: jest.fn().mockReturnValue({ position: 30, isPlaying: true }),
   createPlaylist: jest.fn().mockResolvedValue(undefined),
   removeFromPlaylist: jest.fn().mockResolvedValue(undefined),
+  restoreRemoved: jest.fn().mockResolvedValue(1),
   removeFromLibrary: jest.fn().mockResolvedValue(undefined),
   addToPlaylist: jest.fn().mockResolvedValue(undefined),
   addToLibrary: jest.fn().mockResolvedValue(undefined),
@@ -80,6 +81,7 @@ jest.mock('../../src/services/RemovalHistoryStore', () => ({
   logRemoval: jest.fn(() => Promise.resolve()),
   loadHistory: jest.fn(() => Promise.resolve([])),
   removeFromHistory: jest.fn(() => Promise.resolve()),
+  forgetRemovals: jest.fn(() => Promise.resolve()),
   clearHistoryForSource: jest.fn(() => Promise.resolve()),
 }));
 
@@ -653,6 +655,7 @@ describe('useMusicProvider — observable state', () => {
       source: { type: 'library' },
       provider: 'apple-music',
       removedAt: expect.any(String),
+      collected: true,
     });
     expect(mockProvider.removeFromLibrary).toHaveBeenCalledWith(['1']);
     expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
@@ -690,26 +693,25 @@ describe('useMusicProvider — observable state', () => {
     });
     expect(sift.state.removed).toEqual([]);
     expect(sift.state.kept.map((t) => t.id)).toEqual(['1']);
-    expect(removeFromHistory).toHaveBeenCalledWith('1', { type: 'library' });
+    expect(forgetRemovals).toHaveBeenCalledWith('1', 'apple-music');
   });
 
   test('restoreTrack failure surfaces "name: reason" and keeps the history record', async () => {
-    mockProvider.loadPlaylists.mockResolvedValue([{ id: 'removed-pl', name: 'Sift \u2014 Removed', trackCount: 1 }]);
-    mockProvider.removeFromPlaylist.mockRejectedValueOnce(new Error('network down'));
+    mockProvider.restoreRemoved.mockRejectedValueOnce(new Error('network down'));
     await renderHarness([mockTrack]);
 
     await act(async () => {
       await api.restoreTrack(mockTrack);
     });
     expect(sift.state.removalErrors).toEqual(['Track A: network down']);
-    expect(removeFromHistory).not.toHaveBeenCalled();
+    expect(forgetRemovals).not.toHaveBeenCalled();
     expect(Sentry.captureException).toHaveBeenCalledWith(
       expect.any(Error),
       { tags: { flow: 'restore-track' } },
     );
 
     // Non-Error rejections get the generic reason.
-    mockProvider.removeFromPlaylist.mockRejectedValueOnce('boom');
+    mockProvider.restoreRemoved.mockRejectedValueOnce('boom');
     await act(async () => {
       await api.restoreTrack(mockTrack);
     });
@@ -731,7 +733,6 @@ describe('useMusicProvider — observable state', () => {
   const libraryRemoval = (track: Track) => ({
     track, source: { type: 'library' as const }, provider: 'apple-music' as const, removedAt: '2026-10-01T12:00:00.000Z',
   });
-  const removedPlaylist: Playlist = { id: 'removed-pl', name: 'Sift \u2014 Removed', trackCount: 1 };
 
   test('a library sift skips songs removed in an earlier Apple library sift', async () => {
     mockProvider.loadLibrary.mockResolvedValue([mockTrack, peaches, mockTrackB]);
@@ -811,7 +812,7 @@ describe('useMusicProvider — observable state', () => {
     expect(logRemoval).toHaveBeenCalledWith(expect.objectContaining({ track: mockTrack }));
   });
 
-  test('a playlist remove of a song removed from the library still goes through', async () => {
+  test('a playlist remove of a song already in "Sift \u2014 Removed" isn\'t collected twice', async () => {
     (loadHistory as jest.Mock).mockResolvedValue([libraryRemoval(peaches)]);
     await renderHarness([peaches]);
     await setPlaylistSource();
@@ -819,7 +820,8 @@ describe('useMusicProvider — observable state', () => {
     await act(async () => {
       await api.removeTrack(peaches);
     });
-    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('p1', ['peaches']);
+    expect(mockProvider.removeFromLibrary).not.toHaveBeenCalled();
+    expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
   });
 
   test('a failed Apple library removal drops its record so the next sift offers the song again', async () => {
@@ -834,100 +836,63 @@ describe('useMusicProvider — observable state', () => {
     expect(sift.state.removalErrors).toEqual(['Peaches']);
   });
 
-  test('a failed playlist removal keeps its record', async () => {
-    mockProvider.removeFromPlaylist.mockRejectedValueOnce(new Error('offline'));
+  test('a failed playlist removal drops its record too, so the next sift offers the song again', async () => {
+    mockProvider.removeFromLibrary.mockRejectedValueOnce(new Error('offline'));
     await renderHarness([peaches]);
     await setPlaylistSource();
 
     await act(async () => {
       await api.removeTrack(peaches);
     });
-    expect(removeFromHistory).not.toHaveBeenCalled();
+    expect(logRemoval).toHaveBeenCalledWith(expect.objectContaining({ track: peaches, collected: true }));
+    expect(removeFromHistory).toHaveBeenCalledWith('peaches', {
+      type: 'playlist',
+      playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 },
+    });
   });
 
   test('Apple library restore takes the song out of "Sift \u2014 Removed" instead of re-adding it', async () => {
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'other', name: 'Road Trip', trackCount: 3 },
-      removedPlaylist,
-    ]);
     await renderHarness([mockTrack]);
 
     await act(async () => {
       await api.restoreTrack(mockTrack);
     });
-    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('removed-pl', ['1']);
+    expect(mockProvider.restoreRemoved).toHaveBeenCalledWith(['1']);
     expect(mockProvider.addToLibrary).not.toHaveBeenCalled();
-    expect(removeFromHistory).toHaveBeenCalledWith('1', { type: 'library' });
+    expect(forgetRemovals).toHaveBeenCalledWith('1', 'apple-music');
     expect(sift.state.removalErrors).toEqual([]);
+    // The provider finds "Sift \u2014 Removed" itself: no reading every playlist.
+    expect(mockProvider.loadPlaylists).not.toHaveBeenCalled();
   });
 
-  test('Apple library restore clears the song from every "Sift \u2014 Removed" and looks them up once', async () => {
-    mockProvider.loadPlaylists.mockResolvedValue([
-      removedPlaylist,
-      { id: 'removed-pl-2', name: 'Sift \u2014 Removed', trackCount: 4 },
-    ]);
-    await renderHarness([mockTrack, mockTrackB]);
-
-    await act(async () => {
-      await api.restoreTrack(mockTrack);
-    });
-    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('removed-pl', ['1']);
-    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('removed-pl-2', ['1']);
-
-    await act(async () => {
-      await api.restoreTrack(mockTrackB);
-    });
-    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('removed-pl-2', ['2']);
-    // loadPlaylists reads every playlist's tracks: once is enough.
-    expect(mockProvider.loadPlaylists).toHaveBeenCalledTimes(1);
-  });
-
-  test('an Apple library restore looks for "Sift \u2014 Removed" again when it found none', async () => {
-    // A removal still landing can create the playlist after the first look.
-    mockProvider.loadPlaylists.mockResolvedValueOnce([]).mockResolvedValue([removedPlaylist]);
-    await renderHarness([mockTrack, mockTrackB]);
-
-    await act(async () => {
-      await api.restoreTrack(mockTrack);
-    });
-    expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
-
-    await act(async () => {
-      await api.restoreTrack(mockTrackB);
-    });
-    expect(mockProvider.loadPlaylists).toHaveBeenCalledTimes(2);
-    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('removed-pl', ['2']);
-  });
-
-  test('Apple library restore with no "Sift \u2014 Removed" playlist still purges the record', async () => {
+  test('Apple library restore with nothing in "Sift \u2014 Removed" still purges the record', async () => {
     // The user may have deleted the playlist: nothing to take the song out of.
-    mockProvider.loadPlaylists.mockResolvedValue([]);
+    mockProvider.restoreRemoved.mockResolvedValueOnce(0);
     await renderHarness([mockTrack]);
 
     await act(async () => {
       await api.restoreTrack(mockTrack);
     });
-    expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
-    expect(removeFromHistory).toHaveBeenCalledWith('1', { type: 'library' });
+    expect(forgetRemovals).toHaveBeenCalledWith('1', 'apple-music');
     expect(sift.state.removalErrors).toEqual([]);
   });
 
   test('a failed Apple library restore surfaces the error and keeps the record', async () => {
-    mockProvider.loadPlaylists.mockResolvedValue([removedPlaylist]);
-    mockProvider.removeFromPlaylist.mockRejectedValueOnce(new Error('not editable'));
+    mockProvider.restoreRemoved.mockRejectedValueOnce(new Error('not editable'));
     await renderHarness([mockTrack]);
 
     await act(async () => {
       await api.restoreTrack(mockTrack);
     });
     expect(sift.state.removalErrors).toEqual(['Track A: not editable']);
-    expect(removeFromHistory).not.toHaveBeenCalled();
+    expect(forgetRemovals).not.toHaveBeenCalled();
 
-    // The playlist may be gone: the next restore looks it up again.
+    // The next restore tries again.
     await act(async () => {
       await api.restoreTrack(mockTrack);
     });
-    expect(mockProvider.loadPlaylists).toHaveBeenCalledTimes(2);
+    expect(mockProvider.restoreRemoved).toHaveBeenCalledTimes(2);
+    expect(forgetRemovals).toHaveBeenCalledWith('1', 'apple-music');
   });
 
   test("the load breadcrumb never names the playlist (#147)", async () => {
@@ -1319,23 +1284,64 @@ describe('useMusicProvider — observable state', () => {
     });
     expect(sift.state.phase).toBe('sifting');
     expect(sift.state.tracks.map((t) => t.id)).toEqual(['1']);
-    // Skipping the filters means not even reading the companion or history.
+    // Skipping the filters means not even reading the companion. The history
+    // is still read: songs waiting in "Sift \u2014 Removed" stay out, as for
+    // the library (starting over un-removes nothing).
     expect(mockProvider.loadPlaylists).not.toHaveBeenCalled();
-    expect(loadHistory).not.toHaveBeenCalled();
+    expect(loadHistory).toHaveBeenCalledTimes(1);
   });
 
-  test('removal history from other sources does not hide playlist tracks', async () => {
-    // The same song was removed from the LIBRARY and from ANOTHER playlist —
-    // neither record concerns this playlist, so the track must be offered.
+  test('skipFiltering on a playlist whose songs are all removed says so, not "no tracks"', async () => {
+    mockProvider.loadPlaylistTracks.mockResolvedValue([mockTrack]);
+    (loadHistory as jest.Mock).mockResolvedValueOnce([libraryRemoval(mockTrack)]);
+    await renderHarness([]);
+    await setPlaylistSource();
+
+    await act(async () => {
+      await api.loadTracks({ skipFiltering: true });
+    });
+    expect(sift.state.loadError).toBe('All tracks in this playlist were removed in a previous sift.');
+  });
+
+  test('skipFiltering still leaves out a song waiting in "Sift \u2014 Removed"', async () => {
+    mockProvider.loadPlaylistTracks.mockResolvedValue([mockTrack, mockTrackB]);
+    (loadHistory as jest.Mock).mockResolvedValueOnce([libraryRemoval(mockTrack)]);
+    await renderHarness([]);
+    await setPlaylistSource();
+
+    await act(async () => {
+      await api.loadTracks({ skipFiltering: true });
+    });
+    expect(sift.state.tracks.map((t) => t.id)).toEqual(['2']);
+  });
+
+  test('a removal in another sift hides the song: it waits in "Sift \u2014 Removed" for them all', async () => {
     mockProvider.loadPlaylistTracks.mockResolvedValueOnce([mockTrack]);
     mockProvider.loadPlaylists.mockResolvedValue([]);
     (loadHistory as jest.Mock).mockResolvedValueOnce([
       {
         track: mockTrack,
-        source: { type: 'library' },
+        source: { type: 'playlist', playlist: { id: 'p2', name: 'Other Playlist', trackCount: 3 } },
         provider: 'apple-music',
-        removedAt: '2026-01-01T00:00:00.000Z',
+        removedAt: '2026-01-02T00:00:00.000Z',
+        collected: true,
       },
+    ]);
+    await renderHarness([]);
+    await setPlaylistSource();
+
+    await act(async () => {
+      await api.loadTracks();
+    });
+    expect(sift.state.loadError).toBe('All tracks in this playlist were removed in a previous sift.');
+  });
+
+  test('older removals from another playlist, which never took effect, hide nothing', async () => {
+    // Before removals were collected, a playlist Remove edited the playlist,
+    // which MusicKit refuses for the user's own: those songs never left.
+    mockProvider.loadPlaylistTracks.mockResolvedValueOnce([mockTrack]);
+    mockProvider.loadPlaylists.mockResolvedValue([]);
+    (loadHistory as jest.Mock).mockResolvedValueOnce([
       {
         track: mockTrack,
         source: { type: 'playlist', playlist: { id: 'p2', name: 'Other Playlist', trackCount: 3 } },
@@ -1385,6 +1391,7 @@ describe('useMusicProvider — observable state', () => {
         source: { type: 'playlist', playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 } },
         provider: 'apple-music',
         removedAt: '2026-01-01T00:00:00.000Z',
+        collected: true,
       },
     ]);
     await renderHarness([]);
@@ -1789,7 +1796,7 @@ describe('useMusicProvider — observable state', () => {
     await act(async () => {
       await api.restoreTrack(mockTrack);
     });
-    expect(removeFromHistory).toHaveBeenCalledWith('1', { type: 'library' });
+    expect(forgetRemovals).toHaveBeenCalledWith('1', 'apple-music');
     expect(sift.state.removalErrors).toEqual([]);
 
     // Playlist source: same graceful degradation.
@@ -1801,10 +1808,7 @@ describe('useMusicProvider — observable state', () => {
       await api.restoreTrack(mockTrack);
     });
     expect(sift.state.removalErrors).toEqual([]);
-    expect(removeFromHistory).toHaveBeenLastCalledWith('1', {
-      type: 'playlist',
-      playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 },
-    });
+    expect(forgetRemovals).toHaveBeenCalledTimes(2);
   });
 
   test('warmCache no-ops silently on a provider without cache warming', async () => {

@@ -3,10 +3,10 @@ import { Alert, Linking } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { useSift } from '../context/SiftContext';
 import { useMusicProviderService } from '../context/MusicProviderContext';
-import { logRemoval, loadHistory, removeFromHistory } from '../services/RemovalHistoryStore';
+import { forgetRemovals, logRemoval, loadHistory, removeFromHistory } from '../services/RemovalHistoryStore';
 import { sortTracks } from '../utils/sorting';
 import { TrackIndex } from '../utils/trackIdentity';
-import { APPLE_REMOVED_PLAYLIST, libraryRemovedIds } from '../utils/libraryRemovals';
+import { APPLE_REMOVED_PLAYLIST, collectedRemovalIds, collectsRemovals } from '../utils/libraryRemovals';
 import { ledgerKey } from '../utils/reviewedLedger';
 import { isFiltering, matchesFilter } from '../utils/trackFilter';
 import { loadReviewedIds, markReviewed, unmarkReviewed } from '../services/ReviewedLedgerStore';
@@ -69,10 +69,6 @@ export function useMusicProvider() {
 
   const siftedPlaylistIdRef = useRef<string | null>(null);
   const siftedPlaylistForRef = useRef<string | null>(null);
-  // Ids of the "Sift — Removed" playlists, looked up on the first Apple
-  // library restore. Restores run on the Done screen, so this lives as long
-  // as that screen's hook instance does.
-  const removedPlaylistIdsRef = useRef<string[] | null>(null);
   // Once-per-session readback of the sifted playlist's contents (ids and
   // identities), consulted before keepTrack's direct add so re-keeping a
   // song that already landed can't double-add it. Kept current as adds
@@ -328,13 +324,25 @@ export function useMusicProvider() {
             filteredAsSifted = beforeSiftedFilter - tracks.length;
           }
 
-          // Exclude tracks previously removed from this playlist
-          const history = await loadHistory();
-          const removedIds = new Set(
-            history
-              .filter((r) => r.source.type === 'playlist' && r.source.playlist.id === source.playlist.id)
-              .map((r) => r.track.id),
-          );
+          if (!collectsRemovals(state.provider)) {
+            // Exclude tracks previously removed from this playlist
+            const history = await loadHistory();
+            const removedIds = new Set(
+              history
+                .filter((r) => r.source.type === 'playlist' && r.source.playlist.id === source.playlist.id)
+                .map((r) => r.track.id),
+            );
+            const beforeRemovedFilter = tracks.length;
+            tracks = tracks.filter((t) => !removedIds.has(t.id));
+            filteredAsRemoved = beforeRemovedFilter - tracks.length;
+          }
+        }
+        if (collectsRemovals(state.provider)) {
+          // Skip songs removed in any earlier sift: they wait in "Sift —
+          // Removed" to be deleted from the library (Remove means that,
+          // whatever the sift). Applies with skipFiltering, as for the
+          // library: starting over un-removes nothing.
+          const removedIds = collectedRemovalIds(await loadHistory(), state.provider);
           const beforeRemovedFilter = tracks.length;
           tracks = tracks.filter((t) => !removedIds.has(t.id));
           filteredAsRemoved = beforeRemovedFilter - tracks.length;
@@ -342,15 +350,15 @@ export function useMusicProvider() {
       } else {
         tracks = await providerRef.current.loadLibrary();
         unfilteredCount = tracks.length;
-        if (state.provider === 'apple-music') {
-          // Skip songs removed in an earlier library sift (#139). On Apple
-          // Music they never left the library (they sit in "Sift — Removed"),
-          // so without this every library sift offered them again. Applies
+        if (collectsRemovals(state.provider)) {
+          // Skip songs removed in an earlier sift (#139). On Apple Music
+          // they never left the library (they sit in "Sift — Removed"), so
+          // without this every library sift offered them again. Applies
           // with skipFiltering too: a library Start Over starts the decisions
           // over but un-removes nothing. A provider whose Remove really
           // deletes the song wouldn't need this: a song back in its library
           // was re-added on purpose.
-          const removedIds = libraryRemovedIds(await loadHistory(), state.provider);
+          const removedIds = collectedRemovalIds(await loadHistory(), state.provider);
           const beforeRemovedFilter = tracks.length;
           tracks = tracks.filter((t) => !removedIds.has(t.id));
           filteredAsRemoved = beforeRemovedFilter - tracks.length;
@@ -393,7 +401,7 @@ export function useMusicProvider() {
       if (tracks.length === 0) {
         const error = filteredByLimits > 0
           ? `No songs ${source.type === 'playlist' ? 'in this playlist ' : ''}match your Plays and Added choices.`
-          : source.type === 'playlist' && shouldFilter && unfilteredCount > 0
+          : source.type === 'playlist' && unfilteredCount > 0 && (shouldFilter || filteredAsRemoved > 0)
             ? filteredAsRemoved === 0
               ? 'All tracks in this playlist have already been sifted.'
               : filteredAsSifted === 0
@@ -432,10 +440,11 @@ export function useMusicProvider() {
     const { failedRemovalIds, removed, source, provider } = removalStateRef.current;
     const service = providerRef.current;
     const { removeFromPlaylist, removeFromLibrary } = service;
+    const collecting = collectsRemovals(provider);
     // Nothing to retry with: a missing call must not count as a removal.
     let remove: ((id: string) => Promise<void>) | undefined;
-    if (source.type === 'playlist') {
-      if (removeFromPlaylist) remove = (id) => removeFromPlaylist.call(service, source.playlist.id, [id]);
+    if (source.type === 'playlist' && !collecting) {
+      if (removeFromPlaylist) remove = async (id) => { await removeFromPlaylist.call(service, source.playlist.id, [id]); };
     } else if (removeFromLibrary) {
       remove = (id) => removeFromLibrary.call(service, [id]);
     }
@@ -456,10 +465,10 @@ export function useMusicProvider() {
         try {
           const landed = (await service.removalLanded?.(source, track.id)) ?? false;
           if (!landed) await remove(track.id);
-          // The failed Apple library removal dropped its history record;
-          // now it has landed, record it again so later sifts leave it out.
-          if (source.type === 'library' && provider === 'apple-music') {
-            await logRemoval({ track, source, provider, removedAt: new Date().toISOString() });
+          // The failed collected removal dropped its history record; now
+          // it has landed, record it again so later sifts leave it out.
+          if (collecting) {
+            await logRemoval({ track, source, provider, removedAt: new Date().toISOString(), collected: true });
           }
           dispatch({ type: 'CLEAR_REMOVAL_FAILURE', trackId: track.id, error: track.name });
         } catch (err) {
@@ -483,11 +492,11 @@ export function useMusicProvider() {
     // report: whether this removal belongs to the sift in state, whose
     // failures it shows and retries.
     async (track: Track, source: SiftSource, provider: MusicProvider, report: boolean) => {
-      const appleLibrary = source.type === 'library' && provider === 'apple-music';
-      // An Apple Music song removed in an earlier library sift is already
-      // recorded and already in "Sift — Removed"; removing it again (if a
-      // sift offers it anyway) would add a duplicate there (#139).
-      if (appleLibrary && libraryRemovedIds(await loadHistory(), provider).has(track.id)) return;
+      const collecting = collectsRemovals(provider);
+      // A song removed in an earlier sift is already recorded and already in
+      // "Sift — Removed"; removing it again (if a sift offers it anyway)
+      // would add a duplicate there (#139).
+      if (collecting && collectedRemovalIds(await loadHistory(), provider).has(track.id)) return;
       // Log the removal before attempting it — the user's intent is what
       // matters, and a playlist's failed removal stays filtered out.
       await logRemoval({
@@ -495,9 +504,10 @@ export function useMusicProvider() {
         source,
         provider,
         removedAt: new Date().toISOString(),
+        ...(collecting ? { collected: true } : {}),
       });
       try {
-        if (source.type === 'playlist') {
+        if (source.type === 'playlist' && !collecting) {
           await providerRef.current.removeFromPlaylist?.(source.playlist.id, [track.id]);
         } else {
           await providerRef.current.removeFromLibrary?.([track.id]);
@@ -505,10 +515,10 @@ export function useMusicProvider() {
       } catch (err) {
         Sentry.captureException(err, { tags: { flow: 'remove-track' } });
         if (report) dispatch({ type: 'ADD_REMOVAL_ERROR', error: track.name, failedRemovalId: track.id });
-        // A failed Apple library removal left the song in the library and
-        // out of "Sift — Removed": drop its record so the next library sift
-        // offers it again rather than hiding it for good.
-        if (appleLibrary) await removeFromHistory(track.id, source);
+        // A failed collected removal left the song where it was and out of
+        // "Sift — Removed": drop its record so the next sift offers it
+        // again rather than hiding it for good.
+        if (collecting) await removeFromHistory(track.id, source);
         return;
       }
       // This one landed, so the connection works: retry any that failed.
@@ -546,50 +556,39 @@ export function useMusicProvider() {
         await removalRetryInFlight;
         await removalsInFlight.get(track.id);
         const source = state.source;
-        // A playlist removal that failed may never have taken effect: then
-        // the song is still in the playlist, and adding it back would make
-        // a second copy, so restoring it is only forgetting the removal.
-        // Asked rather than read from failedRemovalIds: one can fail after
-        // taking effect, and a failure that just came in may not be in this
-        // screen's state yet. (Taking a library song out of "Sift — Removed"
-        // is harmless when it never went in.)
         const service = providerRef.current;
-        const stillThere = source.type === 'playlist' && service.removalLanded != null
-          && !(await service.removalLanded(source, track.id));
-        if (source.type === 'playlist') {
-          if (!stillThere) await service.addToPlaylist?.(source.playlist.id, [track.id]);
-        } else if (state.provider === 'apple-music') {
-          // An Apple Music library Remove never took the song out of the
-          // library: it put it in "Sift — Removed". Restoring means taking it
-          // back out of there (#139); addToLibrary did nothing for a song
-          // that never left, yet reported success.
-          // Every playlist by that name (the user, or a missed lookup in the
-          // native remove, can make a second), found once per screen:
-          // loadPlaylists reads every playlist's tracks. An empty result
-          // isn't kept: a removal still landing can create the playlist.
-          let removedIds = removedPlaylistIdsRef.current;
-          if (removedIds == null) {
-            const playlists = await providerRef.current.loadPlaylists?.() ?? [];
-            removedIds = playlists
-              .filter((p) => p.name === APPLE_REMOVED_PLAYLIST)
-              .map((p) => p.id);
-            removedPlaylistIdsRef.current = removedIds.length > 0 ? removedIds : null;
+        if (collectsRemovals(state.provider)) {
+          // An Apple Music Remove never took the song out of the library or
+          // the playlist: it put it in "Sift — Removed". Restoring means
+          // taking it back out of there (#139). Nothing came out is fine
+          // when it never went in (its removal failed); not when it's still
+          // there (filed under an id the take-out didn't match): then the
+          // Restore failed, and says so rather than forget a song the user
+          // would later delete.
+          const out = (await service.restoreRemoved?.([track.id])) ?? 0;
+          if (out === 0 && (await service.removalLanded?.(source, track.id))) {
+            throw new Error(`Couldn\u2019t take it out of "${APPLE_REMOVED_PLAYLIST}". Try again.`);
           }
-          try {
-            for (const id of removedIds) {
-              await providerRef.current.removeFromPlaylist?.(id, [track.id]);
-            }
-          } catch (err) {
-            // The playlist may have been deleted since: look again next time.
-            removedPlaylistIdsRef.current = null;
-            throw err;
-          }
+          // Removed in any sift, it's restored for every sift.
+          await forgetRemovals(track.id, state.provider);
         } else {
-          await providerRef.current.addToLibrary?.([track.id]);
+          // A playlist removal that failed may never have taken effect: then
+          // the song is still in the playlist, and adding it back would make
+          // a second copy, so restoring it is only forgetting the removal.
+          // Asked rather than read from failedRemovalIds: one can fail after
+          // taking effect, and a failure that just came in may not be in
+          // this screen's state yet.
+          const stillThere = source.type === 'playlist' && service.removalLanded != null
+            && !(await service.removalLanded(source, track.id));
+          if (source.type === 'playlist') {
+            if (!stillThere) await service.addToPlaylist?.(source.playlist.id, [track.id]);
+          } else {
+            await service.addToLibrary?.([track.id]);
+          }
+          // Purge the removal-history record so the restored track is offered
+          // again on the next sift of this source instead of being filtered out.
+          await removeFromHistory(track.id, source);
         }
-        // Purge the removal-history record so the restored track is offered
-        // again on the next sift of this source instead of being filtered out.
-        await removeFromHistory(track.id, source);
         // Nothing left to retry: the song is back where it was.
         dispatch({ type: 'CLEAR_REMOVAL_FAILURE', trackId: track.id, error: track.name });
         dispatch({ type: 'RESTORE_TRACK', trackId: track.id });

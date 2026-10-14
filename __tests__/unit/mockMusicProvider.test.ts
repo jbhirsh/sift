@@ -282,14 +282,14 @@ describe('MockMusicProvider', () => {
     expect(settle).toHaveBeenCalledTimes(1);
   });
 
-  test('removeFromPlaylist resolves undefined, but only after its simulated delay', async () => {
+  test('removeFromPlaylist resolves to how many came out, but only after its simulated delay', async () => {
     const settle = jest.fn();
-    const promise = provider.removeFromPlaylist('playlist-1', ['mock-1']);
+    const promise = provider.removeFromPlaylist('playlist-1', ['mock-1', 'mock-3']);
     void promise.then(settle, settle);
     await flushMicrotasks();
     expect(settle).not.toHaveBeenCalled();
     jest.advanceTimersByTime(200);
-    await expect(promise).resolves.toBeUndefined();
+    await expect(promise).resolves.toBe(2);
     expect(settle).toHaveBeenCalledTimes(1);
   });
 
@@ -385,15 +385,26 @@ describe('MockMusicProvider failure injection (EXPO_PUBLIC_MOCK_FAIL_ADDS / _REM
     // ...and other songs go through.
     await expect(provider.removeFromLibrary(['t2'])).resolves.toBeUndefined();
     await expect(provider.removeFromLibrary(['t3'])).resolves.toBeUndefined();
-    // Only the landed library removals show as landed.
+    // Only the landed removals show as landed, whatever the sift: like
+    // Apple Music, a removed song is in "Sift — Removed".
     await expect(provider.removalLanded({ type: 'library' }, 't2')).resolves.toBe(true);
     await expect(provider.removalLanded({ type: 'library' }, 't1')).resolves.toBe(false);
     const playlist = { type: 'playlist' as const, playlist: { id: 'p1', name: 'P', trackCount: 1 } };
-    await expect(provider.removalLanded(playlist, 't2')).resolves.toBe(false);
+    await expect(provider.removalLanded(playlist, 't2')).resolves.toBe(true);
+    await expect(provider.removalLanded(playlist, 't1')).resolves.toBe(false);
     // removeFromPlaylist is deliberately never injected (Start Over /
     // Re-sift clears depend on it), and adds have their own knob.
-    await expect(provider.removeFromPlaylist('p1', ['t1'])).resolves.toBeUndefined();
+    await expect(provider.removeFromPlaylist('p1', ['t1'])).resolves.toBe(1);
     await expect(provider.addToPlaylist('p1', ['t1'])).resolves.toBeUndefined();
+  });
+
+  test('restoreRemoved takes landed songs back out of "Sift — Removed", and only those', async () => {
+    const Fresh = freshMockClass();
+    const provider = new Fresh();
+    await provider.removeFromLibrary(['t1']);
+    await expect(provider.restoreRemoved(['t1', 'never'])).resolves.toBe(1);
+    await expect(provider.removalLanded({ type: 'library' }, 't1')).resolves.toBe(false);
+    await expect(provider.restoreRemoved(['t1'])).resolves.toBe(0);
   });
 
   test('invalid or negative knob values inject nothing', async () => {

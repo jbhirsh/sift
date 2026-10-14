@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/react-native';
 import { File, Paths } from 'expo-file-system';
-import { RemovalRecord, SiftSource } from '../types';
+import { MusicProvider, RemovalRecord, SiftSource } from '../types';
 import { isLegacyLocalFileRecord, isRemovalRecord } from '../utils/validators';
 
 const HISTORY_NAME = 'removal-history.json';
@@ -149,16 +149,18 @@ export function logRemoval(record: RemovalRecord): Promise<void> {
 }
 
 /**
- * Drop every history record for a playlist source. Returns false when the
- * rewrite failed so callers (Start Over / Re-sift) can surface the failure
- * instead of silently proceeding with stale exclusions.
+ * Drop the history records for a playlist source (Start Over / Re-sift),
+ * except collected ones: those songs wait in "Sift — Removed", and starting
+ * over un-removes nothing, as for the library. Returns false when the
+ * rewrite failed so callers can surface the failure instead of silently
+ * proceeding with stale exclusions.
  */
 export function clearHistoryForSource(playlistId: string): Promise<boolean> {
   return enqueueMutation(async () => {
     try {
       const { records: history } = await loadForMutation();
       const filtered = history.filter(
-        (r) => !(r.source.type === 'playlist' && r.source.playlist.id === playlistId),
+        (r) => r.collected === true || !(r.source.type === 'playlist' && r.source.playlist.id === playlistId),
       );
       await writeHistory(filtered);
       return true;
@@ -202,6 +204,25 @@ export function removeFromHistory(trackId: string, source: SiftSource): Promise<
       );
       // After a reset the file must be rewritten even when nothing matched,
       // or every later Restore would back the same file up again.
+      if (reset || filtered.length !== history.length) {
+        await writeHistory(filtered);
+      }
+    } catch (err) {
+      Sentry.captureException(err, { tags: { flow: 'removal-history-remove' } });
+    }
+  });
+}
+
+/**
+ * Drop every history record for a track with this provider, whatever sift
+ * made it: a Restore for a provider that collects removals (one "Sift —
+ * Removed" for every sift). Best-effort, like removeFromHistory.
+ */
+export function forgetRemovals(trackId: string, provider: MusicProvider): Promise<void> {
+  return enqueueMutation(async () => {
+    try {
+      const { records: history, reset } = await loadForMutation();
+      const filtered = history.filter((r) => !(r.track.id === trackId && r.provider === provider));
       if (reset || filtered.length !== history.length) {
         await writeHistory(filtered);
       }

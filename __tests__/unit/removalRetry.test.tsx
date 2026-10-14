@@ -5,7 +5,7 @@ import * as Sentry from '@sentry/react-native';
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
 import { MAX_REMOVAL_RETRIES, resetRemovalRetries, useMusicProvider } from '../../src/hooks/useMusicProvider';
 import { useRemovalRetry } from '../../src/hooks/useRemovalRetry';
-import { logRemoval, removeFromHistory } from '../../src/services/RemovalHistoryStore';
+import { forgetRemovals, logRemoval, removeFromHistory } from '../../src/services/RemovalHistoryStore';
 import type { Track } from '../../src/types';
 
 // Retrying failed removals (#151).
@@ -28,6 +28,7 @@ jest.mock('../../src/services/RemovalHistoryStore', () => ({
   logRemoval: jest.fn(() => Promise.resolve()),
   loadHistory: jest.fn(() => Promise.resolve([])),
   removeFromHistory: jest.fn(() => Promise.resolve()),
+  forgetRemovals: jest.fn(() => Promise.resolve()),
   clearHistoryForSource: jest.fn(() => Promise.resolve()),
 }));
 
@@ -43,6 +44,7 @@ const mockProvider = {
   createPlaylist: jest.fn().mockResolvedValue(undefined),
   removeFromLibrary: jest.fn().mockResolvedValue(undefined),
   removeFromPlaylist: jest.fn().mockResolvedValue(undefined),
+  restoreRemoved: jest.fn().mockResolvedValue(1),
   removalLanded: jest.fn().mockResolvedValue(false) as jest.Mock | undefined,
   loadPlaylists: jest.fn().mockResolvedValue([{ id: 'removed-pl', name: 'Sift — Removed', trackCount: 0 }]),
 };
@@ -175,7 +177,7 @@ describe('retryFailedRemovals', () => {
     expect(mockProvider.removeFromLibrary).toHaveBeenCalledTimes(1);
   });
 
-  test('a playlist removal retries against the playlist, with no history to restore', async () => {
+  test('a playlist removal retries into "Sift — Removed", never the playlist, and is recorded again', async () => {
     await render(<SiftProvider initialTracks={[trackA, trackB]}><Harness /></SiftProvider>);
     const source = { type: 'playlist' as const, playlist: { id: 'p1', name: 'Mix', trackCount: 2 } };
     await act(async () => {
@@ -184,17 +186,20 @@ describe('retryFailedRemovals', () => {
     await act(async () => {
       sift.decide('remove');
     });
-    mockProvider.removeFromPlaylist.mockRejectedValueOnce(new Error('offline'));
+    mockProvider.removeFromLibrary.mockRejectedValueOnce(new Error('offline'));
     await act(async () => {
       await api.removeTrack(trackA);
     });
+    // The failed removal dropped its record, so the song isn't hidden.
+    expect(removeFromHistory).toHaveBeenCalledWith('a', source);
     (logRemoval as jest.Mock).mockClear();
     await act(async () => {
       await api.retryFailedRemovals();
     });
     expect(mockProvider.removalLanded).toHaveBeenCalledWith(source, 'a');
-    expect(mockProvider.removeFromPlaylist).toHaveBeenLastCalledWith('p1', ['a']);
-    expect(logRemoval).not.toHaveBeenCalled();
+    expect(mockProvider.removeFromLibrary).toHaveBeenLastCalledWith(['a']);
+    expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
+    expect(logRemoval).toHaveBeenCalledWith(expect.objectContaining({ track: trackA, source, collected: true }));
     expect(sift.state.failedRemovalIds).toEqual([]);
   });
 
@@ -211,16 +216,16 @@ describe('retryFailedRemovals', () => {
       restore = api.restoreTrack(trackA);
     });
     // The restore hasn't touched "Sift — Removed" while the retry is out.
-    expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
+    expect(mockProvider.restoreRemoved).not.toHaveBeenCalled();
     await act(async () => {
       landedCheck(false);
       await Promise.all([retry, restore]);
     });
     // Retry's remove and record first, then the restore undoes both.
     const removeOrder = mockProvider.removeFromLibrary.mock.invocationCallOrder.at(-1) ?? 0;
-    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('removed-pl', ['a']);
-    expect(mockProvider.removeFromPlaylist.mock.invocationCallOrder[0]).toBeGreaterThan(removeOrder);
-    expect((removeFromHistory as jest.Mock).mock.invocationCallOrder.at(-1))
+    expect(mockProvider.restoreRemoved).toHaveBeenCalledWith(['a']);
+    expect(mockProvider.restoreRemoved.mock.invocationCallOrder[0]).toBeGreaterThan(removeOrder);
+    expect((forgetRemovals as jest.Mock).mock.invocationCallOrder.at(-1))
       .toBeGreaterThan((logRemoval as jest.Mock).mock.invocationCallOrder.at(-1) ?? Infinity);
     expect(sift.state.removed).toEqual([]);
   });
@@ -228,8 +233,8 @@ describe('retryFailedRemovals', () => {
   test('a retry that starts during a Restore leaves that song alone (#151)', async () => {
     await render(<SiftProvider initialTracks={[trackA, trackB]}><Harness /></SiftProvider>);
     await failFirstRemoval();
-    let playlistsLoaded!: (lists: unknown[]) => void;
-    mockProvider.loadPlaylists.mockImplementationOnce(() => new Promise((resolve) => { playlistsLoaded = resolve; }));
+    let restored!: (count: number) => void;
+    mockProvider.restoreRemoved.mockImplementationOnce(() => new Promise((resolve) => { restored = resolve; }));
     mockProvider.removeFromLibrary.mockClear();
     let restore!: Promise<boolean>;
     await act(async () => {
@@ -241,7 +246,7 @@ describe('retryFailedRemovals', () => {
     expect(mockProvider.removalLanded).not.toHaveBeenCalled();
     expect(mockProvider.removeFromLibrary).not.toHaveBeenCalled();
     await act(async () => {
-      playlistsLoaded([{ id: 'removed-pl', name: 'Sift — Removed', trackCount: 0 }]);
+      restored(1);
       await restore;
     });
     expect(sift.state.removed).toEqual([]);

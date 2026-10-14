@@ -69,6 +69,7 @@ jest.mock('../../src/services/RemovalHistoryStore', () => ({
   logRemoval: jest.fn(() => Promise.resolve()),
   loadHistory: jest.fn(() => Promise.resolve([])),
   removeFromHistory: jest.fn(() => Promise.resolve()),
+  forgetRemovals: jest.fn(() => Promise.resolve()),
   clearHistoryForSource: jest.fn(() => Promise.resolve(true)),
 }));
 
