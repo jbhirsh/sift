@@ -103,7 +103,7 @@ name: "Library Sift Skips Removed Songs"
       text: "Songs you’ve already kept are included in new sifts\\."
     timeout: 10000
 
-- tapOn: "Start Sifting"
+- runFlow: shared/start_sifting.yaml
 
 # Peaches' removal failed, so it is offered again; drivers license was
 # removed, so the sift goes from Peaches straight to Montero, one short.

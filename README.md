@@ -30,7 +30,7 @@ Settings: the optional **Start at chorus** switch (Apple Music).
 - **Start at chorus** — an optional setting that starts each song at its most recognizable part. The chorus is found from timed lyrics ([LRCLIB](https://lrclib.net)): the block of lines a song repeats. When that fails, ShazamKit locates Apple Music's preview clip (which labels start at "the good part") inside the full track. Results are cached per song, and the next cards are resolved ahead of time so swiping stays instant.
 - **Crash-safe sessions** — all state lives in a single typed `useReducer`; sessions auto-save (debounced) to `AsyncStorage` after every decision and resume exactly where you left off.
 - **Observability** — Sentry is wired for errors and sampled tracing (5%), with breadcrumbs on user actions and provider calls. No session replay, profiling or default PII; breadcrumbs never name a track or playlist, and quoted names and URL queries are scrubbed from JavaScript events before they leave the device (`utils/sentryScrub`).
-- **Tested & CI-gated** — 28 Jest unit suites (80% coverage threshold) run on every PR via GitHub Actions, plus 7 Maestro E2E flows runnable on demand.
+- **Tested & CI-gated** — Jest unit tests (80% line coverage per file), mutation testing (Stryker) and Maestro E2E flows on an iOS simulator, with an Xcode accessibility audit, run on every PR via GitHub Actions.
 
 ---
 
@@ -55,16 +55,17 @@ Settings: the optional **Start at chorus** switch (Apple Music).
 ```
 src/
   App.tsx               Phase router + settings modal + Sentry init
-  components/           Reusable UI (GlassCard, GlassBackground, InteractiveCard,
-                        PlayerControls, PlaylistPicker, Button)
+  components/           Reusable UI (Button, GlassCard, InteractiveCard, PlayerControls,
+                        PlaylistPicker, DecisionsSheet, UndoPill, …)
   screens/              SetupScreen, LoadingScreen, SiftScreen, DoneScreen, SettingsScreen
-  context/              SiftContext (useReducer state management)
+  context/              SiftContext (useReducer state), MusicProviderContext
   services/             MusicProviderInterface, AppleMusicProvider, MockMusicProvider,
-                        SessionStore, RemovalHistoryStore
-  hooks/                useMusicProvider, useResolvedArtwork
+                        SessionStore, RemovalHistoryStore, ReviewedLedgerStore,
+                        PreferencesStore, ChorusFinder, LrclibClient
+  hooks/                useMusicProvider, usePendingDecision, useReviseDecision, …
   theme/                Design tokens + ThemeContext (light/dark)
   types/                Shared TypeScript types
-  utils/                formatTime, sorting, mockData
+  utils/                Pure logic, one file per job (sorting, trackFilter, …)
 modules/
   expo-musickit/        Custom Swift/MusicKit native module (Expo Modules API)
 __tests__/
@@ -115,11 +116,11 @@ A `Makefile` mirrors these (`make test`, `make lint`, `make typecheck`, `make ch
 
 ## Testing
 
-- **Unit** (`npm test`) — reducers, services, hooks, utils, and component rendering via React Native Testing Library; an 80% coverage threshold is enforced.
-- **E2E** (`make test-e2e`) — Maestro flows in `.maestro/` cover launch, the sift loop, decisions, pause/resume, completion, settings, and playlist sources against a simulator build.
+- **Unit** (`npm test`) — reducers, services, hooks, utils, and component rendering via React Native Testing Library; 80% line coverage is enforced per file, and Stryker measures how much the tests actually check.
+- **E2E** (`make test-e2e`) — Maestro flows in `.maestro/` cover the sift loop end to end (swipes, Undo, changing a decision, resume, Done, Restore, filters, playlist sources, settings) against a simulator build with a mock music provider.
 
 ---
 
 ## CI/CD
 
-Every PR runs lint, typecheck, and unit tests (with coverage) on Ubuntu. The Maestro iOS E2E job (macOS) runs on demand via `workflow_dispatch`. Dependabot keeps npm and Actions dependencies current. All changes reach `main` via PR.
+Every PR runs lint, typecheck, dependency rules and unit tests (with coverage) on Ubuntu, plus secret scanning, SAST and mutation testing. The Maestro iOS E2E job and accessibility audit (macOS) run on every PR that can affect the app. Dependabot keeps npm and Actions dependencies current. All changes reach `main` via PR; see `CLAUDE.md` for the full list of required checks.
