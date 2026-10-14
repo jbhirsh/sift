@@ -89,25 +89,45 @@ jest.mock('../../src/hooks/useResolvedArtwork', () => ({
 // Mock InteractiveCard to expose onDecide for testing handleCardDecide
 jest.mock('../../src/components/InteractiveCard', () => {
   const { TouchableOpacity, Text, View } = require('react-native');
+  const React = require('react');
   return function MockInteractiveCard({ track, onDecide, disabled, artworkRetryKey }: {
     track: { name: string; artist: string; album: string; playCount: number };
-    onDecide: (d: string) => void;
+    onDecide: (d: string) => boolean;
     disabled?: boolean;
     artworkRetryKey?: number;
   }) {
+    // What the last swipe heard back: false springs the real card back.
+    const [lastDecide, setLastDecide] = React.useState(null);
+    const decide = (d: string) => setLastDecide(onDecide(d));
     return (
-      <View testID="mock-card" accessibilityState={{ disabled }} accessibilityHint={`artwork retry ${artworkRetryKey}`}>
+      <View testID="mock-card" accessibilityState={{ disabled }} accessibilityHint={`artwork retry ${artworkRetryKey}`} accessibilityValue={{ text: `last decide ${lastDecide}` }}>
         <Text testID="card-track-name">{track.name}</Text>
         <Text testID="card-artist-name">{track.artist}</Text>
         <Text testID="card-album-name">{track.album}</Text>
         <Text testID="card-play-count">{track.playCount}</Text>
-        <TouchableOpacity testID="mock-card-keep" accessibilityRole="button" accessibilityLabel="Swipe keep" onPress={() => onDecide('keep')} />
-        <TouchableOpacity testID="mock-card-remove" accessibilityRole="button" accessibilityLabel="Swipe remove" onPress={() => onDecide('remove')} />
-        <TouchableOpacity testID="mock-card-skip" accessibilityRole="button" accessibilityLabel="Action skip" onPress={() => onDecide('skip')} />
+        <TouchableOpacity testID="mock-card-keep" accessibilityRole="button" accessibilityLabel="Swipe keep" onPress={() => decide('keep')} />
+        <TouchableOpacity testID="mock-card-remove" accessibilityRole="button" accessibilityLabel="Swipe remove" onPress={() => decide('remove')} />
+        <TouchableOpacity testID="mock-card-skip" accessibilityRole="button" accessibilityLabel="Action skip" onPress={() => decide('skip')} />
+        {/* Two Skips 2.3 s apart that JavaScript runs in one go, as after a stall. */}
+        <TouchableOpacity
+          testID="mock-card-two-skips"
+          accessibilityRole="button"
+          accessibilityLabel="Two skips"
+          onPress={() => {
+            onDecide('skip');
+            jest.setSystemTime(Date.now() + 2_300);
+            onDecide('skip');
+          }}
+        />
       </View>
     );
   };
 });
+
+jest.mock('../../src/services/ReviewedLedgerStore', () => ({
+  ...jest.requireActual('../../src/services/ReviewedLedgerStore'),
+  markReviewed: jest.fn().mockResolvedValue(undefined),
+}));
 
 jest.mock('../../src/services/haptics', () => ({
   decisionHaptic: jest.fn(),
@@ -131,6 +151,13 @@ import SiftScreen from '../../src/screens/SiftScreen';
 import { a11yViolations } from '../helpers/a11yScan';
 import { flyOffDistance } from '../../src/utils/cardLayout';
 import { decisionHaptic, undoHaptic } from '../../src/services/haptics';
+import * as Sentry from '@sentry/react-native';
+import { markReviewed } from '../../src/services/ReviewedLedgerStore';
+
+// A press whose finger lifted at `timestamp` (the touch's own clock, which
+// performance.now() shares: helpers/clock.setup.ts), however late JavaScript
+// gets to it.
+const pressAt = (timestamp: number) => ({ nativeEvent: { timestamp } });
 
 describe('SiftScreen', () => {
   const tracks = [mockTrackA, mockTrackB, mockTrackC];
@@ -172,7 +199,7 @@ describe('SiftScreen', () => {
       mockWithTiming.mockClear();
       await fireEvent.press(getByLabelText('Keep'));
       expect(mockWithTiming).toHaveBeenCalledWith(distance, expect.anything(), expect.any(Function));
-      await fireEvent.press(getByLabelText('Remove'));
+      await fireEvent.press(getByLabelText('Remove'), pressAt(Date.now() + 300));
       expect(mockWithTiming).toHaveBeenCalledWith(-distance, expect.anything(), expect.any(Function));
     });
   });
@@ -424,17 +451,218 @@ describe('SiftScreen', () => {
     }
   });
 
+  describe('the decision guard', () => {
+    test('taps queued in a stall each count, judged by when the finger lifted (flow 21)', async () => {
+      // A stalled JavaScript thread runs its queued taps back to back, long
+      // after they happened, and before any timer that came due meanwhile.
+      jest.useFakeTimers();
+      try {
+        const { getByTestId, getByLabelText } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+        const before = Date.now();
+        jest.setSystemTime(before + 16_000);
+        await fireEvent.press(getByLabelText('Skip'), pressAt(before + 1_000));
+        await fireEvent.press(getByLabelText('Skip'), pressAt(before + 3_300));
+        expect(getByTestId('stat-skipped').props.children).toEqual(['2', ' ', 'skipped']);
+        expect(getByTestId('card-track-name').props.children).toBe('Track C');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    test('a Skip that comes before the last decision shows waits for it, then skips the next card', async () => {
+      // The Keep's card is still flying off when the Skip comes, on time.
+      let landed: ((finished: boolean) => void) | undefined;
+      mockWithTiming.mockImplementationOnce((val: number, _config: unknown, callback?: (finished: boolean) => void) => {
+        landed = callback;
+        return val;
+      });
+      (markReviewed as jest.Mock).mockClear();
+      const { getByTestId, getByLabelText } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+      const t0 = Date.now();
+      await fireEvent.press(getByLabelText('Keep'), pressAt(t0));
+      await fireEvent.press(getByLabelText('Skip'), pressAt(t0 + 400));
+      expect(getByTestId('stat-kept').props.children).toEqual(['0', ' ', 'kept']);
+      expect(getByTestId('stat-skipped').props.children).toEqual(['0', ' ', 'skipped']);
+      await act(() => {
+        landed?.(true);
+      });
+      // Track A kept, then Track B skipped: never Track A twice.
+      expect(getByTestId('stat-kept').props.children).toEqual(['1', ' ', 'kept']);
+      expect(getByTestId('stat-skipped').props.children).toEqual(['1', ' ', 'skipped']);
+      expect(getByTestId('card-track-name').props.children).toBe('Track C');
+      // The Skip ran with the Keep's state, so it sent the held Keep on.
+      expect(markReviewed).toHaveBeenCalledWith(expect.any(String), mockTrackA.id);
+    });
+
+    test('a Keep or Remove that comes before the last decision shows is turned away: its card hasn\'t been seen', async () => {
+      let landed: ((finished: boolean) => void) | undefined;
+      mockWithTiming.mockImplementationOnce((val: number, _config: unknown, callback?: (finished: boolean) => void) => {
+        landed = callback;
+        return val;
+      });
+      const { getByTestId, getByLabelText } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+      const t0 = Date.now();
+      await fireEvent.press(getByLabelText('Keep'), pressAt(t0));
+      await fireEvent.press(getByLabelText('Remove'), pressAt(t0 + 400));
+      await fireEvent.press(getByLabelText('Keep'), pressAt(t0 + 400));
+      await act(() => {
+        landed?.(true);
+      });
+      expect(getByTestId('stat-kept').props.children).toEqual(['1', ' ', 'kept']);
+      expect(getByTestId('stat-removed').props.children).toEqual(['0', ' ', 'removed']);
+      expect(getByTestId('card-track-name').props.children).toBe('Track B');
+    });
+
+    test('two Skips JavaScript gets to in one go both count, one card each', async () => {
+      // As after a stall: the second runs before React shows the first, so
+      // it waits, then skips the next card with the state that shows.
+      jest.useFakeTimers();
+      try {
+        const { getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+        await fireEvent.press(getByTestId('mock-card-two-skips'));
+        expect(getByTestId('stat-skipped').props.children).toEqual(['2', ' ', 'skipped']);
+        expect(getByTestId('card-track-name').props.children).toBe('Track C');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    test('a touch stamped on some other clock is judged as now', async () => {
+      const { getByTestId, getByLabelText } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+      const t0 = Date.now();
+      // Years out: taken as now, so it doesn't hold the guard for years.
+      await fireEvent.press(getByLabelText('Skip'), pressAt(t0 + 1e11));
+      expect(getByTestId('stat-skipped').props.children).toEqual(['1', ' ', 'skipped']);
+      // Judged as then, it would hold the guard years from now.
+      await fireEvent.press(getByLabelText('Skip'), pressAt(t0 + 400));
+      expect(getByTestId('stat-skipped').props.children).toEqual(['2', ' ', 'skipped']);
+    });
+
+    test('a tap within the hold is turned away, and says so: 300 ms after a Skip', async () => {
+      (Sentry.addBreadcrumb as jest.Mock).mockClear();
+      const { getByTestId, getByLabelText } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+      const t0 = Date.now();
+      await fireEvent.press(getByLabelText('Skip'), pressAt(t0));
+      await fireEvent.press(getByLabelText('Skip'), pressAt(t0 + 299));
+      expect(getByTestId('stat-skipped').props.children).toEqual(['1', ' ', 'skipped']);
+      expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
+        category: 'ui.trace',
+        message: 'guard-busy',
+        data: { input: 'skip', held: 299 },
+        level: 'info',
+      });
+      await fireEvent.press(getByLabelText('Skip'), pressAt(t0 + 300));
+      expect(getByTestId('stat-skipped').props.children).toEqual(['2', ' ', 'skipped']);
+    });
+
+    test('300 ms after a button\'s Keep or Remove', async () => {
+      const { getByTestId, getByLabelText } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+      const t0 = Date.now();
+      await fireEvent.press(getByLabelText('Keep'), pressAt(t0));
+      await fireEvent.press(getByLabelText('Keep'), pressAt(t0 + 299));
+      expect(getByTestId('stat-kept').props.children).toEqual(['1', ' ', 'kept']);
+      await fireEvent.press(getByLabelText('Remove'), pressAt(t0 + 300));
+      expect(getByTestId('stat-removed').props.children).toEqual(['1', ' ', 'removed']);
+    });
+
+    test('350 ms after a swipe: its fly-off and the next card landing', async () => {
+      const { getByTestId, getByLabelText } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+      jest.useFakeTimers();
+      try {
+        const swipedAt = Date.now();
+        await fireEvent.press(getByTestId('mock-card-keep'));
+        await fireEvent.press(getByLabelText('Skip'), pressAt(swipedAt + 349));
+        expect(getByTestId('stat-skipped').props.children).toEqual(['0', ' ', 'skipped']);
+        await fireEvent.press(getByLabelText('Skip'), pressAt(swipedAt + 350));
+        expect(getByTestId('stat-skipped').props.children).toEqual(['1', ' ', 'skipped']);
+        expect(getByTestId('card-track-name').props.children).toBe('Track C');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    test('a swipe turned away tells the card, which springs back', async () => {
+      // The InteractiveCard mock passes on what onDecide returns.
+      const { getByTestId, getByLabelText } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+      jest.useFakeTimers();
+      try {
+        await fireEvent.press(getByLabelText('Skip'), pressAt(Date.now()));
+        await fireEvent.press(getByTestId('mock-card-keep'));
+        expect(getByTestId('mock-card').props.accessibilityValue).toEqual({ text: 'last decide false' });
+        jest.setSystemTime(Date.now() + 300);
+        await fireEvent.press(getByTestId('mock-card-keep'));
+        expect(getByTestId('stat-kept').props.children).toEqual(['1', ' ', 'kept']);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    test('while a card is flying off, nothing else decides, finishes, undoes, goes back or opens the list', async () => {
+      const Probe = () => {
+        const { state } = useSift();
+        return (
+          <>
+            <SiftScreen />
+            <Text testID="current-phase">{state.phase}</Text>
+          </>
+        );
+      };
+      const { getByTestId, getByLabelText, queryByTestId } = await renderWithProviders(<Probe />, { initialTracks: tracks });
+      const t0 = Date.now();
+      await fireEvent.press(getByLabelText('Skip'), pressAt(t0));
+      // A Keep whose card never finishes flying off, however long it takes.
+      mockWithTiming.mockImplementationOnce((val: number) => val);
+      await fireEvent.press(getByLabelText('Keep'), pressAt(t0 + 1000));
+      const later = pressAt(t0 + 59_000);
+      await fireEvent.press(getByTestId('undo-pill'), later);
+      await fireEvent.press(getByTestId('decisions-button'), later);
+      await fireEvent.press(getByTestId('finish-button'), later);
+      await fireEvent.press(getByTestId('back-button'), later);
+      expect(getByTestId('stat-skipped').props.children).toEqual(['1', ' ', 'skipped']);
+      expect(getByTestId('stat-kept').props.children).toEqual(['0', ' ', 'kept']);
+      expect(queryByTestId('decisions-sheet')).toBeNull();
+      expect(getByTestId('current-phase').props.children).toBe('sifting');
+    });
+
+    test('Back isn\'t held by a Skip\'s settle: only by a card still flying off', async () => {
+      const Probe = () => {
+        const { state } = useSift();
+        return (
+          <>
+            <SiftScreen />
+            <Text testID="current-phase">{state.phase}</Text>
+          </>
+        );
+      };
+      const { getByTestId, getByLabelText } = await renderWithProviders(<Probe />, { initialTracks: tracks });
+      const t0 = Date.now();
+      await fireEvent.press(getByLabelText('Skip'), pressAt(t0));
+      await fireEvent.press(getByTestId('finish-button'), pressAt(t0 + 100));
+      expect(getByTestId('current-phase').props.children).toBe('sifting');
+      await fireEvent.press(getByTestId('back-button'), pressAt(t0 + 100));
+      expect(getByTestId('current-phase').props.children).toBe('setup');
+    });
+
+    test('the buttons are never disabled for it: they ask it when pressed', async () => {
+      const { getByLabelText, getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+      const t0 = Date.now();
+      await fireEvent.press(getByLabelText('Skip'), pressAt(t0));
+      for (const label of ['Remove', 'Skip', 'Keep']) {
+        expect(getByLabelText(label).props.accessibilityState?.disabled).toBeFalsy();
+      }
+      expect(getByTestId('finish-button').props.accessibilityState?.disabled).toBeFalsy();
+      expect(getByTestId('decisions-button').props.accessibilityState?.disabled).toBeFalsy();
+    });
+  });
+
   describe('swipes and feel', () => {
     test('a swiped card flies off faster, from where it was let go; a button\'s from the middle', async () => {
       const { getByTestId, getByLabelText } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
       mockWithTiming.mockClear();
       await fireEvent.press(getByTestId('mock-card-keep'));
       expect(mockWithTiming).toHaveBeenCalledWith(flyOffDistance(Dimensions.get('window').width), expect.objectContaining({ duration: 200 }), expect.any(Function));
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 200));
-      });
       mockWithTiming.mockClear();
-      await fireEvent.press(getByLabelText('Remove'));
+      await fireEvent.press(getByLabelText('Remove'), pressAt(Date.now() + 350));
       expect(mockWithTiming).toHaveBeenCalledWith(-flyOffDistance(Dimensions.get('window').width), expect.objectContaining({ duration: 300 }), expect.any(Function));
     });
 
@@ -454,10 +682,10 @@ describe('SiftScreen', () => {
         const { getByTestId, getByLabelText } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
         await fireEvent.press(getByLabelText('Keep'));
         expect(decisionHaptic).toHaveBeenLastCalledWith('keep');
-        await fireEvent.press(getByLabelText('Skip'));
+        await fireEvent.press(getByLabelText('Skip'), pressAt(Date.now() + 300));
         expect(decisionHaptic).toHaveBeenLastCalledWith('skip');
         await act(() => {
-          jest.advanceTimersByTime(400);
+          jest.advanceTimersByTime(600);
         });
         await fireEvent.press(getByTestId('undo-pill'));
         expect(undoHaptic).toHaveBeenCalledTimes(1);
@@ -477,11 +705,19 @@ describe('SiftScreen', () => {
         const { getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
         expect(getByTestId('mock-card').props.accessibilityState).toEqual({ disabled: false });
         expect(getByTestId('mock-card').props.accessibilityHint).toBe('artwork retry 0');
+        // The card flies off, and isn't gone yet.
+        let landed: ((finished: boolean) => void) | undefined;
+        mockWithTiming.mockImplementationOnce((val: number, _config: unknown, callback?: (finished: boolean) => void) => {
+          landed = callback;
+          return val;
+        });
         await fireEvent.press(getByTestId('mock-card-keep'));
         expect(getByTestId('mock-card').props.accessibilityState).toEqual({ disabled: true });
+        // The next card is on screen, and can be dragged.
         await act(() => {
-          jest.advanceTimersByTime(150);
+          landed?.(true);
         });
+        expect(getByTestId('card-track-name').props.children).toBe('Track B');
         expect(getByTestId('mock-card').props.accessibilityState).toEqual({ disabled: false });
       } finally {
         jest.useRealTimers();
@@ -546,7 +782,8 @@ describe('SiftScreen', () => {
       await act(async () => {});
       expect(queryByTestId('first-remove-note')).toBeNull();
 
-      await fireEvent.press(getByLabelText('Remove'));
+      // A second ago, so the swipe below isn't within its hold.
+      await fireEvent.press(getByLabelText('Remove'), pressAt(Date.now() - 1_000));
       expect(getByTestId('first-remove-note')).toBeTruthy();
       expect(markRemoveNoteSeen).toHaveBeenCalledTimes(1);
 

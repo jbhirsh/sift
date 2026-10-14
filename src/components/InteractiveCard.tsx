@@ -38,7 +38,8 @@ interface InteractiveCardProps {
    * go: the caller flies it off (programmaticOffset) and shows the next
    * card, which, keyed on its track, starts back at the middle.
    */
-  onDecide: (decision: Decision) => void;
+  /** False when the decision was turned away (one already under way): the card springs back. */
+  onDecide: (decision: Decision) => boolean;
   programmaticOffset?: SharedValue<number>;
   /** False for a provider without play counts, so 0 isn't shown as "Never played". */
   playsKnown?: boolean;
@@ -66,7 +67,10 @@ export default function InteractiveCard({
   const pastThreshold = useSharedValue(false);
 
   const handleDecide = (decision: Decision) => {
-    onDecide(decision);
+    if (onDecide(decision) === false) {
+      dragX.value = withSpring(0, { damping: 12, stiffness: 120 });
+      dragY.value = withSpring(0, { damping: 12, stiffness: 120 });
+    }
   };
 
   const panGesture = Gesture.Pan()

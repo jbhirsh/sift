@@ -17,6 +17,7 @@ import { useMusicProvider } from '../hooks/useMusicProvider';
 import GlassCard from '../components/GlassCard';
 import { COLORS, RADIUS, SPACING } from '../theme';
 import { PROVIDER_DISPLAY } from '../types';
+import { useTraceScreen } from '../hooks/useTrace';
 
 // The running app's version (an update carries its own config).
 const appVersion = Constants.expoConfig?.version ?? null;
@@ -30,6 +31,7 @@ interface SettingsScreenProps {
 }
 
 export default function SettingsScreen({ onClose }: SettingsScreenProps) {
+  useTraceScreen('settings');
   const { state, dispatch, setStartAtChorus } = useSift();
   const { colors } = useTheme();
   const { authorize, isAuthorized } = useMusicProvider();

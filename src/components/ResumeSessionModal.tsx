@@ -12,6 +12,7 @@ import GlassCard from './GlassCard';
 import { Button } from './Button';
 import SessionStatRow from './SessionStatRow';
 import type { SiftSession } from '../types';
+import { useTraceScreen } from '../hooks/useTrace';
 
 interface ResumeSessionModalProps {
   session: SiftSession;
@@ -26,6 +27,7 @@ export default function ResumeSessionModal({
   onStartOver,
   onCancel,
 }: ResumeSessionModalProps) {
+  useTraceScreen('resume-session');
   const { colors } = useTheme();
 
   const sourceLabel =

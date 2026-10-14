@@ -18,6 +18,8 @@ import {
 import { saveSession, clearSession } from '../services/SessionStore';
 import { MusicProviderHost } from './MusicProviderContext';
 import { loadPreferences, savePreferences } from '../services/PreferencesStore';
+import { trace, tracing } from '../services/trace';
+import { describeAction } from '../utils/trace';
 import { sortTracks } from '../utils/sorting';
 import { uniqueTracks } from '../utils/trackIdentity';
 
@@ -537,7 +539,16 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     ? { ...initialState, tracks: initialTracks, phase: 'sifting' as AppPhase }
     : initialState;
 
-  const [state, dispatch] = useReducer(siftReducer, init);
+  const [state, reactDispatch] = useReducer(siftReducer, init);
+  // Every action goes in the E2E trace (services/trace): what a tap did, on
+  // any screen.
+  const dispatch = useCallback((action: SiftAction) => {
+    if (tracing) {
+      const described = describeAction(action);
+      if (described) trace('action', described);
+    }
+    reactDispatch(action);
+  }, []);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSessionRef = useRef<SiftSession | null>(null);
   // Set once the user changes a preference, so a slow initial load can't
@@ -554,7 +565,7 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [dispatch]);
 
   // Keep Sentry context in sync with app state
   useEffect(() => {

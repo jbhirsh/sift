@@ -36,8 +36,10 @@ import {
   removedListSubtitle,
 } from '../utils/sessionCopy';
 import { COLORS, CONTENT_COLUMN, RADIUS, SETTINGS_BUTTON, SPACING } from '../theme';
+import { useTraceScreen } from '../hooks/useTrace';
 
 export default function DoneScreen() {
+  useTraceScreen('done');
   const { state, dispatch, resetToSetup } = useSift();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
