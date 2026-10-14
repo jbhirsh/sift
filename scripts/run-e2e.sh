@@ -52,8 +52,11 @@ screenshot() {
 suite_xml="$OUT_DIR/suite.xml"
 rm -f "$suite_xml"
 echo "::group::Pass 1 — full suite, one session"
+# --flatten-debug-output: otherwise Maestro puts its log, each command's
+# result and the failure's view hierarchy under a hidden .maestro/ folder,
+# which upload-artifact leaves out.
 maestro test \
-  --debug-output "$OUT_DIR/suite-debug" \
+  --debug-output "$OUT_DIR/suite-debug" --flatten-debug-output \
   --format junit --output "$suite_xml" \
   "$FLOW_DIR" 2>&1 | tee "$OUT_DIR/suite.log"
 suite_status=${PIPESTATUS[0]}
@@ -115,7 +118,7 @@ while read -r class flow; do
   rm -f "$OUT_DIR/$name.retry.xml"
   echo "::group::$name (isolated re-run)"
   maestro test \
-    --debug-output "$OUT_DIR/$name.retry-debug" \
+    --debug-output "$OUT_DIR/$name.retry-debug" --flatten-debug-output \
     --format junit --output "$OUT_DIR/$name.retry.xml" \
     "$flow" 2>&1 | tee "$log"
   status=${PIPESTATUS[0]}

@@ -301,8 +301,18 @@ Makefile                Dev commands (test, lint, typecheck, check)
   Each re-run is flagged with a `::warning::` annotation, and if a re-run
   also hits a driver error the runner stops. Don't switch to one
   invocation per flow: restarting the driver per flow caused lost taps
-  right after launch. Fix flaky flows at the root: wait for the element
-  (`extendedWaitUntil`), never assert right after an animated transition.
+  right after launch. A flow starts a sift through
+  `.maestro/shared/start_sifting.yaml` (`runFlow`), which fails at the tap
+  if Setup doesn't go away. `shared/` holds subflows, not flows (Maestro
+  runs only the top level of `.maestro/`).
+- **A flaky E2E flow is a bug: diagnose it and fix it at the root, never
+  re-run CI to get past it.** Read the run's `maestro-results` artifact
+  first: Maestro's log, each command's result and the view hierarchy at
+  the failure (`suite-debug/`), the app's own log (`app-log.txt`), the
+  screenshots. Then fix the flow (wait for the element with
+  `extendedWaitUntil`, never assert right after an animated transition) or
+  the app, whichever is wrong. No retry in a flow to cover one either (a
+  second tap, a repeated step): it hides the failure instead of fixing it.
 
 ---
 

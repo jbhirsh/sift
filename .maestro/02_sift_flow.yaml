@@ -15,7 +15,7 @@ name: "Setup to Sifting - Full Flow"
     timeout: 30000
 
 # Tap start to begin sifting
-- tapOn: "Start Sifting"
+- runFlow: shared/start_sifting.yaml
 
 # Wait for loading to complete and sift screen to appear
 - extendedWaitUntil:
