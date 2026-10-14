@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
+  GestureResponderEvent,
   LayoutChangeEvent,
   useWindowDimensions,
   View,
@@ -36,16 +37,40 @@ import { decidedLatestFirst, decisionFor } from '../utils/decisions';
 import { compactCount } from '../utils/compactCount';
 import { cardSize, flyOffDistance } from '../utils/cardLayout';
 import { decisionHaptic, undoHaptic } from '../services/haptics';
+import { useTraceScreen } from '../hooks/useTrace';
+import { trace } from '../services/trace';
+import { createDecisionGuard } from '../utils/decisionGuard';
 
 const SEGMENT_COUNT = 10;
-// How long after a swiped card has flown off before the next can be decided.
-const SWIPE_SETTLE_MS = 150;
+// How long after a press before the next decision can be pressed: a Skip's
+// settle; a button's Keep or Remove, its 300 ms fly-off; a swipe, its 200 ms
+// fly-off and 150 ms more as the next card lands, so a tap meant for the
+// swiped card can't decide the next one.
+const SKIP_HOLD_MS = 300;
+const BUTTON_HOLD_MS = 300;
+const SWIPE_HOLD_MS = 350;
+
+// A touch stamped further from now than this is on some other clock: judge
+// it as now, rather than hold the guard for years.
+const MAX_TOUCH_AGE_MS = 60_000;
+
+/**
+ * When a press happened: when the finger lifted, on the touch's own clock
+ * (the same clock as performance.now()), not when JavaScript got to it. A
+ * swipe or a VoiceOver action has no touch: now.
+ */
+function pressTime(event?: GestureResponderEvent): number {
+  const now = performance.now();
+  const touched = event?.nativeEvent?.timestamp;
+  return touched != null && Math.abs(now - touched) < MAX_TOUCH_AGE_MS ? touched : now;
+}
 // The action buttons' bottom padding and label line height, which place the
 // Undo pill on the label row.
 const ACTIONS_BOTTOM_PADDING = SPACING['3xl'];
 const ACTION_LABEL_LINE_HEIGHT = 16;
 
 export default function SiftScreen() {
+  useTraceScreen('sift');
   const {
     state,
     dispatch,
@@ -75,31 +100,17 @@ export default function SiftScreen() {
   }, [sendPending, state.tracks]);
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  // One decision at a time (utils/decisionGuard). Every way to decide, and
+  // Finish, Undo, Back and the decisions list, asks it at the press. No
+  // button is disabled for it and no timer lets it go: both change only when
+  // JavaScript next runs, and after a stall the queued taps run first.
+  const [guard] = useState(createDecisionGuard);
+  // Decisions pressed while the one before wasn't on screen yet: each runs
+  // once that one is, with its state.
+  const waitingRef = useRef<{ decision: Decision; swiped: boolean }[]>([]);
+  // The card can't be dragged from a decision's press until it's on screen.
   const [isAnimating, setIsAnimating] = useState(false);
-  // Synchronous mirror of isAnimating: a swipe-decide followed by an
-  // immediate button press can both fire before React re-renders, so the
-  // state value alone cannot close the double-decide window.
-  const isAnimatingRef = useRef(false);
-  const settleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const programmaticOffset = useSharedValue(0);
-
-  const beginDecision = useCallback((): boolean => {
-    if (isAnimatingRef.current) return false;
-    isAnimatingRef.current = true;
-    setIsAnimating(true);
-    return true;
-  }, []);
-
-  const endDecision = useCallback(() => {
-    isAnimatingRef.current = false;
-    setIsAnimating(false);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current);
-    };
-  }, []);
 
   // One-time note on the first Apple Music library remove (#141): Apple
   // doesn't let apps delete library songs, so say where they went. Inline
@@ -180,27 +191,26 @@ export default function SiftScreen() {
   // write inside a useCallback an immutability violation.
   // A swipe's card flies off from where it was let go, faster: it's
   // already moving.
-  const animateDecision = (decision: Decision, { swiped = false } = {}) => {
-    if (!beginDecision()) return;
-    decisionHaptic(decision);
-
+  const runDecision = (decision: Decision, swiped: boolean) => {
     const track = currentTrack;
-    // Far enough to leave the window from its middle, on any width.
-    const distance = flyOffDistance(windowWidth);
-    const direction = decision === 'keep' ? distance : -distance;
-
-    const onComplete = () => {
+    const land = () => {
       // The previous decision can't be undone any more: send it.
       sendPending(state.pending);
       sendIfLast(decide(decision));
       afterDecision(decision, track);
-      programmaticOffset.value = 0;
-      // After a swipe, hold the guard a moment longer as the next card
-      // lands, so a tap that was meant for the swiped card can't decide it.
-      if (swiped) settleTimeoutRef.current = setTimeout(endDecision, SWIPE_SETTLE_MS);
-      else endDecision();
     };
+    if (decision === 'skip') {
+      land();
+      return;
+    }
 
+    // Far enough to leave the window from its middle, on any width.
+    const distance = flyOffDistance(windowWidth);
+    const direction = decision === 'keep' ? distance : -distance;
+    const onComplete = () => {
+      land();
+      programmaticOffset.value = 0;
+    };
     programmaticOffset.value = withTiming(
       direction,
       swiped
@@ -213,25 +223,53 @@ export default function SiftScreen() {
       },
     );
   };
+  // The latest render's, for a waiting decision to run with.
+  const runDecisionRef = useRef(runDecision);
+  useEffect(() => {
+    runDecisionRef.current = runDecision;
+  });
 
-  const handleSkip = useCallback(() => {
-    // Same synchronous lock as the other decide paths: the disabled prop
-    // alone lags a render behind the ref, so a skip tap racing a card swipe
-    // could double-decide the still-current track.
-    if (!beginDecision()) return;
-    decisionHaptic('skip');
-    sendPending(state.pending);
-    sendIfLast(decide('skip'));
-    afterDecision('skip', currentTrack);
-    settleTimeoutRef.current = setTimeout(endDecision, 300);
-  }, [beginDecision, endDecision, decide, afterDecision, currentTrack, sendPending, sendIfLast, state.pending]);
-
-  // A swipe, or a VoiceOver action on the card: Skip as the button does,
-  // Keep and Remove fly the card off first.
-  const handleCardDecide = (decision: Decision) => {
-    if (decision === 'skip') handleSkip();
-    else animateDecision(decision, { swiped: true });
+  // Every decide path: judged at the press, then run now, or once the
+  // decision before it is on screen. Only a Skip waits: a Keep or Remove
+  // would land on a card the user hasn't seen. False when turned away.
+  const requestDecision = (decision: Decision, swiped: boolean, at: number): boolean => {
+    const input = swiped ? `swipe-${decision}` : decision;
+    const hold = decision === 'skip' ? SKIP_HOLD_MS : swiped ? SWIPE_HOLD_MS : BUTTON_HOLD_MS;
+    const judged = guard.press(at, hold, decision === 'skip');
+    if (judged.verdict === 'busy') {
+      trace('guard-busy', { input, held: Math.max(0, Math.round(judged.sinceMs)) });
+      return false;
+    }
+    trace(`guard-${judged.verdict}`, { input });
+    // Felt at the press, even when it waits to run.
+    decisionHaptic(decision);
+    setIsAnimating(true);
+    if (judged.verdict === 'wait') waitingRef.current.push({ decision, swiped });
+    else runDecision(decision, swiped);
+    return true;
   };
+
+  // When React showed the next card: a decision's lines come at the press,
+  // this one when it's on screen.
+  useEffect(() => {
+    trace('cursor', { at: state.cursor, of: state.tracks.length });
+  }, [state.cursor, state.tracks.length]);
+
+  // A decision on screen (the card moved): the next waiting one goes, with
+  // this state, or the card can be dragged again.
+  useEffect(() => {
+    const next = guard.shown() ? waitingRef.current.shift() : undefined;
+    if (next) runDecisionRef.current(next.decision, next.swiped);
+    else setIsAnimating(false);
+  }, [state.cursor, guard]);
+
+  // Mid-decision or in its hold, for Finish, Undo and the list.
+  const deciding = (event?: GestureResponderEvent) => guard.busy(pressTime(event));
+
+  // A swipe, or a VoiceOver action on the card. The card springs back when
+  // it's turned away.
+  const handleCardDecide = (decision: Decision): boolean =>
+    requestDecision(decision, decision !== 'skip', performance.now());
 
   return (
     <View style={styles.root}>
@@ -242,6 +280,9 @@ export default function SiftScreen() {
         <GlassCard intensity="thin" radius={20}>
           <TouchableOpacity
             onPress={() => {
+              // Not while a decision is under way: a Keep or Remove landing
+              // after this would decide on a screen that's gone.
+              if (guard.underWay()) return;
               // Persist any debounced-but-unsaved decisions before leaving —
               // the autosave effect's cleanup would otherwise cancel them.
               flushPendingSave();
@@ -265,16 +306,15 @@ export default function SiftScreen() {
             so Done's Continue sifting picks up at the next card. */}
         <GlassCard intensity="thin" radius={20}>
           <TouchableOpacity
-            onPress={() => {
+            onPress={(event) => {
               // Not mid-decision: the Keep/Remove animation decides only
               // when it ends, and finishing first would drop that decision
               // or land it under Done.
-              if (isAnimatingRef.current) return;
+              if (deciding(event)) return;
               sendPending(state.pending);
               flushPendingSave();
               dispatch({ type: 'FINISH' });
             }}
-            disabled={isAnimating}
             style={styles.finishButton}
             testID="finish-button"
             accessibilityRole="button"
@@ -290,8 +330,9 @@ export default function SiftScreen() {
         {state.cursor > 0 && (
           <GlassCard intensity="thin" radius={20}>
             <TouchableOpacity
-              onPress={() => setShowDecisions(true)}
-              disabled={isAnimating}
+              onPress={(event) => {
+                if (!deciding(event)) setShowDecisions(true);
+              }}
               style={styles.backButton}
               testID="decisions-button"
               accessibilityRole="button"
@@ -432,8 +473,7 @@ export default function SiftScreen() {
           label="Remove"
           color={COLORS.remove}
           labelColor={colors.textSecondary}
-          onPress={() => animateDecision('remove')}
-          disabled={isAnimating}
+          onPress={(event) => { requestDecision('remove', false, pressTime(event)); }}
         />
         <ActionButton
           symbolName="arrow.right.circle"
@@ -441,8 +481,7 @@ export default function SiftScreen() {
           label="Skip"
           color={COLORS.skip}
           labelColor={colors.textSecondary}
-          onPress={handleSkip}
-          disabled={isAnimating}
+          onPress={(event) => { requestDecision('skip', false, pressTime(event)); }}
         />
         <ActionButton
           symbolName="checkmark.circle.fill"
@@ -450,8 +489,7 @@ export default function SiftScreen() {
           label="Keep"
           color={COLORS.keep}
           labelColor={colors.textSecondary}
-          onPress={() => animateDecision('keep')}
-          disabled={isAnimating}
+          onPress={(event) => { requestDecision('keep', false, pressTime(event)); }}
         />
         {/* Undo the latest decision while it hasn't been sent (#152): in
             thumb reach, over the buttons' label row, whose labels step aside
@@ -463,8 +501,8 @@ export default function SiftScreen() {
             <UndoPill
               testID="undo-pill"
               accessibilityLabel={`Undo: ${undoMessage(state.tracks[state.cursor - 1].name, state.pending.decision)}`}
-              onPress={() => {
-                if (isAnimatingRef.current) return;
+              onPress={(event) => {
+                if (deciding(event)) return;
                 undoHaptic();
                 dispatch({ type: 'UNDO_LAST' });
               }}
@@ -540,22 +578,19 @@ function ActionButton({
   color,
   labelColor,
   onPress,
-  disabled,
   hideLabel,
 }: {
   symbolName: string;
   label: string;
   color: string;
   labelColor: string;
-  onPress: () => void;
-  disabled: boolean;
+  onPress: (event: GestureResponderEvent) => void;
   /** Hidden but still laid out, so the row doesn't move. */
   hideLabel: boolean;
 }) {
   return (
     <TouchableOpacity
       onPress={onPress}
-      disabled={disabled}
       style={actionStyles.wrapper}
       accessibilityRole="button"
       accessibilityLabel={label}

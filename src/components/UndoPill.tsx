@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Text, TouchableOpacity, StyleSheet, type GestureResponderEvent } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { SymbolView } from 'expo-symbols';
 import { useTheme } from '../theme/ThemeContext';
@@ -8,7 +8,7 @@ import { FONTS, SHADOWS, SPACING, UNDO_PILL } from '../theme';
 interface UndoPillProps {
   /** What VoiceOver says: "Undo" alone doesn't say what it takes back. */
   accessibilityLabel: string;
-  onPress: () => void;
+  onPress: (event: GestureResponderEvent) => void;
   testID?: string;
 }
 

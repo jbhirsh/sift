@@ -22,6 +22,7 @@ import GlassCard from './GlassCard';
 import { formatTime } from '../utils/formatTime';
 import { RADIUS, SPACING } from '../theme';
 import { Track } from '../types';
+import { trace } from '../services/trace';
 
 const SEEK_ACTIONS = [{ name: 'increment' }, { name: 'decrement' }];
 
@@ -53,6 +54,7 @@ export default function PlayerControls() {
   // Play a track from its start: 0:00, or its chorus with "Start at chorus".
   const playFromStart = useCallback(
     (track: Track) => {
+      trace('play', { id: track.id, chorus: chorusEnabled });
       if (!chorusEnabled) {
         play(track.id);
         return;

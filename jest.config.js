@@ -1,6 +1,9 @@
 module.exports = {
   preset: 'jest-expo',
-  setupFilesAfterEnv: ['@testing-library/react-native/matchers'],
+  setupFilesAfterEnv: ['@testing-library/react-native/matchers', '<rootDir>/__tests__/helpers/clock.setup.ts'],
+  // performance.now() follows Date.now() (helpers/clock.setup.ts), which fake
+  // timers do move.
+  fakeTimers: { doNotFake: ['performance'] },
   transformIgnorePatterns: [
     'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|@sentry/.*|native-base|react-native-svg|react-native-reanimated|react-native-gesture-handler|react-native-worklets|@react-native-async-storage/async-storage)'
   ],

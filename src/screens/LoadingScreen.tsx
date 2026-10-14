@@ -10,8 +10,10 @@ import { useTheme } from '../theme/ThemeContext';
 import { useMusicProvider } from '../hooks/useMusicProvider';
 import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
+import { useTraceScreen } from '../hooks/useTrace';
 
 export default function LoadingScreen() {
+  useTraceScreen('loading');
   const { state } = useSift();
   const { colors } = useTheme();
   const { loadTracks } = useMusicProvider();

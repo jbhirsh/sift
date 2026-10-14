@@ -12,6 +12,8 @@ jest.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 jest.mock('expo-symbols', () => ({ SymbolView: 'SymbolView' }));
 jest.mock('expo-image', () => ({ Image: 'Image' }));
 
+const mockWithSpring = jest.fn((val: number, _config?: unknown) => val);
+
 jest.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: {
@@ -20,7 +22,7 @@ jest.mock('react-native-reanimated', () => ({
   },
   useSharedValue: (val: number) => ({ value: val }),
   useAnimatedStyle: (fn: () => unknown) => fn(),
-  withSpring: (val: number) => val,
+  withSpring: (val: number, config?: unknown) => mockWithSpring(val, config),
   interpolate: (val: number, inputRange: number[], outputRange: number[]) => {
     const ratio = (val - inputRange[0]) / (inputRange[1] - inputRange[0]);
     return outputRange[0] + ratio * (outputRange[1] - outputRange[0]);
@@ -144,6 +146,24 @@ describe('InteractiveCard', () => {
     await renderCard(mockTrack, onDecide);
     panOnEnd?.({ translationX: -100 });
     expect(onDecide).toHaveBeenCalledWith('remove');
+  });
+
+  test('a swipe turned away (a decision already under way) springs the card back', async () => {
+    const onDecide = jest.fn(() => false);
+    await renderCard(mockTrack, onDecide);
+    mockWithSpring.mockClear();
+    panOnEnd?.({ translationX: 100 });
+    expect(onDecide).toHaveBeenCalledWith('keep');
+    expect(mockWithSpring.mock.calls.map(([to]) => to)).toEqual([0, 0]);
+  });
+
+  test('a swipe that decides leaves the card where it was let go, to fly off from there', async () => {
+    const onDecide = jest.fn(() => true);
+    await renderCard(mockTrack, onDecide);
+    mockWithSpring.mockClear();
+    panOnEnd?.({ translationX: -100 });
+    expect(onDecide).toHaveBeenCalledWith('remove');
+    expect(mockWithSpring).not.toHaveBeenCalled();
   });
 
   test('pan gesture below threshold does not trigger decision', async () => {

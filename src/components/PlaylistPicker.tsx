@@ -12,6 +12,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { CONTENT_COLUMN, SPACING, RADIUS } from '../theme';
 import GlassCard from './GlassCard';
 import { Playlist } from '../types';
+import { useTraceScreen } from '../hooks/useTrace';
 
 interface PlaylistPickerProps {
   playlists: Playlist[];
@@ -26,6 +27,7 @@ export default function PlaylistPicker({
   onSelect,
   onCancel,
 }: PlaylistPickerProps) {
+  useTraceScreen('playlist-picker');
   const { colors } = useTheme();
 
   const renderItem = ({ item }: { item: Playlist }) => (

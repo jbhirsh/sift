@@ -39,6 +39,7 @@ import {
   SortOrder,
   SORT_ORDER_DISPLAY,
 } from '../types';
+import { useTraceScreen } from '../hooks/useTrace';
 
 function sourceMatches(a: SiftSource, b: SiftSource): boolean {
   if (a.type !== b.type) return false;
@@ -61,6 +62,7 @@ const SOURCE_DISPLAY: Record<typeof SOURCE_TYPES[number], string> = {
 };
 
 export default function SetupScreen() {
+  useTraceScreen('setup');
   const { state, dispatch, startFresh, flushPendingSave } = useSift();
   const { colors, glass } = useTheme();
   const { loadPlaylists, clearSiftedPlaylist, warmCache, ensureAccess } = useMusicProvider();

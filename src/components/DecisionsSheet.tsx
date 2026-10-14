@@ -12,6 +12,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { CONTENT_COLUMN, RADIUS, SPACING } from '../theme';
 import GlassCard from './GlassCard';
 import type { Decision, Track } from '../types';
+import { useTraceScreen } from '../hooks/useTrace';
 
 const CHOICES: { decision: Decision; label: string }[] = [
   { decision: 'keep', label: 'Keep' },
@@ -35,6 +36,7 @@ interface DecisionsSheetProps {
  * beyond the last decision, which Undo already takes back.
  */
 export default function DecisionsSheet({ tracks, decisionFor, onRevise, onClose, disabled = false }: DecisionsSheetProps) {
+  useTraceScreen('decisions');
   const { colors } = useTheme();
   // Rows whose change is on its way, and ones whose change didn't go through.
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());

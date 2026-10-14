@@ -125,11 +125,12 @@ src/
                         resumeSession (a saved session's defaults)
     services/           MusicProviderInterface, AppleMusicProvider, MockMusicProvider,
                         SessionStore, RemovalHistoryStore, PreferencesStore,
-                        ReviewedLedgerStore, haptics,
+                        ReviewedLedgerStore, haptics, trace (E2E trace),
                         ChorusFinder + LrclibClient ("Start at chorus")
     hooks/              useMusicProvider, usePendingDecision (Undo),
                         useReviseDecision, useRemovalRetry,
-                        useResolvedArtwork, useChorusStart
+                        useResolvedArtwork, useChorusStart,
+                        useTrace (the E2E trace's screens, touches, stalls)
     theme/              Design tokens (SPACING, RADIUS, COLORS, SHADOWS,
                         FONTS, GLASS, GRADIENTS), ThemeContext, useThemeColors
     types/              Track, Decision, AppPhase, SortOrder, TrackFilter,
@@ -186,6 +187,16 @@ Makefile                Dev commands (test, lint, typecheck, check)
   decision directly: send through `useSendPending`, which sends each once.
   A decision a killed app was holding goes out on Resume, or, if a new sift
   replaces that session, through `useSendSavedPending` first.
+- **One decision at a time** (`utils/decisionGuard`): every way to decide
+  on the Sift screen, and Finish, Undo, Back and the decisions list, asks
+  the guard when pressed. A press is judged by its touch's own timestamp
+  (when the finger lifted), not when JavaScript got to it: too soon after
+  the last decision (its fly-off and settle) it's turned away; otherwise it
+  goes, or, if the decision before it isn't on screen yet, a Skip waits and
+  then runs with that state, while a Keep or Remove is turned away (its
+  card hasn't been seen). No timers and no button is disabled for it:
+  after a JavaScript stall, queued taps run before both (the likely way
+  flow 21 lost two Skips).
 - **Changing an older decision**: the decisions list (`DecisionsSheet`, from
   the Sift header and Done) changes any decided card through
   `useReviseDecision`: a held decision just changes (`REVISE`); a sent one
@@ -309,9 +320,13 @@ Makefile                Dev commands (test, lint, typecheck, check)
   runs only the top level of `.maestro/`).
 - **A flaky E2E flow is a bug: diagnose it and fix it at the root, never
   re-run CI to get past it.** Read the run's `maestro-results` artifact
-  first: Maestro's log, each command's result and the view hierarchy at
-  the failure (`suite-debug/`), the app's own log (`app-log.txt`), the
-  screenshots. Then fix the flow (wait for the element with
+  first: the app's trace (`trace.txt`: every touch with where it landed
+  and how late JavaScript saw it, every screen and sheet, every app action,
+  each decision-guard check and any JavaScript stall; `services/trace`,
+  written only by the E2E build), Maestro's log, each command's result and
+  the view hierarchy at the failure (`suite-debug/`), the system log for
+  the app (`app-log.txt`), the screenshots. A touch followed by no action,
+  screen or guard line is a tap the app dropped; say where, then fix it. Then fix the flow (wait for the element with
   `extendedWaitUntil`, never assert right after an animated transition) or
   the app, whichever is wrong. No retry in a flow to cover one either (a
   second tap, a repeated step): it hides the failure instead of fixing it.

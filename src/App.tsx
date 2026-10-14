@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SiftProvider, useSift } from './context/SiftContext';
 import GlassCard from './components/GlassCard';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { touchTraceProps, useJsStallWatch } from './hooks/useTrace';
 import SetupScreen from './screens/SetupScreen';
 import LoadingScreen from './screens/LoadingScreen';
 import SiftScreen from './screens/SiftScreen';
@@ -51,6 +52,9 @@ function PhaseRouter() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [settingsVisible, setSettingsVisible] = useState(false);
+  // The E2E trace (services/trace): every touch on every screen and sheet,
+  // and any stall of the JavaScript thread. Nothing in other builds.
+  useJsStallWatch();
 
   const renderScreen = () => {
     switch (state.phase) {
@@ -66,7 +70,7 @@ function PhaseRouter() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} {...touchTraceProps}>
       {renderScreen()}
 
       {/* On every screen, Setup included: Settings holds Start at chorus
