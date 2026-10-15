@@ -1,6 +1,12 @@
 import * as Sentry from '@sentry/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { loadReviewedIds, markReviewed, unmarkReviewed } from '../../src/services/ReviewedLedgerStore';
+import {
+  loadReviewedIds,
+  markReviewed,
+  storedReviewedIds,
+  takenBack,
+  unmarkReviewed,
+} from '../../src/services/ReviewedLedgerStore';
 
 jest.mock('@sentry/react-native', () => ({
   captureException: jest.fn(),
@@ -149,5 +155,30 @@ describe('ReviewedLedgerStore', () => {
       await unmarkReviewed('k', 'a');
       expect(JSON.parse(setItem.mock.calls.at(-1)?.[1] ?? '{}')).toEqual({ other: ['x'] });
     });
+  });
+
+  test('remembers this launch\'s taken-back keeps per source until kept again', async () => {
+    await markReviewed('tb', 'a');
+    await unmarkReviewed('tb', 'a');
+    expect([...takenBack('tb')]).toEqual(['a']);
+    expect([...takenBack('tb-other')]).toEqual([]);
+    await markReviewed('tb', 'a');
+    expect([...takenBack('tb')]).toEqual([]);
+  });
+
+  test('the stored ids are what the ledger holds on disk, not keeps waiting to be written', async () => {
+    await markReviewed('st', 'a');
+    let release: (() => void) | undefined;
+    setItem.mockImplementationOnce(async (key: string, value: string) => {
+      await new Promise<void>((resolve) => { release = resolve; });
+      return AsyncStorage.setItem(key, value);
+    });
+    const waiting = markReviewed('st', 'b');
+    await expect(storedReviewedIds('st')).resolves.toEqual(new Set(['a']));
+    await expect(loadReviewedIds('st')).resolves.toEqual(new Set(['a', 'b']));
+    await new Promise<void>((resolve) => { setImmediate(() => resolve()); });
+    release?.();
+    await waiting;
+    await expect(storedReviewedIds('st')).resolves.toEqual(new Set(['a', 'b']));
   });
 });

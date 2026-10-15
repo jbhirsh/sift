@@ -1002,6 +1002,8 @@ describe('useMusicProvider — observable state', () => {
     // offer it again.
     mockProvider.loadPlaylistTracks.mockResolvedValue([mockTrack]);
     await markReviewed('apple-music:playlist:p1', '1');
+    // Its "- Sifted" was looked for once already (services/SiftedImport).
+    await AsyncStorage.setItem('sift_sifted_imported', JSON.stringify(['apple-music:playlist:p1']));
     await renderHarness([]);
     await setPlaylistSource();
 
@@ -1132,6 +1134,8 @@ describe('useMusicProvider — observable state', () => {
     // Keeps of the library or another playlist don't count here.
     await markReviewed('apple-music:library', '2');
     await markReviewed('apple-music:playlist:p2', '2');
+    // Its "- Sifted" was looked for once already (services/SiftedImport).
+    await AsyncStorage.setItem('sift_sifted_imported', JSON.stringify(['apple-music:playlist:p1']));
     await renderHarness([]);
     await setPlaylistSource();
 
@@ -1140,9 +1144,37 @@ describe('useMusicProvider — observable state', () => {
     });
     expect(sift.state.phase).toBe('sifting');
     expect(sift.state.tracks.map((t) => t.id)).toEqual(['2']);
-    // The ledger replaced the "- Sifted" lookup: no playlist is listed or read.
+    // The ledger replaced the "- Sifted" lookup: once that was done for the
+    // playlist, no playlist is listed or read.
     expect(mockProvider.loadPlaylists).not.toHaveBeenCalled();
     expect(mockProvider.loadPlaylistTracks).toHaveBeenCalledTimes(1);
+  });
+
+  test('the first sift of a playlist leaves out the songs an older build saved to its "- Sifted", and looks once', async () => {
+    // An older build copied each Keep into "My Playlist - Sifted", where
+    // Apple Music files the song under a new id: matched by song.
+    mockProvider.loadPlaylists.mockResolvedValue([
+      { id: 'p1', name: 'My Playlist', trackCount: 2 },
+      { id: 's1', name: 'My Playlist - Sifted', trackCount: 1 },
+    ]);
+    mockProvider.loadPlaylistTracks.mockImplementation(async (id: string) =>
+      (id === 's1' ? [{ ...mockTrack, id: 'i.77' }] : [mockTrack, mockTrackB]));
+    await renderHarness([]);
+    await setPlaylistSource();
+
+    await act(async () => {
+      await api.loadTracks();
+    });
+    expect(sift.state.tracks.map((t) => t.id)).toEqual(['2']);
+    // Remembered under the id the playlist's own load gives it.
+    await expect(loadReviewedIds('apple-music:playlist:p1')).resolves.toEqual(new Set(['1']));
+    // The playlist was loaded once for the sift, not again for the import.
+    expect(mockProvider.loadPlaylistTracks.mock.calls).toEqual([['p1'], ['s1']]);
+
+    await act(async () => {
+      await api.loadTracks();
+    });
+    expect(mockProvider.loadPlaylists).toHaveBeenCalledTimes(1);
   });
 
   test('a playlist whose every song was kept before says so, and how to bring them back', async () => {

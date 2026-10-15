@@ -76,7 +76,7 @@ export default function SetupScreen() {
   useTraceScreen('setup');
   const { state, dispatch, startFresh, flushPendingSave } = useSift();
   const { colors, glass } = useTheme();
-  const { loadPlaylists, warmCache, ensureAccess } = useMusicProvider();
+  const { loadPlaylists, warmCache, ensureAccess, rememberSiftedKeeps } = useMusicProvider();
   const openSortPicker = () => {
     if (Platform.OS !== 'ios') return;
     const options = [...SORT_ORDERS.map((o) => SORT_ORDER_DISPLAY[o]), 'Cancel'];
@@ -119,15 +119,20 @@ export default function SetupScreen() {
   // show while this one's loads.
   const [reviewed, setReviewed] = useState({ key: '', count: 0 });
   const reviewedCount = reviewed.key === sourceLedgerKey ? reviewed.count : 0;
+  const selectedSource = state.source;
   useEffect(() => {
     let cancelled = false;
-    loadReviewedIds(sourceLedgerKey).then((ids) => {
-      if (!cancelled) setReviewed({ key: sourceLedgerKey, count: ids.size });
-    });
+    // A playlist's count includes keeps an older build saved to
+    // "<name> - Sifted", remembered the first time it's picked.
+    rememberSiftedKeeps(selectedSource)
+      .then(() => loadReviewedIds(sourceLedgerKey))
+      .then((ids) => {
+        if (!cancelled) setReviewed({ key: sourceLedgerKey, count: ids.size });
+      });
     return () => {
       cancelled = true;
     };
-  }, [sourceLedgerKey]);
+  }, [sourceLedgerKey, selectedSource, rememberSiftedKeeps]);
   // The switch shows once the selected source has songs kept in earlier
   // sifts. It decides what a new sift loads, from Start Sifting or Start Over.
   const showIncludeSifted = reviewedCount > 0;

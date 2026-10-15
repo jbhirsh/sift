@@ -6,6 +6,7 @@ import {
   isSiftSession,
   legacyPendingKeeps,
   migrateLegacySession,
+  savedBeforeKeepsRemembered,
 } from '../../src/utils/validators';
 import type { RemovalRecord, SiftSession, Track } from '../../src/types';
 
@@ -209,6 +210,19 @@ describe('legacyPendingKeeps', () => {
     expect(legacyPendingKeeps({ ...session, pendingKeeps: 'x' })).toEqual([]);
     expect(legacyPendingKeeps(null)).toEqual([]);
     expect(legacyPendingKeeps([track])).toEqual([]);
+  });
+});
+
+describe('savedBeforeKeepsRemembered', () => {
+  test('a session carrying either field of the build that copied keeps into "- Sifted"', () => {
+    expect(savedBeforeKeepsRemembered({ ...session, pendingKeeps: [] })).toBe(true);
+    expect(savedBeforeKeepsRemembered({ ...session, siftedPlaylistId: null })).toBe(true);
+  });
+
+  test('not one without them, or anything that isn\'t a session object', () => {
+    expect(savedBeforeKeepsRemembered(session)).toBe(false);
+    expect(savedBeforeKeepsRemembered(null)).toBe(false);
+    expect(savedBeforeKeepsRemembered([{ pendingKeeps: [] }])).toBe(false);
   });
 });
 

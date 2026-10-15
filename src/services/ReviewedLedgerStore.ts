@@ -16,6 +16,10 @@ let writing = new Map<string, Set<string>>();
 const pendingRemovals = new Map<string, Set<string>>();
 let removing = new Map<string, Set<string>>();
 let flushing: Promise<void> | null = null;
+// Keeps taken back this launch, by source key, until kept again: the
+// one-time "- Sifted" import (services/SiftedImport) must not bring back a
+// keep the user just changed.
+const takenBackIds = new Map<string, Set<string>>();
 
 function idsIn(batches: Map<string, Set<string>>[], key: string): string[] {
   return batches.flatMap((batch) => [...(batch.get(key) ?? [])]);
@@ -92,6 +96,7 @@ async function flush(): Promise<void> {
  * which is reported).
  */
 export function markReviewed(key: string, trackId: string): Promise<void> {
+  takenBackIds.get(key)?.delete(trackId);
   queue(pending, pendingRemovals, key, trackId);
   flushing ??= flush();
   return flushing;
@@ -102,7 +107,23 @@ export function markReviewed(key: string, trackId: string): Promise<void> {
  * it again. Like markReviewed: never rejects, resolves once written.
  */
 export function unmarkReviewed(key: string, trackId: string): Promise<void> {
+  const ids = takenBackIds.get(key) ?? new Set<string>();
+  ids.add(trackId);
+  takenBackIds.set(key, ids);
   queue(pendingRemovals, pending, key, trackId);
   flushing ??= flush();
   return flushing;
+}
+
+/** Keeps of a source taken back this launch and not kept again since. */
+export function takenBack(key: string): ReadonlySet<string> {
+  return takenBackIds.get(key) ?? new Set();
+}
+
+/**
+ * The ids the stored ledger holds for a source, as written: no keeps still
+ * waiting to be written. Rejects when it can't be read.
+ */
+export async function storedReviewedIds(key: string): Promise<Set<string>> {
+  return new Set(parseLedger(await AsyncStorage.getItem(LEDGER_KEY))[key] ?? []);
 }
