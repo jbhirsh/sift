@@ -4,6 +4,7 @@ import {
   isRemovalRecord,
   isLegacyLocalFileRecord,
   isSiftSession,
+  legacyPendingKeeps,
   migrateLegacySession,
 } from '../../src/utils/validators';
 import type { RemovalRecord, SiftSession, Track } from '../../src/types';
@@ -157,13 +158,18 @@ describe('isSiftSession', () => {
       cursor: 1,
       provider: 'apple-music',
       source: playlistSource,
-      pendingKeeps: [track],
       removalErrors: ['failed'],
       failedRemovalIds: ['t1'],
-      siftedPlaylistId: 'sifted-1',
+      pending: { trackId: 't1', decision: 'keep', at: 1 },
     };
     expect(isSiftSession(stored(full))).toBe(true);
-    expect(isSiftSession(stored({ ...full, siftedPlaylistId: null }))).toBe(true);
+  });
+
+  test('accepts a session still carrying the old "- Sifted" fields, whatever they hold', () => {
+    // pendingKeeps and siftedPlaylistId went with the automatic "- Sifted"
+    // playlist; a bad value in one no longer costs the whole session.
+    expect(isSiftSession(stored({ ...session, pendingKeeps: [track], siftedPlaylistId: 'sifted-1' }))).toBe(true);
+    expect(isSiftSession(stored({ ...session, pendingKeeps: 'x', siftedPlaylistId: 7 }))).toBe(true);
   });
 
   test.each([
@@ -185,13 +191,24 @@ describe('isSiftSession', () => {
     // Spotify was removed (#140): its saved sessions are set aside, not resumed.
     ['a Spotify provider', { ...session, provider: 'spotify' }],
     ['a malformed source', { ...session, source: { type: 'playlist' } }],
-    ['pendingKeeps not an array', { ...session, pendingKeeps: 'x' }],
-    ['a malformed pending keep', { ...session, pendingKeeps: [{}] }],
     ['a non-string removal error', { ...session, removalErrors: [1] }],
     ['a non-string failed removal id', { ...session, failedRemovalIds: [1] }],
-    ['a numeric siftedPlaylistId', { ...session, siftedPlaylistId: 7 }],
   ])('rejects a session with %s', (_label, value) => {
     expect(isSiftSession(value)).toBe(false);
+  });
+});
+
+describe('legacyPendingKeeps', () => {
+  test('the usable tracks of an old session\'s pendingKeeps', () => {
+    const other = { ...track, id: 't2' };
+    expect(legacyPendingKeeps({ ...session, pendingKeeps: [track, {}, other, { ...track, id: 3 }] })).toEqual([track, other]);
+  });
+
+  test('none for a session without them, or one where they aren\'t a list', () => {
+    expect(legacyPendingKeeps(session)).toEqual([]);
+    expect(legacyPendingKeeps({ ...session, pendingKeeps: 'x' })).toEqual([]);
+    expect(legacyPendingKeeps(null)).toEqual([]);
+    expect(legacyPendingKeeps([track])).toEqual([]);
   });
 });
 

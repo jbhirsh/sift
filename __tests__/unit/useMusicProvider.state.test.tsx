@@ -5,6 +5,8 @@ import * as Sentry from '@sentry/react-native';
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
 import { useMusicProvider } from '../../src/hooks/useMusicProvider';
 import { forgetRemovals, loadHistory, logRemoval, removeFromHistory } from '../../src/services/RemovalHistoryStore';
+import { loadReviewedIds, markReviewed, unmarkReviewed } from '../../src/services/ReviewedLedgerStore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MusicProviderService } from '../../src/services/MusicProviderInterface';
 import { Playlist, Track } from '../../src/types';
 
@@ -38,7 +40,7 @@ const mockProvider = {
   resume: jest.fn().mockResolvedValue(undefined),
   seek: jest.fn(),
   getPlaybackState: jest.fn().mockReturnValue({ position: 30, isPlaying: true }),
-  createPlaylist: jest.fn().mockResolvedValue(undefined),
+  createPlaylist: jest.fn().mockResolvedValue('new-playlist'),
   removeFromPlaylist: jest.fn().mockResolvedValue(undefined),
   restoreRemoved: jest.fn().mockResolvedValue(1),
   removeFromLibrary: jest.fn().mockResolvedValue(undefined),
@@ -72,7 +74,7 @@ function makeMinimalProvider(extras?: Partial<MusicProviderService>): MusicProvi
     resume: jest.fn().mockResolvedValue(undefined),
     seek: jest.fn(),
     getPlaybackState: jest.fn().mockReturnValue({ position: 0, isPlaying: false }),
-    createPlaylist: jest.fn().mockResolvedValue(undefined),
+    createPlaylist: jest.fn().mockResolvedValue('new-playlist'),
     ...extras,
   };
 }
@@ -169,7 +171,7 @@ describe('useMusicProvider — observable state', () => {
     mockProvider.play.mockResolvedValue(undefined);
     mockProvider.pause.mockResolvedValue(undefined);
     mockProvider.resume.mockResolvedValue(undefined);
-    mockProvider.createPlaylist.mockResolvedValue(undefined);
+    mockProvider.createPlaylist.mockResolvedValue('new-playlist');
     mockProvider.removeFromPlaylist.mockResolvedValue(undefined);
     mockProvider.removeFromLibrary.mockResolvedValue(undefined);
     mockProvider.addToPlaylist.mockResolvedValue(undefined);
@@ -178,6 +180,13 @@ describe('useMusicProvider — observable state', () => {
     // Tests that seed a persistent history must not leak it into later ones.
     (loadHistory as jest.Mock).mockReset().mockResolvedValue([]);
     mockProvider.getPlaybackState.mockReturnValue({ position: 30, isPlaying: true });
+  });
+
+  // Each test starts with an empty reviewed ledger: let a write an earlier
+  // test started land, then clear what it stored.
+  beforeEach(async () => {
+    await unmarkReviewed('settle', 'nothing');
+    await AsyncStorage.clear();
   });
 
   afterEach(() => {
@@ -906,137 +915,7 @@ describe('useMusicProvider — observable state', () => {
     expect(messages.join('\n')).not.toContain('My Playlist');
   });
 
-  // ── createPlaylist lifecycle ─────────────────────────
-
-  // ── saveSiftedPlaylist ───────────────────────────────
-
-  test('saveSiftedPlaylist recognizes an already-present track under a different id', async () => {
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
-    ]);
-    // Readback: same song, but under the library-instance id Apple Music
-    // assigned when it landed.
-    mockProvider.loadPlaylistTracks.mockResolvedValue([{ ...mockTrack, id: 'lib-99' }]);
-    await renderHarness([mockTrack]);
-
-    await act(async () => {
-      sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
-    });
-    // A stale error from an earlier failed attempt must not outlive a retry.
-    await act(async () => {
-      sift.dispatch({ type: 'SET_PLAYLIST_ERROR', error: 'stale' });
-    });
-    await act(async () => {
-      await api.saveSiftedPlaylist('My Playlist', [mockTrack]);
-    });
-
-    // Identity match: never re-added under a second id…
-    expect(mockProvider.addToPlaylist).not.toHaveBeenCalled();
-    expect(mockProvider.createPlaylist).not.toHaveBeenCalled();
-    // …yet the save still counts as success and covers the snapshot.
-    expect(sift.state.removalPlaylistCreated).toBe(true);
-    expect(sift.state.pendingKeeps).toEqual([]);
-    expect(sift.state.removalPlaylistError).toBeNull();
-  });
-
-  test('a failed save repairs pendingKeeps via an id-resolved, identity-matched readback', async () => {
-    // The companion was renamed, so only the persisted id can find it — in
-    // the repair path too, or every landed track would stay buffered.
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'sifted-renamed', name: 'Custom Name', trackCount: 0 },
-    ]);
-    mockProvider.loadPlaylistTracks
-      .mockResolvedValueOnce([]) // pre-add diff: nothing present yet
-      .mockResolvedValueOnce([{ ...mockTrack, id: 'lib-77' }]); // post-failure: track 1 landed under a fresh id
-    mockProvider.addToPlaylist.mockRejectedValueOnce(
-      new Error('1 of 2 tracks could not be added'),
-    );
-    await renderHarness([mockTrack, mockTrackB]);
-
-    await act(async () => {
-      sift.dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: 'sifted-renamed' });
-    });
-    await act(async () => {
-      sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
-    });
-    await act(async () => {
-      sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrackB });
-    });
-
-    await act(async () => {
-      await api.saveSiftedPlaylist('My Playlist', [mockTrack, mockTrackB]);
-    });
-
-    expect(mockProvider.addToPlaylist).toHaveBeenCalledWith('sifted-renamed', ['1', '2']);
-    // The repair read the playlist back by id…
-    expect(mockProvider.loadPlaylistTracks).toHaveBeenLastCalledWith('sifted-renamed');
-    // …and dropped exactly the track that landed (matched by identity).
-    expect(sift.state.pendingKeeps.map((t) => t.id)).toEqual(['2']);
-    expect(sift.state.removalPlaylistError).toBe('1 of 2 tracks could not be added');
-    expect(sift.state.isCreatingPlaylist).toBe(false);
-    expect(sift.state.removalPlaylistCreated).toBe(false);
-  });
-
-  test('a failed save whose readback also fails keeps the whole snapshot buffered', async () => {
-    mockProvider.loadPlaylists
-      .mockResolvedValueOnce([{ id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 0 }])
-      .mockRejectedValueOnce(new Error('offline'));
-    mockProvider.loadPlaylistTracks.mockResolvedValueOnce([]); // pre-add diff
-    mockProvider.addToPlaylist.mockRejectedValueOnce(new Error('add failed'));
-    await renderHarness([mockTrack, mockTrackB]);
-
-    await act(async () => {
-      sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
-    });
-    await act(async () => {
-      sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrackB });
-    });
-    await act(async () => {
-      await api.saveSiftedPlaylist('My Playlist', [mockTrack, mockTrackB]);
-    });
-
-    // Best-effort repair failed — everything stays buffered for the retry…
-    expect(sift.state.pendingKeeps.map((t) => t.id)).toEqual(['1', '2']);
-    // …the surfaced error is the SAVE's, not the readback's…
-    expect(sift.state.removalPlaylistError).toBe('add failed');
-    expect(sift.state.isCreatingPlaylist).toBe(false);
-    // …and the readback failure is at least observable.
-    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
-      expect.objectContaining({
-        message: expect.stringContaining('readback failed'),
-        level: 'warning',
-      }),
-    );
-  });
-
-  test('a failed save whose companion vanished neither repairs nor logs a readback failure', async () => {
-    mockProvider.loadPlaylists
-      .mockResolvedValueOnce([{ id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 0 }])
-      .mockResolvedValueOnce([]); // repair lookup: the companion is gone
-    mockProvider.loadPlaylistTracks.mockResolvedValueOnce([]); // pre-add diff
-    mockProvider.addToPlaylist.mockRejectedValueOnce(new Error('add failed'));
-    await renderHarness([mockTrack]);
-
-    await act(async () => {
-      sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
-    });
-    await act(async () => {
-      await api.saveSiftedPlaylist('My Playlist', [mockTrack]);
-    });
-
-    expect(sift.state.pendingKeeps.map((t) => t.id)).toEqual(['1']);
-    expect(sift.state.removalPlaylistError).toBe('add failed');
-    // Only the pre-add diff read the playlist — no repair readback happened,
-    // and a missing companion is not a readback failure.
-    expect(mockProvider.loadPlaylistTracks).toHaveBeenCalledTimes(1);
-    expect(Sentry.addBreadcrumb).not.toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('readback failed') }),
-    );
-  });
-
-  // ── keepTrack id resolution ──────────────────────────
-
-  test('keepTrack on the library source does nothing', async () => {
+  test('keepTrack on the library source writes nothing to the service; the ledger remembers it', async () => {
     await renderHarness([mockTrack]);
 
     await act(async () => {
@@ -1045,86 +924,7 @@ describe('useMusicProvider — observable state', () => {
     expect(mockProvider.loadPlaylists).not.toHaveBeenCalled();
     expect(mockProvider.createPlaylist).not.toHaveBeenCalled();
     expect(mockProvider.addToPlaylist).not.toHaveBeenCalled();
-    expect(sift.state.pendingKeeps).toEqual([]);
-  });
-
-  test('keepTrack reuses the session-known sifted playlist id without a name lookup', async () => {
-    await renderHarness([mockTrack]);
-    await setPlaylistSource();
-    await act(async () => {
-      sift.dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: 'known-id' });
-    });
-    mockProvider.loadPlaylistTracks.mockResolvedValueOnce([]); // duplicate-guard readback
-
-    await act(async () => {
-      await api.keepTrack(mockTrack);
-    });
-
-    // Rename-proof: the persisted id is trusted outright.
-    expect(mockProvider.loadPlaylists).not.toHaveBeenCalled();
-    expect(mockProvider.createPlaylist).not.toHaveBeenCalled();
-    expect(mockProvider.loadPlaylistTracks).toHaveBeenCalledWith('known-id');
-    expect(mockProvider.addToPlaylist).toHaveBeenCalledWith('known-id', ['1']);
-    expect(sift.state.pendingKeeps).toEqual([]);
-  });
-
-  test('keepTrack records the playlist id once a later keep resolves it', async () => {
-    await renderHarness([mockTrack, mockTrackB]);
-    await setPlaylistSource();
-
-    // First keep: creates the playlist, but it never becomes queryable
-    // within the retry window — the id stays unknown.
-    mockProvider.loadPlaylists.mockResolvedValue([]);
-    await act(async () => {
-      const first = api.keepTrack(mockTrack);
-      await jest.advanceTimersByTimeAsync(1100);
-      await first;
-    });
-    expect(mockProvider.createPlaylist).toHaveBeenCalledWith('My Playlist - Sifted', ['1']);
-    expect(sift.state.siftedPlaylistId).toBeNull();
-    // The track landed via creation — nothing to buffer.
-    expect(sift.state.pendingKeeps).toEqual([]);
-
-    // The playlist becomes visible later; the next keep must resolve the id,
-    // persist it for the session, and use it for the add.
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'late-id', name: 'My Playlist - Sifted', trackCount: 1 },
-    ]);
-    await act(async () => {
-      await api.keepTrack(mockTrackB);
-    });
-    expect(sift.state.siftedPlaylistId).toBe('late-id');
-    expect(mockProvider.addToPlaylist).toHaveBeenCalledWith('late-id', ['2']);
-    // The creation-seeded contents cache stood in for a readback.
-    expect(mockProvider.loadPlaylistTracks).not.toHaveBeenCalled();
-    expect(sift.state.pendingKeeps).toEqual([]);
-  });
-
-  test('the sifted-playlist lookup retries on the 0/250/750ms schedule', async () => {
-    await renderHarness([mockTrack]);
-    await setPlaylistSource();
-    mockProvider.loadPlaylists.mockResolvedValue([]);
-
-    let keep!: Promise<void>;
-    await act(async () => {
-      keep = api.keepTrack(mockTrack);
-    });
-    // Initial name lookup + the immediate (0ms) retry attempt.
-    expect(mockProvider.loadPlaylists).toHaveBeenCalledTimes(2);
-
-    await act(async () => {
-      await jest.advanceTimersByTimeAsync(250);
-    });
-    expect(mockProvider.loadPlaylists).toHaveBeenCalledTimes(3);
-
-    await act(async () => {
-      await jest.advanceTimersByTimeAsync(750);
-      await keep;
-    });
-    expect(mockProvider.loadPlaylists).toHaveBeenCalledTimes(4);
-    // The keep itself landed via creation — nothing was buffered.
-    expect(mockProvider.createPlaylist).toHaveBeenCalledTimes(1);
-    expect(sift.state.pendingKeeps).toEqual([]);
+    await expect(loadReviewedIds('apple-music:library')).resolves.toEqual(new Set(['1']));
   });
 
   // ── warmCache ────────────────────────────────────────
@@ -1173,79 +973,6 @@ describe('useMusicProvider — observable state', () => {
     );
   });
 
-  // ── clearSiftedPlaylist result ───────────────────────
-
-  test('clearSiftedPlaylist empties the companion and reports success', async () => {
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 2 },
-    ]);
-    mockProvider.loadPlaylistTracks.mockResolvedValue([mockTrack, mockTrackB]);
-    await renderHarness([mockTrack]);
-
-    let cleared = false;
-    await act(async () => {
-      cleared = await api.clearSiftedPlaylist('My Playlist');
-    });
-    expect(cleared).toBe(true);
-    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('sifted-1', ['1', '2']);
-  });
-
-  test('clearSiftedPlaylist succeeds without touching an already-empty companion', async () => {
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 0 },
-    ]);
-    mockProvider.loadPlaylistTracks.mockResolvedValue([]);
-    await renderHarness([mockTrack]);
-
-    let cleared = false;
-    await act(async () => {
-      cleared = await api.clearSiftedPlaylist('My Playlist');
-    });
-    expect(cleared).toBe(true);
-    expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
-  });
-
-  test('clearSiftedPlaylist reports success when no companion exists to clear', async () => {
-    // Callers wipe local session state only on success — "nothing to clear"
-    // must read as success, or Start Over would refuse to proceed forever.
-    mockProvider.loadPlaylists.mockResolvedValue([]);
-    await renderHarness([mockTrack]);
-
-    let cleared = false;
-    await act(async () => {
-      cleared = await api.clearSiftedPlaylist('My Playlist');
-    });
-    expect(cleared).toBe(true);
-    expect(mockProvider.loadPlaylistTracks).not.toHaveBeenCalled();
-    expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
-  });
-
-  test('clearSiftedPlaylist reports failure so callers keep their local state', async () => {
-    await renderHarness([mockTrack]);
-
-    mockProvider.loadPlaylists.mockRejectedValueOnce(new Error('offline'));
-    let cleared = true;
-    await act(async () => {
-      cleared = await api.clearSiftedPlaylist('My Playlist');
-    });
-    expect(cleared).toBe(false);
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      { tags: { flow: 'clear-sifted-playlist' } },
-    );
-
-    // A failing removal is a failed clear too — not a silent success.
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
-    ]);
-    mockProvider.loadPlaylistTracks.mockResolvedValue([mockTrack]);
-    mockProvider.removeFromPlaylist.mockRejectedValueOnce(new Error('nope'));
-    await act(async () => {
-      cleared = await api.clearSiftedPlaylist('My Playlist');
-    });
-    expect(cleared).toBe(false);
-  });
-
   // ── Authorization is checked, not re-prompted ────────
 
   test('already-authorized flows never re-open the consent prompt', async () => {
@@ -1270,12 +997,11 @@ describe('useMusicProvider — observable state', () => {
   // ── loadTracks filtering behaviors ───────────────────
 
   test('skipFiltering re-offers already-sifted tracks without any filter lookups', async () => {
-    // The companion contains the only source track — normal filtering would
-    // empty the sift, but "Re-sift everything" must offer it again.
+    // The ledger remembers the only source track as kept — normal filtering
+    // would empty the sift, but "Include songs I've already sifted" must
+    // offer it again.
     mockProvider.loadPlaylistTracks.mockResolvedValue([mockTrack]);
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
-    ]);
+    await markReviewed('apple-music:playlist:p1', '1');
     await renderHarness([]);
     await setPlaylistSource();
 
@@ -1284,9 +1010,10 @@ describe('useMusicProvider — observable state', () => {
     });
     expect(sift.state.phase).toBe('sifting');
     expect(sift.state.tracks.map((t) => t.id)).toEqual(['1']);
-    // Skipping the filters means not even reading the companion. The history
-    // is still read: songs waiting in "Sift \u2014 Removed" stay out, as for
-    // the library (starting over un-removes nothing).
+    // Skipping the filters means not even reading the ledger, and a
+    // playlist sift never lists playlists. The history is still read:
+    // songs waiting in "Sift \u2014 Removed" stay out, as for the library
+    // (starting over un-removes nothing).
     expect(mockProvider.loadPlaylists).not.toHaveBeenCalled();
     expect(loadHistory).toHaveBeenCalledTimes(1);
   });
@@ -1374,17 +1101,10 @@ describe('useMusicProvider — observable state', () => {
     expect(sift.state.phase).toBe('setup');
   });
 
-  test('an existing companion that filtered nothing does not steal the removed-tracks blame', async () => {
-    const unrelated: Track = {
-      id: 'c', name: 'Unrelated', artist: 'Someone Else', album: 'X',
-      duration: 90, playCount: 0, dateAdded: '2020-03-01T00:00:00.000Z',
-    };
-    mockProvider.loadPlaylistTracks
-      .mockResolvedValueOnce([mockTrack]) // source playlist
-      .mockResolvedValueOnce([unrelated]); // companion holds only an unrelated track
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
-    ]);
+  test('remembered keeps that filtered nothing do not steal the removed-tracks blame', async () => {
+    mockProvider.loadPlaylistTracks.mockResolvedValueOnce([mockTrack]);
+    // A keep of another song of this playlist: it leaves nothing out here.
+    await markReviewed('apple-music:playlist:p1', 'c');
     (loadHistory as jest.Mock).mockResolvedValueOnce([
       {
         track: mockTrack,
@@ -1406,208 +1126,59 @@ describe('useMusicProvider — observable state', () => {
     );
   });
 
-  test('the sifted filter excludes by id even when the track metadata was edited', async () => {
-    mockProvider.loadPlaylistTracks
-      .mockResolvedValueOnce([mockTrack]) // source: id '1'
-      .mockResolvedValueOnce([{ ...mockTrack, name: 'Track A (Remastered)' }]); // companion: same id, new name
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
-    ]);
+  test('a playlist sift leaves out songs kept in earlier sifts of that playlist, by id', async () => {
+    mockProvider.loadPlaylistTracks.mockResolvedValueOnce([{ ...mockTrack, name: 'Track A (Remastered)' }, mockTrackB]);
+    await markReviewed('apple-music:playlist:p1', '1');
+    // Keeps of the library or another playlist don't count here.
+    await markReviewed('apple-music:library', '2');
+    await markReviewed('apple-music:playlist:p2', '2');
     await renderHarness([]);
     await setPlaylistSource();
 
     await act(async () => {
       await api.loadTracks();
     });
-    expect(sift.state.loadError).toBe('All tracks in this playlist have already been sifted.');
+    expect(sift.state.phase).toBe('sifting');
+    expect(sift.state.tracks.map((t) => t.id)).toEqual(['2']);
+    // The ledger replaced the "- Sifted" lookup: no playlist is listed or read.
+    expect(mockProvider.loadPlaylists).not.toHaveBeenCalled();
+    expect(mockProvider.loadPlaylistTracks).toHaveBeenCalledTimes(1);
+  });
+
+  test('a playlist whose every song was kept before says so, and how to bring them back', async () => {
+    mockProvider.loadPlaylistTracks.mockResolvedValueOnce([mockTrack]);
+    await markReviewed('apple-music:playlist:p1', '1');
+    await renderHarness([]);
+    await setPlaylistSource();
+
+    await act(async () => {
+      await api.loadTracks();
+    });
+    expect(sift.state.loadError).toBe(
+      'You\u2019ve sifted every song in this playlist. Turn on \u201cInclude songs I\u2019ve already sifted\u201d to go through them again.',
+    );
     expect(sift.state.phase).toBe('setup');
   });
 
-  // ── Companion resolution among many playlists ────────
-
-  test('save and clear resolve the companion by exact name among many playlists', async () => {
-    const decoyFirst = [
-      { id: 'decoy', name: 'Another Playlist', trackCount: 9 },
-      { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 0 },
-    ];
-    mockProvider.loadPlaylists.mockResolvedValue(decoyFirst);
-    mockProvider.loadPlaylistTracks.mockResolvedValue([]);
-    await renderHarness([mockTrack]);
-
-    await act(async () => {
-      await api.saveSiftedPlaylist('My Playlist', [mockTrack]);
-    });
-    expect(mockProvider.addToPlaylist).toHaveBeenCalledWith('sifted-1', ['1']);
-    expect(mockProvider.createPlaylist).not.toHaveBeenCalled();
-
-    mockProvider.loadPlaylistTracks.mockResolvedValue([mockTrack]);
-    await act(async () => {
-      await api.clearSiftedPlaylist('My Playlist');
-    });
-    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('sifted-1', ['1']);
-  });
-
-  test('the persisted id outranks list position when resolving the companion', async () => {
-    // The renamed companion sits BEHIND a decoy — only the exact id may win.
-    const decoyFirst = [
-      { id: 'decoy', name: 'Another Playlist', trackCount: 9 },
-      { id: 'sifted-renamed', name: 'Custom Name', trackCount: 0 },
-    ];
-    mockProvider.loadPlaylists.mockResolvedValue(decoyFirst);
-    mockProvider.loadPlaylistTracks.mockResolvedValue([]);
-    await renderHarness([mockTrack]);
-    await act(async () => {
-      sift.dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: 'sifted-renamed' });
-    });
-
-    await act(async () => {
-      await api.saveSiftedPlaylist('My Playlist', [mockTrack]);
-    });
-    expect(mockProvider.addToPlaylist).toHaveBeenCalledWith('sifted-renamed', ['1']);
-
-    mockProvider.loadPlaylistTracks.mockResolvedValue([mockTrack]);
-    await act(async () => {
-      await api.clearSiftedPlaylist('My Playlist');
-    });
-    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('sifted-renamed', ['1']);
-  });
-
-  test('loadTracks filtering resolves the companion among many playlists, by name and by id', async () => {
-    // Name-based, companion behind a decoy.
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'decoy', name: 'Another Playlist', trackCount: 9 },
-      { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
+  test('a playlist emptied by both kept and removed songs blames both', async () => {
+    mockProvider.loadPlaylistTracks.mockResolvedValueOnce([mockTrack, mockTrackB]);
+    await markReviewed('apple-music:playlist:p1', '1');
+    (loadHistory as jest.Mock).mockResolvedValueOnce([
+      {
+        track: mockTrackB,
+        source: { type: 'playlist', playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 } },
+        provider: 'apple-music',
+        removedAt: '2026-01-01T00:00:00.000Z',
+        collected: true,
+      },
     ]);
-    mockProvider.loadPlaylistTracks
-      .mockResolvedValueOnce([mockTrack, mockTrackB])
-      .mockResolvedValueOnce([mockTrack]);
     await renderHarness([]);
     await setPlaylistSource();
+
     await act(async () => {
       await api.loadTracks();
     });
-    expect(mockProvider.loadPlaylistTracks).toHaveBeenCalledWith('sifted-1');
-    expect(sift.state.tracks.map((t) => t.id)).toEqual(['2']);
-
-    // Id-based, renamed companion behind a decoy.
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'decoy', name: 'Another Playlist', trackCount: 9 },
-      { id: 'sifted-renamed', name: 'Custom Name', trackCount: 1 },
-    ]);
-    mockProvider.loadPlaylistTracks
-      .mockResolvedValueOnce([mockTrack, mockTrackB])
-      .mockResolvedValueOnce([mockTrack]);
-    await act(async () => {
-      sift.dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: 'sifted-renamed' });
-    });
-    await act(async () => {
-      await api.loadTracks();
-    });
-    expect(mockProvider.loadPlaylistTracks).toHaveBeenCalledWith('sifted-renamed');
-    expect(sift.state.tracks.map((t) => t.id)).toEqual(['2']);
-  });
-
-  // ── keepTrack resolution caching ─────────────────────
-
-  test('keeps after the first do not repeat the name lookup or the readback', async () => {
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'decoy', name: 'Another Playlist', trackCount: 9 },
-      { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 0 },
-    ]);
-    mockProvider.loadPlaylistTracks.mockResolvedValueOnce([]);
-    await renderHarness([mockTrack, mockTrackB]);
-    await setPlaylistSource();
-
-    await act(async () => {
-      const first = api.keepTrack(mockTrack);
-      const second = api.keepTrack(mockTrackB);
-      await Promise.all([first, second]);
-    });
-
-    // One lookup (finding the exact name behind the decoy), one readback —
-    // the second keep reuses both and lands directly.
-    expect(mockProvider.loadPlaylists).toHaveBeenCalledTimes(1);
-    expect(mockProvider.loadPlaylistTracks).toHaveBeenCalledTimes(1);
-    expect(mockProvider.addToPlaylist).toHaveBeenNthCalledWith(1, 'sifted-1', ['1']);
-    expect(mockProvider.addToPlaylist).toHaveBeenNthCalledWith(2, 'sifted-1', ['2']);
-    // The resolved id is recorded for the session (rename-proofing).
-    expect(sift.state.siftedPlaylistId).toBe('sifted-1');
-  });
-
-  test('the id resolved right after creating the companion is recorded for the session', async () => {
-    mockProvider.loadPlaylists
-      .mockResolvedValueOnce([]) // initial lookup: nothing yet
-      .mockResolvedValue([
-        { id: 'decoy', name: 'Another Playlist', trackCount: 9 },
-        { id: 'new-sifted', name: 'My Playlist - Sifted', trackCount: 1 },
-      ]);
-    await renderHarness([mockTrack]);
-    await setPlaylistSource();
-
-    await act(async () => {
-      await api.keepTrack(mockTrack);
-    });
-    expect(mockProvider.createPlaylist).toHaveBeenCalledWith('My Playlist - Sifted', ['1']);
-    expect(sift.state.siftedPlaylistId).toBe('new-sifted');
-    expect(sift.state.pendingKeeps).toEqual([]);
-  });
-
-  test('a failing keep is buffered for the Done fallback and reported', async () => {
-    mockProvider.loadPlaylists.mockRejectedValueOnce(new Error('offline'));
-    await renderHarness([mockTrack]);
-    await setPlaylistSource();
-
-    await act(async () => {
-      await api.keepTrack(mockTrack);
-    });
-    expect(sift.state.pendingKeeps.map((t) => t.id)).toEqual(['1']);
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      { tags: { flow: 'keep-track' } },
-    );
-  });
-
-  // ── Save dedup and repair by id ──────────────────────
-
-  test('save skips a track already present under the same id after metadata edits', async () => {
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
-    ]);
-    // Same id, edited metadata: identity differs, id must still match.
-    mockProvider.loadPlaylistTracks.mockResolvedValue([
-      { ...mockTrack, name: 'Track A (Remastered)' },
-    ]);
-    await renderHarness([mockTrack]);
-
-    await act(async () => {
-      await api.saveSiftedPlaylist('My Playlist', [mockTrack]);
-    });
-    expect(mockProvider.addToPlaylist).not.toHaveBeenCalled();
-    expect(sift.state.removalPlaylistCreated).toBe(true);
-  });
-
-  test('the failed-save repair recognizes landed tracks by id after metadata edits', async () => {
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 0 },
-    ]);
-    mockProvider.loadPlaylistTracks
-      .mockResolvedValueOnce([]) // pre-add diff
-      .mockResolvedValueOnce([{ ...mockTrack, name: 'Track A (Live)' }]); // landed: same id, new name
-    mockProvider.addToPlaylist.mockRejectedValueOnce(new Error('partial failure'));
-    await renderHarness([mockTrack, mockTrackB]);
-
-    await act(async () => {
-      sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
-    });
-    await act(async () => {
-      sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrackB });
-    });
-    await act(async () => {
-      await api.saveSiftedPlaylist('My Playlist', [mockTrack, mockTrackB]);
-    });
-
-    expect(sift.state.pendingKeeps.map((t) => t.id)).toEqual(['2']);
-    expect(sift.state.removalPlaylistError).toBe('partial failure');
+    expect(sift.state.loadError).toBe('All tracks in this playlist have already been sifted or removed.');
   });
 
   test('warmCache failures are captured, never thrown', async () => {
@@ -1626,113 +1197,51 @@ describe('useMusicProvider — observable state', () => {
   // ── Providers without optional APIs ──────────────────
   // MusicProviderService marks the playlist/library-mutation APIs optional.
   // When a flow has no real work for the missing API, it must degrade
-  // gracefully on a provider that lacks it — never crash, never lose a kept
-  // track, never claim false failure. But when there IS work only the
-  // missing API could do, the flow must surface its normal failure path —
-  // silent success would clear buffers and local state for work that never
-  // happened.
+  // gracefully on a provider that lacks it — never crash, never claim false
+  // failure.
 
-  test('keepTrack on a minimal provider creates the companion and loses nothing', async () => {
-    const minimal = makeMinimalProvider();
+  test('saveKeptPlaylist with no playlist lookup creates the playlist empty, then adds', async () => {
+    const minimal = makeMinimalProvider({
+      createPlaylist: jest.fn().mockResolvedValue('new-1'),
+      loadPlaylistTracks: jest.fn().mockResolvedValue([mockTrack]),
+      addToPlaylist: jest.fn().mockResolvedValue(undefined),
+    });
     mockActiveProvider = minimal;
+    await markReviewed('apple-music:playlist:p1', '1');
     await renderHarness([mockTrack]);
     await setPlaylistSource();
-
+    let result: unknown;
     await act(async () => {
-      const keep = api.keepTrack(mockTrack);
-      await jest.advanceTimersByTimeAsync(1100);
-      await keep;
+      result = await api.saveKeptPlaylist();
     });
-    expect(minimal.createPlaylist).toHaveBeenCalledWith('My Playlist - Sifted', ['1']);
-    // The track landed via creation — nothing buffered, nothing captured.
-    expect(sift.state.pendingKeeps).toEqual([]);
-    expect(Sentry.captureException).not.toHaveBeenCalled();
+    // No playlists to list: none by that name, so it's made.
+    expect(minimal.createPlaylist).toHaveBeenCalledWith('My Playlist - Sifted');
+    expect(minimal.addToPlaylist).toHaveBeenCalledWith('new-1', ['1']);
+    expect(result).toEqual({ playlistName: 'My Playlist - Sifted', sourceName: 'My Playlist', kept: 1, added: 1, notAdded: 0, leftOut: 0 });
   });
 
-  test('saveSiftedPlaylist on a minimal provider creates the companion outright', async () => {
-    const minimal = makeMinimalProvider();
+  test('saveKeptPlaylist without addToPlaylist fails before making anything', async () => {
+    const minimal = makeMinimalProvider({ loadPlaylistTracks: jest.fn().mockResolvedValue([mockTrack]) });
     mockActiveProvider = minimal;
-    await renderHarness([mockTrack]);
-
-    await act(async () => {
-      await api.saveSiftedPlaylist('My Playlist', [mockTrack]);
-    });
-    expect(minimal.createPlaylist).toHaveBeenCalledWith('My Playlist - Sifted', ['1']);
-    expect(sift.state.removalPlaylistCreated).toBe(true);
-    expect(sift.state.removalPlaylistError).toBeNull();
-  });
-
-  test('a failed save on a minimal provider keeps the snapshot without attempting a readback', async () => {
-    const minimal = makeMinimalProvider({
-      createPlaylist: jest.fn().mockRejectedValue('boom'), // non-Error rejection
-    });
-    mockActiveProvider = minimal;
-    await renderHarness([mockTrack]);
-
-    await act(async () => {
-      sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
-    });
-    await act(async () => {
-      await api.saveSiftedPlaylist('My Playlist', [mockTrack]);
-    });
-
-    expect(sift.state.removalPlaylistError).toBe('Failed to save sifted playlist');
-    expect(sift.state.pendingKeeps.map((t) => t.id)).toEqual(['1']);
-    // No playlist listing available — the repair quietly does nothing.
-    expect(Sentry.addBreadcrumb).not.toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('readback failed') }),
-    );
-  });
-
-  test('the failed-save repair tolerates a provider that cannot read the companion back', async () => {
-    const addToPlaylist = jest.fn().mockRejectedValue(new Error('add failed'));
-    const minimal = makeMinimalProvider({
-      loadPlaylists: jest.fn().mockResolvedValue([
-        { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 0 },
-      ]),
-      addToPlaylist,
-    });
-    mockActiveProvider = minimal;
-    await renderHarness([mockTrack]);
-
-    await act(async () => {
-      sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
-    });
-    await act(async () => {
-      await api.saveSiftedPlaylist('My Playlist', [mockTrack]);
-    });
-
-    // Without loadPlaylistTracks the diff treats the companion as empty…
-    expect(addToPlaylist).toHaveBeenCalledWith('sifted-1', ['1']);
-    // …and the repair readback finds nothing landed: everything stays buffered.
-    expect(sift.state.pendingKeeps.map((t) => t.id)).toEqual(['1']);
-    expect(sift.state.removalPlaylistError).toBe('add failed');
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      { tags: { flow: 'save-sifted-playlist' } },
-    );
-    expect(Sentry.addBreadcrumb).not.toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('readback failed') }),
-    );
-  });
-
-  test('keepTrack with a known id adds directly when the provider cannot read the companion', async () => {
-    const addToPlaylist = jest.fn().mockResolvedValue(undefined);
-    const minimal = makeMinimalProvider({ addToPlaylist });
-    mockActiveProvider = minimal;
+    await markReviewed('apple-music:playlist:p1', '1');
     await renderHarness([mockTrack]);
     await setPlaylistSource();
     await act(async () => {
-      sift.dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: 'known-id' });
+      await expect(api.saveKeptPlaylist()).rejects.toThrow('This provider does not support adding to playlists');
     });
+    expect(minimal.createPlaylist).not.toHaveBeenCalled();
+  });
 
+  test('saveKeptPlaylist without playlist reads can\'t tell what is still in the playlist, and says so', async () => {
+    const minimal = makeMinimalProvider();
+    mockActiveProvider = minimal;
+    await markReviewed('apple-music:playlist:p1', '1');
+    await renderHarness([mockTrack]);
+    await setPlaylistSource();
     await act(async () => {
-      await api.keepTrack(mockTrack);
+      await expect(api.saveKeptPlaylist()).rejects.toThrow('This provider does not support playlist loading');
     });
-    // No duplicate-guard readback possible — treat the companion as empty
-    // and land the keep rather than buffering or crashing.
-    expect(addToPlaylist).toHaveBeenCalledWith('known-id', ['1']);
-    expect(sift.state.pendingKeeps).toEqual([]);
+    expect(minimal.createPlaylist).not.toHaveBeenCalled();
   });
 
   test('loadTracks reports missing playlist support on a minimal provider', async () => {
@@ -1747,7 +1256,7 @@ describe('useMusicProvider — observable state', () => {
     expect(sift.state.phase).toBe('setup');
   });
 
-  test('loadTracks filtering proceeds when the provider cannot list playlists', async () => {
+  test('loadTracks filtering never needs to list playlists', async () => {
     const minimal = makeMinimalProvider({
       loadPlaylistTracks: jest.fn().mockResolvedValue([mockTrack]),
     });
@@ -1758,24 +1267,7 @@ describe('useMusicProvider — observable state', () => {
     await act(async () => {
       await api.loadTracks();
     });
-    // No companion can exist — nothing is filtered, the sift proceeds.
-    expect(sift.state.phase).toBe('sifting');
-    expect(sift.state.tracks.map((t) => t.id)).toEqual(['1']);
-  });
-
-  test('an unreadable companion filters nothing from the sift', async () => {
-    mockProvider.loadPlaylistTracks
-      .mockResolvedValueOnce([mockTrack]) // source playlist
-      .mockResolvedValueOnce(undefined as unknown as Track[]); // companion readback unavailable
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
-    ]);
-    await renderHarness([]);
-    await setPlaylistSource();
-
-    await act(async () => {
-      await api.loadTracks();
-    });
+    // The ledger is local: nothing is filtered, the sift proceeds.
     expect(sift.state.phase).toBe('sifting');
     expect(sift.state.tracks.map((t) => t.id)).toEqual(['1']);
   });
@@ -1824,173 +1316,4 @@ describe('useMusicProvider — observable state', () => {
     );
   });
 
-  test('clearSiftedPlaylist trivially succeeds on a provider without playlists', async () => {
-    mockActiveProvider = makeMinimalProvider();
-    await renderHarness([mockTrack]);
-
-    let cleared = false;
-    await act(async () => {
-      cleared = await api.clearSiftedPlaylist('My Playlist');
-    });
-    expect(cleared).toBe(true);
-  });
-
-  test('clearSiftedPlaylist succeeds without removing when the companion cannot be read', async () => {
-    const removeFromPlaylist = jest.fn().mockResolvedValue(undefined);
-    const minimal = makeMinimalProvider({
-      loadPlaylists: jest.fn().mockResolvedValue([
-        { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
-      ]),
-      removeFromPlaylist,
-    });
-    mockActiveProvider = minimal;
-    await renderHarness([mockTrack]);
-
-    let cleared = false;
-    await act(async () => {
-      cleared = await api.clearSiftedPlaylist('My Playlist');
-    });
-    // Unreadable contents read as empty — nothing to remove, still a success.
-    expect(cleared).toBe(true);
-    expect(removeFromPlaylist).not.toHaveBeenCalled();
-  });
-
-  test('saveSiftedPlaylist surfaces a missing addToPlaylist instead of claiming success', async () => {
-    // An existing companion plus tracks to add is real work only
-    // addToPlaylist can do — its absence must fail the save, not clear
-    // pendingKeeps for keeps that never landed.
-    const minimal = makeMinimalProvider({
-      loadPlaylists: jest.fn().mockResolvedValue([
-        { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 0 },
-      ]),
-    });
-    mockActiveProvider = minimal;
-    await renderHarness([mockTrack]);
-
-    await act(async () => {
-      sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
-    });
-    await act(async () => {
-      await api.saveSiftedPlaylist('My Playlist', [mockTrack]);
-    });
-
-    expect(sift.state.removalPlaylistError).toBe(
-      'This provider does not support adding to playlists',
-    );
-    expect(sift.state.removalPlaylistCreated).toBe(false);
-    expect(sift.state.pendingKeeps.map((t) => t.id)).toEqual(['1']);
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      { tags: { flow: 'save-sifted-playlist' } },
-    );
-  });
-
-  test('saveSiftedPlaylist without addToPlaylist still succeeds when every keep already landed', async () => {
-    // Every kept track is already in the companion — there is no work for
-    // the missing API, so this remains a genuine success.
-    const minimal = makeMinimalProvider({
-      loadPlaylists: jest.fn().mockResolvedValue([
-        { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
-      ]),
-      loadPlaylistTracks: jest.fn().mockResolvedValue([mockTrack]),
-    });
-    mockActiveProvider = minimal;
-    await renderHarness([mockTrack]);
-
-    await act(async () => {
-      sift.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrack });
-    });
-    await act(async () => {
-      await api.saveSiftedPlaylist('My Playlist', [mockTrack]);
-    });
-
-    expect(sift.state.removalPlaylistCreated).toBe(true);
-    expect(sift.state.removalPlaylistError).toBeNull();
-    expect(sift.state.pendingKeeps).toEqual([]);
-    expect(Sentry.captureException).not.toHaveBeenCalled();
-  });
-
-  test('keepTrack without addToPlaylist buffers the keep instead of recording it as landed', async () => {
-    // The companion already exists (known id), so the keep needs a direct
-    // add. With no addToPlaylist the track must land in pendingKeeps — not
-    // in the contents cache, which would silently drop it forever.
-    const minimal = makeMinimalProvider();
-    mockActiveProvider = minimal;
-    await renderHarness([mockTrack]);
-    await setPlaylistSource();
-    await act(async () => {
-      sift.dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: 'known-id' });
-    });
-
-    await act(async () => {
-      await api.keepTrack(mockTrack);
-    });
-    expect(sift.state.pendingKeeps.map((t) => t.id)).toEqual(['1']);
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'This provider does not support adding to playlists' }),
-      { tags: { flow: 'keep-track' } },
-    );
-  });
-
-  test('keepTrack without addToPlaylist is a no-op when the track already landed', async () => {
-    // The duplicate guard finds the track already present — nothing left
-    // for the missing API to do, so nothing is buffered or captured.
-    const minimal = makeMinimalProvider({
-      loadPlaylistTracks: jest.fn().mockResolvedValue([mockTrack]),
-    });
-    mockActiveProvider = minimal;
-    await renderHarness([mockTrack]);
-    await setPlaylistSource();
-    await act(async () => {
-      sift.dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: 'known-id' });
-    });
-
-    await act(async () => {
-      await api.keepTrack(mockTrack);
-    });
-    expect(sift.state.pendingKeeps).toEqual([]);
-    expect(Sentry.captureException).not.toHaveBeenCalled();
-  });
-
-  test('clearSiftedPlaylist without removeFromPlaylist fails when tracks remain', async () => {
-    // Tracks are present and cannot be removed — reporting success would
-    // let callers wipe the local state needed to reconcile the leftover.
-    const minimal = makeMinimalProvider({
-      loadPlaylists: jest.fn().mockResolvedValue([
-        { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 1 },
-      ]),
-      loadPlaylistTracks: jest.fn().mockResolvedValue([mockTrack]),
-    });
-    mockActiveProvider = minimal;
-    await renderHarness([mockTrack]);
-
-    let cleared = true;
-    await act(async () => {
-      cleared = await api.clearSiftedPlaylist('My Playlist');
-    });
-    expect(cleared).toBe(false);
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'This provider does not support removing from playlists' }),
-      { tags: { flow: 'clear-sifted-playlist' } },
-    );
-  });
-
-  test('clearSiftedPlaylist without removeFromPlaylist still succeeds on an empty companion', async () => {
-    const minimal = makeMinimalProvider({
-      loadPlaylists: jest.fn().mockResolvedValue([
-        { id: 'sifted-1', name: 'My Playlist - Sifted', trackCount: 0 },
-      ]),
-      loadPlaylistTracks: jest.fn().mockResolvedValue([]),
-    });
-    mockActiveProvider = minimal;
-    await renderHarness([mockTrack]);
-
-    let cleared = false;
-    await act(async () => {
-      cleared = await api.clearSiftedPlaylist('My Playlist');
-    });
-    // Readable and empty — no work for the missing API, still a success.
-    expect(cleared).toBe(true);
-    expect(Sentry.captureException).not.toHaveBeenCalled();
-  });
 });

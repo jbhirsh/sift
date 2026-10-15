@@ -149,7 +149,7 @@ export function logRemoval(record: RemovalRecord): Promise<void> {
 }
 
 /**
- * Drop the history records for a playlist source (Start Over / Re-sift),
+ * Drop the history records for a playlist source (a playlist Start Over),
  * except collected ones: those songs wait in "Sift — Removed", and starting
  * over un-removes nothing, as for the library. Returns false when the
  * rewrite failed so callers can surface the failure instead of silently

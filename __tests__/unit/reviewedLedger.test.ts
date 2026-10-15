@@ -42,6 +42,6 @@ describe('reviewedLedger', () => {
   test('footnote copy', () => {
     expect(reviewedNote(1, false)).toBe('1 song you’ve already kept is left out of new sifts.');
     expect(reviewedNote(2655, false)).toBe('2,655 songs you’ve already kept are left out of new sifts.');
-    expect(reviewedNote(2655, true)).toBe('Songs you’ve already kept are included in new sifts.');
+    expect(reviewedNote(2655, true)).toBe('Songs you’ve already kept are included in new sifts. Songs you removed stay out.');
   });
 });

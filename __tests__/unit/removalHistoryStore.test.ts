@@ -459,7 +459,7 @@ describe('malformed history on disk', () => {
 
   test('clearHistoryForSource backs up wrong-shaped records before rewriting without them', async () => {
     // A parseable file whose entries lack `source` used to make the filter
-    // throw on every call, so Start Over / Re-sift could never proceed. The
+    // throw on every call, so a playlist Start Over could never proceed. The
     // rewrite drops them, so the original is copied aside first.
     mockExists.mockReturnValue(true);
     mockText.mockResolvedValue(JSON.stringify([{ track: record.track }, validRecord]));

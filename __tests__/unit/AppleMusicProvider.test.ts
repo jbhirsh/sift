@@ -151,8 +151,9 @@ afterAll(() => {
 });
 
 import * as Sentry from '@sentry/react-native';
-import { AppleMusicProvider, RECENT_PLAYLIST_SECONDS } from '../../src/services/AppleMusicProvider';
-import { PLAYLISTS_PAGE_SIZE } from '../../src/utils/musicKit';
+import { AppleMusicProvider, RECENT_PLAYLIST_SECONDS, WRITE_STALL_MS } from '../../src/services/AppleMusicProvider';
+import { AddShortfallError, PLAYLISTS_PAGE_SIZE } from '../../src/utils/musicKit';
+import { QueueStallError } from '../../src/utils/serialQueue';
 
 describe('AppleMusicProvider', () => {
   let provider: AppleMusicProvider;
@@ -362,27 +363,65 @@ describe('AppleMusicProvider', () => {
   });
 
   describe('createPlaylist', () => {
-    test('creates it empty and adds every track in order', async () => {
-      fake.library.set('a', rawSong('a'));
-      fake.catalog.set('b', rawSong('b'));
-      await provider.createPlaylist('Keepers', ['a', 'b']);
+    test('makes it empty, and resolves to its id at once', async () => {
+      await expect(provider.createPlaylist('Keepers')).resolves.toBe('new-1');
       expect(mockNative.createEmptyPlaylist).toHaveBeenCalledWith('Keepers');
-      expect(fake.playlists.get('new-1')).toEqual({ name: 'Keepers', items: ['a', 'b'] });
+      expect(fake.playlists.get('new-1')).toEqual({ name: 'Keepers', items: [] });
+      expect(mockNative.addEachToPlaylist).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findPlaylists', () => {
+    test('every playlist by that name, trusting one made here for RECENT_PLAYLIST_SECONDS', async () => {
+      fake.playlists.set('s1', { name: 'Mix - Sifted', items: [] });
+      fake.playlists.set('other', { name: 'Mix', items: [] });
+      await expect(provider.findPlaylists('Mix - Sifted')).resolves.toEqual(['s1']);
+      expect(mockNative.findPlaylistsByName).toHaveBeenCalledWith('Mix - Sifted', RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE);
+    });
+  });
+
+  describe('writesSettled', () => {
+    test('stops waiting for a write that never settles, so a later one still goes', async () => {
+      jest.useFakeTimers();
+      try {
+        mockNative.removeFromPlaylist.mockImplementationOnce(() => new Promise<number>(() => {}));
+        provider.removeFromPlaylist('pl', ['a']).catch(() => undefined);
+        const settled = jest.fn();
+        void provider.writesSettled().then(settled);
+        await jest.advanceTimersByTimeAsync(WRITE_STALL_MS * 4 - 1);
+        expect(settled).not.toHaveBeenCalled();
+        await jest.advanceTimersByTimeAsync(1);
+        expect(settled).toHaveBeenCalledTimes(1);
+        fake.library.set('a', rawSong('a'));
+        fake.playlists.set('pl', { name: 'Mix - Sifted', items: [] });
+        await provider.addToPlaylist('pl', ['a']);
+        await expect(provider.writesSettled()).resolves.toBeUndefined();
+        expect(fake.playlists.get('pl')?.items).toEqual(['a']);
+      } finally {
+        mockNative.removeFromPlaylist.mockReset().mockResolvedValue(undefined);
+        jest.useRealTimers();
+      }
     });
 
-    test('nothing resolvable: no playlist is created', async () => {
-      await expect(provider.createPlaylist('Keepers', ['gone'])).rejects.toThrow('No tracks found for the given IDs.');
-      expect(mockNative.createEmptyPlaylist).not.toHaveBeenCalled();
-    });
-
-    test('a shortfall is an error naming the count and the playlist', async () => {
-      fake.library.set('a', rawSong('a'));
-      fake.library.set('b', rawSong('b'));
-      fake.refuseAdds.add('b');
-      await expect(provider.createPlaylist('Keepers', ['a', 'b', 'gone'])).rejects.toThrow(
-        '2 of 3 tracks could not be resolved and were left out of "Keepers"',
-      );
-      expect(fake.playlists.get('new-1')?.items).toEqual(['a']);
+    test('waits for a write that timed out for its caller to really finish', async () => {
+      jest.useFakeTimers();
+      try {
+        let finish!: (count: number) => void;
+        mockNative.removeFromPlaylist.mockImplementationOnce(() => new Promise<number>((res) => { finish = res; }));
+        const hung = provider.removeFromPlaylist('pl', ['a']);
+        hung.catch(() => undefined);
+        const settled = jest.fn();
+        void provider.writesSettled().then(settled);
+        await jest.advanceTimersByTimeAsync(WRITE_STALL_MS);
+        await expect(hung).rejects.toBeInstanceOf(QueueStallError);
+        expect(settled).not.toHaveBeenCalled();
+        finish(1);
+        await jest.advanceTimersByTimeAsync(0);
+        expect(settled).toHaveBeenCalledTimes(1);
+      } finally {
+        mockNative.removeFromPlaylist.mockReset().mockResolvedValue(undefined);
+        jest.useRealTimers();
+      }
     });
   });
 
@@ -395,11 +434,14 @@ describe('AppleMusicProvider', () => {
       expect(fake.playlists.get('pl')?.items).toEqual(['a']);
     });
 
-    test('a shortfall is an error naming the count', async () => {
+    test('a shortfall is an error naming the count, carrying unresolved and refused ones apart', async () => {
       fake.library.set('a', rawSong('a'));
-      await expect(provider.addToPlaylist('pl', ['a', 'gone'])).rejects.toThrow(
-        '1 of 2 tracks could not be added to the playlist',
-      );
+      fake.library.set('b', rawSong('b'));
+      fake.refuseAdds.add('b');
+      const shortfall = provider.addToPlaylist('pl', ['a', 'gone', 'b']);
+      await expect(shortfall).rejects.toThrow('2 of 3 tracks could not be added to the playlist');
+      await expect(shortfall).rejects.toBeInstanceOf(AddShortfallError);
+      await expect(shortfall).rejects.toMatchObject({ added: 1, unresolved: 1, failed: 1, requested: 3, name: 'AddShortfallError' });
     });
 
     test('a missing playlist fails', async () => {
@@ -458,6 +500,27 @@ describe('AppleMusicProvider', () => {
       expect(fake.playlists.get('pl')?.items).toEqual([]);
     });
 
+    test('a write that never answers fails for its caller after the stall time, and the next one goes', async () => {
+      jest.useFakeTimers();
+      try {
+        fake.playlists.set('pl', { name: 'Mix', items: ['a'] });
+        mockNative.removeFromPlaylist.mockImplementationOnce(() => new Promise<void>(() => {}));
+        const hung = provider.removeFromPlaylist('pl', ['a']);
+        const outcome = jest.fn();
+        hung.then(() => outcome('resolved'), (err: unknown) => outcome(err));
+        fake.library.set('a', rawSong('a'));
+        const next = provider.addToPlaylist('pl', ['a']);
+        await jest.advanceTimersByTimeAsync(WRITE_STALL_MS - 1);
+        expect(outcome).not.toHaveBeenCalled();
+        await jest.advanceTimersByTimeAsync(1);
+        expect(outcome).toHaveBeenCalledWith(expect.any(QueueStallError));
+        await next;
+        expect(fake.playlists.get('pl')?.items).toEqual(['a', 'a']);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     test('creating a playlist and adding to the library take their turn too', async () => {
       fake.library.set('a', rawSong('a'));
       fake.playlists.set('pl', { name: 'Mix', items: ['a'] });
@@ -472,7 +535,7 @@ describe('AppleMusicProvider', () => {
         return ids.map(() => 'added' as const);
       });
       const removal = provider.removeFromPlaylist('pl', ['a']).then(() => order.push('remove'));
-      await Promise.all([removal, provider.createPlaylist('Mix - Sifted', ['a']), provider.addToLibrary(['a'])]);
+      await Promise.all([removal, provider.createPlaylist('Mix - Sifted'), provider.addToLibrary(['a'])]);
       expect(order).toEqual(['remove', 'create', 'library']);
     });
   });

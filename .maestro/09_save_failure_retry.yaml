@@ -2,24 +2,25 @@ appId: com.jessicahirsh.sift
 name: "Save Failure Shows Retry, Retry Recovers"
 ---
 
-# Exercises the failed-save error + Retry path on the Done screen, which is
-# unreachable without failure injection (the mock's playlist calls never
-# fail on their own).
+# Exercises Done's "Save kept songs as a playlist" when the save fails:
+# the error, the button turning into Retry, and Retry saving. Unreachable
+# without failure injection (the mock's playlist calls never fail on their
+# own).
 #
 # Injection: the e2e-simulator build bakes EXPO_PUBLIC_MOCK_FAIL_ADDS=2 into
 # the bundle (eas.json), which makes MockMusicProvider reject the FIRST TWO
 # addToPlaylist calls of each app launch; later calls succeed. Build-time
 # env cannot be scoped to a single flow, so this is only safe because no
-# other flow calls addToPlaylist at all: library sifts (02-05, 10, 11)
-# no-op keepTrack, "Chill Vibes" (07) has no pre-seeded "- Sifted" companion
-# (keeps buffer and the Done fallback goes through createPlaylist), and flow
-# 08's re-sift only clears. This flow sifts "Road Trip", whose pre-seeded
-# companion
-# ("Road Trip - Sifted", containing 2 of its 3 tracks) makes keepTrack
-# attempt a direct add for the third track:
-#   add #1 (keepTrack of "Kiss Me More")  rejects -> keep buffers as pending
-#   add #2 (Done's fallback save)         rejects -> error + Retry appear
-#   add #3 (Retry)                        succeeds -> success confirmation
+# other flow calls addToPlaylist: a Keep writes nothing to Music, and only
+# a save into an existing "- Sifted" playlist adds to one. This flow sifts
+# "Road Trip", whose pre-seeded "Road Trip - Sifted" holds 2 of its 3 songs
+# (drivers license, Peaches), so saving its keeps adds the third (Kiss Me
+# More):
+#   add #1 (Save, after Finish)       rejects -> error, button says Retry
+#   add #2 (Save, Done shown again)   rejects -> error, button says Retry
+#   add #3 (Retry)                    succeeds -> saved confirmation
+# Each step waits for a state only that step can produce (the error, the
+# button's title), so no tap lands while a save is still running.
 # Scoping injection to exactly one flow at runtime (e.g. launch arguments)
 # needs a launch-arg mechanism in the app and is deliberate follow-up work.
 - launchApp:
@@ -32,7 +33,6 @@ name: "Save Failure Shows Retry, Retry Recovers"
       id: "setup-brand"
     timeout: 30000
 
-# Pick the already-sifted playlist (companion pre-seeded in the mock)
 - tapOn:
     id: "source-playlist"
 
@@ -50,52 +50,88 @@ name: "Save Failure Shows Retry, Retry Recovers"
       id: "playlist-picker-modal"
     timeout: 30000
 
-# Companion exists -> the primary button is Re-sift Playlist; confirm the
-# destructive prompt to start an unfiltered sift of all 3 tracks.
-- assertVisible: "Re-sift Playlist"
-- tapOn: "Re-sift Playlist"
-
+# Most Played first, so the song missing from "Road Trip - Sifted" (Kiss Me
+# More, 56 plays) is the first card. Let the native sheet finish sliding in
+# before tapping (see 10_sort_picker.yaml).
+- tapOn: "Least Played"
 - extendedWaitUntil:
-    visible: "Start Over?"
+    visible: "Most Played"
+    timeout: 30000
+- waitForAnimationToEnd
+- tapOn: "Most Played"
+- extendedWaitUntil:
+    notVisible: "Least Played"
     timeout: 30000
 
-- tapOn: "Start Over"
+- runFlow: shared/start_sifting.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+      text: "Kiss Me More"
+    timeout: 30000
+
+- tapOn: "Keep"
+- waitForAnimationToEnd
+
+- tapOn:
+    id: "finish-button"
+
+- extendedWaitUntil:
+    visible: "Save kept songs as a playlist"
+    timeout: 30000
+
+# Add #1 rejects: the error, and the button becomes Retry.
+- tapOn:
+    id: "save-kept-playlist"
+
+- extendedWaitUntil:
+    visible:
+      id: "save-kept-status"
+      text: ".*Simulated add failure.*"
+    timeout: 30000
+- assertVisible: "Retry"
+
+# Keep the other two (already in "Road Trip - Sifted") and finish the sift.
+- tapOn:
+    id: "done-continue"
 
 - extendedWaitUntil:
     visible:
       id: "card-track-name"
     timeout: 30000
 
-# Keep all 3. Two are already in the companion (no add); the third triggers
-# add #1, which the injection rejects — the keep buffers as a pending keep.
-- tapOn: "Keep"
-- waitForAnimationToEnd
 - tapOn: "Keep"
 - waitForAnimationToEnd
 - tapOn: "Keep"
 - waitForAnimationToEnd
 
+# Done again: a fresh button, not the earlier Retry.
 - extendedWaitUntil:
-    visible:
-      id: "done-title"
+    visible: "Save kept songs as a playlist"
     timeout: 30000
+- assertNotVisible: "Retry"
 
-# The Done fallback save flushes the buffered keep; its add (#2) rejects,
-# surfacing the failed-save error and the Retry affordance.
-- extendedWaitUntil:
-    visible:
-      id: "retry-save-button"
-    timeout: 30000
-
-- assertVisible: ".*Simulated add failure.*"
-
-# Retry: add #3 succeeds — error clears, success confirmation appears.
+# Add #2 rejects too.
 - tapOn:
-    id: "retry-save-button"
+    id: "save-kept-playlist"
 
 - extendedWaitUntil:
-    visible: "Sifted playlist created!"
+    visible: "Retry"
+    timeout: 30000
+- assertVisible:
+    id: "save-kept-status"
+    text: ".*Simulated add failure.*"
+
+# Retry: add #3 succeeds. Only the missing song is added.
+- tapOn:
+    id: "save-kept-playlist"
+
+- extendedWaitUntil:
+    visible:
+      id: "save-kept-status"
+      text: "Saved 1 song to \"Road Trip - Sifted\"\\."
     timeout: 30000
 
 - assertNotVisible:
-    id: "retry-save-button"
+    id: "save-kept-playlist"

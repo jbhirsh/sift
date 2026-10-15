@@ -25,12 +25,12 @@ export interface CompactSession {
   savedAt: string;
   provider?: SiftSession['provider'];
   source?: SiftSession['source'];
-  /** Full tracks: few, and needed even if the list changes under them. */
-  pendingKeeps?: Track[];
   removalErrors?: string[];
   failedRemovalIds?: string[];
-  siftedPlaylistId?: string | null;
   pending?: SiftSession['pending'];
+  // Records saved before playlist keeps were remembered can also hold
+  // pendingKeeps (full tracks) and siftedPlaylistId. Neither is read back
+  // into the session: SessionStore records the first in the ledger.
 }
 
 export type TracksSlot = 'a' | 'b';
@@ -57,10 +57,8 @@ export function toCompact(
     savedAt: session.savedAt,
     provider: session.provider,
     source: session.source,
-    pendingKeeps: session.pendingKeeps,
     removalErrors: session.removalErrors,
     failedRemovalIds: session.failedRemovalIds,
-    siftedPlaylistId: session.siftedPlaylistId,
     pending: session.pending,
   };
 }
@@ -100,10 +98,8 @@ export function fromCompact(compact: CompactSession, stored: StoredTracks): Sift
   // Optional fields stay absent when they were, as in the old format.
   if (compact.provider !== undefined) session.provider = compact.provider;
   if (compact.source !== undefined) session.source = compact.source;
-  if (compact.pendingKeeps !== undefined) session.pendingKeeps = compact.pendingKeeps;
   if (compact.removalErrors !== undefined) session.removalErrors = compact.removalErrors;
   if (compact.failedRemovalIds !== undefined) session.failedRemovalIds = compact.failedRemovalIds;
-  if (compact.siftedPlaylistId !== undefined) session.siftedPlaylistId = compact.siftedPlaylistId;
   if (compact.pending !== undefined) session.pending = compact.pending;
   return session;
 }

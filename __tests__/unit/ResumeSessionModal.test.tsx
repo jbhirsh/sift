@@ -103,22 +103,6 @@ describe('ResumeSessionModal', () => {
     expect(remaining.props.accessibilityLabel).toBe('12397 remaining');
   });
 
-  test('a finished session reads as unsaved changes, not an unfinished sift', async () => {
-    // Finished sessions reach this modal only when buffered keeps still
-    // need saving (see SetupScreen) — the copy must not claim otherwise.
-    const finished = { ...session, cursor: session.tracks.length };
-    const { getByText, queryByText } = await render(
-      <ResumeSessionModal
-        session={finished}
-        onResume={onResume}
-        onStartOver={onStartOver}
-        onCancel={onCancel}
-      />,
-    );
-    expect(getByText(/unsaved changes from a finished sift/)).toBeTruthy();
-    expect(queryByText(/unfinished sift/)).toBeNull();
-  });
-
   test('an unfinished session keeps the unfinished-sift copy', async () => {
     const { getByText } = await render(
       <ResumeSessionModal

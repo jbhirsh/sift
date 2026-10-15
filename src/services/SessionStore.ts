@@ -2,7 +2,15 @@ import * as Sentry from '@sentry/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SiftSession, Track } from '../types';
 import { fromCompact, toCompact, type TracksSlot } from '../utils/sessionFormat';
-import { isCompactSession, isSiftSession, isStoredTracks, migrateLegacySession } from '../utils/validators';
+import { ledgerKey } from '../utils/reviewedLedger';
+import {
+  isCompactSession,
+  isSiftSession,
+  isStoredTracks,
+  legacyPendingKeeps,
+  migrateLegacySession,
+} from '../utils/validators';
+import { markReviewed } from './ReviewedLedgerStore';
 
 // The compact format (#150): the track list once, under its own key, and a
 // small record of ids per decision. See utils/sessionFormat.
@@ -101,6 +109,7 @@ async function loadQueued(): Promise<SiftSession | null> {
       if (!session || !isSiftSession(session)) throw new Error('Saved session does not match its track list');
       storedTracks = { tracks: session.tracks, version: stored.version, slot: compact.tracksSlot };
       committedSlot = compact.tracksSlot;
+      rememberLegacyKeeps(session, legacyPendingKeeps(compact));
       return session;
     } catch (err) {
       await setAside(JSON.stringify({ state: stateJson, tracks: tracksJson }), [STATE_KEY, ...ALL_TRACKS_KEYS]);
@@ -110,6 +119,21 @@ async function loadQueued(): Promise<SiftSession | null> {
     }
   }
   return loadLegacySession();
+}
+
+/**
+ * A playlist session saved before playlist keeps were remembered can hold
+ * keeps that never reached "<name> - Sifted" (its pendingKeeps). Nothing
+ * fills that playlist on a Keep any more, so record them in the reviewed
+ * ledger, where a keep goes now: later sifts leave them out and Done's
+ * "Save kept songs" includes them. Whether the session is then resumed or
+ * discarded, they aren't lost. Repeats harmlessly until the session's next
+ * save, which no longer writes the field.
+ */
+function rememberLegacyKeeps(session: SiftSession, keeps: Track[]): void {
+  if (keeps.length === 0 || session.source?.type !== 'playlist') return;
+  const key = ledgerKey(session.provider ?? 'apple-music', session.source);
+  for (const track of keeps) void markReviewed(key, track.id);
 }
 
 /** The slot a stored record names, or null when it can't be read. */
@@ -136,7 +160,13 @@ async function loadLegacySession(): Promise<SiftSession | null> {
   }
   try {
     const parsed = migrateLegacySession(JSON.parse(json));
-    if (isSiftSession(parsed)) return parsed;
+    if (isSiftSession(parsed)) {
+      // Fields this build no longer has stay behind.
+      const { pendingKeeps: _pendingKeeps, siftedPlaylistId: _siftedPlaylistId, ...session } =
+        parsed as SiftSession & { pendingKeeps?: unknown; siftedPlaylistId?: unknown };
+      rememberLegacyKeeps(session, legacyPendingKeeps(parsed));
+      return session;
+    }
     throw new Error('Saved session has an unexpected shape');
   } catch (err) {
     // Set aside first so a failure to do so rides along as a breadcrumb on

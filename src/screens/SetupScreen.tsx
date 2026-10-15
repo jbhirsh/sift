@@ -47,6 +47,17 @@ function sourceMatches(a: SiftSource, b: SiftSource): boolean {
   return true;
 }
 
+/** Whether the sift in memory, unfinished, is one of this source. */
+function inMemoryResumableFor(
+  state: { tracks: readonly unknown[]; cursor: number; activeSource: SiftSource | null },
+  source: SiftSource,
+): boolean {
+  return state.tracks.length > 0
+    && state.cursor < state.tracks.length
+    && state.activeSource != null
+    && sourceMatches(source, state.activeSource);
+}
+
 const SORT_ORDERS: SortOrder[] = [
   'least-played',
   'most-played',
@@ -65,7 +76,7 @@ export default function SetupScreen() {
   useTraceScreen('setup');
   const { state, dispatch, startFresh, flushPendingSave } = useSift();
   const { colors, glass } = useTheme();
-  const { loadPlaylists, clearSiftedPlaylist, warmCache, ensureAccess } = useMusicProvider();
+  const { loadPlaylists, warmCache, ensureAccess } = useMusicProvider();
   const openSortPicker = () => {
     if (Platform.OS !== 'ios') return;
     const options = [...SORT_ORDERS.map((o) => SORT_ORDER_DISPLAY[o]), 'Cancel'];
@@ -100,28 +111,31 @@ export default function SetupScreen() {
   const [showPlaylistPicker, setShowPlaylistPicker] = useState(false);
   const [savedSession, setSavedSession] = useState<SiftSession | null>(null);
   const [showResumeModal, setShowResumeModal] = useState(false);
-  const [alreadySifted, setAlreadySifted] = useState(false);
-  // Songs kept in earlier library sifts, which a new one leaves out unless
-  // the switch says otherwise (#143).
-  const [reviewedCount, setReviewedCount] = useState(0);
+  // Songs kept in earlier sifts of the selected library or playlist, which
+  // a new sift leaves out unless the switch says otherwise (#143).
   const [includeSifted, setIncludeSifted] = useState(false);
-  const isLibrary = state.source.type === 'library';
+  const sourceLedgerKey = ledgerKey(state.provider, state.source);
+  // With the source it was counted for: another source's count doesn't
+  // show while this one's loads.
+  const [reviewed, setReviewed] = useState({ key: '', count: 0 });
+  const reviewedCount = reviewed.key === sourceLedgerKey ? reviewed.count : 0;
   useEffect(() => {
-    if (!isLibrary) return;
     let cancelled = false;
-    loadReviewedIds(ledgerKey(state.provider, { type: 'library' })).then((ids) => {
-      if (!cancelled) setReviewedCount(ids.size);
+    loadReviewedIds(sourceLedgerKey).then((ids) => {
+      if (!cancelled) setReviewed({ key: sourceLedgerKey, count: ids.size });
     });
     return () => {
       cancelled = true;
     };
-  }, [isLibrary, state.provider]);
-  // True while performStartOver's remote clears are running. Together with
-  // state.isCreatingPlaylist this gates every start-over path, so a clear
-  // can never run concurrently with an in-flight sifted-playlist save (or
-  // with itself).
+  }, [sourceLedgerKey]);
+  // The switch shows once the selected source has songs kept in earlier
+  // sifts. It decides what a new sift loads, from Start Sifting or Start Over.
+  const showIncludeSifted = reviewedCount > 0;
+  const includeReviewed = showIncludeSifted && includeSifted;
+  // True while performStartOver runs (a playlist's removal history being
+  // cleared), so a second Start Over can't start alongside it.
   const [isStartingOver, setIsStartingOver] = useState(false);
-  const startOverBlocked = state.isCreatingPlaylist || isStartingOver;
+  const startOverBlocked = isStartingOver;
 
   // Latest state for the async session-load callback below. loadSession
   // resolves after an arbitrary delay, and the callback must judge the
@@ -143,20 +157,10 @@ export default function SetupScreen() {
     sessionCheckedRef.current = true;
     loadSession().then((session) => {
       if (!session) return;
-      const unfinished = session.cursor < session.tracks.length;
-      // A finished session whose buffered keeps never flushed still needs
-      // the resume path: resuming lands on Done, where the fallback save
-      // runs for them. Dropping it here would silently lose those keeps —
-      // the one thing pendingKeeps exists to prevent.
-      if (!unfinished && (session.pendingKeeps?.length ?? 0) === 0) return;
+      if (session.cursor >= session.tracks.length) return;
       setSavedSession(session);
       const current = stateRef.current;
-      const inMemoryResumable =
-        current.tracks.length > 0 &&
-        current.cursor < current.tracks.length &&
-        current.activeSource != null &&
-        sourceMatches(current.source, current.activeSource);
-      if (inMemoryResumable) {
+      if (inMemoryResumableFor(current, current.source)) {
         // Backing out of an active sift leaves the same session both in
         // memory and on disk (the back button flushes the autosave without
         // clearing in-memory state, and this screen remounts on every phase
@@ -179,28 +183,21 @@ export default function SetupScreen() {
       if (session.source) {
         dispatch({ type: 'SET_SOURCE', source: session.source });
       }
-      // Restore the persisted sifted-playlist id too, and AFTER SET_SOURCE —
-      // SET_SOURCE nulls the id when the source changes. Without this, a
-      // Start Over taken from here without resuming clears by name only and
-      // a renamed "<name> - Sifted" companion silently survives while the
-      // local history is wiped.
-      dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: session.siftedPlaylistId ?? null });
       setShowResumeModal(true);
     });
   }, [dispatch]);
 
-  const checkForMatchingSession = (sourceType: string, playlistId?: string) => {
+  const checkForMatchingSession = (chosen: SiftSource) => {
     if (!savedSession) return;
     const sessionSource = savedSession.source;
     if (!sessionSource) return;
-
-    const matches =
-      sourceType === 'library'
-        ? sessionSource.type === 'library'
-        : sessionSource.type === 'playlist' &&
-          sessionSource.playlist.id === playlistId;
-
-    if (matches) {
+    // The sift in memory for this source is the same session, and newer
+    // than the copy loaded from disk when this screen mounted (a held
+    // decision sent on the way out, a removal that failed since): the
+    // inline Resume Sifting resumes it. Offering the disk copy here would
+    // restore it over the newer one and lose those changes.
+    if (inMemoryResumableFor(state, chosen)) return;
+    if (sourceMatches(chosen, sessionSource)) {
       setShowResumeModal(true);
     }
   };
@@ -259,21 +256,12 @@ export default function SetupScreen() {
     setIsStartingOver(true);
     try {
       const source = state.source;
-      // First, so a held keep lands (the clear below waits for keeps)
-      // before "<name> - Sifted" is emptied.
+      // First: the decision the saved session still holds goes out before
+      // the session is discarded.
       sendSavedPending(await loadSession());
       if (source.type === 'playlist') {
-        // Only proceed once each clear actually landed — wiping the local
-        // removal history (or discarding the saved session) after a failed
-        // remote clear would silently lose the state needed to reconcile.
-        const playlistCleared = await clearSiftedPlaylist(source.playlist.name);
-        if (!playlistCleared) {
-          dispatch({
-            type: 'SET_LOAD_ERROR',
-            error: 'Could not empty the sifted playlist. Check your connection and try again.',
-          });
-          return;
-        }
+        // Only go on once the clear landed: discarding the saved session
+        // after a failed clear would lose the sift while the history stays.
         const historyCleared = await clearHistoryForSource(source.playlist.id);
         if (!historyCleared) {
           dispatch({ type: 'SET_LOAD_ERROR', error: 'Could not clear the removal history. Try again.' });
@@ -281,12 +269,10 @@ export default function SetupScreen() {
         }
       }
       setSavedSession(null);
-      setAlreadySifted(false);
-      // A playlist Start Over skips the sifted filter (its companion was
-      // just emptied). A library one keeps leaving out songs kept in
-      // earlier sifts unless the switch says otherwise (#143): dropping an
-      // unfinished sift shouldn't bring back thousands of reviewed songs.
-      startFresh(source.type === 'playlist' || includeSifted);
+      // Songs kept in earlier sifts stay left out unless the switch says
+      // otherwise (#143): dropping an unfinished sift shouldn't bring back
+      // every song already kept.
+      startFresh(includeReviewed);
     } finally {
       setIsStartingOver(false);
     }
@@ -301,7 +287,7 @@ export default function SetupScreen() {
     const saved = await loadSession();
     if (!saved) return null;
     const counts = decisionCounts(saved);
-    const unfinished = saved.cursor < saved.tracks.length || counts.pendingKeeps > 0;
+    const unfinished = saved.cursor < saved.tracks.length;
     if (!unfinished || counts.total === 0) return null;
     return {
       provider: saved.provider ?? state.provider,
@@ -340,9 +326,7 @@ export default function SetupScreen() {
   };
 
   const handleStartOver = () => withDiscardCheck(async () => {
-    // Never start a clear while a sifted-playlist save is in flight (or a
-    // previous clear is still running): the two would race each other on
-    // the same remote playlist and could interleave adds after the clear.
+    // Not while a previous Start Over is still running.
     if (startOverBlocked) return;
     // The resume modal (when open) is the first affordance — dismiss it
     // before the confirmation so the two prompts never stack.
@@ -351,24 +335,21 @@ export default function SetupScreen() {
     const risk = await sessionAtRisk();
     const start = () => { performStartOver(); };
     // One tap must never silently erase decisions (#137), whichever source
-    // they belong to: Re-sift of one playlist replaces a library sift too.
+    // they belong to: the saved sift may be another source's.
     if (risk && sourceMatches(source, risk.source)) {
       confirmDiscard(discardConfirmation(risk.provider, source, risk.counts, 'start-over'), start);
     } else if (risk) {
-      confirmDiscard(discardConfirmation(risk.provider, risk.source, risk.counts, 'new-sift', {
-        alsoEmpties: source.type === 'playlist' ? source.playlist.name : undefined,
-      }), start);
+      confirmDiscard(discardConfirmation(risk.provider, risk.source, risk.counts, 'new-sift'), start);
     } else if (source.type === 'playlist') {
-      // No decisions to lose, but this empties "<name> - Sifted" and wipes
-      // the removal history, exactly like DoneScreen's Start Over.
+      // No decisions to lose, but a playlist's Start Over still says what
+      // it does (and doesn't) undo, exactly like DoneScreen's.
       confirmDiscard({
         title: 'Start Over?',
         message: playlistStartOverMessage(state.provider, source.playlist.name),
         confirm: 'Start Over',
       }, start);
     } else {
-      // Nothing to lose: no decisions, and a library start-over clears
-      // nothing remote.
+      // No decisions to lose.
       start();
     }
   });
@@ -376,8 +357,6 @@ export default function SetupScreen() {
   // Starting a sift replaces the one saved session, whatever its source
   // (#137). If that would throw away an unfinished sift's decisions, ask.
   const handleStartSifting = () => withDiscardCheck(async () => {
-    // skipFiltering brings back the songs kept in earlier library sifts.
-    const includeReviewed = isLibrary && includeSifted;
     const risk = await sessionAtRisk();
     if (!risk) {
       await replaceSavedSession(includeReviewed);
@@ -400,17 +379,12 @@ export default function SetupScreen() {
     });
   };
 
-  const canResumeInMemory = state.tracks.length > 0
-    && state.cursor < state.tracks.length
-    && state.activeSource != null
-    && sourceMatches(state.source, state.activeSource);
+  const canResumeInMemory = inMemoryResumableFor(state, state.source);
   const canResumeFromSaved = !canResumeInMemory
     && savedSession != null
     && savedSession.source != null
     && sourceMatches(state.source, savedSession.source)
     && savedSession.cursor < savedSession.tracks.length;
-  // Decides what a new library sift loads, from Start Sifting or Start Over.
-  const showIncludeSifted = isLibrary && reviewedCount > 0;
 
   return (
     <View style={styles.container}>
@@ -479,8 +453,7 @@ export default function SetupScreen() {
                       setupTouchedRef.current = true;
                       if (sourceType === 'library') {
                         dispatch({ type: 'SET_SOURCE', source: { type: 'library' } });
-                        setAlreadySifted(false);
-                        checkForMatchingSession('library');
+                        checkForMatchingSession({ type: 'library' });
                       } else {
                         openPlaylistPicker();
                       }
@@ -547,18 +520,17 @@ export default function SetupScreen() {
 
         {showPlaylistPicker && (
           <PlaylistPicker
-            // Companion "- Sifted" playlists and "Sift — Removed" are outputs
-            // of sifting, not sources: offering them would let a sift target
-            // "<x> - Sifted - Sifted", or songs already removed. The
-            // unfiltered list is kept in state because the already-sifted
-            // check below needs the companions.
+            // "<name> - Sifted" playlists (Done's "Save kept songs as a
+            // playlist") and "Sift — Removed" are outputs of sifting, not
+            // sources: offering them would let a sift save to
+            // "<x> - Sifted - Sifted", or sift songs already removed.
             playlists={playlists.filter((p) => !p.name.endsWith(' - Sifted') && p.name !== APPLE_REMOVED_PLAYLIST)}
             loading={loadingPlaylists}
             onSelect={(playlist) => {
-              dispatch({ type: 'SET_SOURCE', source: { type: 'playlist', playlist } });
+              const source: SiftSource = { type: 'playlist', playlist };
+              dispatch({ type: 'SET_SOURCE', source });
               setShowPlaylistPicker(false);
-              setAlreadySifted(playlists.some((p) => p.name === `${playlist.name} - Sifted`));
-              checkForMatchingSession('playlist', playlist.id);
+              checkForMatchingSession(source);
             }}
             onCancel={() => setShowPlaylistPicker(false)}
           />
@@ -682,17 +654,6 @@ export default function SetupScreen() {
                     disabled={startOverBlocked}
                   />
                 </>
-              );
-            }
-            if (alreadySifted && state.source.type === 'playlist') {
-              return (
-                <Button
-                  title="Re-sift Playlist"
-                  testID="setup-resift"
-                  size="large"
-                  onPress={handleStartOver}
-                  disabled={startOverBlocked}
-                />
               );
             }
             return (

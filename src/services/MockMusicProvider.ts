@@ -113,9 +113,10 @@ const MOCK_PLAYLIST_TRACK_INDICES: Record<string, number[]> = {
   'playlist-1': [0, 2, 9],
   'playlist-2': [1, 4, 5, 7],
   'playlist-3': [3, 6, 8],
-  // Pre-seeded "- Sifted" companion for Road Trip so the already-sifted
-  // Re-sift Playlist flow is exercisable in E2E (the mock is stateless, so
-  // playlists created at runtime never show up in loadPlaylists).
+  // A pre-seeded "Road Trip - Sifted" (two of Road Trip's three songs), so
+  // Done's "Save kept songs as a playlist" can add to an existing playlist
+  // in E2E (the mock is stateless, so playlists created at runtime never
+  // show up in loadPlaylists), and Setup's picker has one to hide.
   'playlist-4': [3, 6],
 };
 
@@ -129,7 +130,8 @@ const MOCK_PLAYLISTS: Playlist[] = [
 // ── Failure injection (E2E / unit tests) ───────────────
 //
 // EXPO_PUBLIC_MOCK_FAIL_ADDS=<n> makes the FIRST n addToPlaylist calls of
-// each app launch reject (each exactly once); later calls succeed.
+// each app launch into a seeded playlist (MOCK_PLAYLISTS, not one created
+// this launch) reject, each exactly once; later calls succeed.
 // EXPO_PUBLIC_MOCK_FAIL_REMOVES=<n> makes removeFromLibrary fail for the
 // first n songs it is asked to remove in each launch, and keep failing for
 // them, so retrying a failed removal (#151) can't heal the injected failure
@@ -137,25 +139,26 @@ const MOCK_PLAYLISTS: Playlist[] = [
 // deliberately never injected, see below). Unset or invalid → zero injected
 // failures, i.e. default behavior is unchanged.
 //
-// The counters are module-scoped, not per-instance: every useMusicProvider
-// hook instance constructs its own MockMusicProvider (keeps add through the
-// sifting screen's instance, the Done fallback saves through its own), and
-// the injection must count them as one launch-wide series. With
-// FAIL_ADDS=2 a playlist sift walks the full failure/recovery path in one
-// launch:
-//   add #1 (keepTrack)        rejects → the keep buffers as a pending keep
-//   add #2 (Done fallback)    rejects → failed-save error + Retry appear
-//   add #3 (Retry)            succeeds → success confirmation
+// The counters are module-scoped, not per-instance, so the injection counts
+// every call of a launch as one series, whichever screen makes it. With
+// FAIL_ADDS=2, saving Road Trip's keeps to the pre-seeded
+// "Road Trip - Sifted" walks the failure/recovery path in one launch:
+//   add #1 (Save)                   rejects → error, the button says Retry
+//   add #2 (Save, Done shown again) rejects → error, the button says Retry
+//   add #3 (Retry)                  succeeds → saved confirmation
 // With FAIL_REMOVES=1 a library sift's first removed song can't be removed,
 // retries included, surfacing the removal-errors warning block on Done.
 //
 // EXPO_PUBLIC_* env is baked into the bundle at build time (see the
 // e2e-simulator profile in eas.json), so both knobs apply to every flow of
 // an E2E build. That is only safe because of a flow audit:
-//   - addToPlaylist: flows 01-08 never call it (library sifts no-op
-//     keepTrack; "Chill Vibes" has no companion, so its keeps buffer and
-//     the Done fallback goes through createPlaylist; flow 08's re-sift
-//     only clears). Only 09_save_failure_retry.yaml triggers adds.
+//   - addToPlaylist: only Done's "Save kept songs as a playlist" calls it
+//     (a Keep writes nothing; a Restore takes the song out of "Sift —
+//     Removed" rather than adding it back), and only adds into one of the
+//     seeded playlists count: flow 07 saves "Chill Vibes", which has no
+//     "- Sifted", so its save creates one and adds to that, untouched.
+//     Only 09_save_failure_retry.yaml saves into a seeded playlist
+//     ("Road Trip - Sifted").
 //   - removeFromLibrary: every Remove goes through it, from a library or a
 //     playlist sift, so each flow's first removed song fails. Flow 03 never
 //     reaches the Done screen and asserts only DECIDE-driven stats, which a
@@ -164,12 +167,13 @@ const MOCK_PLAYLISTS: Playlist[] = [
 //     next library sift, the second is not); 11_removal_error.yaml is the
 //     flow built around it, and 24_playlist_remove.yaml counts on it too.
 //     The other flows that Remove assert nothing a failed removal changes.
-//   - removeFromPlaylist is NOT injectable on purpose: Start Over /
-//     Re-sift clears (flows 08 and 09) depend on it succeeding, and a
-//     launch-wide counter cannot distinguish a sift-decision remove from
-//     a clear. Playlist-removal failure UI stays covered by unit tests
-//     until a launch-argument mechanism can scope injection per flow.
+//   - removeFromPlaylist is NOT injectable: a launch-wide counter would
+//     fail any edit of a playlist Sift made that a future flow relies on.
+//     Playlist-removal failure UI stays covered by unit tests until a
+//     launch-argument mechanism can scope injection per flow.
 let injectedAddFailures = 0;
+/** Playlists createPlaylist has made this launch: id → name. */
+const createdPlaylists = new Map<string, string>();
 /** Songs whose library removal always fails (FAIL_REMOVES). */
 const failingRemoveIds = new Set<string>();
 /** Songs whose library removal landed: "in Sift — Removed". */
@@ -246,9 +250,22 @@ export class MockMusicProvider implements MusicProviderService {
     };
   }
 
-  async createPlaylist(_name: string, _trackIDs: string[]): Promise<void> {
+  async createPlaylist(name: string): Promise<string> {
     // Simulate a short API delay
     await delay(500);
+    const id = `mock-created-${createdPlaylists.size + 1}`;
+    createdPlaylists.set(id, name);
+    return id;
+  }
+
+  async findPlaylists(name: string): Promise<string[]> {
+    await delay(100);
+    // Like Apple Music's lookup, which counts a playlist made this launch
+    // even before the library lists it (loadPlaylists here never does).
+    return [
+      ...MOCK_PLAYLISTS.filter((p) => p.name === name).map((p) => p.id),
+      ...[...createdPlaylists].filter(([, created]) => created === name).map(([id]) => id),
+    ];
   }
 
   async removeFromLibrary(trackIDs: string[]): Promise<void> {
@@ -287,9 +304,10 @@ export class MockMusicProvider implements MusicProviderService {
     await delay(200);
   }
 
-  async addToPlaylist(_playlistID: string, _trackIDs: string[]): Promise<void> {
+  async addToPlaylist(playlistID: string, _trackIDs: string[]): Promise<void> {
     await delay(200);
-    if (injectedAddFailures < requestedFailures(process.env.EXPO_PUBLIC_MOCK_FAIL_ADDS)) {
+    if (!createdPlaylists.has(playlistID)
+      && injectedAddFailures < requestedFailures(process.env.EXPO_PUBLIC_MOCK_FAIL_ADDS)) {
       injectedAddFailures += 1;
       throw new Error('Simulated add failure (EXPO_PUBLIC_MOCK_FAIL_ADDS)');
     }

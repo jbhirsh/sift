@@ -60,19 +60,15 @@ export interface SiftSession {
   savedAt: string; // ISO 8601
   provider?: MusicProvider;
   source?: SiftSource;
-  /** Keeps that never landed in the "- Sifted" playlist, persisted so the
-   *  Done-screen repair pass survives an app kill/relaunch. Optional because
-   *  sessions saved by older builds don't carry it. */
-  pendingKeeps?: Track[];
-  /** Failed-removal messages, persisted for the same reason. */
+  /** Failed-removal messages, persisted so Done's warning and the retries
+   *  survive an app kill/relaunch. Optional because sessions saved by older
+   *  builds don't carry it. (Builds before keeps were remembered for
+   *  playlists also saved pendingKeeps and siftedPlaylistId: SessionStore
+   *  reads the first once and drops both.) */
   removalErrors?: string[];
   /** Ids of the removed tracks whose removal failed; optional for the same
    *  reason. */
   failedRemovalIds?: string[];
-  /** Id of the "<name> - Sifted" companion playlist, persisted so a resumed
-   *  session resolves it by id (rename-proof). Optional because sessions
-   *  saved by older builds don't carry it — those fall back to name match. */
-  siftedPlaylistId?: string | null;
   /** A decision not yet sent when the session was saved (#152); sent on
    *  resume. Optional because sessions saved by older builds don't carry it. */
   pending?: PendingDecision | null;

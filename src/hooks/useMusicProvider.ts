@@ -8,27 +8,74 @@ import { sortTracks } from '../utils/sorting';
 import { TrackIndex } from '../utils/trackIdentity';
 import { APPLE_REMOVED_PLAYLIST, collectedRemovalIds, collectsRemovals } from '../utils/libraryRemovals';
 import { ledgerKey } from '../utils/reviewedLedger';
+import { AddShortfallError, batches } from '../utils/musicKit';
+import { keptSaveRetryable, siftedPlaylistName } from '../utils/sessionCopy';
 import { isFiltering, matchesFilter } from '../utils/trackFilter';
 import { loadReviewedIds, markReviewed, unmarkReviewed } from '../services/ReviewedLedgerStore';
 import type { MusicProvider, Playlist, SiftSource, Track } from '../types';
 
 const SKIP_SECONDS = 15;
-// Upper bound on how long clearSiftedPlaylist waits for in-flight keeps to
-// settle. A native add that never settles would otherwise park the clear's
-// `await keepQueue` forever and permanently brick Start Over.
-const CLEAR_KEEP_QUEUE_TIMEOUT_MS = 15000;
 
-// The keep queue is module-scoped rather than a per-hook ref: keeps are
-// queued by the sifting screen's hook instance, but clearSiftedPlaylist is
-// usually called from a different screen's instance (Setup/Done). Sharing
-// the chain lets the clear await any in-flight keep before reading the
-// playlist, instead of racing an add that would land after the "clear".
-// Links in the chain never reject (keepTrack catches internally).
-let keepQueue: Promise<void> = Promise.resolve();
-// Bumped when a keep is taken back out of a "- Sifted" playlist. Each hook
-// instance's readback of that playlist (siftedContentsRef) is dropped when
-// it falls behind, so a song taken out and kept again is added again.
-let siftedContentsVersion = 0;
+// Done's "Save kept songs as a playlist" adds the songs this many at a time.
+// Each batch is one queued library write with its own stall timeout
+// (AppleMusicProvider adds one item at a time), so a few hundred kept songs
+// don't add up to one write that times out while it's still working, and a
+// batch that does time out leaves few songs still landing behind it.
+export const KEPT_SAVE_BATCH = 10;
+
+// How long a save waits for earlier library writes to finish before it
+// reads "<name> - Sifted". One that timed out may still be adding songs; a
+// save that read the playlist meanwhile would add them again.
+export const KEPT_SAVE_SETTLE_MS = 15000;
+
+export const STILL_FINISHING =
+  'Music is still finishing an earlier change. Try again in a moment.';
+
+// One kept-songs save at a time, launch-wide: two would each read
+// "<name> - Sifted" before the other's adds landed and add the same songs
+// twice, or each create the playlist. Module-scoped because a Done screen
+// left mid-save and shown again is a new hook instance. Links never reject.
+let keptSaveQueue: Promise<unknown> = Promise.resolve();
+// The "<name> - Sifted" playlists saves made this launch, by name: when the
+// lookup lists more than one, it's the one to add to. Without a provider
+// lookup that knows new playlists (findPlaylists), it's used even while
+// the library doesn't list it yet.
+const createdKeptPlaylists = new Map<string, string>();
+
+/** Forget the playlists saves made, as a fresh launch would. For tests. */
+export function resetKeptSaves(): void {
+  createdKeptPlaylists.clear();
+  keptSaveQueue = Promise.resolve();
+}
+
+/** What a kept-songs save did (Done's message says it). */
+export interface KeptSaveResult {
+  /** The "<name> - Sifted" playlist saved to. */
+  playlistName: string;
+  /** The playlist sifted. */
+  sourceName: string;
+  /** Songs remembered as kept that are still in the source playlist. */
+  kept: number;
+  /** How many of them this save added. */
+  added: number;
+  /** How many had no song for Music to add (couldn't be found): not worth retrying. */
+  notAdded: number;
+  /** Songs remembered as kept that are no longer in the source playlist. */
+  leftOut: number;
+}
+
+/** Whether the promise settles within ms; the timer never outlives it. */
+async function settlesWithin(promise: Promise<unknown>, ms: number): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<false>((resolve) => {
+    timer = setTimeout(() => resolve(false), ms);
+  });
+  try {
+    return await Promise.race([promise.then(() => true, () => true), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 // Failed removals are retried (#151) at most this many times per song per
 // launch, so a song that can't be removed doesn't retry forever.
@@ -67,21 +114,7 @@ export function useMusicProvider() {
   const { state, dispatch } = useSift();
   const providerRef = useMusicProviderService();
 
-  const siftedPlaylistIdRef = useRef<string | null>(null);
-  const siftedPlaylistForRef = useRef<string | null>(null);
-  // Once-per-session readback of the sifted playlist's contents (ids and
-  // identities), consulted before keepTrack's direct add so re-keeping a
-  // song that already landed can't double-add it. Kept current as adds
-  // land; invalidated by clearSiftedPlaylist. A fresh sift (START_FRESH)
-  // remounts the sifting screen, which discards this cache with the
-  // instance.
-  const siftedContentsRef = useRef<TrackIndex | null>(null);
-  const siftedContentsVersionRef = useRef(siftedContentsVersion);
   const loadingInProgressRef = useRef(false);
-  // Pending sifted-playlist retry delays, keyed by timer with the awaiting
-  // promise's resolver as the value so unmount can settle the promise.
-  const retryTimersRef = useRef<Map<ReturnType<typeof setTimeout>, () => void>>(new Map());
-  const unmountedRef = useRef(false);
   // What a removal retry needs, read when it runs rather than when it was
   // scheduled. The source is the one the removed songs came from.
   const removalStateRef = useRef({
@@ -98,26 +131,6 @@ export function useMusicProvider() {
       provider: state.provider,
     };
   });
-
-  // Cancel any in-flight sifted-playlist retry delays on unmount so no timers
-  // outlive the component (also keeps Jest workers from leaking timers).
-  // Each cleared timer's resolver is invoked — clearTimeout alone would strand
-  // the `await new Promise(...)` in findSiftedPlaylistWithRetry forever,
-  // leaving the keepTrack continuation hanging and its pending keep silently
-  // lost. After resolving, unmountedRef makes the retry loop bail out with
-  // null so the caller falls through to its ADD_PENDING_KEEP buffering.
-  useEffect(() => {
-    unmountedRef.current = false;
-    const timers = retryTimersRef.current;
-    return () => {
-      unmountedRef.current = true;
-      timers.forEach((resolve, timer) => {
-        clearTimeout(timer);
-        resolve();
-      });
-      timers.clear();
-    };
-  }, []);
 
   // ── Provider methods ──────────────────────────────────
 
@@ -275,7 +288,6 @@ export function useMusicProvider() {
     const shouldFilter = !options?.skipFiltering;
     const source = state.source;
     const filter = state.filter;
-    const knownSiftedId = state.siftedPlaylistId;
     const label = source.type === 'playlist' ? `"${source.playlist.name}"` : 'library';
 
     dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0, message: `Loading ${label}…` });
@@ -293,8 +305,7 @@ export function useMusicProvider() {
       let unfilteredCount: number;
       // How many tracks each independent filter dropped — the zero-track
       // message below distinguishes "already sifted" from "previously
-      // removed" instead of blaming the sifted filter for both.
-      let filteredAsSifted = 0;
+      // removed" instead of blaming the ledger filter for both.
       let filteredAsRemoved = 0;
       let filteredAsReviewed = 0;
       if (source.type === 'playlist') {
@@ -304,25 +315,13 @@ export function useMusicProvider() {
         unfilteredCount = tracks.length;
 
         if (shouldFilter) {
-          // Exclude tracks already in the sifted playlist. Resolve it by id
-          // first (rename-proof); the name match is only the legacy fallback
-          // for sessions that predate siftedPlaylistId.
-          const siftedName = `${source.playlist.name} - Sifted`;
-          const playlists = await providerRef.current.loadPlaylists?.() ?? [];
-          const sifted =
-            (knownSiftedId != null ? playlists.find((p) => p.id === knownSiftedId) : undefined) ??
-            playlists.find((p) => p.name === siftedName);
-          if (sifted) {
-            const siftedTracks = await providerRef.current.loadPlaylistTracks?.(sifted.id) ?? [];
-            // Match by id OR identity: a non-library track kept under its
-            // catalog id reads back from the sifted playlist under a fresh
-            // library-instance id, and an id-only filter would re-offer it
-            // on every re-sift.
-            const alreadySifted = new TrackIndex(siftedTracks);
-            const beforeSiftedFilter = tracks.length;
-            tracks = tracks.filter((t) => !alreadySifted.has(t));
-            filteredAsSifted = beforeSiftedFilter - tracks.length;
-          }
+          // Leave out songs kept in earlier sifts of this playlist, as a
+          // library sift does (#143): a keep leaves the song in the playlist.
+          // By id: the ids the keeps recorded came from this same load.
+          const reviewedIds = await loadReviewedIds(ledgerKey(state.provider, source));
+          const beforeReviewedFilter = tracks.length;
+          tracks = tracks.filter((t) => !reviewedIds.has(t.id));
+          filteredAsReviewed = beforeReviewedFilter - tracks.length;
 
           if (!collectsRemovals(state.provider)) {
             // Exclude tracks previously removed from this playlist
@@ -403,8 +402,8 @@ export function useMusicProvider() {
           ? `No songs ${source.type === 'playlist' ? 'in this playlist ' : ''}match your Plays and Added choices.`
           : source.type === 'playlist' && unfilteredCount > 0 && (shouldFilter || filteredAsRemoved > 0)
             ? filteredAsRemoved === 0
-              ? 'All tracks in this playlist have already been sifted.'
-              : filteredAsSifted === 0
+              ? 'You\u2019ve sifted every song in this playlist. Turn on \u201cInclude songs I\u2019ve already sifted\u201d to go through them again.'
+              : filteredAsReviewed === 0
                 ? 'All tracks in this playlist were removed in a previous sift.'
                 : 'All tracks in this playlist have already been sifted or removed.'
             : source.type === 'playlist'
@@ -427,7 +426,7 @@ export function useMusicProvider() {
     } finally {
       loadingInProgressRef.current = false;
     }
-  }, [providerRef, dispatch, ensureAccess, state.source, state.sortOrder, state.siftedPlaylistId, state.provider, state.filter]);
+  }, [providerRef, dispatch, ensureAccess, state.source, state.sortOrder, state.provider, state.filter]);
 
   /**
    * Retry the removals that failed (#151). Each is checked first: a removal
@@ -616,298 +615,123 @@ export function useMusicProvider() {
     [restoreNow],
   );
 
-  const saveSiftedPlaylist = useCallback(
-    async (playlistName: string, keptTracks: Track[]) => {
-      if (keptTracks.length === 0) return;
-      const siftedName = `${playlistName} - Sifted`;
-      const knownSiftedId = state.siftedPlaylistId;
-
-      dispatch({ type: 'SET_CREATING_PLAYLIST', creating: true });
-      dispatch({ type: 'SET_PLAYLIST_ERROR', error: null });
+  /**
+   * Done's "Save kept songs as a playlist": every song remembered as kept
+   * from the playlist being sifted (the reviewed ledger, so every sift of it
+   * so far, not just this one) and still in it goes into "<name> - Sifted".
+   * The playlist is made, empty, when there isn't one by that name, so its
+   * id is known before any add; then only the songs not in it yet are added.
+   * A song Music can't add is counted, not retried forever. Rejects when a
+   * write fails or times out: the songs that landed stay, and saving again
+   * adds only the rest.
+   */
+  const saveKeptPlaylist = useCallback((): Promise<KeptSaveResult> => {
+    const source = state.activeSource ?? state.source;
+    const provider = state.provider;
+    if (source.type !== 'playlist') {
+      return Promise.reject(new Error('Only a playlist sift saves its kept songs as a playlist'));
+    }
+    const run = keptSaveQueue.then(async (): Promise<KeptSaveResult> => {
+      const playlistName = siftedPlaylistName(source.playlist.name);
+      const sourceName = source.playlist.name;
       try {
-        const playlists = await providerRef.current.loadPlaylists?.() ?? [];
-        // Resolve by id first (rename-proof); the name match is only the
-        // legacy fallback for sessions that predate siftedPlaylistId.
-        const existing =
-          (knownSiftedId != null ? playlists.find((p) => p.id === knownSiftedId) : undefined) ??
-          playlists.find((p) => p.name === siftedName);
+        const service = providerRef.current;
+        // An earlier write that timed out may still be landing: wait for the
+        // library writes to finish rather than read the playlist under them.
+        if (service.writesSettled && !(await settlesWithin(service.writesSettled(), KEPT_SAVE_SETTLE_MS))) {
+          throw new Error(STILL_FINISHING);
+        }
+        // Read after the queue: keeps recorded while an earlier save ran count.
+        const remembered = [...await loadReviewedIds(ledgerKey(provider, source))];
+        if (remembered.length === 0) return { playlistName, sourceName, kept: 0, added: 0, notAdded: 0, leftOut: 0 };
+        // Only songs still in the playlist: the ledger's ids came from its
+        // loads, and a song taken out of it since can't be matched by song.
+        const sourceTracks = await service.loadPlaylistTracks?.(source.playlist.id);
+        if (!sourceTracks) throw new Error('This provider does not support playlist loading');
+        const inSource = new Map(sourceTracks.map((t) => [t.id, t]));
+        const kept = remembered.flatMap((id) => inSource.get(id) ?? []);
+        const leftOut = remembered.length - kept.length;
+        if (kept.length === 0) return { playlistName, sourceName, kept: 0, added: 0, notAdded: 0, leftOut };
+        const addToPlaylist = service.addToPlaylist?.bind(service);
+        if (!addToPlaylist) throw new Error('This provider does not support adding to playlists');
 
-        if (existing) {
-          const existingTracks = await providerRef.current.loadPlaylistTracks?.(existing.id) ?? [];
-          // Apple Music re-identifies a track when it lands in a playlist
-          // (catalog id at keep-time vs library-instance id on readback), so
-          // an id-only diff re-adds exactly those tracks. Fall back to the
-          // shared name/artist/duration identity so an already-present track
-          // is never added twice under a second id.
-          const present = new TrackIndex(existingTracks);
-          const newTrackIDs = keptTracks
-            .filter((t) => !present.has(t))
-            .map((t) => t.id);
-          if (newTrackIDs.length > 0) {
-            // A provider without addToPlaylist cannot land these tracks.
-            // Optional-chaining past the gap would report success and clear
-            // pendingKeeps for keeps that never happened — throw into the
-            // normal failure path so the snapshot stays buffered for retry.
-            if (!providerRef.current.addToPlaylist) {
-              throw new Error('This provider does not support adding to playlists');
-            }
-            await providerRef.current.addToPlaylist(existing.id, newTrackIDs);
-          }
+        const listed = service.findPlaylists
+          ? await service.findPlaylists(playlistName)
+          : (await service.loadPlaylists?.() ?? []).filter((p) => p.name === playlistName).map((p) => p.id);
+        const mine = createdKeptPlaylists.get(playlistName);
+        let playlistId = mine != null && (listed.includes(mine) || !service.findPlaylists) ? mine : listed[0];
+        let entries: Track[] = [];
+        if (playlistId == null) {
+          playlistId = await service.createPlaylist(playlistName);
+          createdKeptPlaylists.set(playlistName, playlistId);
         } else {
-          await providerRef.current.createPlaylist(siftedName, keptTracks.map((t) => t.id));
+          entries = await service.loadPlaylistTracks?.(playlistId) ?? [];
         }
-
-        dispatch({ type: 'SET_PLAYLIST_CREATED', created: true });
-        // Exactly the snapshot this save persisted is now covered — remove
-        // only those tracks from the buffer. A keep that got buffered while
-        // this save was in flight was NOT part of the snapshot; it must
-        // survive this cleanup so the Done fallback fires again for it.
-        dispatch({ type: 'REMOVE_PENDING_KEEPS', trackIds: keptTracks.map((t) => t.id) });
-      } catch (err) {
-        Sentry.captureException(err, { tags: { flow: 'save-sifted-playlist' } });
-        // Partial-success repair: the provider throws on ANY shortfall, but
-        // by then most tracks may have landed (native adds are per-item).
-        // Treating the error as "nothing was saved" would strand every kept
-        // track in pendingKeeps and retry them all forever. Read the
-        // playlist back and drop exactly the tracks that actually landed,
-        // so the retry path only re-attempts genuine failures.
-        try {
-          const playlistsAfter = await providerRef.current.loadPlaylists?.() ?? [];
-          const target =
-            (knownSiftedId != null
-              ? playlistsAfter.find((p) => p.id === knownSiftedId)
-              : undefined) ??
-            playlistsAfter.find((p) => p.name === siftedName);
-          if (target) {
-            const nowPresent = await providerRef.current.loadPlaylistTracks?.(target.id) ?? [];
-            const present = new TrackIndex(nowPresent);
-            const landed = keptTracks
-              .filter((t) => present.has(t))
-              .map((t) => t.id);
-            if (landed.length > 0) {
-              dispatch({ type: 'REMOVE_PENDING_KEEPS', trackIds: landed });
-            }
-          }
-        } catch (readbackErr) {
-          // Best-effort: with no readback the whole snapshot stays buffered
-          // and the retry path still covers everything.
-          Sentry.addBreadcrumb({
-            category: 'music-provider',
-            message: `saveSiftedPlaylist: partial-success readback failed: ${readbackErr}`,
-            level: 'warning',
-          });
-        }
-        const message = err instanceof Error ? err.message : 'Failed to save sifted playlist';
-        dispatch({ type: 'SET_PLAYLIST_ERROR', error: message });
-      } finally {
-        dispatch({ type: 'SET_CREATING_PLAYLIST', creating: false });
-      }
-    },
-    [providerRef, dispatch, state.siftedPlaylistId],
-  );
-
-  const findSiftedPlaylistWithRetry = useCallback(
-    async (name: string): Promise<string | null> => {
-      const delays = [0, 250, 750];
-      for (const delay of delays) {
-        // Bail out promptly once the component is gone: returning null lets
-        // the caller buffer the keep via ADD_PENDING_KEEP instead of hanging.
-        if (unmountedRef.current) return null;
-        if (delay > 0) {
-          await new Promise<void>((resolve) => {
-            const timer = setTimeout(() => {
-              retryTimersRef.current.delete(timer);
-              resolve();
-            }, delay);
-            retryTimersRef.current.set(timer, resolve);
-          });
-          if (unmountedRef.current) return null;
-        }
-        const refreshed = await providerRef.current.loadPlaylists?.() ?? [];
-        const found = refreshed.find((p) => p.name === name);
-        if (found) return found.id;
-      }
-      return null;
-    },
-    [providerRef],
-  );
-
-  const keepTrack = useCallback(
-    (track: Track): Promise<void> => {
-      if (state.source.type !== 'playlist') {
-        // A library keep leaves the song where it is; remember it so later
-        // library sifts leave it out (#143).
-        return markReviewed(ledgerKey(state.provider, state.source), track.id);
-      }
-      const playlistName = state.source.playlist.name;
-      const siftedName = `${playlistName} - Sifted`;
-      const knownSiftedId = state.siftedPlaylistId;
-
-      const next = keepQueue.then(async () => {
-        try {
-          if (siftedPlaylistIdRef.current == null) {
-            if (knownSiftedId != null) {
-              // Already resolved earlier in this session (or restored from a
-              // saved one) — reuse the id instead of re-deriving it by name.
-              siftedPlaylistIdRef.current = knownSiftedId;
-              siftedPlaylistForRef.current = siftedName;
-            } else if (siftedPlaylistForRef.current !== siftedName) {
-              const playlists = await providerRef.current.loadPlaylists?.() ?? [];
-              const existing = playlists.find((p) => p.name === siftedName);
-              if (existing) {
-                siftedPlaylistIdRef.current = existing.id;
-                siftedPlaylistForRef.current = siftedName;
-                dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: existing.id });
-              } else {
-                await providerRef.current.createPlaylist(siftedName, [track.id]);
-                siftedPlaylistForRef.current = siftedName;
-                // The playlist was just created with exactly this track —
-                // seed the contents cache so a later re-keep of it is a
-                // no-op instead of a readback plus a duplicate add.
-                siftedContentsRef.current = new TrackIndex([track]);
-                siftedPlaylistIdRef.current = await findSiftedPlaylistWithRetry(siftedName);
-                if (siftedPlaylistIdRef.current != null) {
-                  dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: siftedPlaylistIdRef.current });
-                }
-                return;
-              }
+        // Apple Music files a song under a new id when it lands in a
+        // playlist: compare by song (name, artist, duration).
+        const present = new TrackIndex(entries);
+        const missing = kept.filter((t) => !present.has(t)).map((t) => t.id);
+        // Every batch is tried, so a batch that fails doesn't keep the ones
+        // after it out. Songs with nothing to add (unresolved) are counted:
+        // retrying won't find them. Songs the add refused (failed) make the
+        // save fail, so Done offers Retry for them. A batch that timed out
+        // (QueueStallError) may still be adding while later batches go; the
+        // next save waits for it (writesSettled) before reading the playlist,
+        // so nothing it lands is added twice.
+        let added = 0;
+        let notAdded = 0;
+        let refused = 0;
+        let failure: unknown = null;
+        for (const batch of batches(missing, KEPT_SAVE_BATCH)) {
+          try {
+            await addToPlaylist(playlistId, batch);
+            added += batch.length;
+          } catch (err) {
+            if (err instanceof AddShortfallError) {
+              added += err.added;
+              notAdded += err.unresolved;
+              refused += err.failed;
             } else {
-              siftedPlaylistIdRef.current = await findSiftedPlaylistWithRetry(siftedName);
-              if (siftedPlaylistIdRef.current != null) {
-                dispatch({ type: 'SET_SIFTED_PLAYLIST_ID', id: siftedPlaylistIdRef.current });
-              }
+              failure ??= err;
             }
           }
-
-          if (siftedPlaylistIdRef.current) {
-            // Duplicate guard: consult a once-per-session readback of the
-            // sifted playlist before the direct add. Re-keeping a song that
-            // is already present — under the same id, or under the fresh
-            // library-instance id Apple Music assigns on landing — must not
-            // add it a second time.
-            if (siftedContentsVersionRef.current !== siftedContentsVersion) {
-              siftedContentsVersionRef.current = siftedContentsVersion;
-              siftedContentsRef.current = null;
-            }
-            if (siftedContentsRef.current == null) {
-              const existingTracks =
-                await providerRef.current.loadPlaylistTracks?.(siftedPlaylistIdRef.current) ?? [];
-              siftedContentsRef.current = new TrackIndex(existingTracks);
-            }
-            const contents = siftedContentsRef.current;
-            if (!contents.has(track)) {
-              // Without addToPlaylist the keep cannot land — recording it in
-              // the contents cache anyway would silently drop the track.
-              // Throw into the normal failure path so it gets buffered and
-              // retried by the Done screen's saveSiftedPlaylist flush.
-              if (!providerRef.current.addToPlaylist) {
-                throw new Error('This provider does not support adding to playlists');
-              }
-              await providerRef.current.addToPlaylist(siftedPlaylistIdRef.current, [track.id]);
-              contents.add(track);
-            }
-          } else {
-            // The sifted playlist could not be resolved within the retry
-            // window. Buffer the track instead of silently dropping it — the
-            // Done screen flushes pending keeps via saveSiftedPlaylist.
-            dispatch({ type: 'ADD_PENDING_KEEP', track });
-          }
-        } catch (err) {
-          Sentry.captureException(err, { tags: { flow: 'keep-track' } });
-          // The add failed outright — buffer it so it is retried at Done.
-          dispatch({ type: 'ADD_PENDING_KEEP', track });
         }
-      });
+        if (failure != null) throw failure;
+        if (refused > 0) throw new Error(keptSaveRetryable({ added, refused, notAdded }));
+        return { playlistName, sourceName, kept: kept.length, added, notAdded, leftOut };
+      } catch (err) {
+        Sentry.captureException(err, { tags: { flow: 'save-kept-playlist' } });
+        throw err;
+      }
+    });
+    keptSaveQueue = run.catch(() => undefined);
+    return run;
+  }, [providerRef, state.activeSource, state.source, state.provider]);
 
-      keepQueue = next;
-      return next;
-    },
-    [providerRef, state.source, state.provider, state.siftedPlaylistId, findSiftedPlaylistWithRetry, dispatch],
+  /**
+   * Keep a song: it stays where it is, and the reviewed ledger remembers it
+   * for its source, so later sifts of that library or playlist leave it out
+   * (#143). Nothing is written to the music service; Done's "Save kept songs
+   * as a playlist" copies a playlist's keeps when asked.
+   */
+  const keepTrack = useCallback(
+    (track: Track): Promise<void> =>
+      markReviewed(ledgerKey(state.provider, state.activeSource ?? state.source), track.id),
+    [state.provider, state.activeSource, state.source],
   );
 
   /**
-   * Take back a keep that was sent (its decision changed): a library keep
-   * comes out of the reviewed ledger, so later sifts offer the song again;
-   * a playlist keep comes out of "<name> - Sifted", or out of the buffer if
-   * it never got there. Resolves to whether it worked.
+   * Take back a keep that was sent (its decision changed): out of the
+   * reviewed ledger, so later sifts offer the song again. Resolves to
+   * whether it worked, which it always does: the ledger reports its own
+   * write failures. A song already saved to "<name> - Sifted" stays there.
    */
   const unkeepTrack = useCallback(
     async (track: Track): Promise<boolean> => {
-      const source = state.source;
-      if (source.type !== 'playlist') {
-        await unmarkReviewed(ledgerKey(state.provider, source), track.id);
-        return true;
-      }
-      if (state.pendingKeeps.some((t) => t.id === track.id)) {
-        dispatch({ type: 'REMOVE_PENDING_KEEPS', trackIds: [track.id] });
-        return true;
-      }
-      const siftedName = `${source.playlist.name} - Sifted`;
-      const knownSiftedId = state.siftedPlaylistId;
-      // After the keeps: one still landing would come back after this.
-      const run = keepQueue.then(async (): Promise<boolean> => {
-        try {
-          const service = providerRef.current;
-          let siftedId = knownSiftedId;
-          if (siftedId == null) {
-            const playlists = await service.loadPlaylists?.() ?? [];
-            siftedId = playlists.find((p) => p.name === siftedName)?.id ?? null;
-          }
-          // No sifted playlist: the keep never landed, so there's nothing to take out.
-          if (siftedId == null) return true;
-          // Apple Music files a kept song under its library id in the
-          // playlist, so match the entries by song, not only by id.
-          const song = new TrackIndex([track]);
-          const entries = (await service.loadPlaylistTracks?.(siftedId) ?? []).filter((t) => song.has(t));
-          if (entries.length > 0) {
-            if (!service.removeFromPlaylist) throw new Error('This provider does not support removing from playlists');
-            await service.removeFromPlaylist(siftedId, entries.map((t) => t.id));
-            siftedContentsVersion += 1;
-          }
-          return true;
-        } catch (err) {
-          Sentry.captureException(err, { tags: { flow: 'unkeep-track' } });
-          return false;
-        }
-      });
-      keepQueue = run.then(() => undefined);
-      return run;
+      await unmarkReviewed(ledgerKey(state.provider, state.activeSource ?? state.source), track.id);
+      return true;
     },
-    [providerRef, dispatch, state.source, state.provider, state.pendingKeeps, state.siftedPlaylistId],
-  );
-
-  /**
-   * Keep a song for a saved session being discarded (its held decision,
-   * #152): to that session's source, without touching the sift in state.
-   * Queued with the keeps; a failure is reported to Sentry only.
-   */
-  const keepFromSavedSession = useCallback(
-    (track: Track, from: { source: SiftSource; provider: MusicProvider; siftedPlaylistId: string | null }): Promise<void> => {
-      const { source, provider, siftedPlaylistId } = from;
-      if (source.type !== 'playlist') return markReviewed(ledgerKey(provider, source), track.id);
-      const siftedName = `${source.playlist.name} - Sifted`;
-      const next = keepQueue.then(async () => {
-        try {
-          const service = providerRef.current;
-          const playlists = await service.loadPlaylists?.() ?? [];
-          const sifted =
-            (siftedPlaylistId != null ? playlists.find((p) => p.id === siftedPlaylistId) : undefined) ??
-            playlists.find((p) => p.name === siftedName);
-          if (!sifted) {
-            await service.createPlaylist(siftedName, [track.id]);
-            return;
-          }
-          // It may have landed before the app was killed.
-          const present = new TrackIndex(await service.loadPlaylistTracks?.(sifted.id) ?? []);
-          if (!present.has(track)) await service.addToPlaylist?.(sifted.id, [track.id]);
-        } catch (err) {
-          Sentry.captureException(err, { tags: { flow: 'keep-saved-session' } });
-        }
-      });
-      keepQueue = next;
-      return next;
-    },
-    [providerRef],
+    [state.provider, state.activeSource, state.source],
   );
 
   const warmCache = useCallback(async (trackIDs: string[], playlistID?: string): Promise<void> => {
@@ -933,71 +757,6 @@ export function useMusicProvider() {
     }
   }, [providerRef]);
 
-  /**
-   * Empty the "<name> - Sifted" playlist. Returns false when the clear could
-   * not be completed (e.g. a network failure) so callers can stop before
-   * wiping local state that would be needed to reconcile later.
-   */
-  const clearSiftedPlaylist = useCallback(
-    async (playlistName: string): Promise<boolean> => {
-      const knownSiftedId = state.siftedPlaylistId;
-      try {
-        const siftedName = `${playlistName} - Sifted`;
-        // Let queued/in-flight keeps settle first: reading the playlist while
-        // an add is still mid-flight would miss that track, leaving it behind
-        // after the "clear". The chain is module-scoped precisely so this
-        // works across hook instances (keeps queue on the sifting screen,
-        // clears run from Setup/Done). Bounded: a native promise that never
-        // settles must not brick Start Over forever, so after a generous
-        // timeout the clear proceeds anyway (worst case it misses a track
-        // that lands later — recoverable by another Start Over).
-        await new Promise<void>((resolve) => {
-          const timer = setTimeout(() => {
-            Sentry.addBreadcrumb({
-              category: 'music-provider',
-              message: `clearSiftedPlaylist: keep queue did not settle within ${CLEAR_KEEP_QUEUE_TIMEOUT_MS}ms — proceeding with the clear`,
-              level: 'warning',
-            });
-            resolve();
-          }, CLEAR_KEEP_QUEUE_TIMEOUT_MS);
-          // Links in the keep chain never reject (keepTrack catches
-          // internally), so a bare then is safe here.
-          keepQueue.then(() => {
-            clearTimeout(timer);
-            resolve();
-          });
-        });
-        siftedPlaylistIdRef.current = null;
-        siftedPlaylistForRef.current = null;
-        siftedContentsRef.current = null;
-        const playlists = await providerRef.current.loadPlaylists?.() ?? [];
-        // Resolve by id first (rename-proof); name match is the legacy
-        // fallback for sessions that predate siftedPlaylistId.
-        const sifted =
-          (knownSiftedId != null ? playlists.find((p) => p.id === knownSiftedId) : undefined) ??
-          playlists.find((p) => p.name === siftedName);
-        if (sifted) {
-          const tracks = await providerRef.current.loadPlaylistTracks?.(sifted.id) ?? [];
-          if (tracks.length > 0) {
-            // Tracks are present but a provider without removeFromPlaylist
-            // cannot clear them. Returning true here would let callers wipe
-            // the local state needed to reconcile the leftover playlist —
-            // throw into the normal failure path so this reports false.
-            if (!providerRef.current.removeFromPlaylist) {
-              throw new Error('This provider does not support removing from playlists');
-            }
-            await providerRef.current.removeFromPlaylist(sifted.id, tracks.map((t) => t.id));
-          }
-        }
-        return true;
-      } catch (err) {
-        Sentry.captureException(err, { tags: { flow: 'clear-sifted-playlist' } });
-        return false;
-      }
-    },
-    [providerRef, state.siftedPlaylistId],
-  );
-
   return {
     authorize,
     isAuthorized,
@@ -1012,15 +771,13 @@ export function useMusicProvider() {
     togglePlayPause,
     skipForward,
     skipBackward,
-    saveSiftedPlaylist,
+    saveKeptPlaylist,
     keepTrack,
     unkeepTrack,
-    keepFromSavedSession,
     removeTrack,
     retryFailedRemovals,
     restoreTrack,
     warmCache,
-    clearSiftedPlaylist,
     previewOffset,
   };
 }

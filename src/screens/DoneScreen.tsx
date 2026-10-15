@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Platform,
   Clipboard,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import type { Track } from '../types';
@@ -23,6 +22,8 @@ import { useReviseDecision } from '../hooks/useReviseDecision';
 import DecisionsSheet from '../components/DecisionsSheet';
 import { decidedLatestFirst, decisionFor } from '../utils/decisions';
 import { clearHistoryForSource } from '../services/RemovalHistoryStore';
+import { loadReviewedIds } from '../services/ReviewedLedgerStore';
+import { ledgerKey } from '../utils/reviewedLedger';
 import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
 import { Button } from '../components/Button';
@@ -32,24 +33,35 @@ import {
   discardConfirmation,
   doneHeadline,
   failedRemovalCount,
-  keptDestination,
+  keptSaveFailure,
+  keptSaveMessage,
   nothingRemovedNote,
   playlistStartOverMessage,
   removedListSubtitle,
+  SAVE_KEPT_TITLE,
+  siftedPlaylistName,
 } from '../utils/sessionCopy';
 import { collectsRemovals } from '../utils/libraryRemovals';
 import { COLORS, CONTENT_COLUMN, RADIUS, SETTINGS_BUTTON, SPACING } from '../theme';
 import { useTraceScreen } from '../hooks/useTrace';
+
+/** Done's "Save kept songs as a playlist", from press to result. */
+type KeptSave =
+  | { status: 'idle' }
+  | { status: 'saving' }
+  /** `kept`: this sift's keeps when it was pressed, to tell when they change. */
+  | { status: 'saved'; message: string; kept: Track[] }
+  | { status: 'failed'; message: string };
 
 export default function DoneScreen() {
   useTraceScreen('done');
   const { state, dispatch, resetToSetup } = useSift();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { restoreTrack, saveSiftedPlaylist, clearSiftedPlaylist } = useMusicProvider();
+  const { restoreTrack, saveKeptPlaylist } = useMusicProvider();
   // A decision still held back (a session resumed straight to Done, #152)
   // has nothing left to undo it here: send it.
-  const sendPending = useSendPending({ bufferPlaylistKeeps: true });
+  const sendPending = useSendPending();
   useRemovalRetry();
   // Every decision of the sift, changeable here too.
   const revise = useReviseDecision(sendPending);
@@ -64,29 +76,14 @@ export default function DoneScreen() {
   const [copied, setCopied] = useState(false);
   const [restoringIds, setRestoringIds] = useState<Set<string>>(new Set());
   const [startOverError, setStartOverError] = useState<string | null>(null);
-  // True while the confirmed Start Over's remote clears run. Combined with
-  // state.isCreatingPlaylist it gates BOTH directions of the save/clear
-  // exclusion: Start Over is blocked while a save is in flight, and the
-  // fallback save effect + Retry below are blocked while the clear is in
-  // flight — so clearSiftedPlaylist can never run concurrently with a
-  // sifted-playlist save racing the same remote playlist. In-flight
-  // restores block Start Over too: a restore's removeFromHistory would
-  // otherwise race clearHistoryForSource on the same history file (their
-  // writes are serialized in RemovalHistoryStore, but a restore queued
-  // behind the clear would still re-add its record to the just-wiped
+  // True while a confirmed Start Over clears the playlist's removal history.
+  // In-flight restores block Start Over too: a restore's removeFromHistory
+  // would otherwise race clearHistoryForSource on the same history file
+  // (their writes are serialized in RemovalHistoryStore, but a restore
+  // queued behind the clear would still re-add its record to the just-wiped
   // history and re-add the track remotely after the reset).
   const [isStartingOver, setIsStartingOver] = useState(false);
-  const startOverBlocked =
-    state.isCreatingPlaylist || isStartingOver || restoringIds.size > 0;
-  // Stale-closure-safe mirror of "a save is in flight". The Start Over
-  // confirmation can sit open while the fallback effect (or Retry) starts a
-  // save — e.g. a parked keep fails and dispatches ADD_PENDING_KEEP — and
-  // the confirm callback's captured state predates that save. It re-checks
-  // through this ref instead.
-  const isCreatingPlaylistRef = useRef(state.isCreatingPlaylist);
-  useEffect(() => {
-    isCreatingPlaylistRef.current = state.isCreatingPlaylist;
-  }, [state.isCreatingPlaylist]);
+  const startOverBlocked = isStartingOver || restoringIds.size > 0;
   // The "Copied!" toast reset timer must not outlive the screen: an
   // uncleared timeout fires setState on an unmounted component and holds
   // the process open (surfaced as Jest's "did not exit" warning). Same
@@ -98,42 +95,51 @@ export default function DoneScreen() {
     };
   }, []);
 
-  // Fallback: persist the full kept list when anything went wrong during
-  // incremental sifting — keeps that were buffered because their playlist add
-  // could not land (see pendingKeeps in SiftContext). Save ONLY the buffered
-  // keeps: replaying the full kept list double-adds tracks whose Apple Music
-  // identity changed between keep-time (catalog id) and playlist readback
-  // (library-instance id), which the id-based diff cannot recognize. The
-  // removalPlaylistError guard stops retry loops after a failed save (the
-  // error stays visible in the footer). The isStartingOver guard is the
-  // reverse half of the save/clear exclusion: a pending keep can land while
-  // Start Over's clear is mid-flight (a parked keep failing dispatches
-  // ADD_PENDING_KEEP exactly when the clear's `await keepQueue` settles),
-  // and starting a save then would race the clear on the same playlist.
+  // "Save kept songs as a playlist" (playlist sifts): copies every song
+  // remembered as kept from the playlist, in this sift or an earlier one,
+  // into "<name> - Sifted". Shown once there is something to save: a keep
+  // in this sift, or one the ledger remembers from before.
+  const keptSource = state.activeSource ?? state.source;
+  const keptLedgerKey = keptSource.type === 'playlist' ? ledgerKey(state.provider, keptSource) : null;
+  const [rememberedKeeps, setRememberedKeeps] = useState(0);
   useEffect(() => {
-    if (
-      state.source.type === 'playlist' &&
-      state.pendingKeeps.length > 0 &&
-      !state.isCreatingPlaylist &&
-      !isStartingOver &&
-      state.removalPlaylistError == null
-    ) {
-      saveSiftedPlaylist(state.source.playlist.name, state.pendingKeeps);
+    if (keptLedgerKey == null) return;
+    let cancelled = false;
+    loadReviewedIds(keptLedgerKey).then((ids) => {
+      if (!cancelled) setRememberedKeeps(ids.size);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Again when this sift's keeps change: a decision changed to or from Keep.
+  }, [keptLedgerKey, state.kept]);
+  const [keptSave, setKeptSave] = useState<KeptSave>({ status: 'idle' });
+  const saving = keptSave.status === 'saving';
+  // A second press while one save runs is ignored, even before the
+  // disabled button has rendered.
+  const savingRef = useRef(false);
+  const saveKept = useCallback(async () => {
+    if (savingRef.current || keptSource.type !== 'playlist') return;
+    savingRef.current = true;
+    const kept = state.kept;
+    setKeptSave({ status: 'saving' });
+    try {
+      const result = await saveKeptPlaylist();
+      setKeptSave({ status: 'saved', message: keptSaveMessage(result), kept });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : 'Something went wrong.';
+      setKeptSave({ status: 'failed', message: keptSaveFailure(siftedPlaylistName(keptSource.playlist.name), reason) });
+    } finally {
+      savingRef.current = false;
     }
-  }, [state.source, state.pendingKeeps, state.isCreatingPlaylist, isStartingOver, state.removalPlaylistError, saveSiftedPlaylist]);
-
-  // Manual retry for a failed sifted-playlist save. Without this, a single
-  // transient failure would leave removalPlaylistError set forever (the
-  // fallback effect above is guarded on it), stranding any buffered
-  // pendingKeeps with no non-destructive way to try again. Gated on
-  // isCreatingPlaylist so a retry can't start while a save is in flight,
-  // and on isStartingOver so it can't race Start Over's in-flight clear.
-  const handleRetrySave = useCallback(() => {
-    if (state.source.type !== 'playlist') return;
-    if (state.isCreatingPlaylist || isStartingOver) return;
-    dispatch({ type: 'SET_PLAYLIST_ERROR', error: null });
-    saveSiftedPlaylist(state.source.playlist.name, state.pendingKeeps);
-  }, [dispatch, state.source, state.isCreatingPlaylist, isStartingOver, state.pendingKeeps, saveSiftedPlaylist]);
+  }, [keptSource, state.kept, saveKeptPlaylist]);
+  const canSaveKept = keptSource.type === 'playlist'
+    && (state.kept.length > 0 || rememberedKeeps > 0 || keptSave.status !== 'idle');
+  // After a save, the button comes back once this sift's keeps change.
+  const showSaveButton = keptSave.status !== 'saved' || keptSave.kept !== state.kept;
+  // Changing a decision while the save reads the ledger could leave a song
+  // saved that is no longer kept (or the reverse).
+  const decisionsBlocked = startOverBlocked || saving;
 
   const copyRemovedList = useCallback(() => {
     const text = state.removed
@@ -205,12 +211,30 @@ export default function DoneScreen() {
   // Cards not yet decided: a sift ended early with Finish (#142).
   const remaining = Math.max(0, state.tracks.length - state.cursor);
   const headline = doneHeadline(state.source, state.cursor, state.tracks.length);
-  const keptLine = keptDestination(state.source, state.kept.length);
-  // Review N skipped replaces this session (LOAD_TRACKS), so it waits for
-  // unsaved keeps and is offered only once no cards remain: with cards
-  // left, Continue sifting comes first and nothing is dropped.
+  // Review N skipped replaces this session (LOAD_TRACKS), so it is offered
+  // only once no cards remain: with cards left, Continue sifting comes
+  // first and nothing is dropped.
   const canReviewSkipped = remaining === 0 && state.skipped.length > 0;
-  const reviewSkippedBlocked = startOverBlocked || state.pendingKeeps.length > 0;
+
+  // Start Over, once confirmed (or with no decisions to lose). A playlist's
+  // removal history is cleared first, and the reset happens only once that
+  // landed: wiping the session after a failed clear would lose the sift
+  // while the history it was meant to clear stays.
+  const startOver = async () => {
+    const source = state.source;
+    if (source.type === 'playlist') {
+      setStartOverError(null);
+      setIsStartingOver(true);
+      if (!(await clearHistoryForSource(source.playlist.id))) {
+        setStartOverError('Could not clear the removal history. Try again.');
+        setIsStartingOver(false);
+        return;
+      }
+      // Success: the gate stays up. resetToSetup's RESET_TO_SETUP lands
+      // after clearSession settles and retires this screen with it.
+    }
+    resetToSetup();
+  };
 
   const reviewSkipped = () => {
     const start = () => dispatch({ type: 'LOAD_TRACKS', tracks: state.skipped });
@@ -273,11 +297,6 @@ export default function DoneScreen() {
             />
           </View>
         </GlassCard>
-        {keptLine && (
-          <Text testID="kept-destination" style={[styles.keptDestination, { color: colors.textSecondary }]}>
-            {keptLine}
-          </Text>
-        )}
       </View>
 
       {state.removed.length === 0 && (
@@ -346,42 +365,36 @@ export default function DoneScreen() {
 
   const listFooter = (
     <View style={styles.buttonSection}>
-      {state.isCreatingPlaylist && state.source.type === 'playlist' && (
-        <View style={styles.siftedConfirmation}>
-          <ActivityIndicator size="small" color={colors.accent} />
-          <Text style={[styles.siftedConfirmationText, { color: colors.textSecondary }]}>
-            Creating sifted playlist…
-          </Text>
-        </View>
-      )}
-
-      {state.removalPlaylistCreated && state.source.type === 'playlist' && (
-        <View style={styles.siftedConfirmation}>
-          <SymbolView name="checkmark.circle.fill" size={18} tintColor={COLORS.keep} accessibilityElementsHidden />
-          <Text style={[styles.siftedConfirmationText, { color: colors.text }]}>
-            Sifted playlist created!
-          </Text>
-        </View>
-      )}
-
-      {state.removalPlaylistError && (
-        <View style={styles.errorSection}>
-          <Text style={[styles.playlistError, { color: colors.removeText }]}>{state.removalPlaylistError}</Text>
-          {state.source.type === 'playlist' && state.kept.length > 0 && (
-            <TouchableOpacity
-              testID="retry-save-button"
-              // Disabled while a save is in flight OR while Start Over's
-              // clear runs — a retry mid-clear would interleave adds with
-              // the clear's readback/remove on the same remote playlist.
-              style={[styles.smallSecondaryButton, { borderColor: colors.accent }, startOverBlocked && { opacity: 0.4 }]}
-              onPress={handleRetrySave}
-              disabled={startOverBlocked}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.smallSecondaryButtonText, { color: colors.accent }]}>
-                Retry
+      {canSaveKept && (
+        <View style={styles.saveKept}>
+          {(keptSave.status === 'saved' || keptSave.status === 'failed') && (
+            <View style={styles.saveKeptStatus}>
+              <SymbolView
+                name={keptSave.status === 'saved' ? 'checkmark.circle.fill' : 'exclamationmark.triangle.fill'}
+                size={18}
+                tintColor={keptSave.status === 'saved' ? COLORS.keep : COLORS.skip}
+                accessibilityElementsHidden
+              />
+              <Text
+                testID="save-kept-status"
+                style={[
+                  styles.saveKeptStatusText,
+                  { color: keptSave.status === 'saved' ? colors.text : colors.removeText },
+                ]}
+              >
+                {keptSave.message}
               </Text>
-            </TouchableOpacity>
+            </View>
+          )}
+          {showSaveButton && (
+            <Button
+              title={saving ? 'Saving\u2026' : keptSave.status === 'failed' ? 'Retry' : SAVE_KEPT_TITLE}
+              testID="save-kept-playlist"
+              size="large"
+              variant="secondary"
+              disabled={saving || isStartingOver}
+              onPress={() => { void saveKept(); }}
+            />
           )}
         </View>
       )}
@@ -395,8 +408,8 @@ export default function DoneScreen() {
       {state.cursor > 0 && (
         <TouchableOpacity
           testID="done-change-decisions"
-          style={[styles.changeDecisions, startOverBlocked && { opacity: 0.4 }]}
-          disabled={startOverBlocked}
+          style={[styles.changeDecisions, decisionsBlocked && { opacity: 0.4 }]}
+          disabled={decisionsBlocked}
           onPress={() => setShowDecisions(true)}
           accessibilityRole="button"
           accessibilityHint="Lists this sift's decisions, to change any of them"
@@ -410,9 +423,8 @@ export default function DoneScreen() {
           title="Continue sifting"
           testID="done-continue"
           size="large"
-          // Not while a sifted-playlist save runs: the sift's fresh hook
-          // doesn't know the playlist yet and a keep would create another.
-          disabled={startOverBlocked}
+          // Not while a save runs: the sift would go on without its result.
+          disabled={startOverBlocked || saving}
           onPress={() => dispatch({ type: 'CONTINUE_SIFTING' })}
         />
       )}
@@ -422,16 +434,13 @@ export default function DoneScreen() {
           title={`Review ${state.skipped.length.toLocaleString('en-US')} skipped`}
           testID="done-review-skipped"
           size="large"
-          disabled={reviewSkippedBlocked}
+          disabled={startOverBlocked}
           onPress={reviewSkipped}
         />
       )}
 
-      {/* Disabled while a sifted-playlist save is in flight (the fallback
-          effect above or a manual Retry) or while a previous Start Over's
-          clears are still running: a concurrent clearSiftedPlaylist would
-          race the save on the same remote playlist, and the interleaving
-          can leave it neither fully cleared nor fully saved. */}
+      {/* Disabled while a Start Over is clearing the removal history, or a
+          restore is running (see startOverBlocked). */}
       <Button
         title="Start Over"
         testID="done-start-over"
@@ -440,74 +449,26 @@ export default function DoneScreen() {
         color={colors.removeText}
         disabled={startOverBlocked}
         onPress={() => {
-          if (state.source.type === 'playlist') {
-            const playlist = state.source.playlist;
-            // Destructive: this empties the just-built sifted playlist and
-            // clears the removal history for this source (all but the songs
-            // waiting in "Sift — Removed"). Confirm first.
-            Alert.alert(
-              'Start Over?',
-              playlistStartOverMessage(state.provider, playlist.name),
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Start Over',
-                  style: 'destructive',
-                  onPress: async () => {
-                    // Re-check through the ref: the fallback effect (or a
-                    // Retry) can start a save while this confirmation sits
-                    // open, and this closure's captured state predates it.
-                    // Bailing out keeps the clear from racing that save —
-                    // the user can press Start Over again once it settles.
-                    if (isCreatingPlaylistRef.current) return;
-                    // Only reset once both clears actually landed. Wiping the
-                    // local removal history (or the session) after a failed
-                    // remote clear would silently lose the state needed to
-                    // reconcile the still-populated sifted playlist.
-                    // Neither clear throws (both catch internally and report
-                    // via their boolean), so releasing the gate explicitly on
-                    // the failure paths is exhaustive.
-                    setStartOverError(null);
-                    setIsStartingOver(true);
-                    const playlistCleared = await clearSiftedPlaylist(playlist.name);
-                    if (!playlistCleared) {
-                      setStartOverError('Could not empty the sifted playlist. Check your connection and try again.');
-                      setIsStartingOver(false);
-                      return;
-                    }
-                    const historyCleared = await clearHistoryForSource(playlist.id);
-                    if (!historyCleared) {
-                      setStartOverError('Could not clear the removal history. Try again.');
-                      setIsStartingOver(false);
-                      return;
-                    }
-                    // Success: deliberately KEEP the gate up. resetToSetup's
-                    // RESET_TO_SETUP lands asynchronously (after clearSession
-                    // settles), and dropping the gate first would reopen the
-                    // fallback-save window for a keep that buffered during
-                    // the clear — the save would repopulate the playlist
-                    // that was just emptied. The reset wipes pendingKeeps and
-                    // retires this screen (phase leaves 'done'), taking the
-                    // gate with it.
-                    resetToSetup();
-                  },
-                },
-              ],
-            );
-          } else {
-            // Library: nothing remote is cleared, but the session and its
-            // decisions are, so ask first (#137).
-            const counts = decisionCounts(state);
-            if (counts.total === 0) {
-              resetToSetup();
+          // The session and its decisions are cleared, so ask first (#137).
+          // A playlist's Start Over asks even with none to lose, saying what
+          // it does and doesn't undo.
+          const counts = decisionCounts(state);
+          if (counts.total === 0) {
+            if (state.source.type !== 'playlist') {
+              void startOver();
               return;
             }
-            const copy = discardConfirmation(state.provider, state.source, counts, 'done', { unfinished: remaining > 0 });
-            Alert.alert(copy.title, copy.message, [
+            Alert.alert('Start Over?', playlistStartOverMessage(state.provider, state.source.playlist.name), [
               { text: 'Cancel', style: 'cancel' },
-              { text: copy.confirm, style: 'destructive', onPress: () => resetToSetup() },
+              { text: 'Start Over', style: 'destructive', onPress: () => { void startOver(); } },
             ]);
+            return;
           }
+          const copy = discardConfirmation(state.provider, state.source, counts, 'done', { unfinished: remaining > 0 });
+          Alert.alert(copy.title, copy.message, [
+            { text: 'Cancel', style: 'cancel' },
+            { text: copy.confirm, style: 'destructive', onPress: () => { void startOver(); } },
+          ]);
         }}
       />
     </View>
@@ -533,8 +494,7 @@ export default function DoneScreen() {
           decisionFor={decisionOf}
           onRevise={revise}
           onClose={() => setShowDecisions(false)}
-          // A playlist keep taken back while the save runs would still land.
-          disabled={startOverBlocked}
+          disabled={decisionsBlocked}
         />
       )}
     </View>
@@ -692,10 +652,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  errorSection: {
-    alignItems: 'center',
-    gap: 8,
-  },
   playlistError: {
     fontSize: 12,
     marginBottom: 8,
@@ -712,11 +668,6 @@ const styles = StyleSheet.create({
   restoreButtonText: {
     fontSize: 15,
     fontWeight: '600',
-  },
-  keptDestination: {
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: SPACING.base,
   },
   nothingRemoved: {
     fontSize: 15,
@@ -738,13 +689,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     marginTop: 20,
   },
-  siftedConfirmation: {
+  saveKept: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    gap: SPACING.lg,
+  },
+  saveKeptStatus: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: SPACING.md,
   },
-  siftedConfirmationText: {
+  saveKeptStatusText: {
+    flexShrink: 1,
     fontSize: 15,
     fontWeight: '600',
+    textAlign: 'center',
   },
 });

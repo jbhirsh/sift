@@ -5,7 +5,6 @@ import * as Sentry from '@sentry/react-native';
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
 import { resetRemovalRetries, useMusicProvider } from '../../src/hooks/useMusicProvider';
 import { forgetRemovals, logRemoval, removeFromHistory } from '../../src/services/RemovalHistoryStore';
-import { markReviewed } from '../../src/services/ReviewedLedgerStore';
 import type { MusicProvider, SiftSource, Track } from '../../src/types';
 
 // Removals and restores that overlap, a removal that failed, decisions from
@@ -392,60 +391,6 @@ describe('decisions from a saved session being discarded', () => {
     expect(sift.state.failedRemovalIds).toEqual(['a']);
   });
 
-  test('a library Keep is recorded in that library\'s ledger', async () => {
-    await renderSift(mix);
-    await act(async () => {
-      await api.keepFromSavedSession(trackA, { source: { type: 'library' }, provider: 'apple-music', siftedPlaylistId: null });
-    });
-    expect(markReviewed).toHaveBeenCalledWith(expect.stringContaining('library'), 'a');
-    expect(mockProvider.addToPlaylist).not.toHaveBeenCalled();
-  });
-
-  test('a playlist Keep lands in its sifted playlist, found by id', async () => {
-    await renderSift();
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'other', name: 'Mix - Sifted', trackCount: 0 },
-      { id: 'sp', name: 'Renamed', trackCount: 1 },
-    ]);
-    mockProvider.loadPlaylistTracks.mockResolvedValue([trackB]);
-    await act(async () => {
-      await api.keepFromSavedSession(trackA, { source: mix, provider: 'apple-music', siftedPlaylistId: 'sp' });
-    });
-    expect(mockProvider.loadPlaylistTracks).toHaveBeenCalledWith('sp');
-    expect(mockProvider.addToPlaylist).toHaveBeenCalledWith('sp', ['a']);
-    expect(sift.state.siftedPlaylistId).toBeNull();
-    expect(sift.state.pendingKeeps).toEqual([]);
-  });
-
-  test('else by name; one that already landed isn\'t added again', async () => {
-    await renderSift();
-    mockProvider.loadPlaylists.mockResolvedValue([{ id: 'sp', name: 'Mix - Sifted', trackCount: 1 }]);
-    mockProvider.loadPlaylistTracks.mockResolvedValue([trackA]);
-    await act(async () => {
-      await api.keepFromSavedSession(trackA, { source: mix, provider: 'apple-music', siftedPlaylistId: null });
-    });
-    expect(mockProvider.loadPlaylistTracks).toHaveBeenCalledWith('sp');
-    expect(mockProvider.addToPlaylist).not.toHaveBeenCalled();
-  });
-
-  test('with no sifted playlist yet, it makes one', async () => {
-    await renderSift();
-    await act(async () => {
-      await api.keepFromSavedSession(trackA, { source: mix, provider: 'apple-music', siftedPlaylistId: 'gone' });
-    });
-    expect(mockProvider.createPlaylist).toHaveBeenCalledWith('Mix - Sifted', ['a']);
-  });
-
-  test('a failure is reported, not buffered into the sift in state', async () => {
-    await renderSift(mix);
-    mockProvider.loadPlaylists.mockResolvedValue([{ id: 'sp', name: 'Mix - Sifted', trackCount: 0 }]);
-    mockProvider.addToPlaylist.mockRejectedValueOnce(new Error('offline'));
-    await act(async () => {
-      await api.keepFromSavedSession(trackA, { source: mix, provider: 'apple-music', siftedPlaylistId: null });
-    });
-    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'keep-saved-session' } });
-    expect(sift.state.pendingKeeps).toEqual([]);
-  });
 });
 
 describe('ensureAccess', () => {

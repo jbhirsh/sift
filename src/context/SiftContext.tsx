@@ -42,9 +42,6 @@ export interface SiftState {
   loadError: string | null;
   playbackPosition: number;
   isPlaying: boolean;
-  removalPlaylistCreated: boolean;
-  removalPlaylistError: string | null;
-  isCreatingPlaylist: boolean;
   removalErrors: string[];
   /**
    * Ids of the removed tracks whose removal failed. removalErrors holds
@@ -54,23 +51,10 @@ export interface SiftState {
   failedRemovalIds: string[];
   connectionStatus: ConnectionStatus;
   /**
-   * Kept tracks whose add to the sifted playlist could not land yet (e.g. the
-   * freshly-created playlist was not queryable within the retry window).
-   * Flushed via saveSiftedPlaylist on the Done screen — never silently
-   * dropped while the sift they belong to is alive. Only the deliberate
-   * session-abandonment exits (LOAD_TRACKS / START_FRESH / RESET_TO_SETUP)
-   * discard them, because they discard the whole kept list along with them.
+   * When true, the next loadTracks call skips the reviewed-ledger filter
+   * (and, for a playlist, the removal-history one).
    */
-  pendingKeeps: Track[];
-  /** When true, the next loadTracks call skips sifted/removal filtering. */
   skipFiltering: boolean;
-  /**
-   * Id of the "<name> - Sifted" companion playlist for the current playlist
-   * source, captured by keepTrack when it creates or first resolves the
-   * playlist. Lets later lookups resolve by id (rename-proof) instead of by
-   * name; null until known (and for legacy sessions that predate the field).
-   */
-  siftedPlaylistId: string | null;
   /**
    * "Start at chorus" setting: Apple Music tracks start at their chorus
    * instead of 0:00. A preference, not session state: persisted by
@@ -118,15 +102,10 @@ const initialState: SiftState = {
   loadError: null,
   playbackPosition: 0,
   isPlaying: false,
-  removalPlaylistCreated: false,
-  removalPlaylistError: null,
-  isCreatingPlaylist: false,
   removalErrors: [],
   failedRemovalIds: [],
   connectionStatus: 'unknown',
-  pendingKeeps: [],
   skipFiltering: false,
-  siftedPlaylistId: null,
   pending: null,
   startAtChorus: DEFAULT_PREFERENCES.startAtChorus,
   playbackFailedId: null,
@@ -152,15 +131,9 @@ type SiftAction =
   | { type: 'SET_PLAYBACK_POSITION'; position: number }
   | { type: 'SET_IS_PLAYING'; isPlaying: boolean }
   | { type: 'SET_CONNECTION_STATUS'; status: ConnectionStatus }
-  | { type: 'SET_PLAYLIST_CREATED'; created: boolean }
-  | { type: 'SET_PLAYLIST_ERROR'; error: string | null }
-  | { type: 'SET_CREATING_PLAYLIST'; creating: boolean }
   | { type: 'ADD_REMOVAL_ERROR'; error: string; failedRemovalId?: string }
   /** A failed removal landed on a retry (#151): it's no longer a failure. */
   | { type: 'CLEAR_REMOVAL_FAILURE'; trackId: string; error: string }
-  | { type: 'ADD_PENDING_KEEP'; track: Track }
-  | { type: 'REMOVE_PENDING_KEEPS'; trackIds: string[] }
-  | { type: 'SET_SIFTED_PLAYLIST_ID'; id: string | null }
   | { type: 'RESTORE_TRACK'; trackId: string }
   | { type: 'SET_SOURCE'; source: SiftSource }
   | { type: 'SET_START_AT_CHORUS'; enabled: boolean }
@@ -280,16 +253,7 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         skipped: [],
         removalErrors: [],
         failedRemovalIds: [],
-        // Intentional discard: loading a fresh track list abandons the
-        // previous sift wholesale (kept/removed/skipped included), so any
-        // still-buffered keeps from it are deliberately dropped with it.
-        // Mid-sift cleanup must use REMOVE_PENDING_KEEPS instead.
-        pendingKeeps: [],
         pending: null,
-        // The last sift's save status: a stale error would also stop Done's
-        // fallback save for this sift's keeps (Review N skipped, #142).
-        removalPlaylistCreated: false,
-        removalPlaylistError: null,
         phase: 'sifting',
         loadProgress: 1,
         activeSource: state.source,
@@ -334,8 +298,7 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
       const target = action.decision === 'keep' ? 'kept' : action.decision === 'remove' ? 'removed' : 'skipped';
       if (lists[target].length < state[target].length) return state;
       lists[target] = [...lists[target], track];
-      // A removal that failed is no longer owed once it isn't a removal,
-      // nor a buffered keep once it isn't a keep.
+      // A removal that failed is no longer owed once it isn't a removal.
       const wasFailed = state.failedRemovalIds.includes(track.id) && action.decision !== 'remove';
       const errorIndex = wasFailed ? state.removalErrors.indexOf(track.name) : -1;
       return {
@@ -346,21 +309,11 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         pending: state.pending?.trackId === track.id ? { ...state.pending, decision: action.decision } : state.pending,
         failedRemovalIds: wasFailed ? state.failedRemovalIds.filter((id) => id !== track.id) : state.failedRemovalIds,
         removalErrors: errorIndex < 0 ? state.removalErrors : state.removalErrors.filter((_, i) => i !== errorIndex),
-        pendingKeeps: action.decision === 'keep' ? state.pendingKeeps : without(state.pendingKeeps),
       };
     }
 
     case 'SONG_CACHE_WARMED':
       return { ...state, songCacheWarming: false, songCacheGeneration: state.songCacheGeneration + 1 };
-
-    case 'SET_PLAYLIST_CREATED':
-      return { ...state, removalPlaylistCreated: action.created };
-
-    case 'SET_PLAYLIST_ERROR':
-      return { ...state, removalPlaylistError: action.error };
-
-    case 'SET_CREATING_PLAYLIST':
-      return { ...state, isCreatingPlaylist: action.creating };
 
     case 'ADD_REMOVAL_ERROR':
       return {
@@ -384,27 +337,6 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
       };
     }
 
-    case 'ADD_PENDING_KEEP': {
-      if (state.pendingKeeps.some((t) => t.id === action.track.id)) return state;
-      return { ...state, pendingKeeps: [...state.pendingKeeps, action.track] };
-    }
-
-    case 'REMOVE_PENDING_KEEPS': {
-      // Remove exactly the tracks the caller persisted — never the whole
-      // array. A keep that gets buffered while a save is in flight must
-      // survive that save's cleanup so the Done fallback can fire again.
-      const ids = new Set(action.trackIds);
-      const remaining = state.pendingKeeps.filter((t) => !ids.has(t.id));
-      return remaining.length === state.pendingKeeps.length
-        ? state
-        : { ...state, pendingKeeps: remaining };
-    }
-
-    case 'SET_SIFTED_PLAYLIST_ID':
-      return state.siftedPlaylistId === action.id
-        ? state
-        : { ...state, siftedPlaylistId: action.id };
-
     case 'RESTORE_TRACK': {
       const track = state.removed.find((t) => t.id === action.trackId);
       if (!track) return state;
@@ -415,20 +347,8 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
       };
     }
 
-    case 'SET_SOURCE': {
-      // The sifted-playlist id is only meaningful for the playlist it was
-      // resolved for — switching to a different source must not let a stale
-      // id point id-first lookups at the wrong "<name> - Sifted" playlist.
-      const samePlaylist =
-        action.source.type === 'playlist' &&
-        state.source.type === 'playlist' &&
-        action.source.playlist.id === state.source.playlist.id;
-      return {
-        ...state,
-        source: action.source,
-        siftedPlaylistId: samePlaylist ? state.siftedPlaylistId : null,
-      };
-    }
+    case 'SET_SOURCE':
+      return { ...state, source: action.source };
 
     case 'SET_START_AT_CHORUS':
       return state.startAtChorus === action.enabled ? state : { ...state, startAtChorus: action.enabled };
@@ -457,13 +377,8 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         loadProgress: 0,
         loadError: null,
         loadMessage: state.source.type === 'playlist' ? 'Loading playlist…' : 'Loading library…',
-        removalPlaylistCreated: false,
-        removalPlaylistError: null,
         removalErrors: [],
         failedRemovalIds: [],
-        // Intentional discard — START_FRESH is a deliberate abandonment of
-        // the previous sift (its kept list included), not mid-sift cleanup.
-        pendingKeeps: [],
         pending: null,
         phase: 'loading',
         skipFiltering: action.skipFiltering ?? false,
@@ -471,7 +386,6 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         songCacheWarming: false,
         isPlaying: false,
         playbackPosition: 0,
-        isCreatingPlaylist: false,
       };
 
     case 'RESET_TO_SETUP':
@@ -486,20 +400,14 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         loadProgress: 0,
         loadError: null,
         loadMessage: '',
-        removalPlaylistCreated: false,
-        removalPlaylistError: null,
         removalErrors: [],
         failedRemovalIds: [],
-        // Intentional discard — RESET_TO_SETUP abandons the finished sift
-        // entirely; see the LOAD_TRACKS note above.
-        pendingKeeps: [],
         pending: null,
         phase: 'setup',
         skipFiltering: false,
         songCacheWarming: false,
         isPlaying: false,
         playbackPosition: 0,
-        isCreatingPlaylist: false,
       };
 
     default:
@@ -585,8 +493,7 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
   useEffect(() => {
     // Setup with tracks is a sift backed out of: still saved, so a held
     // decision sent on the way out (#152) isn't left on disk to come back.
-    // Only while Setup shows that sift's own source: picking another one
-    // changes the source and drops the sifted-playlist id in state.
+    // Only while Setup shows that sift's own source.
     const backedOut = state.phase === 'setup'
       && state.activeSource != null
       && sameSource(state.activeSource, state.source);
@@ -605,15 +512,10 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
       // The source these tracks came from: on Setup the picker can already
       // show another one.
       source: state.activeSource ?? state.source,
-      // Persisted so the never-silently-dropped guarantee survives an app
-      // kill/relaunch: without these, a resumed session forgets the repair
-      // signal and Done's fallback save never fires.
-      pendingKeeps: state.pendingKeeps,
+      // Persisted so a resumed session still shows its failed removals and
+      // retries them.
       removalErrors: state.removalErrors,
       failedRemovalIds: state.failedRemovalIds,
-      // Persisted so a resumed session keeps resolving its sifted playlist
-      // by id (rename-proof) instead of falling back to the name match.
-      siftedPlaylistId: state.siftedPlaylistId,
       // Persisted before it is sent, so a crash in the undo window still
       // sends it on resume (#152).
       pending: state.pending,
@@ -629,7 +531,7 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [state.cursor, state.kept, state.removed, state.skipped, state.tracks, state.phase, state.sortOrder, state.provider, state.source, state.activeSource, state.pendingKeeps, state.removalErrors, state.failedRemovalIds, state.siftedPlaylistId, state.pending]);
+  }, [state.cursor, state.kept, state.removed, state.skipped, state.tracks, state.phase, state.sortOrder, state.provider, state.source, state.activeSource, state.removalErrors, state.failedRemovalIds, state.pending]);
 
   // Flush a debounced session write immediately (see SiftContextValue docs).
   const flushPendingSave = useCallback(() => {

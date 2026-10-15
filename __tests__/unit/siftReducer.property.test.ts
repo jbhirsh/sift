@@ -22,8 +22,6 @@ const action = fc.oneof(
   fc.constantFrom('least-played', 'most-played', 'oldest', 'newest').map((sortOrder) => ({ type: 'SET_SORT_ORDER' as const, sortOrder })),
   trackList.map((tracks) => ({ type: 'LOAD_TRACKS' as const, tracks })),
   fc.integer({ min: 0, max: 40 }).map((i) => ({ type: 'RESTORE_TRACK' as const, trackId: `t${i}` })),
-  fc.integer({ min: 0, max: 40 }).map((i) => ({ type: 'ADD_PENDING_KEEP' as const, track: track(i) })),
-  fc.array(fc.integer({ min: 0, max: 40 })).map((ids) => ({ type: 'REMOVE_PENDING_KEEPS' as const, trackIds: ids.map((i) => `t${i}`) })),
   fc.integer({ min: 0, max: 40 }).map((i) => ({ type: 'ADD_REMOVAL_ERROR' as const, error: `Track ${i}`, failedRemovalId: `t${i}` })),
   fc.constant({ type: 'UNDO_LAST' as const }),
   fc.tuple(fc.integer({ min: 0, max: 40 }), fc.constantFrom('keep', 'remove', 'skip')).map(([i, decision]) => ({ type: 'REVISE' as const, trackId: `t${i}`, decision })),
@@ -36,9 +34,8 @@ const start = (tracks: Track[]): SiftState => ({
   phase: 'sifting', provider: 'apple-music', source: { type: 'library' }, activeSource: { type: 'library' },
   tracks, cursor: 0, kept: [], removed: [], skipped: [], sortOrder: 'least-played',
   loadProgress: 1, loadMessage: '', loadError: null, playbackPosition: 0, isPlaying: false,
-  removalPlaylistCreated: false, removalPlaylistError: null, isCreatingPlaylist: false,
-  removalErrors: [], failedRemovalIds: [], connectionStatus: 'connected', pendingKeeps: [],
-  skipFiltering: false, siftedPlaylistId: null, startAtChorus: false, pending: null,
+  removalErrors: [], failedRemovalIds: [], connectionStatus: 'connected',
+  skipFiltering: false, startAtChorus: false, pending: null,
   playbackFailedId: null, songCacheWarming: false, songCacheGeneration: 0,
   filter: { maxPlays: null, addedYearsAgo: null },
 });
@@ -55,8 +52,6 @@ function checkInvariants(state: SiftState) {
   expect(new Set(decided).size).toBe(decided.length);
   expect(decided.length).toBe(state.cursor);
   expect(new Set(decided)).toEqual(new Set(ids(state.tracks.slice(0, state.cursor))));
-  // A buffered keep is listed once.
-  expect(new Set(ids(state.pendingKeeps)).size).toBe(state.pendingKeeps.length);
   // A held decision is the latest decided card's (#152).
   if (state.pending) {
     expect(state.cursor).toBeGreaterThan(0);

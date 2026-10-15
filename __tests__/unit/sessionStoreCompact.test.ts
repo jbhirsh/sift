@@ -32,7 +32,7 @@ const sessionOf = (tracks: Track[], cursor: number): SiftSession => ({
   removed: tracks.slice(0, cursor).filter((_, i) => i % 3 === 1),
   skipped: tracks.slice(0, cursor).filter((_, i) => i % 3 === 2),
   sortOrder: 'least-played', savedAt: '2026-10-10T00:00:00.000Z', provider: 'apple-music', source: { type: 'library' },
-  pendingKeeps: [], removalErrors: [], failedRemovalIds: [], siftedPlaylistId: null,
+  removalErrors: [], failedRemovalIds: [],
 });
 const keysWritten = () => setItem.mock.calls.map(([key]) => key as string);
 
