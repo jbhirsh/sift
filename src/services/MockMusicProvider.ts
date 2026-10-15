@@ -116,7 +116,9 @@ const MOCK_PLAYLIST_TRACK_INDICES: Record<string, number[]> = {
   // A pre-seeded "Road Trip - Sifted" (two of Road Trip's three songs), so
   // Done's "Save kept songs as a playlist" can add to an existing playlist
   // in E2E (the mock is stateless, so playlists created at runtime never
-  // show up in loadPlaylists), and Setup's picker has one to hide.
+  // show up in loadPlaylists), and Setup's picker has one to hide. Like one
+  // an older build left, the first look at Road Trip remembers those two as
+  // kept (services/SiftedImport).
   'playlist-4': [3, 6],
 };
 

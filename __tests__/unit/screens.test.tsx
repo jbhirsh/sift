@@ -80,6 +80,8 @@ import LoadingScreen from '../../src/screens/LoadingScreen';
 import DoneScreen from '../../src/screens/DoneScreen';
 import SettingsScreen from '../../src/screens/SettingsScreen';
 import PlaylistPicker from '../../src/components/PlaylistPicker';
+import { loadReviewedIds, unmarkReviewed } from '../../src/services/ReviewedLedgerStore';
+import { useMusicProvider } from '../../src/hooks/useMusicProvider';
 
 describe('SetupScreen', () => {
   // Start Sifting and Start Over read the saved session from disk before
@@ -1133,6 +1135,33 @@ describe('SetupScreen: songs sifted before (#143)', () => {
     expect(getByTestId('probe-skip').props.children).toBe('loading:true');
   });
 
+  test('a playlist counts the songs an older build saved to its "- Sifted"', async () => {
+    // Matched by song: "- Sifted" files each one under a new id.
+    mockProvider.loadPlaylists.mockResolvedValue([
+      { id: 'p1', name: 'My Playlist', trackCount: 3 },
+      { id: 's1', name: 'My Playlist - Sifted', trackCount: 2 },
+    ]);
+    mockProvider.loadPlaylistTracks.mockImplementation(async (id: string) =>
+      (id === 's1' ? [{ ...mockTrackA, id: 'i.1' }, { ...mockTrackB, id: 'i.2' }] : [mockTrackA, mockTrackB, mockTrackC]));
+    try {
+      const { getByTestId, queryByTestId } = await renderWithProviders(<SetupScreen />);
+      await act(async () => {});
+      expect(queryByTestId('include-sifted-switch')).toBeNull();
+      await act(async () => {
+        await fireEvent.press(getByTestId('source-playlist'));
+      });
+      await act(async () => {
+        await fireEvent.press(getByTestId('playlist-row-p1'));
+      });
+      await act(async () => {});
+      expect(getByTestId('reviewed-note').props.children).toBe('2 songs you’ve already kept are left out of new sifts.');
+      expect(getByTestId('include-sifted-switch')).toBeTruthy();
+    } finally {
+      mockProvider.loadPlaylists.mockResolvedValue([]);
+      mockProvider.loadPlaylistTracks.mockReset().mockResolvedValue([]);
+    }
+  });
+
   test('a playlist shows its own kept songs, and the switch brings them back for it', async () => {
     await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({
       'apple-music:library': ['x'],
@@ -1246,6 +1275,8 @@ describe('SetupScreen: Start Over and songs sifted before (#143)', () => {
     });
     mockProvider.loadPlaylists.mockClear();
     await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({ 'apple-music:playlist:p1': ['x'] }));
+    // Its "- Sifted" was looked for once already (services/SiftedImport).
+    await AsyncStorage.setItem('sift_sifted_imported', JSON.stringify(['apple-music:playlist:p1']));
     const { getByTestId } = await renderWithProviders(<BackedOut playlist />);
     await act(async () => {});
     if (on) {
@@ -1770,6 +1801,72 @@ describe('DoneScreen: Finish, Continue, Review skipped (#142)', () => {
     expect(restore.props.accessibilityLabel).toBe(`Restore ${mockTrackA.name}`);
   });
 
+  // A ledger with nothing an earlier test wrote: let its writes land, then clear.
+  async function emptyLedger() {
+    await unmarkReviewed('settle', 'nothing');
+    await require('@react-native-async-storage/async-storage').default.clear();
+  }
+
+  test('a song restored here counts as kept, and later sifts leave it out like one', async () => {
+    await emptyLedger();
+    const { getByTestId } = await renderWithProviders(
+      <DoneAfter decisions={['remove', 'skip', 'skip']} />,
+      { initialTracks: tracks },
+    );
+    await act(async () => {});
+    await act(async () => {
+      await fireEvent.press(getByTestId(`restore-track-${mockTrackA.id}`));
+    });
+    await expect(loadReviewedIds('apple-music:library')).resolves.toEqual(new Set([mockTrackA.id]));
+  });
+
+  test('Restore does nothing while the decisions list is already restoring that song', async () => {
+    // A Remove changed to Skip in the list restores the song first; a Restore
+    // pressed meanwhile must not record it as kept over that change.
+    await emptyLedger();
+    let finish: ((out: number) => void) | undefined;
+    mockProvider.restoreRemoved.mockImplementationOnce(() => new Promise<number>((resolve) => { finish = resolve; }));
+    let restore: ((track: typeof mockTrackA) => Promise<boolean>) | undefined;
+    function Grab() {
+      restore = useMusicProvider().restoreTrack;
+      return null;
+    }
+    const { getByTestId } = await renderWithProviders(
+      <><DoneAfter decisions={['remove', 'skip', 'skip']} /><Grab /></>,
+      { initialTracks: tracks },
+    );
+    await act(async () => {});
+    const callsBefore = mockProvider.restoreRemoved.mock.calls.length;
+    let running: Promise<boolean> | undefined;
+    await act(async () => {
+      running = restore?.(mockTrackA);
+    });
+    await act(async () => {
+      await fireEvent.press(getByTestId(`restore-track-${mockTrackA.id}`));
+    });
+    await act(async () => {
+      finish?.(1);
+      await running;
+    });
+    expect(mockProvider.restoreRemoved.mock.calls.length - callsBefore).toBe(1);
+    await expect(loadReviewedIds('apple-music:library')).resolves.toEqual(new Set());
+  });
+
+  test('a Restore that fails remembers nothing', async () => {
+    await emptyLedger();
+    mockProvider.restoreRemoved.mockRejectedValueOnce(new Error('offline'));
+    const { getByTestId } = await renderWithProviders(
+      <DoneAfter decisions={['remove', 'skip', 'skip']} />,
+      { initialTracks: tracks },
+    );
+    await act(async () => {});
+    await act(async () => {
+      await fireEvent.press(getByTestId(`restore-track-${mockTrackA.id}`));
+    });
+    expect(getByTestId(`restore-track-${mockTrackA.id}`)).toBeTruthy();
+    await expect(loadReviewedIds('apple-music:library')).resolves.toEqual(new Set());
+  });
+
   test('with nothing removed, Done points at the next thing to do', async () => {
     const { getByTestId } = await renderWithProviders(
       <DoneAfter decisions={['keep']} />,
@@ -1782,7 +1879,6 @@ describe('DoneScreen: Finish, Continue, Review skipped (#142)', () => {
 
 describe('DoneScreen: Save kept songs as a playlist', () => {
   const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-  const { unmarkReviewed } = require('../../src/services/ReviewedLedgerStore');
   const { resetKeptSaves } = require('../../src/hooks/useMusicProvider');
   const tracks = [mockTrackA, mockTrackB, mockTrackC];
   const mix = { type: 'playlist' as const, playlist: { id: 'p1', name: 'Mix', trackCount: 3 } };

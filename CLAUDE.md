@@ -125,7 +125,8 @@ src/
                         resumeSession (a saved session's defaults)
     services/           MusicProviderInterface, AppleMusicProvider, MockMusicProvider,
                         SessionStore, RemovalHistoryStore, PreferencesStore,
-                        ReviewedLedgerStore, haptics, trace (E2E trace),
+                        ReviewedLedgerStore, SiftedImport, haptics,
+                        trace (E2E trace),
                         ChorusFinder + LrclibClient ("Start at chorus")
     hooks/              useMusicProvider, usePendingDecision (Undo),
                         useReviseDecision, useRemovalRetry,
@@ -182,7 +183,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
   has kept songs, passes `skipFiltering` (for Start Sifting and Start Over)
   to bring them back; removed songs stay out either way (see "Remove
   collects"). Skipped songs aren't recorded. A sent keep changed in the
-  decisions list leaves the ledger (`unmarkReviewed`).
+  decisions list leaves the ledger (`unmarkReviewed`). A song restored on
+  Done counts as kept, so it's recorded as one too.
 - **Saving kept songs** (playlist sifts, Done only): Done's "Save kept songs
   as a playlist" (`save-kept-playlist`, `useMusicProvider.saveKeptPlaylist`)
   copies every song the ledger remembers for that playlist, from every sift
@@ -203,16 +205,23 @@ Makefile                Dev commands (test, lint, typecheck, check)
   at a time, launch-wide. Done shows Saving… (Continue sifting and the
   decisions list wait), then what was saved, or the error with the button
   turned into Retry. Nothing fills "- Sifted" on a Keep any more, and
-  Setup's picker hides "- Sifted" playlists (outputs, not sources). A session saved
-  before this (with `pendingKeeps`/`siftedPlaylistId`) still loads: its
-  keeps that never reached "- Sifted" go to the ledger and both fields are
-  dropped (`SessionStore`).
+  Setup's picker hides "- Sifted" playlists (outputs, not sources). Keeps
+  from the builds that filled it come over once: the first time a playlist
+  is picked or loaded, the songs of it found (by song) in its
+  "<name> - Sifted" go to the ledger, and `sift_sifted_imported` records
+  that it was looked at (`services/SiftedImport`; a failed look is tried
+  again next time). A session saved by those builds (with
+  `pendingKeeps`/`siftedPlaylistId`) still loads: its sent keeps and the
+  ones that never reached "- Sifted" go to the ledger (not a keep still
+  held for Undo) and both fields are dropped (`SessionStore`).
 - **Undo** (#152): the latest decision is held in `state.pending` (persisted
   with the session) and reaches the music service only after a 5 s undo
   window, on the next decision, or when the Sift screen goes away or the app
   goes to the background (`hooks/usePendingDecision`). `UNDO_LAST` takes it
   back while it's held. Nothing calls `removeTrack`/`keepTrack` for a
   decision directly: send through `useSendPending`, which sends each once.
+  (Done's Restore is not a decision: once the song is restored it records
+  it with `keepTrack`.)
   A decision a killed app was holding goes out on Resume, or, if a new sift
   replaces that session, through `useSendSavedPending` first.
 - **One decision at a time** (`utils/decisionGuard`): every way to decide

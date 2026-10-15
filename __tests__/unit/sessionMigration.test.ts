@@ -69,6 +69,12 @@ describe('saved sessions from every build (#61)', () => {
     expectNoGoneFields(state);
   });
 
+  test('a playlist session from before the "- Sifted" fields: its keeps are remembered too', async () => {
+    // Every session stored in the pre-compact shape predates remembered keeps.
+    await resumeFrom(v2);
+    await expect(loadReviewedIds(ROAD_TRIP)).resolves.toEqual(new Set(['a']));
+  });
+
   test('failed removals saved by name get their ids back', async () => {
     const state = await resumeFrom(v3);
     expect(state.removalErrors).toEqual(['Stay']);
@@ -117,6 +123,27 @@ describe('saved sessions from every build (#61)', () => {
     if (!saved) throw new Error('fixture did not load');
     expectNoGoneFields(saved);
     expectNoGoneFields(resumeState(saved, { provider: 'apple-music', connectionStatus: 'connected' }));
+    await expect(loadReviewedIds(ROAD_TRIP)).resolves.toEqual(new Set(['a']));
+  });
+
+  test('an old playlist session: the keeps it sent to "- Sifted" are remembered, not the one held for Undo', async () => {
+    // Its build copied each sent keep into "Road Trip - Sifted" and recorded
+    // none: they go to the ledger, where a keep goes now. The held keep (c)
+    // isn't sent yet: Resume sends it, or Undo takes it back.
+    const legacy = {
+      ...v6State,
+      source: { type: 'playlist', playlist: { id: 'p1', name: 'Road Trip', trackCount: 4 } },
+      keptIds: ['a', 'c'],
+      skippedIds: [],
+      pending: { trackId: 'c', decision: 'keep', at: 1760097600000 },
+      pendingKeeps: [],
+      siftedPlaylistId: 'sifted-1',
+    };
+    await AsyncStorage.setItem('sift_session_v2', JSON.stringify(legacy));
+    await AsyncStorage.setItem('sift_session_v2_tracks_b', JSON.stringify(v5Tracks));
+    const saved = await loadSession();
+    if (!saved) throw new Error('fixture did not load');
+    expect(saved.kept.map((t) => t.id)).toEqual(['a', 'c']);
     await expect(loadReviewedIds(ROAD_TRIP)).resolves.toEqual(new Set(['a']));
   });
 

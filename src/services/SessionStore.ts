@@ -9,6 +9,7 @@ import {
   isStoredTracks,
   legacyPendingKeeps,
   migrateLegacySession,
+  savedBeforeKeepsRemembered,
 } from '../utils/validators';
 import { markReviewed } from './ReviewedLedgerStore';
 
@@ -109,7 +110,7 @@ async function loadQueued(): Promise<SiftSession | null> {
       if (!session || !isSiftSession(session)) throw new Error('Saved session does not match its track list');
       storedTracks = { tracks: session.tracks, version: stored.version, slot: compact.tracksSlot };
       committedSlot = compact.tracksSlot;
-      rememberLegacyKeeps(session, legacyPendingKeeps(compact));
+      rememberLegacyKeeps(session, compact);
       return session;
     } catch (err) {
       await setAside(JSON.stringify({ state: stateJson, tracks: tracksJson }), [STATE_KEY, ...ALL_TRACKS_KEYS]);
@@ -122,18 +123,22 @@ async function loadQueued(): Promise<SiftSession | null> {
 }
 
 /**
- * A playlist session saved before playlist keeps were remembered can hold
- * keeps that never reached "<name> - Sifted" (its pendingKeeps). Nothing
- * fills that playlist on a Keep any more, so record them in the reviewed
- * ledger, where a keep goes now: later sifts leave them out and Done's
- * "Save kept songs" includes them. Whether the session is then resumed or
- * discarded, they aren't lost. Repeats harmlessly until the session's next
- * save, which no longer writes the field.
+ * A playlist session saved before playlist keeps were remembered holds keeps
+ * the reviewed ledger doesn't have: the ones it sent to "<name> - Sifted",
+ * and any still waiting to go there (its pendingKeeps). Nothing fills that
+ * playlist on a Keep any more, so record them in the ledger, where a keep
+ * goes now: later sifts leave them out and Done's "Save kept songs"
+ * includes them. Whether the session is then resumed or discarded, they
+ * aren't lost. Repeats harmlessly until the session's next save, which no
+ * longer writes those fields.
  */
-function rememberLegacyKeeps(session: SiftSession, keeps: Track[]): void {
-  if (keeps.length === 0 || session.source?.type !== 'playlist') return;
+function rememberLegacyKeeps(session: SiftSession, stored: unknown, legacy = savedBeforeKeepsRemembered(stored)): void {
+  if (session.source?.type !== 'playlist' || !legacy) return;
   const key = ledgerKey(session.provider ?? 'apple-music', session.source);
-  for (const track of keeps) void markReviewed(key, track.id);
+  // A keep still held for Undo isn't sent: Resume sends it, or Undo takes it back.
+  const held = session.pending?.trackId;
+  const sent = session.kept.filter((track) => track.id !== held);
+  for (const track of [...legacyPendingKeeps(stored), ...sent]) void markReviewed(key, track.id);
 }
 
 /** The slot a stored record names, or null when it can't be read. */
@@ -164,7 +169,8 @@ async function loadLegacySession(): Promise<SiftSession | null> {
       // Fields this build no longer has stay behind.
       const { pendingKeeps: _pendingKeeps, siftedPlaylistId: _siftedPlaylistId, ...session } =
         parsed as SiftSession & { pendingKeeps?: unknown; siftedPlaylistId?: unknown };
-      rememberLegacyKeeps(session, legacyPendingKeeps(parsed));
+      // Every session saved in this shape predates remembered keeps.
+      rememberLegacyKeeps(session, parsed, true);
       return session;
     }
     throw new Error('Saved session has an unexpected shape');

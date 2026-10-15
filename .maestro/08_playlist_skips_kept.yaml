@@ -4,8 +4,8 @@ name: "Playlist Sift Skips Kept Songs"
 
 # A playlist Keep is remembered for that playlist, as a library keep is
 # (#143): the next sift of it leaves the song out, and Setup says so beside
-# the switch that brings it back. No "- Sifted" playlist is involved: the
-# mock's "Road Trip - Sifted" exists, and the button stays Start Sifting.
+# the switch that brings it back. Workout Mix has no "- Sifted" playlist, so
+# nothing is remembered from before (flow 09 covers one that has).
 - launchApp:
     clearState: true
 
@@ -24,9 +24,9 @@ name: "Playlist Sift Skips Kept Songs"
       id: "playlist-picker-modal"
     timeout: 30000
 
-# Road Trip (3 songs).
+# Workout Mix (4 songs).
 - tapOn:
-    id: "playlist-row-playlist-3"
+    id: "playlist-row-playlist-2"
 
 # The picker modal slides out — wait for it to leave, don't assert instantly.
 - extendedWaitUntil:
@@ -47,7 +47,7 @@ name: "Playlist Sift Skips Kept Songs"
 
 - assertVisible:
     id: "remaining-count"
-    text: "3 left"
+    text: "4 left"
 
 - tapOn: "Keep"
 - waitForAnimationToEnd
@@ -68,7 +68,7 @@ name: "Playlist Sift Skips Kept Songs"
     timeout: 30000
 - tapOn: "Discard and Start Over"
 
-# Back on Setup, still on Road Trip, with the kept song left out.
+# Back on Setup, still on Workout Mix, with the kept song left out.
 - extendedWaitUntil:
     visible:
       id: "reviewed-note"
@@ -87,4 +87,4 @@ name: "Playlist Sift Skips Kept Songs"
 
 - assertVisible:
     id: "remaining-count"
-    text: "2 left"
+    text: "3 left"

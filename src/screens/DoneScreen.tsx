@@ -58,7 +58,7 @@ export default function DoneScreen() {
   const { state, dispatch, resetToSetup } = useSift();
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
-  const { restoreTrack, saveKeptPlaylist } = useMusicProvider();
+  const { restoreTrack, restoreUnderWay, keepTrack, saveKeptPlaylist } = useMusicProvider();
   // A decision still held back (a session resumed straight to Done, #152)
   // has nothing left to undo it here: send it.
   const sendPending = useSendPending();
@@ -155,15 +155,21 @@ export default function DoneScreen() {
 
   const handleRestore = useCallback(
     async (track: Track) => {
+      // Already being restored from the decisions list, as part of a change
+      // to another decision: recording it as kept here would undo that.
+      if (restoreUnderWay(track.id)) return;
       setRestoringIds((prev) => new Set(prev).add(track.id));
-      await restoreTrack(track);
+      // A restored song counts as kept (RESTORE_TRACK), so it's remembered
+      // as one too: later sifts leave it out, and a playlist's saved keeps
+      // include it.
+      if (await restoreTrack(track)) await keepTrack(track);
       setRestoringIds((prev) => {
         const next = new Set(prev);
         next.delete(track.id);
         return next;
       });
     },
-    [restoreTrack],
+    [restoreTrack, restoreUnderWay, keepTrack],
   );
 
   const renderTrackRow = useCallback(

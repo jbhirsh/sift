@@ -12,6 +12,7 @@ import { AddShortfallError, batches } from '../utils/musicKit';
 import { keptSaveRetryable, siftedPlaylistName } from '../utils/sessionCopy';
 import { isFiltering, matchesFilter } from '../utils/trackFilter';
 import { loadReviewedIds, markReviewed, unmarkReviewed } from '../services/ReviewedLedgerStore';
+import { importSiftedKeeps } from '../services/SiftedImport';
 import type { MusicProvider, Playlist, SiftSource, Track } from '../types';
 
 const SKIP_SECONDS = 15;
@@ -313,6 +314,9 @@ export function useMusicProvider() {
         if (!result) throw new Error('This provider does not support playlist loading');
         tracks = result;
         unfilteredCount = tracks.length;
+        // Keeps an older build saved to "<name> - Sifted", into the ledger
+        // first (once per playlist), so the filter below counts them.
+        await importSiftedKeeps(providerRef.current, state.provider, source, result);
 
         if (shouldFilter) {
           // Leave out songs kept in earlier sifts of this playlist, as a
@@ -584,8 +588,9 @@ export function useMusicProvider() {
           } else {
             await service.addToLibrary?.([track.id]);
           }
-          // Purge the removal-history record so the restored track is offered
-          // again on the next sift of this source instead of being filtered out.
+          // Purge the removal-history record so the restored track is no
+          // longer filtered out as removed (a Restore on Done then records
+          // it as kept, which the ledger filter decides).
           await removeFromHistory(track.id, source);
         }
         // Nothing left to retry: the song is back where it was.
@@ -603,6 +608,9 @@ export function useMusicProvider() {
     },
     [providerRef, dispatch, state.source, state.provider],
   );
+
+  /** Whether a restore of this song is running (from Done or the decisions list). */
+  const restoreUnderWay = useCallback((trackId: string): boolean => restoresInFlight.has(trackId), []);
 
   const restoreTrack = useCallback(
     (track: Track): Promise<boolean> => {
@@ -734,6 +742,16 @@ export function useMusicProvider() {
     [state.provider, state.activeSource, state.source],
   );
 
+  /**
+   * Setup's count of a playlist's remembered keeps, before a sift loads it:
+   * includes the ones an older build saved to "<name> - Sifted"
+   * (services/SiftedImport). Never rejects.
+   */
+  const rememberSiftedKeeps = useCallback(
+    (source: SiftSource): Promise<void> => importSiftedKeeps(providerRef.current, state.provider, source),
+    [providerRef, state.provider],
+  );
+
   const warmCache = useCallback(async (trackIDs: string[], playlistID?: string): Promise<void> => {
     try {
       const isAuth = await providerRef.current.isAuthorized();
@@ -772,11 +790,13 @@ export function useMusicProvider() {
     skipForward,
     skipBackward,
     saveKeptPlaylist,
+    rememberSiftedKeeps,
     keepTrack,
     unkeepTrack,
     removeTrack,
     retryFailedRemovals,
     restoreTrack,
+    restoreUnderWay,
     warmCache,
     previewOffset,
   };

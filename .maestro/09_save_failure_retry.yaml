@@ -50,6 +50,22 @@ name: "Save Failure Shows Retry, Retry Recovers"
       id: "playlist-picker-modal"
     timeout: 30000
 
+# An older build saved drivers license and Peaches to "Road Trip - Sifted":
+# the first look at Road Trip remembers them as kept, so a sift would leave
+# them out. The switch brings them back, for a sift of all three.
+- extendedWaitUntil:
+    visible:
+      id: "reviewed-note"
+      text: "2 songs you’ve already kept are left out of new sifts\\."
+    timeout: 30000
+- tapOn:
+    id: "include-sifted-switch"
+- extendedWaitUntil:
+    visible:
+      id: "reviewed-note"
+      text: "Songs you’ve already kept are included in new sifts\\..*"
+    timeout: 10000
+
 # Most Played first, so the song missing from "Road Trip - Sifted" (Kiss Me
 # More, 56 plays) is the first card. Let the native sheet finish sliding in
 # before tapping (see 10_sort_picker.yaml).

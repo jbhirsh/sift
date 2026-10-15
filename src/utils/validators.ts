@@ -179,6 +179,15 @@ export function legacyPendingKeeps(value: unknown): Track[] {
   return value.pendingKeeps.filter(isTrack);
 }
 
+/**
+ * Whether a session was saved by a build that copied playlist keeps into
+ * "<name> - Sifted" rather than remembering them (it carries that build's
+ * pendingKeeps or siftedPlaylistId).
+ */
+export function savedBeforeKeepsRemembered(value: unknown): boolean {
+  return isObject(value) && ('pendingKeeps' in value || 'siftedPlaylistId' in value);
+}
+
 /** A stored compact session (#150), before it is joined to its track list. */
 export function isCompactSession(value: unknown): value is CompactSession {
   return (
