@@ -6,6 +6,7 @@ import { useSift } from '../../src/context/SiftContext';
 import { renderWithProviders } from '../helpers/renderWithProviders';
 import { a11yViolations } from '../helpers/a11yScan';
 import DoneScreen from '../../src/screens/DoneScreen';
+import { loadReviewedIds } from '../../src/services/ReviewedLedgerStore';
 import { PendingDecision, Track } from '../../src/types';
 
 // The latest decision is held back for the undo window and sent after it,
@@ -196,9 +197,10 @@ describe('held-back decisions and Undo (#152)', () => {
     expect(removeSpy).toHaveBeenCalledWith(['a']);
   });
 
-  test('a held playlist keep resumed into Done goes to the fallback save: one "- Sifted" playlist', async () => {
+  test('a held playlist keep resumed into Done is remembered for that playlist; nothing is written to Music', async () => {
     const { MockMusicProvider } = jest.requireActual('../../src/services/MockMusicProvider');
     const createSpy = jest.spyOn(MockMusicProvider.prototype, 'createPlaylist');
+    const addSpy = jest.spyOn(MockMusicProvider.prototype, 'addToPlaylist');
     function ResumedKeep() {
       const { dispatch, state } = useSift();
       const ran = React.useRef(false);
@@ -216,8 +218,12 @@ describe('held-back decisions and Undo (#152)', () => {
     const { getByTestId } = await renderWithProviders(<ResumedKeep />, { initialTracks: tracks });
     await advance(5000);
     expect(getByTestId('held').props.children).toBe('null');
-    expect(createSpy.mock.calls.length).toBeLessThanOrEqual(1);
+    // Only the held keep is sent (the first was sent before the "kill").
+    await expect(loadReviewedIds('apple-music:playlist:p1')).resolves.toEqual(new Set(['b']));
+    expect(createSpy).not.toHaveBeenCalled();
+    expect(addSpy).not.toHaveBeenCalled();
     createSpy.mockRestore();
+    addSpy.mockRestore();
   });
 
   test('the last card is sent before Done shows, from the Sift screen', async () => {

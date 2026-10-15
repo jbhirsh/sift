@@ -89,10 +89,22 @@ describe('MockMusicProvider', () => {
     expect(state.position).toBe(0);
   });
 
-  test('createPlaylist resolves without error', async () => {
-    await expect(
-      flushAsync(provider.createPlaylist('Test Playlist', ['track-1', 'track-2']))
-    ).resolves.toBeUndefined();
+  test('createPlaylist resolves to a new playlist id each time, which findPlaylists then lists', async () => {
+    const first = await flushAsync(provider.createPlaylist('Test Playlist'));
+    const second = await flushAsync(provider.createPlaylist('Test Playlist'));
+    expect(first).toMatch(/^mock-created-\d+$/);
+    expect(second).toMatch(/^mock-created-\d+$/);
+    expect(second).not.toBe(first);
+    await expect(flushAsync(provider.findPlaylists('Test Playlist'))).resolves.toEqual([first, second]);
+    // Like the stateless library listing, loadPlaylists never shows them.
+    const listed = await flushAsync(provider.loadPlaylists());
+    expect(listed.map((p) => p.id)).not.toContain(first);
+  });
+
+  test('findPlaylists lists the seeded playlists by exact name', async () => {
+    await expect(flushAsync(provider.findPlaylists('Road Trip - Sifted'))).resolves.toEqual(['playlist-4']);
+    await expect(flushAsync(provider.findPlaylists('Road Trip'))).resolves.toEqual(['playlist-3']);
+    await expect(flushAsync(provider.findPlaylists('Nope - Sifted'))).resolves.toEqual([]);
   });
 
   test('pause preserves playback position', async () => {
@@ -170,7 +182,7 @@ describe('MockMusicProvider', () => {
     expect(tracks).toEqual([]);
   });
 
-  test('seeds an already-sifted companion playlist for the re-sift E2E flow', async () => {
+  test('seeds a "Road Trip - Sifted" for the Save-to-an-existing-playlist E2E flow', async () => {
     const playlists = await flushAsync(provider.loadPlaylists());
     const roadTrip = playlists.find((p) => p.name === 'Road Trip');
     const sifted = playlists.find((p) => p.name === 'Road Trip - Sifted');
@@ -178,8 +190,8 @@ describe('MockMusicProvider', () => {
       throw new Error('Road Trip and Road Trip - Sifted must both be seeded');
     }
 
-    // The companion's tracks must be a subset of the source playlist so the
-    // sifted-filtering path stays coherent.
+    // Its tracks must be some of Road Trip's, so a save of Road Trip's
+    // keeps has some already there and some to add.
     const sourceTracks = await flushAsync(provider.loadPlaylistTracks(roadTrip.id));
     const siftedTracks = await flushAsync(provider.loadPlaylistTracks(sifted.id));
     expect(siftedTracks.length).toBeGreaterThan(0);
@@ -260,14 +272,14 @@ describe('MockMusicProvider', () => {
 
   test('createPlaylist stays pending until its simulated delay elapses', async () => {
     const settle = jest.fn();
-    const promise = provider.createPlaylist('New Mix', ['mock-1', 'mock-2']);
+    const promise = provider.createPlaylist('New Mix');
     void promise.then(settle, settle);
     await flushMicrotasks();
     // Nothing has advanced the timer, so the simulated API call is still in
     // flight. Emptying the method body (or delay's body) resolves it now.
     expect(settle).not.toHaveBeenCalled();
     jest.advanceTimersByTime(500);
-    await expect(promise).resolves.toBeUndefined();
+    await expect(promise).resolves.toMatch(/^mock-created-\d+$/);
     expect(settle).toHaveBeenCalledTimes(1);
   });
 
@@ -373,6 +385,18 @@ describe('MockMusicProvider failure injection (EXPO_PUBLIC_MOCK_FAIL_ADDS / _REM
     await expect(second.addToPlaylist('p1', ['t4'])).resolves.toBeUndefined();
   });
 
+  test('adds into a playlist made this launch are never injected; they don\'t use up the failures', async () => {
+    process.env[ENV_KEY] = '1';
+    const Fresh = freshMockClass();
+    const provider = new Fresh();
+    const made = await provider.createPlaylist('Chill Vibes - Sifted');
+    await expect(provider.addToPlaylist(made, ['t1'])).resolves.toBeUndefined();
+    await expect(provider.addToPlaylist('playlist-4', ['t1'])).rejects.toThrow(
+      'Simulated add failure (EXPO_PUBLIC_MOCK_FAIL_ADDS)',
+    );
+    await expect(provider.addToPlaylist('playlist-4', ['t1'])).resolves.toBeUndefined();
+  });
+
   test('FAIL_REMOVES=1 fails the first removed song launch-wide, retries included, then lets others through; playlist removes and adds are untouched', async () => {
     process.env[REMOVES_ENV_KEY] = '1';
     const Fresh = freshMockClass();
@@ -392,8 +416,8 @@ describe('MockMusicProvider failure injection (EXPO_PUBLIC_MOCK_FAIL_ADDS / _REM
     const playlist = { type: 'playlist' as const, playlist: { id: 'p1', name: 'P', trackCount: 1 } };
     await expect(provider.removalLanded(playlist, 't2')).resolves.toBe(true);
     await expect(provider.removalLanded(playlist, 't1')).resolves.toBe(false);
-    // removeFromPlaylist is deliberately never injected (Start Over /
-    // Re-sift clears depend on it), and adds have their own knob.
+    // removeFromPlaylist is deliberately never injected (see the mock's
+    // flow audit), and adds have their own knob.
     await expect(provider.removeFromPlaylist('p1', ['t1'])).resolves.toBe(1);
     await expect(provider.addToPlaylist('p1', ['t1'])).resolves.toBeUndefined();
   });

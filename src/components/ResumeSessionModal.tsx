@@ -36,9 +36,8 @@ export default function ResumeSessionModal({
       : 'Library';
 
   // Clamped like the reducer's `remaining` (SiftContext): a corrupted or
-  // legacy session could carry cursor > tracks.length, and a finished
-  // session (offered when unflushed keeps need repair) has exactly
-  // cursor === tracks.length.
+  // legacy session could carry cursor > tracks.length. (Setup offers only
+  // unfinished sessions.)
   const remaining = Math.max(0, session.tracks.length - session.cursor);
 
   return (
@@ -70,12 +69,7 @@ export default function ResumeSessionModal({
             </View>
 
             <Text style={[styles.sourceLabel, { color: colors.textSecondary }]}>
-              {remaining === 0
-                // Finished sessions reach this modal only when buffered
-                // keeps still need saving — "unfinished sift" would be a
-                // false claim for them.
-                ? `You have unsaved changes from a finished sift for ${sourceLabel}.`
-                : `You have an unfinished sift for ${sourceLabel}.`}
+              {`You have an unfinished sift for ${sourceLabel}.`}
             </Text>
 
             <SessionStatRow

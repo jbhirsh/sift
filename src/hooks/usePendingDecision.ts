@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { useSift } from '../context/SiftContext';
 import { useMusicProvider } from './useMusicProvider';
+import { markReviewed } from '../services/ReviewedLedgerStore';
 import type { PendingDecision, SiftSession } from '../types';
+import { ledgerKey } from '../utils/reviewedLedger';
 import { undoWindowMs } from '../utils/undoWindow';
 
 /**
@@ -31,26 +33,17 @@ export function wasSent(pending: PendingDecision): boolean {
 }
 
 /**
- * Sends a held-back decision to the music service: Remove removes, Keep
- * keeps, Skip has nothing to send. Marks it sent first, so Undo can't take
- * back a decision that is already on its way.
+ * Sends a held-back decision: Remove removes, Keep records the song in the
+ * reviewed ledger, Skip has nothing to send. Marks it sent first, so Undo
+ * can't take back a decision that is already on its way.
  */
-export function useSendPending(
-  { bufferPlaylistKeeps = false }: {
-    /**
-     * Hand a playlist keep to Done's fallback save (pendingKeeps) rather
-     * than adding it here: this hook instance doesn't know a "- Sifted"
-     * playlist created moments ago, and would create a second.
-     */
-    bufferPlaylistKeeps?: boolean;
-  } = {},
-): (pending: PendingDecision | null) => void {
+export function useSendPending(): (pending: PendingDecision | null) => void {
   const { state, dispatch, flushPendingSave } = useSift();
   const { keepTrack, removeTrack } = useMusicProvider();
   // Latest values for sends from timers and unmount cleanups.
-  const latest = useRef({ tracks: state.tracks, source: state.source, keepTrack, removeTrack });
+  const latest = useRef({ tracks: state.tracks, keepTrack, removeTrack });
   useEffect(() => {
-    latest.current = { tracks: state.tracks, source: state.source, keepTrack, removeTrack };
+    latest.current = { tracks: state.tracks, keepTrack, removeTrack };
   });
 
   return useCallback((pending: PendingDecision | null) => {
@@ -65,15 +58,12 @@ export function useSendPending(
     // linger there to be undone after the service acted on it.
     dispatch({ type: 'PENDING_SENT', trackId: pending.trackId, at: pending.at });
     if (alreadySent) return;
-    const { tracks, source, keepTrack: keep, removeTrack: remove } = latest.current;
+    const { tracks, keepTrack: keep, removeTrack: remove } = latest.current;
     const track = tracks.find((t) => t.id === pending.trackId);
     if (!track) return;
     if (pending.decision === 'remove') void remove(track);
-    if (pending.decision === 'keep') {
-      if (bufferPlaylistKeeps && source.type === 'playlist') dispatch({ type: 'ADD_PENDING_KEEP', track });
-      else void keep(track);
-    }
-  }, [dispatch, flushPendingSave, bufferPlaylistKeeps]);
+    if (pending.decision === 'keep') void keep(track);
+  }, [dispatch, flushPendingSave]);
 }
 
 /**
@@ -84,7 +74,7 @@ export function useSendPending(
  * over. Sent to that session's own source; nothing in state changes.
  */
 export function useSendSavedPending(): (session: SiftSession | null) => void {
-  const { removeTrack, keepFromSavedSession } = useMusicProvider();
+  const { removeTrack } = useMusicProvider();
   return useCallback((session: SiftSession | null) => {
     const pending = session?.pending;
     if (!session || !pending || !session.source || !session.provider) return;
@@ -95,10 +85,8 @@ export function useSendSavedPending(): (session: SiftSession | null) => void {
     if (!track) return;
     const from = { source: session.source, provider: session.provider };
     if (pending.decision === 'remove') void removeTrack(track, from);
-    if (pending.decision === 'keep') {
-      void keepFromSavedSession(track, { ...from, siftedPlaylistId: session.siftedPlaylistId ?? null });
-    }
-  }, [removeTrack, keepFromSavedSession]);
+    if (pending.decision === 'keep') void markReviewed(ledgerKey(from.provider, from.source), track.id);
+  }, [removeTrack]);
 }
 
 /**
@@ -134,8 +122,7 @@ export function useHoldPendingDecision(sendPending: (pending: PendingDecision | 
     return () => {
       subscription.remove();
       // A backstop: Finish, Back and the last card send it while the
-      // screen is still mounted, where the keep path's playlist lookups
-      // still work.
+      // screen is still mounted.
       sendPending(pendingRef.current);
     };
   }, [sendPending]);

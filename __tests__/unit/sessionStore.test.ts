@@ -306,7 +306,6 @@ describe('loadSession with a session saved by a different build', () => {
       kept: [t('a'), local(1)],
       removed: [t('b')],
       skipped: [local(2)],
-      pendingKeeps: [local(1)],
     };
     storeLegacy(JSON.stringify(legacy));
 
@@ -320,7 +319,6 @@ describe('loadSession with a session saved by a different build', () => {
       kept: [t('a')],
       removed: [t('b')],
       skipped: [],
-      pendingKeeps: [],
     });
     expect(result?.tracks[result.cursor].id).toBe('c');
     expect(Sentry.captureException).not.toHaveBeenCalled();
@@ -343,11 +341,20 @@ describe('loadSession with a session saved by a different build', () => {
       ...sampleSession,
       cursor: 1,
       source: { type: 'playlist', playlist: { id: 'p1', name: 'Mix', trackCount: 1 } },
-      pendingKeeps: [],
       removalErrors: [],
-      siftedPlaylistId: null,
     };
     storeLegacy(JSON.stringify(full));
+
+    expect(await loadSession()).toEqual(full);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(mockRemoveItem).not.toHaveBeenCalled();
+  });
+
+  it('drops the fields playlist keeps used before they were remembered, whatever they hold', async () => {
+    // pendingKeeps and siftedPlaylistId went with the automatic "- Sifted"
+    // playlist: a malformed one no longer costs the session.
+    const full: SiftSession = { ...sampleSession, removalErrors: [] };
+    storeLegacy(JSON.stringify({ ...full, pendingKeeps: 'not a list', siftedPlaylistId: 7 }));
 
     expect(await loadSession()).toEqual(full);
     expect(Sentry.captureException).not.toHaveBeenCalled();

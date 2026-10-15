@@ -162,14 +162,21 @@ export function isSiftSession(value: unknown): value is SiftSession {
     typeof value.savedAt === 'string' &&
     (value.provider === undefined || isMusicProvider(value.provider)) &&
     (value.source === undefined || isSiftSource(value.source)) &&
-    (value.pendingKeeps === undefined || isArrayOf(value.pendingKeeps, isTrack)) &&
     (value.removalErrors === undefined || isArrayOf(value.removalErrors, isString)) &&
     (value.failedRemovalIds === undefined || isArrayOf(value.failedRemovalIds, isString)) &&
-    (value.siftedPlaylistId === undefined ||
-      value.siftedPlaylistId === null ||
-      typeof value.siftedPlaylistId === 'string') &&
     (value.pending === undefined || value.pending === null || isPendingDecision(value.pending))
   );
+}
+
+/**
+ * The keeps a session saved before playlist keeps were remembered was still
+ * holding because they never reached "<name> - Sifted" (its pendingKeeps).
+ * The field is legacy, so it doesn't decide whether the session loads: only
+ * its usable tracks come back, and anything else is no keeps.
+ */
+export function legacyPendingKeeps(value: unknown): Track[] {
+  if (!isObject(value) || !Array.isArray(value.pendingKeeps)) return [];
+  return value.pendingKeeps.filter(isTrack);
 }
 
 /** A stored compact session (#150), before it is joined to its track list. */
@@ -189,12 +196,8 @@ export function isCompactSession(value: unknown): value is CompactSession {
     typeof value.savedAt === 'string' &&
     (value.provider === undefined || isMusicProvider(value.provider)) &&
     (value.source === undefined || isSiftSource(value.source)) &&
-    (value.pendingKeeps === undefined || isArrayOf(value.pendingKeeps, isTrack)) &&
     (value.removalErrors === undefined || isArrayOf(value.removalErrors, isString)) &&
     (value.failedRemovalIds === undefined || isArrayOf(value.failedRemovalIds, isString)) &&
-    (value.siftedPlaylistId === undefined ||
-      value.siftedPlaylistId === null ||
-      typeof value.siftedPlaylistId === 'string') &&
     (value.pending === undefined || value.pending === null || isPendingDecision(value.pending))
   );
 }

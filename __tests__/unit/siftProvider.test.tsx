@@ -48,8 +48,7 @@ function TestConsumer() {
       <TouchableOpacity testID="start-fresh" onPress={() => ctx.startFresh()} />
       <TouchableOpacity testID="reset-to-setup" onPress={ctx.resetToSetup} />
       <TouchableOpacity testID="flush-pending-save" onPress={ctx.flushPendingSave} />
-      <Text testID="pendingKeepsCount">{ctx.state.pendingKeeps.length}</Text>
-      <TouchableOpacity testID="add-pending-keep" onPress={() => ctx.dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrackC })} />
+      <Text testID="removalErrorsCount">{ctx.state.removalErrors.length}</Text>
       <TouchableOpacity testID="add-removal-error" onPress={() => ctx.dispatch({ type: 'ADD_REMOVAL_ERROR', error: 'Could not remove Track B' })} />
       <TouchableOpacity
         testID="resume-with-pending"
@@ -59,7 +58,6 @@ function TestConsumer() {
             ...ctx.state,
             tracks: [mockTrackA, mockTrackB],
             cursor: 1,
-            pendingKeeps: [mockTrackC],
             removalErrors: ['Could not remove Track B'],
           },
         })}
@@ -187,33 +185,32 @@ describe('SiftProvider', () => {
     expect(getByTestId('isPlaying').props.children).toBe('false');
   });
 
-  test('autosave persists pendingKeeps and removalErrors in the session', async () => {
+  test('autosave persists removalErrors in the session, and nothing of the old "- Sifted" save', async () => {
     jest.useFakeTimers();
     try {
       const { getByTestId } = await renderWithProvider([mockTrackA, mockTrackB]);
       await fireEvent.press(getByTestId('decide-keep'));
-      await fireEvent.press(getByTestId('add-pending-keep'));
       await fireEvent.press(getByTestId('add-removal-error'));
       await act(() => {
         jest.advanceTimersByTime(600);
       });
       // The on-disk session must carry the repair signal, or a kill/relaunch
-      // would silently forget that a keep never reached the Sifted playlist.
+      // would silently forget that a removal failed.
       expect(SessionStore.saveSession).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          pendingKeeps: [expect.objectContaining({ id: mockTrackC.id })],
-          removalErrors: ['Could not remove Track B'],
-        }),
+        expect.objectContaining({ removalErrors: ['Could not remove Track B'] }),
       );
+      const saved = (SessionStore.saveSession as jest.Mock).mock.calls.at(-1)[0] as object;
+      expect(saved).not.toHaveProperty('pendingKeeps');
+      expect(saved).not.toHaveProperty('siftedPlaylistId');
     } finally {
       jest.useRealTimers();
     }
   });
 
-  test('RESUME_SESSION restores persisted pendingKeeps and removalErrors', async () => {
+  test('RESUME_SESSION restores persisted removalErrors', async () => {
     const { getByTestId } = await renderWithProvider([mockTrackA, mockTrackB]);
     await fireEvent.press(getByTestId('resume-with-pending'));
-    expect(getByTestId('pendingKeepsCount').props.children).toBe(1);
+    expect(getByTestId('removalErrorsCount').props.children).toBe(1);
     expect(getByTestId('phase').props.children).toBe('sifting');
   });
 

@@ -59,8 +59,8 @@ export class TrackIndex {
 /**
  * The tracks with repeated ids dropped, first occurrence first (#56). A
  * playlist can hold one song twice, and MusicKit reports both entries under
- * the song's id, so everything keyed by id (removing, restoring, buffered
- * keeps, list keys) would conflate the two cards. One card per id matches
+ * the song's id, so everything keyed by id (removing, restoring, the
+ * reviewed ledger, list keys) would conflate the two cards. One card per id matches
  * what a decision does anyway: removing an id removes every entry of it.
  */
 export function uniqueTracks(tracks: readonly Track[]): Track[] {

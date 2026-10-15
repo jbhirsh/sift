@@ -82,25 +82,35 @@ name: "Playlist Source - Select and Sift"
     id: "summary-count-removed"
     text: "0"
 
-# The stateless mock provider never exposes the incrementally-created
-# "Chill Vibes - Sifted" playlist, so the kept tracks buffer as pendingKeeps
-# and the Done screen's fallback save persists them — ending in the
-# sifted-playlist success confirmation. (The failure/Retry state is not
-# reachable here — this fallback goes through createPlaylist, which is
-# never injected; 09_save_failure_retry.yaml covers the failed-save error
-# and Retry via the EXPO_PUBLIC_MOCK_FAIL_ADDS injection.)
+# A Keep writes nothing to Music: the three keeps are remembered for
+# Chill Vibes, and Done offers to save them as a playlist. Chill Vibes has
+# no "- Sifted" playlist in the mock, so the save creates one (createPlaylist,
+# which is never injected; 09_save_failure_retry.yaml covers a failed save
+# and Retry via the EXPO_PUBLIC_MOCK_FAIL_ADDS injection).
 - extendedWaitUntil:
-    visible: "Sifted playlist created!"
+    visible: "Save kept songs as a playlist"
     timeout: 30000
+- tapOn:
+    id: "save-kept-playlist"
 
-# ── Start Over on a playlist source must ask for confirmation ──
+- extendedWaitUntil:
+    visible:
+      id: "save-kept-status"
+      text: "Saved 3 songs to \"Chill Vibes - Sifted\"\\."
+    timeout: 30000
+- assertNotVisible:
+    id: "save-kept-playlist"
+
+# ── Start Over with decisions must ask for confirmation ──
 - tapOn: "Start Over"
 
+# Maestro matches text as a regex: an unescaped "?" would also match the
+# screen's own "Start Over" button.
 - extendedWaitUntil:
-    visible: "Start Over?"
+    visible: "Start Over\\?"
     timeout: 30000
 
-# Cancel keeps everything: still on Done, success message intact.
+# Cancel keeps everything: still on Done, saved message intact.
 # Wait for the Cancel button itself, not just the "Start Over?" title above:
 # on a slow runner the native alert's buttons enter the accessibility tree a
 # beat after its title, so a bare tapOn "Cancel" intermittently misses it.
@@ -109,6 +119,10 @@ name: "Playlist Source - Select and Sift"
     timeout: 30000
 - tapOn: "Cancel"
 
+- extendedWaitUntil:
+    notVisible: "Start Over\\?"
+    timeout: 30000
 - assertVisible:
     id: "done-title"
-- assertVisible: "Sifted playlist created!"
+- assertVisible:
+    id: "save-kept-status"

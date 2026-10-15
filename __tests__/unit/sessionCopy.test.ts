@@ -7,14 +7,17 @@ import {
   playlistStartOverMessage,
   removeExplanation,
   removedListSubtitle,
-  unsyncedCount,
   failedRemovalCount,
   legacyFailedRemovalIds,
   decisionAnnouncement,
   undoMessage,
   doneHeadline,
-  keptDestination,
+  keptSaveFailure,
+  keptSaveMessage,
+  keptSaveRetryable,
   nothingRemovedNote,
+  SAVE_KEPT_TITLE,
+  siftedPlaylistName,
 } from '../../src/utils/sessionCopy';
 import type { MusicProvider, SiftSource, Track } from '../../src/types';
 
@@ -32,17 +35,17 @@ describe('removeExplanation', () => {
     );
   });
 
-  test('an Apple Music playlist collects removed songs the same way, and names its "- Sifted" companion', () => {
+  test('an Apple Music playlist collects removed songs the same way; kept songs stay, to save at the end', () => {
     expect(removeExplanation('apple-music', playlist)).toBe(
-      `Removed songs are collected in "${APPLE_REMOVED_PLAYLIST}" for you to delete from your library in Music; `
-      + 'kept songs are collected in "Workout Mix - Sifted".',
+      `Removed songs are collected in "${APPLE_REMOVED_PLAYLIST}" for you to delete from your library in Music. `
+      + 'Kept songs stay, and you can save them as a playlist when you’re done.',
     );
   });
 
   test('a provider that deletes says so', () => {
     expect(removeExplanation(deleting, library)).toBe('Removed songs are taken out of your library.');
     expect(removeExplanation(deleting, playlist)).toBe(
-      'Removed songs leave this playlist; kept songs are collected in "Workout Mix - Sifted".',
+      'Removed songs leave this playlist. Kept songs stay, and you can save them as a playlist when you’re done.',
     );
   });
 });
@@ -62,27 +65,26 @@ describe('finishing a Remove in Music', () => {
     );
   });
 
-  test("a playlist's Start Over: removed songs stay collected with Apple Music", () => {
+  test("a playlist's Start Over empties nothing: removed songs stay collected with Apple Music", () => {
     expect(playlistStartOverMessage('apple-music', 'Mix')).toBe(
-      `This will empty "Mix - Sifted". Songs you removed stay in "${APPLE_REMOVED_PLAYLIST}". This cannot be undone.`,
+      `This starts "Mix" over. Songs you removed stay in "${APPLE_REMOVED_PLAYLIST}".`,
     );
     expect(playlistStartOverMessage(deleting, 'Mix')).toBe(
-      'This will empty "Mix - Sifted" and clear the removal history for this playlist. This cannot be undone.',
+      'This starts "Mix" over and clears the removal history for this playlist. This cannot be undone.',
     );
   });
 });
 
 describe('decisionCounts', () => {
-  test('counts each list, the total and parked keeps', () => {
+  test('counts each list and the total', () => {
     expect(decisionCounts({ kept: [1, 2], removed: [3], skipped: [] })).toEqual({
-      kept: 2, removed: 1, skipped: 0, total: 3, pendingKeeps: 0,
+      kept: 2, removed: 1, skipped: 0, total: 3,
     });
-    expect(decisionCounts({ kept: [1], removed: [], skipped: [], pendingKeeps: [1] }).pendingKeeps).toBe(1);
   });
 });
 
 describe('discardConfirmation', () => {
-  const counts = { kept: 782, removed: 1563, skipped: 0, total: 2345, pendingKeeps: 0 };
+  const counts = { kept: 782, removed: 1563, skipped: 0, total: 2345 };
 
   test('a new sift over an Apple library sift: counts, where removals are, no resume', () => {
     expect(discardConfirmation('apple-music', library, counts, 'new-sift')).toEqual({
@@ -95,16 +97,13 @@ describe('discardConfirmation', () => {
     });
   });
 
-  test('re-sifting another playlist over a sift also says what it empties', () => {
-    const message = discardConfirmation('apple-music', library, counts, 'new-sift', { alsoEmpties: 'Road Trip' }).message;
-    expect(message).toContain(`Songs you removed stay in "${APPLE_REMOVED_PLAYLIST}". It also empties "Road Trip - Sifted". Starting`);
-    const deleted = discardConfirmation(deleting, library, counts, 'new-sift', { alsoEmpties: 'Road Trip' }).message;
-    expect(deleted).toContain('It also empties "Road Trip - Sifted" and clears that playlist\'s removal history.');
-  });
-
-  test('keeps that never reached the "- Sifted" playlist are called out', () => {
-    const message = discardConfirmation('apple-music', playlist, { ...counts, pendingKeeps: 3 }, 'new-sift').message;
-    expect(message).toContain('3 kept songs never reached "Workout Mix - Sifted" and would be lost.');
+  test('a playlist sift being replaced says nothing about "- Sifted": a keep wrote nothing there', () => {
+    const message = discardConfirmation('apple-music', playlist, counts, 'new-sift').message;
+    expect(message).toBe(
+      'You have 2,345 decisions so far (782 kept, 1,563 removed, 0 skipped) in your sift of "Workout Mix". '
+      + `Songs you removed stay in "${APPLE_REMOVED_PLAYLIST}". `
+      + 'Starting a new sift replaces it, and you won’t be able to resume it.',
+    );
   });
 
   test('leaving Done after Finish says the rest of the sift goes too (#142)', () => {
@@ -114,19 +113,33 @@ describe('discardConfirmation', () => {
     expect(complete).not.toContain('resume');
   });
 
-  test('starting over a playlist says what it empties', () => {
+  test('starting over a playlist says it clears the removal history, and nothing about "- Sifted"', () => {
     const copy = discardConfirmation('apple-music', playlist, counts, 'start-over');
     expect(copy.title).toBe('Start Over?');
     expect(copy.confirm).toBe('Discard and Start Over');
-    expect(copy.message).toContain('in your sift of "Workout Mix".');
     // Apple Music: removed songs stay collected, so nothing about history.
-    expect(copy.message).toContain(
-      `Starting over empties "Workout Mix - Sifted". Songs you removed stay in "${APPLE_REMOVED_PLAYLIST}". ${RESUME}`,
+    expect(copy.message).toBe(
+      'You have 2,345 decisions so far (782 kept, 1,563 removed, 0 skipped) in your sift of "Workout Mix". '
+      + `Songs you removed stay in "${APPLE_REMOVED_PLAYLIST}". ${RESUME}`,
     );
     const deleted = discardConfirmation(deleting, playlist, counts, 'start-over').message;
-    expect(deleted).toContain('Starting over empties "Workout Mix - Sifted" and clears this playlist\'s removal history. ');
-    expect(deleted).not.toContain('stay removed');
-    expect(copy.message.endsWith(RESUME)).toBe(true);
+    expect(deleted).toBe(
+      'You have 2,345 decisions so far (782 kept, 1,563 removed, 0 skipped) in your sift of "Workout Mix". '
+      + `Starting over clears this playlist’s removal history. ${RESUME}`,
+    );
+  });
+
+  test('leaving a playlist sift\'s Done: the removal history goes with the summary only where it isn\'t collected', () => {
+    const few = { kept: 2, removed: 1, skipped: 0, total: 3 };
+    expect(discardConfirmation('apple-music', playlist, few, 'done').message).toBe(
+      'You made 3 decisions (2 kept, 1 removed, 0 skipped) in your sift of "Workout Mix". '
+      + `Songs you removed stay in "${APPLE_REMOVED_PLAYLIST}". `
+      + 'Starting over clears this summary and its Restore buttons.',
+    );
+    expect(discardConfirmation(deleting, playlist, few, 'done').message).toBe(
+      'You made 3 decisions (2 kept, 1 removed, 0 skipped) in your sift of "Workout Mix". Songs you removed stay removed. '
+      + 'Starting over clears this summary, its Restore buttons and this playlist’s removal history.',
+    );
   });
 
   test('a provider that deletes: removed songs stay removed', () => {
@@ -135,12 +148,12 @@ describe('discardConfirmation', () => {
   });
 
   test('no removals: no line about removed songs, and one decision is singular', () => {
-    const message = discardConfirmation('apple-music', library, { kept: 1, removed: 0, skipped: 0, total: 1, pendingKeeps: 0 }, 'start-over').message;
+    const message = discardConfirmation('apple-music', library, { kept: 1, removed: 0, skipped: 0, total: 1 }, 'start-over').message;
     expect(message).toBe(`You have 1 decision so far (1 kept, 0 removed, 0 skipped) in your sift of your library. ${RESUME}`);
   });
 
   test('leaving a finished sift says what goes: the summary and Restore', () => {
-    const copy = discardConfirmation('apple-music', library, { kept: 2, removed: 1, skipped: 0, total: 3, pendingKeeps: 0 }, 'done');
+    const copy = discardConfirmation('apple-music', library, { kept: 2, removed: 1, skipped: 0, total: 3 }, 'done');
     expect(copy.title).toBe('Start Over?');
     expect(copy.message).toBe(
       `You made 3 decisions (2 kept, 1 removed, 0 skipped) in your sift of your library. Songs you removed stay in "${APPLE_REMOVED_PLAYLIST}". `
@@ -173,17 +186,6 @@ describe('legacyFailedRemovalIds', () => {
   test('the removed tracks whose name is a removal error', () => {
     expect(legacyFailedRemovalIds([track('1', 'A'), track('2', 'B'), track('3', 'C')], ['B', 'C: offline'])).toEqual(['2']);
     expect(legacyFailedRemovalIds([track('1', 'A')], [])).toEqual([]);
-  });
-});
-
-describe('unsyncedCount', () => {
-  test('adds failed removals and parked keeps', () => {
-    expect(unsyncedCount([track('1', 'A'), track('2', 'B')], ['1', '2'], [track('3', 'C')])).toBe(3);
-    expect(unsyncedCount([], [], [])).toBe(0);
-  });
-
-  test('counts failed removals the way Done does', () => {
-    expect(unsyncedCount([track('1', 'Intro'), track('2', 'Intro')], ['2'], [])).toBe(1);
   });
 });
 
@@ -225,10 +227,42 @@ describe('Done copy (#142)', () => {
     expect(doneHeadline(playlist, 10, 10).subtitle).toBe('You reviewed every song in this sift of "Workout Mix".');
   });
 
-  test('keptDestination: only a playlist sift copies keeps anywhere', () => {
-    expect(keptDestination(playlist, 3)).toBe('Kept songs go to "Workout Mix - Sifted".');
-    expect(keptDestination(playlist, 0)).toBeNull();
-    expect(keptDestination(library, 3)).toBeNull();
+  test('the kept-songs playlist is named for its source', () => {
+    expect(siftedPlaylistName('Workout Mix')).toBe('Workout Mix - Sifted');
+    expect(SAVE_KEPT_TITLE).toBe('Save kept songs as a playlist');
+  });
+
+  test('keptSaveMessage says how many were saved, or that all were there already', () => {
+    const base = { playlistName: 'Mix - Sifted', sourceName: 'Mix', notAdded: 0, leftOut: 0 };
+    expect(keptSaveMessage({ ...base, kept: 4, added: 3 })).toBe('Saved 3 songs to "Mix - Sifted".');
+    expect(keptSaveMessage({ ...base, kept: 1, added: 1 })).toBe('Saved 1 song to "Mix - Sifted".');
+    expect(keptSaveMessage({ ...base, kept: 1200, added: 1200 })).toBe('Saved 1,200 songs to "Mix - Sifted".');
+    expect(keptSaveMessage({ ...base, kept: 4, added: 0 })).toBe('All kept songs are already in "Mix - Sifted".');
+    expect(keptSaveMessage({ ...base, kept: 0, added: 0 })).toBe('No kept songs to save yet.');
+  });
+
+  test('keptSaveMessage counts the songs Music couldn\'t add, and the keeps no longer in the playlist', () => {
+    const base = { playlistName: 'Mix - Sifted', sourceName: 'Mix' };
+    expect(keptSaveMessage({ ...base, kept: 5, added: 3, notAdded: 2, leftOut: 0 }))
+      .toBe('Saved 3 songs to "Mix - Sifted". 2 songs couldn’t be added.');
+    expect(keptSaveMessage({ ...base, kept: 1, added: 0, notAdded: 1, leftOut: 0 }))
+      .toBe('Nothing new could be saved to "Mix - Sifted". 1 song couldn’t be added.');
+    expect(keptSaveMessage({ ...base, kept: 3, added: 3, notAdded: 0, leftOut: 1 }))
+      .toBe('Saved 3 songs to "Mix - Sifted". 1 kept song no longer in "Mix" was left out.');
+    expect(keptSaveMessage({ ...base, kept: 3, added: 0, notAdded: 0, leftOut: 2 }))
+      .toBe('All kept songs are already in "Mix - Sifted". 2 kept songs no longer in "Mix" were left out.');
+    expect(keptSaveMessage({ ...base, kept: 0, added: 0, notAdded: 0, leftOut: 2 }))
+      .toBe('None of your kept songs are in "Mix" any more.');
+  });
+
+  test('keptSaveRetryable says what was added and that the refused ones can be tried again', () => {
+    expect(keptSaveRetryable({ added: 3, refused: 2, notAdded: 0 })).toBe('3 songs added; 2 songs failed and can be tried again.');
+    expect(keptSaveRetryable({ added: 0, refused: 1, notAdded: 1 }))
+      .toBe('0 songs added; 1 song failed and can be tried again. 1 song couldn’t be found.');
+  });
+
+  test('keptSaveFailure names the playlist and the reason', () => {
+    expect(keptSaveFailure('Mix - Sifted', 'Offline.')).toBe('Couldn’t save to "Mix - Sifted": Offline.');
   });
 
   test('nothingRemovedNote points at the next action', () => {

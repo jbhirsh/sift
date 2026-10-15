@@ -158,7 +158,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
 - **State management**: `SiftContext` uses `useReducer` with a `SiftState`/`SiftAction` pattern.
   All app state lives in a single reducer — no external state library.
 - **Phase routing**: `PhaseRouter` in `App.tsx` switches screens based on `state.phase`
-  (setup, loading, sifting, paused, done). No React Navigation — phase-driven switching.
+  (setup, loading, sifting, done). No React Navigation — phase-driven switching.
 - **Provider pattern**: Music services implement `MusicProviderInterface`.
   `AppleMusicProvider` is the concrete implementation (Spotify was removed,
   #140; the interface stays so another service can be added);
@@ -174,11 +174,39 @@ Makefile                Dev commands (test, lint, typecheck, check)
   every saved shape: add one when the shape changes, never edit them. User settings (`startAtChorus`) are
   preferences, not session state: `PreferencesStore` persists them and
   `RESUME_SESSION` never touches them.
-- **Reviewed ledger**: library keeps leave the song in place, so
-  `ReviewedLedgerStore` records kept ids per source and later library sifts
-  leave them out; Setup's "Include songs I've already sifted" switch passes
-  `skipFiltering` (for Start Sifting and a library Start Over) to bring them
-  back. Skipped songs aren't recorded.
+- **Reviewed ledger**: a Keep leaves the song in place and writes nothing to
+  Apple Music, for a library or a playlist sift alike: `ReviewedLedgerStore`
+  records kept ids per source (`utils/reviewedLedger` `ledgerKey`, one entry
+  per playlist id) and later sifts of that source leave them out. Setup's
+  "Include songs I've already sifted" switch, shown when the selected source
+  has kept songs, passes `skipFiltering` (for Start Sifting and Start Over)
+  to bring them back; removed songs stay out either way (see "Remove
+  collects"). Skipped songs aren't recorded. A sent keep changed in the
+  decisions list leaves the ledger (`unmarkReviewed`).
+- **Saving kept songs** (playlist sifts, Done only): Done's "Save kept songs
+  as a playlist" (`save-kept-playlist`, `useMusicProvider.saveKeptPlaylist`)
+  copies every song the ledger remembers for that playlist, from every sift
+  of it, that is still in it (the rest are counted as left out) into
+  "<name> - Sifted". It finds that playlist with the provider's lookup,
+  which trusts one made this launch before the library lists it
+  (`findPlaylists`), preferring one an earlier save made (a launch-wide
+  map); when there is none it makes it empty first, so its id is known
+  before any add can fail. Then only the songs not in it yet are added
+  (matched by song, as Apple re-identifies tracks in playlists), 10 at a
+  time through the serial write queue; every batch is tried. Songs with
+  nothing to add (`AddShortfallError.unresolved`) are counted, not retried
+  forever; songs the add refused (`failed`) make the save fail, with
+  Retry. A batch that times out may still be adding while later ones go:
+  before reading anything a save waits for earlier writes to finish
+  (`writesSettled`), so nothing still landing is added again; after 15 s
+  it says Music is still finishing. One save runs
+  at a time, launch-wide. Done shows Saving… (Continue sifting and the
+  decisions list wait), then what was saved, or the error with the button
+  turned into Retry. Nothing fills "- Sifted" on a Keep any more, and
+  Setup's picker hides "- Sifted" playlists (outputs, not sources). A session saved
+  before this (with `pendingKeeps`/`siftedPlaylistId`) still loads: its
+  keeps that never reached "- Sifted" go to the ledger and both fields are
+  dropped (`SessionStore`).
 - **Undo** (#152): the latest decision is held in `state.pending` (persisted
   with the session) and reaches the music service only after a 5 s undo
   window, on the next decision, or when the Sift screen goes away or the app
@@ -201,7 +229,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
   the Sift header and Done) changes any decided card through
   `useReviseDecision`: a held decision just changes (`REVISE`); a sent one
   is taken back first (`restoreTrack`, or `unkeepTrack`: out of the
-  reviewed ledger or "<name> - Sifted"), then the new one is sent through
+  reviewed ledger), then the new one is sent through
   the screen's `useSendPending`. If taking it back fails, nothing changes.
 - **Remove collects; it never deletes or edits the user's playlists.**
   MusicKit can't delete library songs and edits only playlists the app
@@ -216,7 +244,12 @@ Makefile                Dev commands (test, lint, typecheck, check)
   throws on any other, so a "Sift — Removed" the user made is skipped.
 - **Library writes run one at a time.** `AppleMusicProvider` queues every
   write (`utils/serialQueue`): a native playlist removal reads the playlist
-  and writes it back, so two at once would undo each other.
+  and writes it back, so two at once would undo each other. A write that
+  doesn't settle within `WRITE_STALL_MS` (30 s) lets the next one start and
+  rejects for its caller with a `QueueStallError` (it may still land), so
+  nothing waits on it forever; `settled()` resolves once every queued write
+  has really finished, but gives up on one 2 minutes after it started, so
+  a write that never settles can't block saving for the rest of the launch.
 - **Start at chorus** (Apple Music only): `ChorusFinder` picks each track's start
   from LRCLIB synced lyrics (the repeated block, `utils/chorus`), then from where
   ShazamKit places Apple's preview clip in the track (`AppleMusicProvider.previewOffset`, native `shazamOffset`), then

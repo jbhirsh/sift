@@ -16,8 +16,7 @@ name: "Failed Removal Shows the Removal-Errors Warning"
 # DECIDE-driven stats that a silently-failed native removal does not
 # change, and 15 and 24 rely on their first remove failing; the other
 # flows that Remove assert nothing it changes. removeFromPlaylist is
-# deliberately NOT injectable — the Start Over clears in flows 08/09 depend
-# on it.
+# deliberately NOT injectable (see the mock's flow audit).
 #
 # Default sort is Least Played, so the first card is "Peaches" (playCount
 # 28). Removing it takes the injected failure: the decision itself still

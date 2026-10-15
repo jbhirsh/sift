@@ -27,7 +27,7 @@ import PlayerControls from '../components/PlayerControls';
 import { COLORS, RADIUS, SETTINGS_BUTTON, SHADOWS, SPACING, UNDO_PILL } from '../theme';
 import { Decision, PendingDecision, PROVIDER_DISPLAY, Track } from '../types';
 import { loadSeenRemoveNote, loadSeenSwipeHint, markRemoveNoteSeen, markSwipeHintSeen } from '../services/PreferencesStore';
-import { decisionAnnouncement, FIRST_REMOVE_NOTE, SWIPE_HINT, undoMessage, unsyncedCount } from '../utils/sessionCopy';
+import { decisionAnnouncement, failedRemovalCount, FIRST_REMOVE_NOTE, SWIPE_HINT, undoMessage } from '../utils/sessionCopy';
 import { collectsRemovals } from '../utils/libraryRemovals';
 import { useHoldPendingDecision, useSendPending, wasSent } from '../hooks/usePendingDecision';
 import { useRemovalRetry } from '../hooks/useRemovalRetry';
@@ -94,8 +94,7 @@ export default function SiftScreen() {
     (trackId: string) => decisionFor(trackId, { kept: state.kept, removed: state.removed, skipped: state.skipped }),
     [state.kept, state.removed, state.skipped],
   );
-  // The last card's decision goes now: Done has no Undo, and this screen's
-  // keep path still knows a "- Sifted" playlist it created moments ago.
+  // The last card's decision goes now: Done has no Undo to hold it for.
   const sendIfLast = useCallback((held: PendingDecision | null) => {
     if (held && state.tracks[state.tracks.length - 1]?.id === held.trackId) sendPending(held);
   }, [sendPending, state.tracks]);
@@ -158,10 +157,10 @@ export default function SiftScreen() {
     }
   }, [removeNoteEligible, showSwipeHint]);
 
-  // Failed removals and keeps parked after a failed add: changes that didn't
-  // reach the provider, shown during the sift rather than only on Done.
-  // Failed removals are counted the same way Done counts them.
-  const unsynced = unsyncedCount(state.removed, state.failedRemovalIds, state.pendingKeeps);
+  // Failed removals: changes that didn't reach the provider, shown during
+  // the sift rather than only on Done, and counted the same way Done counts
+  // them. (A keep writes nothing to the provider, so it can't fail to.)
+  const unsynced = failedRemovalCount(state.removed, state.failedRemovalIds);
 
   // Decisions since this screen mounted: one sitting. Finish then Continue
   // sifting remounts it, which starts a new count.

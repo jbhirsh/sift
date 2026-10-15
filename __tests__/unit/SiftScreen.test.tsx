@@ -812,7 +812,8 @@ describe('SiftScreen', () => {
         // Remove the first card (A), whose removal then fails.
         dispatch({ type: 'DECIDE', decision: 'remove' });
         dispatch({ type: 'ADD_REMOVAL_ERROR', error: mockTrackA.name, failedRemovalId: mockTrackA.id });
-        dispatch({ type: 'ADD_PENDING_KEEP', track: mockTrackB });
+        // A keep writes nothing to the provider, so it never counts.
+        dispatch({ type: 'DECIDE', decision: 'keep' });
       }, [dispatch]);
       return null;
     };
@@ -821,8 +822,8 @@ describe('SiftScreen', () => {
     });
     await act(async () => {});
     const chip = getByTestId('unsynced-chip');
-    expect(chip.props.children).toBe('2 didn\u2019t sync');
-    expect(chip.props.accessibilityLabel).toBe("2 changes didn't reach Apple Music");
+    expect(chip.props.children).toBe('1 didn\u2019t sync');
+    expect(chip.props.accessibilityLabel).toBe("1 change didn't reach Apple Music");
   });
 });
 

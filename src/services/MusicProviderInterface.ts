@@ -32,8 +32,24 @@ export interface MusicProviderService {
   /** Get the current playback position and playing state. */
   getPlaybackState(): { position: number; isPlaying: boolean };
 
-  /** Create a playlist with the given name containing the specified tracks. */
-  createPlaylist(name: string, trackIDs: string[]): Promise<void>;
+  /**
+   * Create an empty playlist with the given name; resolves to its id, so
+   * tracks can be added to it at once (a new playlist can take a moment to
+   * show up in loadPlaylists).
+   */
+  createPlaylist(name: string): Promise<string>;
+
+  /**
+   * Ids of every playlist with this exact name, counting one created this
+   * launch that the library may not list yet.
+   */
+  findPlaylists?(name: string): Promise<string[]>;
+
+  /**
+   * Resolves once every write queued so far has finished, including one
+   * that timed out for its caller but was still running.
+   */
+  writesSettled?(): Promise<void>;
 
   /**
    * Remove tracks from the user's library. Apple Music can't delete library
@@ -67,7 +83,10 @@ export interface MusicProviderService {
   /** Add tracks back to the user's music library. */
   addToLibrary?(trackIDs: string[]): Promise<void>;
 
-  /** Add tracks to a playlist. */
+  /**
+   * Add tracks to a playlist. When only some land, rejects with an
+   * AddShortfallError (utils/musicKit) carrying the counts.
+   */
   addToPlaylist?(playlistID: string, trackIDs: string[]): Promise<void>;
 
   /** List the user's playlists. Optional — not all providers support it yet. */

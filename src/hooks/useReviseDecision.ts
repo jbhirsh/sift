@@ -15,11 +15,10 @@ let lastSentAt = 0;
  * Changes a decided card's decision (the decisions list), beyond what
  * Undo reaches. A decision still held for Undo just changes, and goes out
  * as the new one when its window ends. One already sent is taken back
- * first (a Remove restored, a Keep taken out of the ledger or the
- * "- Sifted" playlist), then the new one goes out through `send`, the
- * screen's useSendPending, so a playlist keep follows that screen's rule.
- * Resolves to whether it changed: if taking the old one back fails,
- * nothing changes.
+ * first (a Remove restored, a Keep taken out of the reviewed ledger), then
+ * the new one goes out through `send`, the screen's useSendPending, which
+ * sends each decision once. Resolves to whether it changed: if taking the
+ * old one back fails, nothing changes.
  */
 export function useReviseDecision(
   send: (pending: PendingDecision) => void,

@@ -29,29 +29,22 @@ export function resumeState(
     provider: saved.provider ?? provider,
     source,
     activeSource: source,
-    // A FINISHED session is only offered for resume when it still has
-    // unflushed pendingKeeps: resume it straight to Done so the fallback
-    // save can repair them instead of replaying a sift with nothing left.
+    // A session with no cards left has nothing to sift: it resumes to Done.
     phase: finish || saved.cursor >= saved.tracks.length ? 'done' : 'sifting',
     loadProgress: 1,
     loadMessage: '',
     loadError: null,
     playbackPosition: 0,
     isPlaying: false,
-    removalPlaylistCreated: false,
-    removalPlaylistError: null,
-    isCreatingPlaylist: false,
     // Legacy sessions predate these fields: default to empty rather than
     // dropping the persisted repair signal on the floor.
     removalErrors: saved.removalErrors ?? [],
     failedRemovalIds:
       saved.failedRemovalIds ?? legacyFailedRemovalIds(saved.removed, saved.removalErrors ?? []),
     connectionStatus,
-    pendingKeeps: saved.pendingKeeps ?? [],
     skipFiltering: false,
-    // Null falls back to the name-based sifted-playlist lookup.
-    siftedPlaylistId: saved.siftedPlaylistId ?? null,
-    // Sent on resume by the screen that resumes (#152).
+    // Sent on resume by the screen that resumes (#152). A held playlist
+    // keep from an older build goes to the reviewed ledger like any keep.
     pending: saved.pending ?? null,
   };
 }

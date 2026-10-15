@@ -5,6 +5,7 @@ import type { Playlist, SiftSource, Track } from '../types';
 import { APPLE_REMOVED_PLAYLIST } from '../utils/libraryRemovals';
 import { createSerialQueue } from '../utils/serialQueue';
 import {
+  AddShortfallError,
   batches,
   bestPreviewCandidate,
   canonicalPairing,
@@ -110,27 +111,25 @@ export class AppleMusicProvider implements MusicProviderService {
     return this.native.getPlaybackState();
   }
 
-  createPlaylist(name: string, trackIDs: string[]): Promise<void> {
-    return this.writes.run(() => this.createPlaylistNow(name, trackIDs));
+  /**
+   * An empty playlist, made at once so its id is known before anything is
+   * added (an add that fails can't then lose it, or lead to a second).
+   */
+  createPlaylist(name: string): Promise<string> {
+    return this.writes.run(() => this.native.createEmptyPlaylist(name));
   }
 
-  private async createPlaylistNow(name: string, trackIDs: string[]): Promise<void> {
-    await this.resolveIntoCaches(trackIDs);
-    // Don't leave an empty playlist behind when nothing can be added.
-    if (countCached(this.native.cachedKinds(trackIDs)) === 0) throw new Error(NO_TRACKS_FOUND);
-    // Created empty, then filled one item at a time in caller order: a bulk
-    // create is all-or-nothing, and retrying one that failed after creating
-    // the playlist would make a second playlist of the same name.
-    const playlistID = await this.native.createEmptyPlaylist(name);
-    const included = countAdded(await this.native.addEachToPlaylist(playlistID, trackIDs));
-    // Items that couldn't be resolved or added are left out; surface the
-    // shortfall as an error so callers buffer/report instead of assuming
-    // success.
-    if (included < trackIDs.length) {
-      throw new Error(
-        `${trackIDs.length - included} of ${trackIDs.length} tracks could not be resolved and were left out of "${name}"`,
-      );
-    }
+  /**
+   * Every playlist with this name, plus one created here in the last
+   * RECENT_PLAYLIST_SECONDS that the library doesn't list yet.
+   */
+  findPlaylists(name: string): Promise<string[]> {
+    return this.native.findPlaylistsByName(name, RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE);
+  }
+
+  /** Once every write queued so far has finished, one that timed out too. */
+  writesSettled(): Promise<void> {
+    return this.writes.settled();
   }
 
   /**
@@ -228,15 +227,11 @@ export class AppleMusicProvider implements MusicProviderService {
 
   private async addToPlaylistNow(playlistID: string, trackIDs: string[]): Promise<void> {
     await this.resolveIntoCaches(trackIDs);
-    const added = countAdded(await this.native.addEachToPlaylist(playlistID, trackIDs));
-    // See createPlaylist: a shortfall means some tracks couldn't be added;
-    // turn that into a visible failure so keepTrack buffers the track via
-    // ADD_PENDING_KEEP.
-    if (added < trackIDs.length) {
-      throw new Error(
-        `${trackIDs.length - added} of ${trackIDs.length} tracks could not be added to the playlist`,
-      );
-    }
+    // A shortfall means some tracks couldn't be resolved or added; turn it
+    // into a visible failure, with the counts of each, so the caller can
+    // tell what's worth trying again.
+    const shortfall = AddShortfallError.of(await this.native.addEachToPlaylist(playlistID, trackIDs));
+    if (shortfall) throw shortfall;
   }
 
   async loadPlaylists(): Promise<Playlist[]> {

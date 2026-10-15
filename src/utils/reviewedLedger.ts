@@ -54,7 +54,7 @@ export function removeFromLedger(ledger: ReviewedLedger, key: string, ids: Itera
 
 /** Setup's footnote under "Include songs I've already sifted". */
 export function reviewedNote(count: number, included: boolean): string {
-  if (included) return 'Songs you’ve already kept are included in new sifts.';
+  if (included) return 'Songs you’ve already kept are included in new sifts. Songs you removed stay out.';
   const n = count.toLocaleString('en-US');
   return count === 1
     ? '1 song you’ve already kept is left out of new sifts.'

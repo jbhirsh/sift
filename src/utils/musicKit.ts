@@ -111,6 +111,36 @@ export function countAdded(results: readonly AddResult[]): number {
   return results.filter((result) => result === 'added').length;
 }
 
+/**
+ * An add to a playlist that landed only some of its items. `unresolved`
+ * ones have no song to add (gone from the catalog, say): retrying won't
+ * help, so a caller can count them. `failed` ones were refused by the add
+ * itself (no network, say): those are worth trying again.
+ */
+export class AddShortfallError extends Error {
+  readonly added: number;
+  readonly unresolved: number;
+  readonly failed: number;
+  readonly requested: number;
+
+  constructor({ added, unresolved, failed }: { added: number; unresolved: number; failed: number }) {
+    const requested = added + unresolved + failed;
+    super(`${requested - added} of ${requested} tracks could not be added to the playlist`);
+    this.name = 'AddShortfallError';
+    this.added = added;
+    this.unresolved = unresolved;
+    this.failed = failed;
+    this.requested = requested;
+  }
+
+  /** The shortfall in a per-item add's results, or null when all landed. */
+  static of(results: readonly AddResult[]): AddShortfallError | null {
+    const count = (kind: AddResult) => results.filter((result) => result === kind).length;
+    const counts = { added: count('added'), unresolved: count('unresolved'), failed: count('failed') };
+    return counts.added === results.length ? null : new AddShortfallError(counts);
+  }
+}
+
 /** How many ids have something cached to play or add. */
 export function countCached(kinds: readonly CachedKind[]): number {
   return kinds.filter((kind) => kind != null).length;

@@ -32,7 +32,7 @@ const sessionArb = fc
     const base: SiftSession = { tracks, cursor: decided.length, kept, removed, skipped, sortOrder: 'oldest', savedAt: '2026-10-10T00:00:00.000Z' };
     return withOptional
       ? {
-        ...base, provider: 'apple-music', source: { type: 'library' }, pendingKeeps: kept.slice(0, 1), removalErrors: ['x'], failedRemovalIds: [], siftedPlaylistId: null,
+        ...base, provider: 'apple-music', source: { type: 'library' }, removalErrors: ['x'], failedRemovalIds: [],
         pending: decided.length > 0 ? { trackId: tracks[decided.length - 1].id, decision: decided[decided.length - 1], at: 1700000000000 } : null,
       }
       : base;

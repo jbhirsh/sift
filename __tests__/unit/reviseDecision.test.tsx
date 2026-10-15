@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { render, act } from '@testing-library/react-native';
 import * as Sentry from '@sentry/react-native';
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
-import { resetRemovalRetries, useMusicProvider } from '../../src/hooks/useMusicProvider';
+import { resetRemovalRetries } from '../../src/hooks/useMusicProvider';
 import { useSendPending } from '../../src/hooks/usePendingDecision';
 import { useReviseDecision } from '../../src/hooks/useReviseDecision';
 import { forgetRemovals, logRemoval } from '../../src/services/RemovalHistoryStore';
@@ -49,7 +49,7 @@ const mockProvider = {
   resume: jest.fn().mockResolvedValue(undefined),
   seek: jest.fn(),
   getPlaybackState: jest.fn().mockReturnValue({ position: 0, isPlaying: false }),
-  createPlaylist: jest.fn().mockResolvedValue(undefined),
+  createPlaylist: jest.fn().mockResolvedValue('new-playlist'),
   addToPlaylist: jest.fn().mockResolvedValue(undefined),
   removeFromLibrary: jest.fn().mockResolvedValue(undefined),
   removeFromPlaylist: jest.fn().mockResolvedValue(undefined),
@@ -72,18 +72,15 @@ const [trackA, trackB, trackC] = [track('a'), track('b'), track('c')];
 const mix: SiftSource = { type: 'playlist', playlist: { id: 'p1', name: 'Mix', trackCount: 3 } };
 
 let sift!: ReturnType<typeof useSift>;
-let api!: ReturnType<typeof useMusicProvider>;
 let send!: (pending: PendingDecision | null) => void;
 let revise!: (track: Track, decision: Decision) => Promise<boolean>;
 
 function Harness() {
   const currentSift = useSift();
-  const currentApi = useMusicProvider();
   const currentSend = useSendPending();
   const currentRevise = useReviseDecision(currentSend);
   useEffect(() => {
     sift = currentSift;
-    api = currentApi;
     send = currentSend;
     revise = currentRevise;
   });
@@ -206,29 +203,30 @@ describe('changing a decision', () => {
     expect(sift.state.kept).toEqual([trackA]);
   });
 
-  test('a playlist Keep changed to Skip comes out of "- Sifted", found by song', async () => {
+  test('a sent playlist Keep changed to Skip comes out of that playlist\'s ledger; nothing is written', async () => {
     await renderSift(mix);
-    // Read back under the library id Apple Music files a kept song under.
-    const landed = { ...trackA, id: 'i.lib-a' };
-    mockProvider.loadPlaylists.mockResolvedValue([{ id: 'sp', name: 'Mix - Sifted', trackCount: 2 }]);
     await decideAndSend('keep');
-    mockProvider.loadPlaylistTracks.mockResolvedValue([landed, trackB]);
+    expect(markReviewed).toHaveBeenCalledWith('apple-music:playlist:p1', 'a');
     await expect(change(trackA, 'skip')).resolves.toBe(true);
-    expect(mockProvider.removeFromPlaylist).toHaveBeenCalledWith('sp', ['i.lib-a']);
+    expect(unmarkReviewed).toHaveBeenCalledWith('apple-music:playlist:p1', 'a');
     expect(sift.state.skipped).toEqual([trackA]);
+    expect(sift.state.kept).toEqual([]);
+    expect(mockProvider.loadPlaylists).not.toHaveBeenCalled();
+    expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
+    expect(mockProvider.addToPlaylist).not.toHaveBeenCalled();
+    expect(mockProvider.createPlaylist).not.toHaveBeenCalled();
   });
 
-  test('kept again after that, it is added again', async () => {
+  test('kept again after that, it is remembered again', async () => {
     await renderSift(mix);
-    mockProvider.loadPlaylists.mockResolvedValue([{ id: 'sp', name: 'Mix - Sifted', trackCount: 1 }]);
     await decideAndSend('keep');
-    expect(mockProvider.addToPlaylist).toHaveBeenCalledTimes(1);
-    mockProvider.loadPlaylistTracks.mockResolvedValue([trackA]);
     await change(trackA, 'skip');
-    mockProvider.loadPlaylistTracks.mockResolvedValue([]);
     await change(trackA, 'keep');
-    expect(mockProvider.addToPlaylist).toHaveBeenCalledTimes(2);
-    expect(mockProvider.addToPlaylist).toHaveBeenLastCalledWith('sp', ['a']);
+    expect((markReviewed as jest.Mock).mock.calls).toEqual([
+      ['apple-music:playlist:p1', 'a'],
+      ['apple-music:playlist:p1', 'a'],
+    ]);
+    expect(sift.state.kept).toEqual([trackA]);
   });
 
   test('two changes of one song in the same millisecond both go out', async () => {
@@ -256,34 +254,6 @@ describe('changing a decision', () => {
     } finally {
       now.mockRestore();
     }
-  });
-
-  test('a playlist Keep that never landed comes out of the buffer instead', async () => {
-    await renderSift(mix);
-    await decideAndSend('skip');
-    await act(async () => {
-      sift.dispatch({ type: 'REVISE', trackId: 'a', decision: 'keep' });
-      sift.dispatch({ type: 'ADD_PENDING_KEEP', track: trackA });
-    });
-    await expect(change(trackA, 'remove')).resolves.toBe(true);
-    expect(sift.state.pendingKeeps).toEqual([]);
-    expect(mockProvider.loadPlaylistTracks).not.toHaveBeenCalledWith('sp');
-    // The new Remove is collected, like any Remove: the playlist isn't edited.
-    expect(mockProvider.removeFromLibrary).toHaveBeenCalledWith(['a']);
-    expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalledWith('p1', expect.anything());
-  });
-
-  test('with no "- Sifted" playlist, there is nothing to take out', async () => {
-    await renderSift(mix);
-    mockProvider.createPlaylist.mockRejectedValueOnce(new Error('offline'));
-    await decideAndSend('keep');
-    mockProvider.loadPlaylists.mockResolvedValue([]);
-    mockProvider.removeFromPlaylist.mockClear();
-    await act(async () => {
-      sift.dispatch({ type: 'REMOVE_PENDING_KEEPS', trackIds: ['a'] });
-    });
-    await expect(change(trackA, 'skip')).resolves.toBe(true);
-    expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
   });
 
   test('if the Remove can\'t be undone, nothing changes', async () => {
@@ -317,16 +287,15 @@ describe('changing a decision', () => {
     expect(forgetRemovals).toHaveBeenCalledWith('a', 'apple-music');
   });
 
-  test('if the Keep can\'t be taken back, nothing changes', async () => {
+  test('a sent playlist Keep changed to Remove is unremembered, then collected like any Remove', async () => {
     await renderSift(mix);
-    mockProvider.loadPlaylists.mockResolvedValue([{ id: 'sp', name: 'Mix - Sifted', trackCount: 1 }]);
     await decideAndSend('keep');
-    mockProvider.loadPlaylistTracks.mockResolvedValue([trackA]);
-    mockProvider.removeFromPlaylist.mockRejectedValueOnce(new Error('offline'));
-    await expect(change(trackA, 'remove')).resolves.toBe(false);
-    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'unkeep-track' } });
-    expect(sift.state.kept).toEqual([trackA]);
-    expect(sift.state.removed).toEqual([]);
+    await expect(change(trackA, 'remove')).resolves.toBe(true);
+    expect(unmarkReviewed).toHaveBeenCalledWith('apple-music:playlist:p1', 'a');
+    expect(mockProvider.removeFromLibrary).toHaveBeenCalledWith(['a']);
+    expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
+    expect(sift.state.removed).toEqual([trackA]);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
   test('an undecided card can\'t be changed; the same decision is no change', async () => {
@@ -340,20 +309,4 @@ describe('changing a decision', () => {
     expect(sift.state.kept).toEqual([trackA]);
   });
 
-  test('unkeepTrack without a way to remove from playlists reports it', async () => {
-    await renderSift(mix);
-    mockProvider.loadPlaylists.mockResolvedValue([{ id: 'sp', name: 'Mix - Sifted', trackCount: 1 }]);
-    mockProvider.loadPlaylistTracks.mockResolvedValue([trackA]);
-    const remove = mockProvider.removeFromPlaylist;
-    (mockProvider as Partial<typeof mockProvider>).removeFromPlaylist = undefined;
-    try {
-      let ok = true;
-      await act(async () => {
-        ok = await api.unkeepTrack(trackA);
-      });
-      expect(ok).toBe(false);
-    } finally {
-      mockProvider.removeFromPlaylist = remove;
-    }
-  });
 });

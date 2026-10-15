@@ -16,13 +16,14 @@ const mockSift = {
 const mockProvider = {
   keepTrack: jest.fn(() => Promise.resolve()),
   removeTrack: jest.fn(() => Promise.resolve()),
-  keepFromSavedSession: jest.fn(() => Promise.resolve()),
 };
 
 jest.mock('../../src/context/SiftContext', () => ({ useSift: () => mockSift }));
 jest.mock('../../src/hooks/useMusicProvider', () => ({ useMusicProvider: () => mockProvider }));
+jest.mock('../../src/services/ReviewedLedgerStore', () => ({ markReviewed: jest.fn(() => Promise.resolve()) }));
 
 import { useHoldPendingDecision, useSendPending, useSendSavedPending, wasSent, UNDO_WINDOW_MS } from '../../src/hooks/usePendingDecision';
+import { markReviewed } from '../../src/services/ReviewedLedgerStore';
 import type { SiftSession } from '../../src/types';
 
 // Each test uses its own times: the sent set lives for the module.
@@ -75,25 +76,14 @@ describe('useSendPending', () => {
     expect(mockSift.dispatch).toHaveBeenCalledTimes(2);
   });
 
-  test('Done hands a playlist keep to its fallback save; a library keep is still sent', async () => {
-    mockSift.state.source = { type: 'playlist', playlist: { id: 'p', name: 'Mix', trackCount: 2 } };
-    const { result } = await renderHook(() => useSendPending({ bufferPlaylistKeeps: true }));
-    await act(async () => result.current(held('b', 'keep')));
-    expect(mockSift.dispatch).toHaveBeenCalledWith({ type: 'ADD_PENDING_KEEP', track: track('b') });
-    expect(mockProvider.keepTrack).not.toHaveBeenCalled();
-
-    mockSift.state = { ...mockSift.state, source: { type: 'library' } };
-    const { result: library } = await renderHook(() => useSendPending({ bufferPlaylistKeeps: true }));
-    await act(async () => library.current(held('a', 'keep')));
-    expect(mockProvider.keepTrack).toHaveBeenCalledWith(track('a'));
-  });
-
-  test('elsewhere a playlist keep is sent', async () => {
+  test('a playlist keep is sent like a library one, on every screen', async () => {
     mockSift.state.source = { type: 'playlist', playlist: { id: 'p', name: 'Mix', trackCount: 2 } };
     const { result } = await renderHook(() => useSendPending());
-    await act(async () => result.current(held('a', 'keep')));
+    const pending = held('a', 'keep');
+    await act(async () => result.current(pending));
     expect(mockProvider.keepTrack).toHaveBeenCalledWith(track('a'));
-    expect(mockSift.dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'ADD_PENDING_KEEP' }));
+    expect(mockSift.dispatch).toHaveBeenCalledTimes(1);
+    expect(mockSift.dispatch).toHaveBeenCalledWith({ type: 'PENDING_SENT', trackId: 'a', at: pending.at });
   });
 
   test('finds tracks from the latest render', async () => {
@@ -166,7 +156,7 @@ describe('useSendSavedPending', () => {
   const playlist: SiftSource = { type: 'playlist', playlist: { id: 'p', name: 'Mix', trackCount: 2 } };
   const saved = (pending: PendingDecision | null, over: Partial<SiftSession> = {}): SiftSession => ({
     tracks: [track('a'), track('b')], cursor: 1, kept: [], removed: [], skipped: [], sortOrder: 'random',
-    savedAt: '2026-01-01T00:00:00.000Z', provider: 'apple-music', source: playlist, siftedPlaylistId: 'sp', pending,
+    savedAt: '2026-01-01T00:00:00.000Z', provider: 'apple-music', source: playlist, pending,
     ...over,
   });
 
@@ -179,15 +169,15 @@ describe('useSendSavedPending', () => {
     expect(wasSent(pending)).toBe(true);
   });
 
-  test('sends a held Keep with the session\'s sifted playlist', async () => {
+  test('records a held Keep in the saved session\'s own source\'s ledger, writing nothing to the service', async () => {
     const { result } = await renderHook(() => useSendSavedPending());
     await act(async () => result.current(saved(held('a', 'keep'))));
-    expect(mockProvider.keepFromSavedSession).toHaveBeenCalledWith(
-      track('a'), { source: playlist, provider: 'apple-music', siftedPlaylistId: 'sp' });
+    expect(markReviewed).toHaveBeenCalledTimes(1);
+    expect(markReviewed).toHaveBeenCalledWith('apple-music:playlist:p', 'a');
+    expect(mockProvider.keepTrack).not.toHaveBeenCalled();
     jest.clearAllMocks();
-    await act(async () => result.current(saved(held('b', 'keep'), { siftedPlaylistId: undefined })));
-    expect(mockProvider.keepFromSavedSession).toHaveBeenCalledWith(
-      track('b'), { source: playlist, provider: 'apple-music', siftedPlaylistId: null });
+    await act(async () => result.current(saved(held('b', 'keep'), { source: { type: 'library' } })));
+    expect(markReviewed).toHaveBeenCalledWith('apple-music:library', 'b');
   });
 
   test('sends it once, even if Resume or another discard gets to it too', async () => {
@@ -216,8 +206,10 @@ describe('useSendSavedPending', () => {
       result.current(saved(held('zz', 'remove')));
       result.current(saved(held('a', 'remove'), { source: undefined }));
       result.current(saved(held('a', 'remove'), { provider: undefined }));
+      result.current(saved(held('b', 'keep'), { source: undefined }));
+      result.current(saved(held('zz', 'keep')));
     });
     expect(mockProvider.removeTrack).not.toHaveBeenCalled();
-    expect(mockProvider.keepFromSavedSession).not.toHaveBeenCalled();
+    expect(markReviewed).not.toHaveBeenCalled();
   });
 });
