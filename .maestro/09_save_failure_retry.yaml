@@ -63,7 +63,7 @@ name: "Save Failure Shows Retry, Retry Recovers"
 - extendedWaitUntil:
     visible:
       id: "reviewed-note"
-      text: "Songs you’ve already kept are included in new sifts\\..*"
+      text: "Songs you’ve already kept are included in new sifts\\. Songs you removed stay out\\."
     timeout: 10000
 
 # Most Played first, so the song missing from "Road Trip - Sifted" (Kiss Me
