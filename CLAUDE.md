@@ -305,7 +305,10 @@ Makefile                Dev commands (test, lint, typecheck, check)
   only), in parallel with CI rather than after it, so a red PR is reviewed
   too. It is kept out of `ci.yml` because claude-code-action skips (while
   reporting success) any PR that edits the workflow file it runs from; in
-  its own file, CI changes still get reviewed. The auto-fix workflow lives
+  its own file, CI changes still get reviewed. It reads every changed file's
+  diff on its own (big output is cut to a preview it must open in full) and
+  posts one summary comment per PR, updated on each push, saying what it
+  read; only its inline comments are merge blockers. The auto-fix workflow lives
   alongside it in `.github/workflows/claude-autofix.yml`. It acts only on
   bots' PRs (Dependabot's): it fixes review threads opened by Claude Review or
   the owner (two rounds per PR at most, once CI and Claude Review are both
