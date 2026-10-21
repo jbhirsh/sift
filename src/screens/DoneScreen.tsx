@@ -672,10 +672,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING['2xl'],
     paddingVertical: 4,
   },
+  // Even padding on both sides: the right reaches into the row's margin,
+  // so the word stays where it was.
   restoreButton: {
     minHeight: 44,
     justifyContent: 'center',
-    paddingLeft: 12,
+    paddingHorizontal: 12,
+    marginRight: -12,
   },
   restoreButtonText: {
     fontSize: 15,
