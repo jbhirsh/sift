@@ -378,11 +378,11 @@ Makefile                Dev commands (test, lint, typecheck, check)
   re-run CI to get past it.** Read the run's `maestro-results` artifact
   first: the app's trace (`trace.txt`: every touch with where it landed
   and how late JavaScript saw it, every screen and sheet (when it started
-  rendering and when it was up), every app action,
-  each decision-guard check and any JavaScript stall; `services/trace`,
-  written only by the E2E build), Maestro's log, each command's result and
-  the view hierarchy at the failure (`suite-debug/`), the system log for
-  the app (`app-log.txt`), the screenshots. A touch followed by no action,
+  rendering, when React committed it and when it was up), every app
+  action, each decision-guard check and any JavaScript stall;
+  `services/trace`, written only by the E2E build), Maestro's log, each
+  command's result and the view hierarchy at the failure (`suite-debug/`),
+  the system log for the app (`app-log.txt`), the screenshots. A touch followed by no action,
   screen or guard line is a tap the app dropped; say where, then fix it. Then fix the flow (wait for the element with
   `extendedWaitUntil`, never assert right after an animated transition) or
   the app, whichever is wrong. No retry in a flow to cover one either (a
