@@ -207,3 +207,33 @@ export function bestPreviewCandidate<T extends CandidateSong>(
 export function toCandidate(raw: RawTrack): CandidateSong {
   return { id: raw.id, title: raw.name, artist: raw.artist, duration: raw.duration };
 }
+
+/**
+ * MusicKitError's descriptions (ExpoMusicKitModule.swift), as the bridge
+ * passes them on in the rejected error's message.
+ */
+export const NO_TRACKS_FOUND = 'No tracks found for the given IDs.';
+const NOT_AUTHORIZED = 'Music library access not authorized';
+
+/**
+ * Why loading songs failed (#174), for the words Setup shows:
+ * - `gone`: the playlist isn't in the library any more (MusicKit's
+ *   noTracksFound for a playlist id); trying again won't help.
+ * - `denied`: library access was taken away.
+ * - `offline`: the network, by the system's own wording. Only English
+ *   wording is known: on another language it counts as `other`.
+ * - `other`: anything else.
+ * Not "connection" alone: the system's "connection to service … was
+ * interrupted" is no network problem.
+ */
+export type LoadFailure = 'gone' | 'denied' | 'offline' | 'other';
+
+export function loadFailureKind(error: unknown): LoadFailure {
+  const text = error instanceof Error ? error.message : '';
+  if (text.includes(NO_TRACKS_FOUND)) return 'gone';
+  if (text.includes(NOT_AUTHORIZED)) return 'denied';
+  if (/offline|internet connection|network connection|network error|timed out|could not connect to the server|hostname could not be found/i.test(text)) {
+    return 'offline';
+  }
+  return 'other';
+}

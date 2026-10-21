@@ -18,6 +18,8 @@ import {
   webArtworkURL,
   type CandidateSong,
   type RawTrack,
+  loadFailureKind,
+  NO_TRACKS_FOUND,
 } from '../../src/utils/musicKit';
 
 const raw = (over: Partial<RawTrack> = {}): RawTrack => ({
@@ -248,5 +250,44 @@ describe('bestPreviewCandidate', () => {
 describe('toCandidate', () => {
   test('is the pairing view of a raw track', () => {
     expect(toCandidate(raw())).toEqual(song('i1', 'Peaches', 'Justin Bieber', 198));
+  });
+});
+
+describe('loadFailureKind (#174)', () => {
+  // As the bridge passes a native error on: Expo prefixes the description.
+  const native = (description: string) => new Error(`Calling the 'loadPlaylistItems' function has failed\n\u2192 Caused by: ${description}`);
+
+  test('a playlist no longer in the library', () => {
+    expect(loadFailureKind(native(NO_TRACKS_FOUND))).toBe('gone');
+  });
+
+  test('library access taken away', () => {
+    expect(loadFailureKind(native('Music library access not authorized. Allow access in Settings > Privacy & Security > Media & Apple Music.'))).toBe('denied');
+  });
+
+  test.each([
+    'The Internet connection appears to be offline.',
+    'Device is offline',
+    'The internet connection was lost.',
+    'The network connection was lost.',
+    'A network error occurred.',
+    'The request timed out.',
+    'Could not connect to the server.',
+    'A server with the specified hostname could not be found.',
+  ])('the network: %s', (message) => {
+    expect(loadFailureKind(new Error(message))).toBe('offline');
+  });
+
+  test.each([
+    'The connection to service named com.apple.Music.xpc was interrupted.',
+    'Couldn\u2019t read the whole playlist.',
+    '',
+  ])('anything else: %p', (message) => {
+    expect(loadFailureKind(new Error(message))).toBe('other');
+  });
+
+  test('not an Error at all', () => {
+    expect(loadFailureKind('offline')).toBe('other');
+    expect(loadFailureKind(undefined)).toBe('other');
   });
 });

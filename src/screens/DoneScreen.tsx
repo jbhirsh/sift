@@ -200,7 +200,9 @@ export default function DoneScreen() {
           onPress={() => handleRestore(track)}
           disabled={restoringIds.has(track.id)}
           style={[styles.restoreButton, restoringIds.has(track.id) && { opacity: 0.4 }]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          // Sideways only: it's as tall as its row, and more would reach
+          // into the next row's Restore.
+          hitSlop={{ left: 8, right: 8 }}
           accessibilityRole="button"
           accessibilityLabel={`Restore ${track.name}`}
         >
@@ -648,14 +650,16 @@ const styles = StyleSheet.create({
   removalErrorItem: {
     fontSize: 12,
   },
+  // Copy List and Restore are 44 pt tall, a full-size target (#174).
   smallSecondaryButton: {
+    minHeight: 44,
+    justifyContent: 'center',
     borderRadius: RADIUS.sm,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 14,
     borderWidth: 1,
   },
   smallSecondaryButtonText: {
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: '600',
   },
   playlistError: {
@@ -666,9 +670,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING['2xl'],
-    paddingVertical: 8,
+    paddingVertical: 4,
   },
   restoreButton: {
+    minHeight: 44,
+    justifyContent: 'center',
     paddingLeft: 12,
   },
   restoreButtonText: {

@@ -1,5 +1,6 @@
 import type { Decision, MusicProvider, SiftSource, Track } from '../types';
 import { APPLE_REMOVED_PLAYLIST, collectsRemovals } from './libraryRemovals';
+import { loadFailureKind } from './musicKit';
 
 // What Remove and Keep actually do, said the same way everywhere: the Setup
 // footnote, the first-remove note, the discard confirmation and Done. One
@@ -24,6 +25,33 @@ export function removeExplanation(provider: MusicProvider, source: SiftSource): 
   return source.type === 'playlist'
     ? `${removed}. Kept songs stay, and you can save them as a playlist when you\u2019re done.`
     : `${removed}.`;
+}
+
+/** Setup's words when Music won't let Sift read the library. */
+export const ACCESS_REQUIRED = 'Music library access is required to use Sift.';
+
+/**
+ * What Setup says when loading the songs failed outright (#174). The
+ * service's own error text ("No tracks found for the given IDs.") means
+ * nothing to the user: it says what didn't load and what will help, which
+ * is not always trying again (`loadFailureKind`).
+ */
+export function loadFailureMessage(source: SiftSource, error: unknown): string {
+  const what = source.type === 'playlist' ? `"${source.playlist.name}"` : 'your library';
+  switch (loadFailureKind(error)) {
+    case 'gone':
+      if (source.type === 'playlist') {
+        return `Couldn\u2019t find ${what} in your library. Pick another playlist.`;
+      }
+      break;
+    case 'denied':
+      return `${ACCESS_REQUIRED} Allow it in Settings, under Privacy & Security, Media & Apple Music.`;
+    case 'offline':
+      return `Couldn\u2019t load ${what}: Music can\u2019t be reached. Check your connection, then try again.`;
+    case 'other':
+      break;
+  }
+  return `Couldn\u2019t load ${what}. Try again in a moment.`;
 }
 
 /** The first card's one-time hint: nothing else says which way is which. */

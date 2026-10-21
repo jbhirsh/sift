@@ -486,11 +486,16 @@ export default function SetupScreen() {
               <Text style={[styles.selectedPlaylistName, { color: colors.text }]} numberOfLines={1}>
                 {state.source.playlist.name}
               </Text>
+              {/* A button VoiceOver names, with a full-size hit area (#174). */}
               <TouchableOpacity
+                testID="setup-change-playlist"
                 onPress={openPlaylistPicker}
+                style={styles.changeButton}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityHint="Picks another playlist to sift"
               >
-                <Text style={[styles.changeButton, { color: colors.accent }]}>
+                <Text style={[styles.changeButtonText, { color: colors.accent }]}>
                   Change
                 </Text>
               </TouchableOpacity>
@@ -740,20 +745,24 @@ const styles = StyleSheet.create({
   segmentText: {
     fontSize: 15,
   },
+  // The value buttons are 44 pt tall (#174); the rows' padding shrinks to
+  // match, so the cards keep their height.
   sortContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   sortButton: {
-    paddingVertical: 4,
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: 8,
   },
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 4,
   },
   filterDivider: {
     height: StyleSheet.hairlineWidth,
@@ -805,7 +814,15 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: SPACING.base,
   },
+  // 44 pt to hit, laid out as tall as its text, so the row keeps its height.
   changeButton: {
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.base,
+    marginRight: -SPACING.base,
+    marginVertical: -13,
+  },
+  changeButtonText: {
     fontSize: 15,
     fontWeight: '600',
   },

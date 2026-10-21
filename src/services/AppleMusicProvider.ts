@@ -14,6 +14,7 @@ import {
   countCached,
   LIBRARY_PAGE_SIZE,
   LOOKUP_BATCH_SIZE,
+  NO_TRACKS_FOUND,
   PLAYLISTS_PAGE_SIZE,
   PREVIEW_SEARCH_LIMIT,
   preferSongs,
@@ -28,7 +29,6 @@ import {
 /** The native module's API, typed from its wrapper so the two can't drift. */
 type NativeMusicKit = typeof import('../../modules/expo-musickit/src/index');
 
-const NO_TRACKS_FOUND = 'No tracks found for the given IDs.';
 // How long a write that never settles holds up the next one.
 export const WRITE_STALL_MS = 30000;
 // How long a playlist created here counts when the library doesn't list it

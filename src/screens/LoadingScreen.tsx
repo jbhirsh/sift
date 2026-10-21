@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import {
+  AccessibilityInfo,
   View,
   Text,
   StyleSheet,
@@ -23,6 +24,15 @@ export default function LoadingScreen() {
     loadTracks({ skipFiltering });
   }, [loadTracks, skipFiltering]);
 
+  // VoiceOver hears each step as the bar moves (#174): nothing else tells
+  // it the screen is still working. Queued, so a quick step doesn't cut
+  // off the one before.
+  const { loadMessage } = state;
+  useEffect(() => {
+    if (loadMessage) AccessibilityInfo.announceForAccessibilityWithOptions(loadMessage, { queue: true });
+  }, [loadMessage]);
+  const percent = Math.round(Math.min(state.loadProgress, 1) * 100);
+
   return (
     <View style={styles.container}>
       <GlassBackground phase="loading" />
@@ -37,20 +47,30 @@ export default function LoadingScreen() {
       </Text>
 
       <View style={styles.progressSection}>
-        {/* Glass progress pill */}
-        <GlassCard intensity="thin" radius={16}>
-          <View style={styles.progressPill}>
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  backgroundColor: colors.accent,
-                  width: `${Math.min(state.loadProgress * 100, 100)}%`,
-                },
-              ]}
-            />
-          </View>
-        </GlassCard>
+        {/* Glass progress pill: as wide as the screen allows, up to 300 pt
+            (a fixed 300 ran into the margins on an SE or mini, #174). */}
+        <View
+          testID="loading-progress"
+          style={styles.progressTrack}
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel="Loading"
+          accessibilityValue={{ min: 0, max: 100, now: percent }}
+        >
+          <GlassCard intensity="thin" radius={16}>
+            <View style={styles.progressPill}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    backgroundColor: colors.accent,
+                    width: `${percent}%`,
+                  },
+                ]}
+              />
+            </View>
+          </GlassCard>
+        </View>
 
         <Text
           testID="loading-message"
@@ -86,8 +106,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     width: '100%',
   },
+  progressTrack: {
+    width: '100%',
+    maxWidth: 300,
+  },
   progressPill: {
-    width: 300,
     height: 32,
     justifyContent: 'center',
     overflow: 'hidden',

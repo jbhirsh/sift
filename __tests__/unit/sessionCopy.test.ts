@@ -15,6 +15,8 @@ import {
   keptSaveFailure,
   keptSaveMessage,
   keptSaveRetryable,
+  ACCESS_REQUIRED,
+  loadFailureMessage,
   nothingRemovedNote,
   SAVE_KEPT_TITLE,
   siftedPlaylistName,
@@ -71,6 +73,35 @@ describe('finishing a Remove in Music', () => {
     );
     expect(playlistStartOverMessage(deleting, 'Mix')).toBe(
       'This starts "Mix" over and clears the removal history for this playlist. This cannot be undone.',
+    );
+  });
+});
+
+describe('loadFailureMessage (#174)', () => {
+  test('names what didn\'t load, never the service\'s own text', () => {
+    const raw = new Error('Something MusicKit said.');
+    expect(loadFailureMessage(library, raw)).toBe('Couldn\u2019t load your library. Try again in a moment.');
+    expect(loadFailureMessage(playlist, raw)).toBe('Couldn\u2019t load "Workout Mix". Try again in a moment.');
+    expect(loadFailureMessage(library, 'not an Error')).toBe('Couldn\u2019t load your library. Try again in a moment.');
+  });
+
+  test('a playlist gone from the library says to pick another, not to try again', () => {
+    const gone = new Error('No tracks found for the given IDs.');
+    expect(loadFailureMessage(playlist, gone)).toBe('Couldn\u2019t find "Workout Mix" in your library. Pick another playlist.');
+    // The library itself can't be gone: the general words.
+    expect(loadFailureMessage(library, gone)).toBe('Couldn\u2019t load your library. Try again in a moment.');
+  });
+
+  test('access taken away says where to allow it', () => {
+    const denied = new Error('Music library access not authorized. Allow access in Settings > Privacy & Security > Media & Apple Music.');
+    expect(loadFailureMessage(library, denied)).toBe(
+      `${ACCESS_REQUIRED} Allow it in Settings, under Privacy & Security, Media & Apple Music.`,
+    );
+  });
+
+  test('a lost connection says so', () => {
+    expect(loadFailureMessage(playlist, new Error('The Internet connection appears to be offline.'))).toBe(
+      'Couldn\u2019t load "Workout Mix": Music can\u2019t be reached. Check your connection, then try again.',
     );
   });
 });
