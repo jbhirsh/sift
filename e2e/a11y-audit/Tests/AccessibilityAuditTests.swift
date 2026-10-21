@@ -23,7 +23,7 @@ final class AccessibilityAuditTests: XCTestCase {
   }
 
   /// One pass through the app, as a fresh install sees it (the runner
-  /// reinstalls first): Setup, Sift, Settings, then Done.
+  /// reinstalls first): Setup, Sift, Settings, then Done with removed songs.
   func testEveryScreen() throws {
     app.launch()
     waitFor("setup-brand")
@@ -39,10 +39,15 @@ final class AccessibilityAuditTests: XCTestCase {
     element("settings-done-button").tap()
     waitFor("card-track-name")
 
-    app.buttons["Keep"].tap()
+    // Two Removes, so Done shows its Finish in Music card (#173): the E2E
+    // build fails the first removed song of a launch
+    // (EXPO_PUBLIC_MOCK_FAIL_REMOVES=1), and the second lands.
+    app.buttons["Remove"].tap()
+    waitFor("undo-pill")
+    app.buttons["Remove"].tap()
     waitFor("finish-button")
     element("finish-button").tap()
-    waitFor("done-title")
+    waitFor("finish-in-music")
     try audit("Done")
   }
 

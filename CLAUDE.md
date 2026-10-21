@@ -244,7 +244,10 @@ Makefile                Dev commands (test, lint, typecheck, check)
   MusicKit can't delete library songs and edits only playlists the app
   created, so every Apple Music Remove, from a library or a playlist sift,
   adds the song to "Sift — Removed" (`AppleMusicProvider.removeFromLibrary`)
-  for the user to delete from their library in Music; Done says how.
+  for the user to delete from their library in Music; Done's "Finish in
+  Music" card says how (on a Mac, select all; on iPhone, one at a time),
+  with Open Music, whenever a removal reached it (#173); Share List shows
+  whenever anything was removed.
   Removed songs are left out of every later sift (`collectedRemovalIds`, a
   playlist record carries `collected: true`); Restore takes the song back
   out (`restoreRemoved`) and forgets every record of it. Start Over clears

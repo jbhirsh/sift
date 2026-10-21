@@ -1,5 +1,5 @@
 import React from 'react';
-import { AccessibilityInfo, ActionSheetIOS, Alert, Text } from 'react-native';
+import { AccessibilityInfo, ActionSheetIOS, Alert, Linking, Share, Text } from 'react-native';
 import { fireEvent, act, waitFor } from '@testing-library/react-native';
 
 // Common mocks
@@ -72,6 +72,7 @@ jest.mock('../../src/hooks/useResolvedArtwork', () => ({
 // Must import after mocks
 import { renderWithProviders, mockTrackA, mockTrackB, mockTrackC } from '../helpers/renderWithProviders';
 import { a11yViolations } from '../helpers/a11yScan';
+import { FINISH_IN_MUSIC_NOTE, FINISH_IN_MUSIC_STEPS, FINISH_IN_MUSIC_WAYS } from '../../src/utils/sessionCopy';
 import { clearHistoryForSource } from '../../src/services/RemovalHistoryStore';
 import { clearSession } from '../../src/services/SessionStore';
 import { useSift } from '../../src/context/SiftContext';
@@ -1372,10 +1373,6 @@ describe('LoadingScreen', () => {
   });
 });
 
-// Mock Clipboard on react-native's Clipboard export
-import { Clipboard } from 'react-native';
-const mockClipboardSetString = jest.fn();
-Clipboard.setString = mockClipboardSetString;
 
 describe('DoneScreen', () => {
   const tracks = [mockTrackA, mockTrackB, mockTrackC];
@@ -1549,63 +1546,90 @@ describe('DoneScreen', () => {
   });
 
 
-  test('shows removed tracks section after removing tracks', async () => {
-    const DecideThenDone = () => {
-      const { decide, state } = useSift();
-      React.useEffect(() => { decide('remove'); }, [decide]);
-      if (state.removed.length === 0) return null;
-      return <DoneScreen />;
-    };
-    const { getByText } = await renderWithProviders(<DecideThenDone />, { initialTracks: tracks });
+  // Removes a song, then shows Done (#173).
+  const RemoveThenDone = () => {
+    const { decide, state } = useSift();
+    const ran = React.useRef(false);
+    React.useEffect(() => {
+      if (ran.current) return;
+      ran.current = true;
+      decide('remove');
+    }, [decide]);
+    if (state.removed.length === 0) return null;
+    return <DoneScreen />;
+  };
+
+  test('a Remove that reached "Sift \u2014 Removed" gets the Finish in Music card, first thing (#173)', async () => {
+    const { getByText, getByTestId, getByLabelText } = await renderWithProviders(<RemoveThenDone />, { initialTracks: tracks });
     expect(getByText('Tracks Removed')).toBeTruthy();
-    expect(getByText('Copy List')).toBeTruthy();
+    const title = getByTestId('finish-in-music');
+    expect(title.props.children).toBe('Finish in Music');
+    expect(title.props.accessibilityRole).toBe('header');
+    for (const step of FINISH_IN_MUSIC_STEPS) expect(getByText(step)).toBeTruthy();
+    for (const way of FINISH_IN_MUSIC_WAYS) expect(getByLabelText(way)).toBeTruthy();
+    expect(getByText(FINISH_IN_MUSIC_NOTE)).toBeTruthy();
+    expect(getByTestId('open-music')).toBeTruthy();
+    expect(getByTestId('share-removed')).toBeTruthy();
   });
 
-  test('copy list button copies removed tracks', async () => {
-    const DecideThenDone = () => {
-      const { decide, state } = useSift();
-      React.useEffect(() => { decide('remove'); }, [decide]);
+  test('with every removal failed, nothing reached Music: no card, but the list can still be shared (#173)', async () => {
+    mockProvider.removeFromLibrary.mockRejectedValue(new Error('offline'));
+    const AllFailed = () => {
+      const { decide, dispatch, state } = useSift();
+      const ran = React.useRef(false);
+      React.useEffect(() => {
+        if (ran.current) return;
+        ran.current = true;
+        decide('remove');
+        dispatch({ type: 'ADD_REMOVAL_ERROR', error: mockTrackA.name, failedRemovalId: mockTrackA.id });
+        dispatch({ type: 'FINISH' });
+      }, [decide, dispatch]);
       if (state.removed.length === 0) return null;
       return <DoneScreen />;
     };
-    const { getByText } = await renderWithProviders(<DecideThenDone />, { initialTracks: tracks });
-    await fireEvent.press(getByText('Copy List'));
-    expect(mockClipboardSetString).toHaveBeenCalled();
-    expect(getByText('Copied!')).toBeTruthy();
+    const { getByTestId, queryByTestId } = await renderWithProviders(<AllFailed />, { initialTracks: tracks });
+    await act(async () => {});
+    expect(getByTestId('removal-errors')).toBeTruthy();
+    expect(queryByTestId('finish-in-music')).toBeNull();
+    expect(queryByTestId('open-music')).toBeNull();
+    expect(getByTestId('share-removed')).toBeTruthy();
+    mockProvider.removeFromLibrary.mockReset().mockResolvedValue(undefined);
   });
 
-  test('copy toast reset timer is cleared on unmount', async () => {
-    // Regression: the 2s "Copied!" reset timeout leaked past unmount,
-    // firing setState on an unmounted screen and holding the process open
-    // (Jest's "did not exit one second after the test run" warning).
-    jest.useFakeTimers();
+  test('Open Music opens the Music app, and says so when it can\'t (#173)', async () => {
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(true);
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     try {
-      const DecideThenDone = () => {
-        const { decide, state } = useSift();
-        React.useEffect(() => { decide('remove'); }, [decide]);
-        if (state.removed.length === 0) return null;
-        return <DoneScreen />;
-      };
-      const { getByText, unmount } = await renderWithProviders(<DecideThenDone />, { initialTracks: tracks });
-      // Spy on the timer pair rather than counting pending timers — the
-      // press also schedules framework-internal timers, so identify the
-      // toast timer by its unique 2000ms delay and assert that exact
-      // handle is what unmount clears.
-      const setSpy = jest.spyOn(globalThis, 'setTimeout');
-      const clearSpy = jest.spyOn(globalThis, 'clearTimeout');
-      try {
-        await fireEvent.press(getByText('Copy List'));
-        const toastCallIndex = setSpy.mock.calls.findIndex((call) => call[1] === 2000);
-        expect(toastCallIndex).toBeGreaterThanOrEqual(0);
-        const toastHandle = setSpy.mock.results[toastCallIndex].value;
-        await unmount();
-        expect(clearSpy).toHaveBeenCalledWith(toastHandle);
-      } finally {
-        setSpy.mockRestore();
-        clearSpy.mockRestore();
-      }
+      const { getByTestId } = await renderWithProviders(<RemoveThenDone />, { initialTracks: tracks });
+      await fireEvent.press(getByTestId('open-music'));
+      expect(openURL).toHaveBeenCalledWith('music://');
+      expect(alert).not.toHaveBeenCalled();
+
+      openURL.mockRejectedValueOnce(new Error('no Music app'));
+      await fireEvent.press(getByTestId('open-music'));
+      await act(async () => {});
+      expect(alert).toHaveBeenCalledWith('Couldn\u2019t open Music', 'Open the Music app yourself to finish.');
     } finally {
-      jest.useRealTimers();
+      openURL.mockRestore();
+      alert.mockRestore();
+    }
+  });
+
+  test('Share List shares the removed songs; a sheet that fails to open is no error (#173)', async () => {
+    const share = jest.spyOn(Share, 'share').mockResolvedValueOnce({ action: 'sharedAction' });
+    try {
+      const { getByTestId } = await renderWithProviders(<RemoveThenDone />, { initialTracks: tracks });
+      await fireEvent.press(getByTestId('share-removed'));
+      expect(share).toHaveBeenCalledTimes(1);
+      expect(share.mock.calls[0][0]).toEqual({ message: `${mockTrackA.name} \u2014 ${mockTrackA.artist}` });
+
+      // A sheet that fails to open throws nothing at the user.
+      share.mockRejectedValueOnce(new Error('could not present'));
+      await fireEvent.press(getByTestId('share-removed'));
+      await act(async () => {});
+      expect(share).toHaveBeenCalledTimes(2);
+    } finally {
+      share.mockRestore();
     }
   });
 
@@ -1704,7 +1728,7 @@ describe('DoneScreen', () => {
     // Track A is recorded more than once. Only Track A's removal failed.
     expect(getByText('2 of 3 have been added to "Sift — Removed" in Music; 1 could not be.')).toBeTruthy();
     // Some landed, so Done says how to finish in Music.
-    expect(getByTestId('delete-in-music-hint')).toBeTruthy();
+    expect(getByTestId('finish-in-music')).toBeTruthy();
     mockProvider.removeFromLibrary.mockReset().mockResolvedValue(undefined);
   });
 
@@ -2371,8 +2395,10 @@ describe('VoiceOver scan (#146)', () => {
       }, [decide, dispatch]);
       return <DoneScreen />;
     };
-    const { toJSON } = await renderWithProviders(<WithRemoved />, { initialTracks: [mockTrackA, mockTrackB, mockTrackC] });
+    const { toJSON, getByTestId } = await renderWithProviders(<WithRemoved />, { initialTracks: [mockTrackA, mockTrackB, mockTrackC] });
     await act(async () => {});
+    // The Finish in Music card is in what's scanned (#173).
+    expect(getByTestId('finish-in-music')).toBeTruthy();
     expect(a11yViolations(toJSON())).toEqual([]);
   });
 

@@ -9,6 +9,13 @@ import type { MusicProvider, RemovalRecord } from '../types';
 export const APPLE_REMOVED_PLAYLIST = 'Sift — Removed';
 
 /**
+ * Opens the Music app, for finishing a Remove there (#173). It can't open
+ * "Sift — Removed" itself: Apple's playlist links are for catalog
+ * playlists, not ones in the user's library.
+ */
+export const MUSIC_APP_URL = 'music://';
+
+/**
  * Whether this provider's Remove collects songs in "Sift — Removed" rather
  * than deleting them or editing the playlist being sifted. Such a removal
  * is one per song, whatever sift made it.
