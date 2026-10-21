@@ -592,29 +592,29 @@ describe('useMusicProvider — observable state', () => {
     await act(async () => {
       await api.loadTracks();
     });
-    expect(sift.state.loadError).toBe('This provider does not support playlist loading');
+    expect(sift.state.loadError).toBe('Couldn\u2019t load "My Playlist". Try again in a moment.');
     expect(sift.state.phase).toBe('setup');
   });
 
-  test('loadTracks failure surfaces the reason, generic for non-Errors', async () => {
-    mockProvider.loadLibrary.mockRejectedValueOnce(new Error('load fail'));
+  test('loadTracks failure says what didn\'t load in plain words; the raw error goes to Sentry (#174)', async () => {
+    const raw = new Error('No tracks found for the given IDs.');
+    mockProvider.loadLibrary.mockRejectedValueOnce(raw);
     await renderHarness();
 
     await act(async () => {
       await api.loadTracks();
     });
-    expect(sift.state.loadError).toBe('load fail');
+    expect(sift.state.loadError).toBe('Couldn\u2019t load your library. Try again in a moment.');
     expect(sift.state.phase).toBe('setup');
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      { tags: { flow: 'load-tracks' } },
-    );
+    expect(Sentry.captureException).toHaveBeenCalledWith(raw, { tags: { flow: 'load-tracks' } });
 
-    mockProvider.loadLibrary.mockRejectedValueOnce('string error');
+    mockProvider.loadLibrary.mockRejectedValueOnce(new Error('The Internet connection appears to be offline.'));
     await act(async () => {
       await api.loadTracks();
     });
-    expect(sift.state.loadError).toBe('Failed to load tracks');
+    expect(sift.state.loadError).toBe(
+      'Couldn\u2019t load your library: Music can\u2019t be reached. Check your connection, then try again.',
+    );
   });
 
   test('loadPlaylists returns [] on denial without querying, and the list once granted', async () => {
@@ -1284,7 +1284,7 @@ describe('useMusicProvider — observable state', () => {
     await act(async () => {
       await api.loadTracks();
     });
-    expect(sift.state.loadError).toBe('This provider does not support playlist loading');
+    expect(sift.state.loadError).toBe('Couldn\u2019t load "My Playlist". Try again in a moment.');
     expect(sift.state.phase).toBe('setup');
   });
 

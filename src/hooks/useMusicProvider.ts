@@ -9,7 +9,7 @@ import { TrackIndex } from '../utils/trackIdentity';
 import { APPLE_REMOVED_PLAYLIST, collectedRemovalIds, collectsRemovals } from '../utils/libraryRemovals';
 import { ledgerKey } from '../utils/reviewedLedger';
 import { AddShortfallError, batches } from '../utils/musicKit';
-import { keptSaveRetryable, siftedPlaylistName } from '../utils/sessionCopy';
+import { ACCESS_REQUIRED, keptSaveRetryable, loadFailureMessage, siftedPlaylistName } from '../utils/sessionCopy';
 import { isFiltering, matchesFilter } from '../utils/trackFilter';
 import { loadReviewedIds, markReviewed, unmarkReviewed } from '../services/ReviewedLedgerStore';
 import { importSiftedKeeps } from '../services/SiftedImport';
@@ -296,7 +296,7 @@ export function useMusicProvider() {
 
     try {
       if (!(await ensureAccess())) {
-        dispatch({ type: 'SET_LOAD_ERROR', error: 'Music library access is required to use Sift.' });
+        dispatch({ type: 'SET_LOAD_ERROR', error: ACCESS_REQUIRED });
         return;
       }
 
@@ -424,9 +424,9 @@ export function useMusicProvider() {
       dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0.9, message: 'Sorting tracks…' });
       dispatch({ type: 'LOAD_TRACKS', tracks: sortTracks(tracks, state.sortOrder) });
     } catch (err) {
+      // The raw error goes to Sentry; the user gets plain words (#174).
       Sentry.captureException(err, { tags: { flow: 'load-tracks' } });
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load tracks';
-      dispatch({ type: 'SET_LOAD_ERROR', error: errorMessage });
+      dispatch({ type: 'SET_LOAD_ERROR', error: loadFailureMessage(source, err) });
     } finally {
       loadingInProgressRef.current = false;
     }

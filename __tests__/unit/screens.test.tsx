@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActionSheetIOS, Alert, Text } from 'react-native';
+import { AccessibilityInfo, ActionSheetIOS, Alert, Text } from 'react-native';
 import { fireEvent, act, waitFor } from '@testing-library/react-native';
 
 // Common mocks
@@ -1340,6 +1340,36 @@ describe('LoadingScreen', () => {
     // loadLibrary triggers isAuthorized → loadLibrary chain
     expect(mockProvider.isAuthorized).toHaveBeenCalled();
   });
+
+  test('the bar is a progress bar VoiceOver reads, and each step is announced (#174)', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => {});
+    let api!: ReturnType<typeof useSift>;
+    const Probe = () => {
+      api = useSift();
+      return <LoadingScreen />;
+    };
+    const { getByTestId } = await renderWithProviders(<Probe />);
+    await act(async () => {
+      api.dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0.3, message: 'Fetching tracks\u2026' });
+    });
+    const bar = getByTestId('loading-progress');
+    expect(bar.props.accessibilityRole).toBe('progressbar');
+    expect(bar.props.accessibilityLabel).toBe('Loading');
+    expect(bar.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 30 });
+    expect(announce).toHaveBeenCalledWith('Fetching tracks\u2026', { queue: true });
+    // Past the end, the bar stops at full.
+    await act(async () => {
+      api.dispatch({ type: 'SET_LOAD_PROGRESS', progress: 1.4 });
+    });
+    expect(getByTestId('loading-progress').props.accessibilityValue).toEqual({ min: 0, max: 100, now: 100 });
+    // A step with no words says nothing.
+    announce.mockClear();
+    await act(async () => {
+      api.dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0.5, message: '' });
+    });
+    expect(announce).not.toHaveBeenCalled();
+    announce.mockRestore();
+  });
 });
 
 // Mock Clipboard on react-native's Clipboard export
@@ -2306,6 +2336,25 @@ describe('VoiceOver scan (#146)', () => {
     };
     const { toJSON } = await renderWithProviders(<Backed />);
     await act(async () => {});
+    expect(a11yViolations(toJSON())).toEqual([]);
+  });
+
+  test('Setup, with a playlist picked: its Change button (#174)', async () => {
+    const Picked = () => {
+      const { dispatch } = useSift();
+      React.useEffect(() => {
+        dispatch({ type: 'SET_SOURCE', source: { type: 'playlist', playlist: { id: 'p1', name: 'Road Trip', trackCount: 3 } } });
+      }, [dispatch]);
+      return <SetupScreen />;
+    };
+    const { toJSON, getByTestId } = await renderWithProviders(<Picked />);
+    await act(async () => {});
+    expect(getByTestId('setup-change-playlist').props.accessibilityRole).toBe('button');
+    expect(a11yViolations(toJSON())).toEqual([]);
+  });
+
+  test('Loading', async () => {
+    const { toJSON } = await renderWithProviders(<LoadingScreen />);
     expect(a11yViolations(toJSON())).toEqual([]);
   });
 
