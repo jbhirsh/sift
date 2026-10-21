@@ -27,10 +27,12 @@ beforeEach(() => {
 describe('useTraceScreen', () => {
   test('says when a screen comes up and goes down, and marks it on top meanwhile', async () => {
     const { unmount, rerender } = await renderHook(() => useTraceScreen('settings'));
-    // When React started drawing it, then when it's on screen; a re-render says nothing.
+    // When React started drawing it, when it committed it, then when its
+    // effects ran; a re-render says nothing.
     await rerender({});
     expect(mockTrace.mock.calls).toEqual([
       ['screen', { name: 'settings', at: 'render' }],
+      ['screen', { name: 'settings', at: 'commit' }],
       ['screen', { name: 'settings', at: 'up' }],
     ]);
     expect(mockEnterScreen).toHaveBeenCalledWith('settings');
@@ -47,11 +49,34 @@ describe('useTraceScreen', () => {
     await rerender({ name: 'loading' });
     expect(mockTrace.mock.calls).toEqual([
       ['screen', { name: 'setup', at: 'render' }],
+      ['screen', { name: 'setup', at: 'commit' }],
       ['screen', { name: 'setup', at: 'up' }],
+      // Committed before the old one's effects are cleaned up.
+      ['screen', { name: 'loading', at: 'commit' }],
       ['screen', { name: 'setup', at: 'down' }],
       ['screen', { name: 'loading', at: 'up' }],
     ]);
     expect(mockEnterScreen.mock.calls).toEqual([['setup'], ['loading']]);
+  });
+});
+
+describe('useTraceScreen, one screen replacing another', () => {
+  function Screen({ name }: { name: string }) {
+    useTraceScreen(name);
+    return null;
+  }
+
+  test('the new screen is committed, then the old one goes down, then the new one is up', async () => {
+    const { rerender } = await render(<Screen key="sift" name="sift" />);
+    mockTrace.mockClear();
+    // How the phase router swaps Sift for Done: one unmounts, another mounts.
+    await rerender(<Screen key="done" name="done" />);
+    expect(mockTrace.mock.calls).toEqual([
+      ['screen', { name: 'done', at: 'render' }],
+      ['screen', { name: 'done', at: 'commit' }],
+      ['screen', { name: 'sift', at: 'down' }],
+      ['screen', { name: 'done', at: 'up' }],
+    ]);
   });
 });
 

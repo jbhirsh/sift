@@ -1,17 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import type { GestureResponderEvent } from 'react-native';
 import { currentScreen, enterScreen, trace, traceTouch, tracing } from '../services/trace';
 import { STALL_TICK_MS, stallGap } from '../utils/trace';
 
 /**
- * A screen or sheet in the trace: `screen name=… at=render|up|down`, and the
- * name touches carry while it's on top. `render` is when React started
- * drawing it (once per mount), `up` when it's on screen: a slow screen shows
- * as the gap between them, a busy thread before it as the gap from the tap
- * to `render`.
+ * A screen or sheet in the trace: `screen name=… at=render|commit|up|down`,
+ * and the name touches carry while it's on top. `render` is when React
+ * started drawing it (once per mount), `commit` when React had committed it
+ * (before paint), `up` when its effects ran. A busy thread before it shows
+ * as the gap from the tap to `render`. `render` to `commit` is React drawing
+ * it (its children's layout effects too) and swapping out the screen it
+ * replaced. `commit` to `up` is effects: the old screen's cleanups (its
+ * `down`) and the new screen's other effects. After a tap that is all it
+ * holds, as React runs them in the same task; after an update from an
+ * animation (a swiped card's last decision) React can run other queued work
+ * first. A stall in either gap with no work to show for it is the thread
+ * being held (#172).
  */
 export function useTraceScreen(name: string): void {
   useState(() => trace('screen', { name, at: 'render' }));
+  useLayoutEffect(() => {
+    trace('screen', { name, at: 'commit' });
+  }, [name]);
   useEffect(() => {
     trace('screen', { name, at: 'up' });
     const leave = enterScreen(name);
