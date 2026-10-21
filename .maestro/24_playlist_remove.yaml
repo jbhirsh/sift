@@ -76,8 +76,18 @@ name: "Remove and Restore in a Playlist Sift"
     visible: '1 of 2 have been added to "Sift — Removed" in Music; 1 could not be\.'
     timeout: 30000
 
+# One landed, so Done's Finish in Music card says how to delete it in
+# Music, with Open Music and Share List (#173).
 - assertVisible:
-    id: "delete-in-music-hint"
+    id: "finish-in-music"
+    text: "Finish in Music"
+
+- scrollUntilVisible:
+    element:
+      id: "share-removed"
+
+- assertVisible:
+    id: "open-music"
 
 # Restore the one that landed: it comes back out of "Sift — Removed".
 - scrollUntilVisible:

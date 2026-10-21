@@ -65,12 +65,38 @@ export const FIRST_REMOVE_NOTE =
   `Removed songs stay where they are for now: they're collected in "${APPLE_REMOVED_PLAYLIST}" so you can delete them from your library in Music.`;
 
 /**
- * How to finish a Remove in Music, under Done's removed list. Apple Music's
- * "Add & Delete Playlist Songs" setting (which Sift can't read) decides
- * whether deleting from the library also empties the user's playlists.
+ * Done's "Finish in Music" card (#173): Sift can only collect removed songs,
+ * so the deleting happens in Music. Two steps; the second has one way per
+ * device, since Music on a Mac deletes a selection at once and on iPhone
+ * it's one song at a time.
  */
-export const DELETE_IN_MUSIC_HINT =
-  `To finish, delete the songs in "${APPLE_REMOVED_PLAYLIST}" from your library in Music. With Add & Delete Playlist Songs on (in Settings, under Music), that also takes them out of your playlists. A song that isn't in your library has to be removed from its playlist instead.`;
+export const FINISH_IN_MUSIC_TITLE = 'Finish in Music';
+export const FINISH_IN_MUSIC_STEPS: readonly string[] = [
+  `1. Open the "${APPLE_REMOVED_PLAYLIST}" playlist.`,
+  '2. Delete its songs from your library:',
+];
+export const FINISH_IN_MUSIC_WAYS: readonly string[] = [
+  'On a Mac, select them all, then choose Delete from Library.',
+  'On iPhone, press and hold each song, then choose Delete from Library.',
+];
+/**
+ * Apple Music's "Add & Delete Playlist Songs" setting (which Sift can't
+ * read) decides whether deleting from the library also empties the user's
+ * playlists.
+ */
+export const FINISH_IN_MUSIC_NOTE =
+  'Deleting from your library also takes them out of your playlists when Add & Delete Playlist Songs is on (in Settings, under Music). A song that isn\u2019t in your library has to be removed from its playlist instead.';
+export const OPEN_MUSIC_TITLE = 'Open Music';
+export const OPEN_MUSIC_FAILED = {
+  title: 'Couldn\u2019t open Music',
+  message: 'Open the Music app yourself to finish.',
+};
+export const SHARE_LIST_TITLE = 'Share List';
+
+/** The removed songs as Done's Share sends them: one "Name — Artist" a line. */
+export function removedListText(removed: readonly Track[]): string {
+  return removed.map((t) => `${t.name} \u2014 ${t.artist}`).join('\n');
+}
 
 /**
  * The confirmation before a playlist's Start Over from Setup or Done, when

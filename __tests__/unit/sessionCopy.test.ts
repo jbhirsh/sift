@@ -1,7 +1,14 @@
 import {
   APPLE_REMOVED_PLAYLIST,
   decisionCounts,
-  DELETE_IN_MUSIC_HINT,
+  FINISH_IN_MUSIC_NOTE,
+  FINISH_IN_MUSIC_STEPS,
+  FINISH_IN_MUSIC_TITLE,
+  FINISH_IN_MUSIC_WAYS,
+  OPEN_MUSIC_FAILED,
+  OPEN_MUSIC_TITLE,
+  SHARE_LIST_TITLE,
+  removedListText,
   discardConfirmation,
   FIRST_REMOVE_NOTE,
   playlistStartOverMessage,
@@ -59,12 +66,30 @@ describe('finishing a Remove in Music', () => {
     );
   });
 
-  test("Done's hint names the Apple Music setting that decides whether playlists empty too", () => {
-    expect(DELETE_IN_MUSIC_HINT).toBe(
-      `To finish, delete the songs in "${APPLE_REMOVED_PLAYLIST}" from your library in Music. `
-      + 'With Add & Delete Playlist Songs on (in Settings, under Music), that also takes them out of your playlists. '
-      + 'A song that isn\'t in your library has to be removed from its playlist instead.',
+  test("Done's Finish in Music card: the playlist, one way per device, and the setting that decides whether playlists empty too (#173)", () => {
+    expect(FINISH_IN_MUSIC_TITLE).toBe('Finish in Music');
+    expect(FINISH_IN_MUSIC_STEPS).toEqual([
+      `1. Open the "${APPLE_REMOVED_PLAYLIST}" playlist.`,
+      '2. Delete its songs from your library:',
+    ]);
+    expect(FINISH_IN_MUSIC_WAYS).toEqual([
+      'On a Mac, select them all, then choose Delete from Library.',
+      'On iPhone, press and hold each song, then choose Delete from Library.',
+    ]);
+    expect(FINISH_IN_MUSIC_NOTE).toBe(
+      'Deleting from your library also takes them out of your playlists when Add & Delete Playlist Songs is on (in Settings, under Music). '
+      + 'A song that isn\u2019t in your library has to be removed from its playlist instead.',
     );
+    expect(OPEN_MUSIC_TITLE).toBe('Open Music');
+    expect(OPEN_MUSIC_FAILED).toEqual({ title: 'Couldn\u2019t open Music', message: 'Open the Music app yourself to finish.' });
+    expect(SHARE_LIST_TITLE).toBe('Share List');
+  });
+
+  test('the removed list to share: one "Name \u2014 Artist" a line', () => {
+    const a = { id: '1', name: 'Peaches', artist: 'Justin Bieber' } as Track;
+    const b = { id: '2', name: 'drivers license', artist: 'Olivia Rodrigo' } as Track;
+    expect(removedListText([a, b])).toBe('Peaches \u2014 Justin Bieber\ndrivers license \u2014 Olivia Rodrigo');
+    expect(removedListText([])).toBe('');
   });
 
   test("a playlist's Start Over empties nothing: removed songs stay collected with Apple Music", () => {

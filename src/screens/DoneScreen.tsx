@@ -6,8 +6,10 @@ import {
   FlatList,
   StyleSheet,
   Platform,
-  Clipboard,
   Alert,
+  Linking,
+  Share,
+  findNodeHandle,
 } from 'react-native';
 import type { Track } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,19 +31,26 @@ import GlassCard from '../components/GlassCard';
 import { Button } from '../components/Button';
 import {
   decisionCounts,
-  DELETE_IN_MUSIC_HINT,
   discardConfirmation,
   doneHeadline,
+  FINISH_IN_MUSIC_NOTE,
+  FINISH_IN_MUSIC_STEPS,
+  FINISH_IN_MUSIC_TITLE,
+  FINISH_IN_MUSIC_WAYS,
   failedRemovalCount,
   keptSaveFailure,
   keptSaveMessage,
   nothingRemovedNote,
+  OPEN_MUSIC_FAILED,
+  OPEN_MUSIC_TITLE,
   playlistStartOverMessage,
+  removedListText,
   removedListSubtitle,
   SAVE_KEPT_TITLE,
+  SHARE_LIST_TITLE,
   siftedPlaylistName,
 } from '../utils/sessionCopy';
-import { collectsRemovals } from '../utils/libraryRemovals';
+import { collectsRemovals, MUSIC_APP_URL } from '../utils/libraryRemovals';
 import { COLORS, CONTENT_COLUMN, RADIUS, SETTINGS_BUTTON, SPACING } from '../theme';
 import { useTraceScreen } from '../hooks/useTrace';
 
@@ -73,7 +82,6 @@ export default function DoneScreen() {
   useEffect(() => {
     sendPending(state.pending);
   }, [state.pending, sendPending]);
-  const [copied, setCopied] = useState(false);
   const [restoringIds, setRestoringIds] = useState<Set<string>>(new Set());
   const [startOverError, setStartOverError] = useState<string | null>(null);
   // True while a confirmed Start Over clears the playlist's removal history.
@@ -84,16 +92,6 @@ export default function DoneScreen() {
   // history and re-add the track remotely after the reset).
   const [isStartingOver, setIsStartingOver] = useState(false);
   const startOverBlocked = isStartingOver || restoringIds.size > 0;
-  // The "Copied!" toast reset timer must not outlive the screen: an
-  // uncleared timeout fires setState on an unmounted component and holds
-  // the process open (surfaced as Jest's "did not exit" warning). Same
-  // pattern as settleTimeoutRef in SiftScreen.
-  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    return () => {
-      if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
-    };
-  }, []);
 
   // "Save kept songs as a playlist" (playlist sifts): copies every song
   // remembered as kept from the playlist, in this sift or an earlier one,
@@ -141,17 +139,20 @@ export default function DoneScreen() {
   // saved that is no longer kept (or the reverse).
   const decisionsBlocked = startOverBlocked || saving;
 
-  const copyRemovedList = useCallback(() => {
-    const text = state.removed
-      .map((t) => `${t.name} \u2014 ${t.artist}`)
-      .join('\n');
-    Clipboard.setString(text);
-    setCopied(true);
-    // Re-presses restart the 2s window instead of letting the first
-    // press's timer hide the toast early.
-    if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
-    copiedTimeoutRef.current = setTimeout(() => setCopied(false), 2000);
+  // The share sheet, not just the clipboard (#173): to Notes, Messages or
+  // a Mac, and Copy is still there. On iPad it opens from the button.
+  // Closing it resolves; a sheet that fails to open has nothing to add.
+  const shareButtonRef = useRef<View>(null);
+  const shareRemovedList = useCallback(() => {
+    const anchor = shareButtonRef.current ? findNodeHandle(shareButtonRef.current) : null;
+    Share.share({ message: removedListText(state.removed) }, anchor != null ? { anchor } : undefined).catch(() => {});
   }, [state.removed]);
+
+  const openMusic = useCallback(() => {
+    Linking.openURL(MUSIC_APP_URL).catch(() => {
+      Alert.alert(OPEN_MUSIC_FAILED.title, OPEN_MUSIC_FAILED.message);
+    });
+  }, []);
 
   const handleRestore = useCallback(
     async (track: Track) => {
@@ -216,6 +217,22 @@ export default function DoneScreen() {
   const keyExtractor = useCallback((track: Track) => track.id, []);
 
   const failedRemovals = failedRemovalCount(state.removed, state.failedRemovalIds);
+  // Some removals reached "Sift — Removed", so there is something to finish
+  // in Music.
+  const finishInMusic = collectsRemovals(state.provider) && failedRemovals < state.removed.length;
+  const shareButton = (
+    <TouchableOpacity
+      ref={shareButtonRef}
+      testID="share-removed"
+      style={[styles.smallSecondaryButton, { borderColor: colors.accent }]}
+      onPress={shareRemovedList}
+      accessibilityRole="button"
+      accessibilityHint="Shares the list of removed songs"
+      activeOpacity={0.8}
+    >
+      <Text style={[styles.smallSecondaryButtonText, { color: colors.accent }]}>{SHARE_LIST_TITLE}</Text>
+    </TouchableOpacity>
+  );
   // Cards not yet decided: a sift ended early with Finish (#142).
   const remaining = Math.max(0, state.tracks.length - state.cursor);
   const headline = doneHeadline(state.source, state.cursor, state.tracks.length);
@@ -327,26 +344,56 @@ export default function DoneScreen() {
                     below names the tracks that are still in place. */}
                 {removedListSubtitle(state.provider, state.source, state.removed.length, failedRemovals)}
               </Text>
-              {/* Sift can only collect them: the deleting happens in Music. */}
-              {collectsRemovals(state.provider) && failedRemovals < state.removed.length && (
-                <Text testID="delete-in-music-hint" style={[styles.removedSubtitle, { color: colors.textSecondary }]}>
-                  {DELETE_IN_MUSIC_HINT}
-                </Text>
-              )}
-            </View>
-            <View style={styles.removedActions}>
-              <TouchableOpacity
-                style={[styles.smallSecondaryButton, { borderColor: colors.accent }]}
-                onPress={copyRemovedList}
-                accessibilityRole="button"
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.smallSecondaryButtonText, { color: colors.accent }]}>
-                  {copied ? 'Copied!' : 'Copy List'}
-                </Text>
-              </TouchableOpacity>
             </View>
           </View>
+
+          {/* Sift can only collect them: the deleting happens in Music, and
+              this card says how, first thing (#173). Only for songs that
+              reached "Sift — Removed". */}
+          {finishInMusic ? (
+            <View style={styles.finishCard}>
+              <GlassCard intensity="regular" radius={RADIUS.lg}>
+                <View style={styles.finishContent}>
+                  <Text
+                    testID="finish-in-music"
+                    accessibilityRole="header"
+                    style={[styles.finishTitle, { color: colors.text }]}
+                  >
+                    {FINISH_IN_MUSIC_TITLE}
+                  </Text>
+                  {/* Each step one Text, so VoiceOver reads it in one stop. */}
+                  {FINISH_IN_MUSIC_STEPS.map((step) => (
+                    <Text key={step} style={[styles.finishStepText, { color: colors.text }]}>{step}</Text>
+                  ))}
+                  {/* Step 2's ways: one or the other, not both in turn. The
+                      bullet hangs, so a wrapped line starts under the text;
+                      VoiceOver reads each as one stop, without the bullet. */}
+                  {FINISH_IN_MUSIC_WAYS.map((way) => (
+                    <View key={way} style={styles.finishWay} accessible accessibilityLabel={way}>
+                      <Text style={[styles.finishStepText, { color: colors.text }]}>{'\u2022'}</Text>
+                      <Text style={[styles.finishWayText, { color: colors.text }]}>{way}</Text>
+                    </View>
+                  ))}
+                  <Text style={[styles.finishNote, { color: colors.textSecondary }]}>{FINISH_IN_MUSIC_NOTE}</Text>
+                  <View style={styles.removedActions}>
+                    <TouchableOpacity
+                      testID="open-music"
+                      style={[styles.smallSecondaryButton, { borderColor: colors.accent }]}
+                      onPress={openMusic}
+                      accessibilityRole="button"
+                      accessibilityHint="Opens the Music app"
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.smallSecondaryButtonText, { color: colors.accent }]}>{OPEN_MUSIC_TITLE}</Text>
+                    </TouchableOpacity>
+                    {shareButton}
+                  </View>
+                </View>
+              </GlassCard>
+            </View>
+          ) : (
+            <View style={[styles.removedActions, styles.shareOnly]}>{shareButton}</View>
+          )}
 
           {state.removalErrors.length > 0 && (
             <View testID="removal-errors" style={styles.removalErrorsBlock}>
@@ -616,7 +663,37 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   removedHeader: {
-    marginBottom: 12,
+    marginBottom: SPACING.base,
+  },
+  finishCard: {
+    marginBottom: SPACING.lg,
+  },
+  finishContent: {
+    padding: SPACING.xl,
+    gap: SPACING.base,
+  },
+  finishTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+  },
+  finishStepText: {
+    fontSize: 15,
+  },
+  finishWay: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    paddingLeft: SPACING.xl,
+  },
+  finishWayText: {
+    flex: 1,
+    fontSize: 15,
+  },
+  finishNote: {
+    fontSize: 13,
+  },
+  shareOnly: {
+    marginTop: 0,
+    marginBottom: SPACING.lg,
   },
   removedTitle: {
     fontSize: 17,
@@ -629,6 +706,8 @@ const styles = StyleSheet.create({
   },
   removedActions: {
     flexDirection: 'row',
+    // At large text sizes the two buttons stack rather than clip.
+    flexWrap: 'wrap',
     gap: 8,
     marginTop: 8,
   },
@@ -650,7 +729,7 @@ const styles = StyleSheet.create({
   removalErrorItem: {
     fontSize: 12,
   },
-  // Copy List and Restore are 44 pt tall, a full-size target (#174).
+  // Open Music, Share List and Restore are 44 pt tall, a full-size target (#174).
   smallSecondaryButton: {
     minHeight: 44,
     justifyContent: 'center',
