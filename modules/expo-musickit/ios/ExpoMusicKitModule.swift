@@ -475,6 +475,8 @@ public class ExpoMusicKitModule: Module {
       "playCount": nullable(song.playCount),
       "dateAdded": nullable(song.libraryAddedDate.map { dateFormatter.string(from: $0) }),
       "artworkURL": nullable(song.artwork?.url(width: 600, height: 600)?.absoluteString),
+      "trackNumber": nullable(song.trackNumber),
+      "discNumber": nullable(song.discNumber),
       "kind": "song",
     ]
   }
@@ -490,6 +492,8 @@ public class ExpoMusicKitModule: Module {
       "playCount": NSNull(),
       "dateAdded": NSNull(),
       "artworkURL": nullable(track.artwork?.url(width: 600, height: 600)?.absoluteString),
+      "trackNumber": nullable(track.trackNumber),
+      "discNumber": nullable(track.discNumber),
       "kind": "track",
     ]
   }

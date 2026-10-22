@@ -35,6 +35,10 @@ function isOptionalString(value: unknown): value is string | undefined {
   return value === undefined || typeof value === 'string';
 }
 
+function isOptionalFiniteNumber(value: unknown): value is number | undefined {
+  return value === undefined || isFiniteNumber(value);
+}
+
 function isArrayOf<T>(value: unknown, guard: (item: unknown) => item is T): value is T[] {
   return Array.isArray(value) && value.every(guard);
 }
@@ -62,7 +66,9 @@ export function isTrack(value: unknown): value is Track {
     isFiniteNumber(value.playCount) &&
     typeof value.dateAdded === 'string' &&
     isOptionalString(value.artworkURL) &&
-    isOptionalString(value.previewURL)
+    isOptionalString(value.previewURL) &&
+    isOptionalFiniteNumber(value.trackNumber) &&
+    isOptionalFiniteNumber(value.discNumber)
   );
 }
 

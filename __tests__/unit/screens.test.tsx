@@ -130,8 +130,8 @@ describe('SetupScreen', () => {
     await fireEvent.press(getByText('Least Played'));
     expect(spy).toHaveBeenCalledWith(
       expect.objectContaining({
-        options: ['Least Played', 'Most Played', 'Oldest Added', 'Newest Added', 'Random', 'Cancel'],
-        cancelButtonIndex: 5,
+        options: ['Least Played', 'Most Played', 'Oldest Added', 'Newest Added', 'Artist', 'Album', 'Random', 'Cancel'],
+        cancelButtonIndex: 7,
       }),
       expect.any(Function),
     );

@@ -96,6 +96,23 @@ describe('toTrack', () => {
   });
 });
 
+describe('toTrack: album order (#176)', () => {
+  test('track and disc numbers come over when the service sends them', () => {
+    expect(toTrack(raw({ trackNumber: 3, discNumber: 2 }))).toMatchObject({ trackNumber: 3, discNumber: 2 });
+  });
+
+  test('missing or null numbers leave the fields out, as an older build sends', () => {
+    const track = toTrack(raw({ trackNumber: null, discNumber: null }));
+    expect(track).not.toHaveProperty('trackNumber');
+    expect(track).not.toHaveProperty('discNumber');
+    expect(toTrack(raw())).not.toHaveProperty('trackNumber');
+  });
+
+  test('track 0 or disc 0 is still a number', () => {
+    expect(toTrack(raw({ trackNumber: 0, discNumber: 0 }))).toMatchObject({ trackNumber: 0, discNumber: 0 });
+  });
+});
+
 describe('toPlaylist', () => {
   test('keeps web artwork, drops the rest', () => {
     expect(toPlaylist({ id: 'p', name: 'Mix', trackCount: 3, artworkURL: 'https://a.example/p.jpg' }))
