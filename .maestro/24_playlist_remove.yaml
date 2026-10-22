@@ -93,6 +93,10 @@ name: "Remove and Restore in a Playlist Sift"
 - scrollUntilVisible:
     element:
       id: "restore-track-mock-10"
+# Let the list stop: a tap on a list still coasting only stops it, and the
+# button never sees it (#189's run: the Restore tap 0.3 s after the scroll
+# was lost).
+- waitForAnimationToEnd
 
 - tapOn:
     id: "restore-track-mock-10"
@@ -110,6 +114,10 @@ name: "Remove and Restore in a Playlist Sift"
 - scrollUntilVisible:
     element:
       id: "restore-track-mock-3"
+# Let the list stop: a tap on a list still coasting only stops it, and the
+# button never sees it (#189's run: the Restore tap 0.3 s after the scroll
+# was lost).
+- waitForAnimationToEnd
 
 - tapOn:
     id: "restore-track-mock-3"
