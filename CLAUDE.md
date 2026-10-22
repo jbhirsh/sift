@@ -319,7 +319,10 @@ Makefile                Dev commands (test, lint, typecheck, check)
   open in full; only lockfiles, generated files and images may be skimmed
   or skipped) and
   posts one summary comment per PR, updated on each push, saying what it
-  read; only its inline comments are merge blockers. The auto-fix workflow lives
+  read; only its inline comments are merge blockers. Its tool calls are
+  then checked (`scripts/review-coverage.mjs`, rules in
+  `scripts/reviewCoverage.ts`): a changed file it never read goes back to
+  a second pass, and one still unread after that fails the check. The auto-fix workflow lives
   alongside it in `.github/workflows/claude-autofix.yml`. It acts only on
   bots' PRs (Dependabot's): it fixes review threads opened by Claude Review or
   the owner (two rounds per PR at most, once CI and Claude Review are both
