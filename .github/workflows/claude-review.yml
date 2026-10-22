@@ -69,11 +69,16 @@ jobs:
                  `git diff --stat -M origin/main...HEAD` and
                  `git diff --name-status -M origin/main...HEAD`. Lockfiles,
                  generated files and images may be skimmed or skipped; say
-                 which in the summary.
-              2. Read each other file's diff on its own:
+                 which in the summary. Every other file must be read in
+                 full.
+              2. Read each other file's diff on its own, tests included:
                  `git diff -M origin/main...HEAD -- <file>` (for a rename,
-                 give both paths). Don't ask for several files in one
-                 command: large output is cut to a preview. To save turns,
+                 give both paths). Files under `__tests__/`, `.maestro/`
+                 and `e2e/` are changed files like any other, and a changed
+                 or removed assertion is where a weakened test hides.
+                 Seeing a file only in `--stat` is not reading it. Don't
+                 ask for several files in one command: large output is cut
+                 to a preview. To save turns,
                  send several of these single-file diffs as parallel tool
                  calls in one message; each gets its own output limit.
               3. If a result comes back as "Output too large" with a path to
@@ -250,7 +255,10 @@ jobs:
               - the verdict (merge blockers found or not, and how many inline
                 comments you left);
               - the files you read, and any you skimmed or skipped and why
-                (group them by directory when there are many);
+                (group them by directory when there are many). A file seen
+                only in `--stat`, or only in part, counts as skimmed; say
+                "nothing skipped" only when every changed file other than
+                lockfiles, generated files and images was read in full;
               - the non-blocking notes.
             Keep a single summary per PR, updated on each push. Find yours
             (posted as `claude[bot]`) with
