@@ -39,6 +39,7 @@ jobs:
           fetch-depth: 0
 
       - uses: anthropics/claude-code-action@v1
+        id: review
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -78,7 +79,11 @@ jobs:
                  or removed assertion is where a weakened test hides.
                  Seeing a file only in `--stat` is not reading it. Don't
                  ask for several files in one command: large output is cut
-                 to a preview. To save turns,
+                 to a preview. A check counts what you read from your own
+                 tool calls, and only a plain command counts: no loop,
+                 variable, pipe or `&&` chain (a leading `cd <dir> &&` is
+                 fine); a file it can't see you read comes back to you in
+                 a second pass. To save turns,
                  send several of these single-file diffs as parallel tool
                  calls in one message; each gets its own output limit.
               3. If a result comes back as "Output too large" with a path to
@@ -277,3 +282,103 @@ jobs:
           claude_args: |
             --max-turns 200
             --allowedTools "Read,Grep,Glob,Bash(gh:*),Bash(git fetch:*),Bash(git checkout:*),Bash(git log:*),Bash(git diff:*),Bash(git show:*),Bash(git blame:*),Bash(git rev-parse:*),Bash(git branch:*),Bash(git ls-files:*),mcp__github_inline_comment__create_inline_comment"
+
+      # The prompt says to read every changed file's diff, tests included,
+      # yet a review passed #188 twice having seen its tests only in
+      # `--stat`. scripts/review-coverage.mjs reads the review's own tool
+      # calls and lists the changed files it never read (lockfiles and
+      # images aside); those go back to a second pass, and a file still
+      # unread after it fails the check. No execution file means the action
+      # skipped (a PR that edits this file): nothing to check.
+      - uses: actions/setup-node@v7
+        if: steps.review.outputs.execution_file != ''
+        with:
+          node-version: 24
+
+      - name: Check the review read every changed file
+        id: coverage
+        if: steps.review.outputs.execution_file != ''
+        env:
+          REPO_DIR: ${{ github.workspace }}
+        run: |
+          set -o pipefail
+          # The follow-up writes its log to the same path.
+          cp "${{ steps.review.outputs.execution_file }}" "$RUNNER_TEMP/review-pass-1.json"
+          git -c core.quotePath=false diff --name-only -M origin/main...HEAD \
+            | node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/review-coverage.mjs "$RUNNER_TEMP/review-pass-1.json" \
+            > "$RUNNER_TEMP/unread.txt"
+          if [ -s "$RUNNER_TEMP/unread.txt" ]; then
+            echo "The review didn't read:"
+            cat "$RUNNER_TEMP/unread.txt"
+            {
+              echo 'unread<<UNREAD_EOF'
+              sed 's/^/  - /' "$RUNNER_TEMP/unread.txt"
+              echo 'UNREAD_EOF'
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "The review read every changed file."
+          fi
+
+      - uses: anthropics/claude-code-action@v1
+        id: followup
+        if: steps.coverage.outputs.unread != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          allowed_bots: "dependabot[bot],claude[bot]"
+          prompt: |
+            REPO_DIR: ${{ github.workspace }}
+            PR: ${{ github.event.pull_request.number }}
+
+            A review of this pull request just finished without reading
+            these changed files' diffs:
+            ${{ steps.coverage.outputs.unread }}
+
+            Read CLAUDE.md, then read each of those diffs in full, one file
+            per command, exactly `git diff -M origin/main...HEAD -- <file>`:
+            no loop, variable, pipe or `&&` chain, or the check that sent
+            you here can't see that you read it, and the job fails. If a
+            result comes back as "Output too large" with a path to the full
+            output, open that path with the Read tool and read all of it
+            (offset/limit for a long one). Review them as the first pass did the
+            rest: correctness, the conventions in CLAUDE.md, and in tests a
+            changed or removed assertion (never modify a test to make it
+            pass), a weakened check, a fixture edited rather than added.
+            For each problem that must be fixed before merge, leave an
+            inline comment with
+            `mcp__github_inline_comment__create_inline_comment`.
+
+            Then update the review's summary comment: find it with
+            `gh api repos/${{ github.repository }}/issues/<PR>/comments --paginate --jq '.[] | select(.user.login == "claude[bot]" and (.body | startswith("<!-- claude-review-summary -->"))) | .id'`
+            and replace it with
+            `gh api -X PATCH repos/${{ github.repository }}/issues/comments/<id> -F body=@- <<'EOF'`,
+            the body, then a line holding only `EOF`. Keep its first line
+            and everything still true; move these files from skimmed to
+            read, and add what you found (or that you found nothing).
+          classify_inline_comments: "true"
+          display_report: "true"
+          show_full_output: "true"
+          claude_args: |
+            --max-turns 100
+            --allowedTools "Read,Grep,Glob,Bash(gh:*),Bash(git diff:*),Bash(git show:*),Bash(git log:*),Bash(git rev-parse:*),Bash(git ls-files:*),mcp__github_inline_comment__create_inline_comment"
+
+      - name: Fail if files are still unread
+        if: steps.coverage.outputs.unread != ''
+        env:
+          REPO_DIR: ${{ github.workspace }}
+        run: |
+          set -o pipefail
+          passes=("$RUNNER_TEMP/review-pass-1.json")
+          if [ -n "${{ steps.followup.outputs.execution_file }}" ]; then
+            passes+=("${{ steps.followup.outputs.execution_file }}")
+          fi
+          unread=$(git -c core.quotePath=false diff --name-only -M origin/main...HEAD \
+            | node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/review-coverage.mjs "${passes[@]}")
+          if [ -n "$unread" ]; then
+            while IFS= read -r file; do
+              echo "::error file=$file::Claude Review never read this file's diff, even on a second pass."
+            done <<< "$unread"
+            exit 1
+          fi
+          echo "The follow-up read the rest."
