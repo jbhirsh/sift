@@ -15,6 +15,11 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
+      "icon": {
+        "light": "./assets/icon.png",
+        "dark": "./assets/icon-dark.png",
+        "tinted": "./assets/icon-tinted.png"
+      },
       "bundleIdentifier": "com.jessicahirsh.sift",
       "infoPlist": {
         "NSAppleMusicUsageDescription": "Sift needs access to your Music library to help you review and organize your tracks.",
@@ -96,7 +101,11 @@
         {
           "image": "./assets/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "imageWidth": 150,
+          "backgroundColor": "#F8F0FF",
+          "dark": {
+            "backgroundColor": "#1A0A2E"
+          }
         }
       ]
     ],

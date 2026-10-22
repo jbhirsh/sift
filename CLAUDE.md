@@ -337,7 +337,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
   runner (`eas build --local`) and uploads it to EAS (`eas upload`) for an
   install link. Local builds don't use the plan's EAS cloud builds (15 iOS a
   month). A change that touches native code (Swift, a native package, an SDK
-  bump), or edits `eas.json` or the `package.json` scripts (both part of the
+  bump), edits `eas.json`, the `package.json` scripts or the native parts of
+  `app.json` (such as the app icon or launch screen: all part of the
   fingerprint), therefore needs a reinstall; everything else arrives by
   itself. `--refresh-ad-hoc-provisioning-profile` rebuilds the ad hoc
   provisioning profile from the iPhones registered on EAS (`eas device:create`).
@@ -424,6 +425,15 @@ Makefile                Dev commands (test, lint, typecheck, check)
 ## App Identity
 - **Bundle ID**: `com.jessicahirsh.sift`
 - **Display name**: Sift
+- **Icon**: a stack of song cards, the front one with Remove and Keep.
+  `ios.icon` in `app.json` takes `assets/icon.png` (light: on Setup's
+  dark purple), `icon-dark.png` (no background: iOS adds its own) and
+  `icon-tinted.png` (grayscale on black: iOS tints it); the launch screen
+  shows `splash-icon.png` (the light icon as a rounded tile) on Setup's
+  light or dark purple. Each PNG is its same-named SVG in
+  `assets/icon-source/` rendered at 1024x1024 (e.g. headless Chromium, with
+  a transparent background for the dark icon and the tile). Changing one of
+  the PNGs is a native change: it ships in a new build, not an EAS Update.
 - **Platform**: iOS only (iPhone and iPad) — the expo-musickit native module is iOS-only and Apple MusicKit has no Android SDK
 
 ---
