@@ -49,7 +49,8 @@ jobs:
       # everything, which made the exclusions dead.) Excluded: docs, repo
       # config, and tooling that can't change the app or this job: other
       # workflows (ci.yml is this job; E2E reuses ios-build's app), the
-      # commit check, and scripts/ apart from the two E2E runners.
+      # commit check, and scripts/ apart from the E2E job's three (suite,
+      # audit, screenshots).
       - uses: dorny/paths-filter@v4
         id: filter
         with:
@@ -63,7 +64,7 @@ jobs:
               - '!.github/*'
               - '!.github/scripts/**'
               - '!.github/workflows/!(ci|ios-build).yml'
-              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh)'
+              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh)'
               - '!stryker.config.json'
 
       - uses: actions/setup-node@v7
@@ -128,12 +129,12 @@ jobs:
     # >=26 — macos-15's default Xcode 16.4 cannot compile expo-modules-core).
     runs-on: macos-26
     # Worst case: ~10 min setup + the 30-min ios-build wait + the build's
-    # 40-min cap + ~3 min simulator prep + the Maestro step's 40-min cap +
-    # the accessibility audit's 10-min cap. The
+    # 60-min cap + ~3 min simulator prep + the Maestro step's 40-min cap +
+    # the accessibility audit's 10-min cap + the screenshots' 10. The
     # step caps must expire before this one: a JOB timeout counts as
     # cancellation, which skips the failure()/!cancelled() diagnostics and
-    # upload steps and loses all evidence.
-    timeout-minutes: 145
+    # upload steps and loses all evidence (and fails the check).
+    timeout-minutes: 170
     # actions: read for the ios-build run lookup and artifact download (the
     # repo default token may not grant it, and the steps fail quietly).
     permissions:
@@ -465,3 +466,27 @@ jobs:
           path: a11y-audit
           if-no-files-found: ignore
           retention-days: 7
+
+      # The main screens on the Simulator, light and dark, for PR
+      # descriptions (CLAUDE.md, "Show UI changes in the PR"): real SF
+      # Symbols and materials, which a web export can't draw. Last, so it
+      # can't disturb the suite or the audit, and it never fails the job.
+      - name: Take screenshots
+        if: ${{ !cancelled() && env.RUN_SUITE == 'true' }}
+        timeout-minutes: 10
+        continue-on-error: true
+        env:
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: "300000"
+          MAESTRO_CLI_NO_ANALYTICS: "1"
+        run: |
+          export PATH="$HOME/.maestro/bin:$PATH"
+          scripts/take-screenshots.sh screenshots
+
+      - name: Upload screenshots
+        if: ${{ !cancelled() && env.RUN_SUITE == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-screenshots
+          path: screenshots
+          if-no-files-found: warn
+          retention-days: 14
