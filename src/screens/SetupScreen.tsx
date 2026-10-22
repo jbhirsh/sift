@@ -569,8 +569,9 @@ export default function SetupScreen() {
           </View>
         </GlassCard>
 
-        {/* Which songs to go through: the least played, or the oldest. */}
-        <GlassCard intensity="thin" radius={RADIUS.md}>
+        {/* Which songs to go through: the least played, or the oldest. A
+            card of its own, set apart from Sort by. */}
+        <GlassCard intensity="thin" radius={RADIUS.md} style={styles.filterCard}>
           <View style={styles.filterRow}>
             <Text style={[styles.sectionLabel, { color: colors.text }]}>Plays</Text>
             <View style={{ flex: 1 }} />
@@ -753,10 +754,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
+  // The value's hit area reaches past its text; the negative margin keeps
+  // the text 16 pt from the card's edge, like the label on the left.
   sortButton: {
     minHeight: 44,
     justifyContent: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: SPACING.base,
+    marginRight: -SPACING.base,
+  },
+  filterCard: {
+    marginTop: SPACING.lg,
   },
   filterRow: {
     flexDirection: 'row',
