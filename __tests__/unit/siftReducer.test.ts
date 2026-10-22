@@ -207,6 +207,19 @@ describe('siftReducer', () => {
     expect(next.phase).toBe('setup');
   });
 
+  test('CANCEL_LOAD goes back to Setup as if the load never began (#177)', () => {
+    const state = makeState({ phase: 'loading', loadProgress: 0.3, loadMessage: 'Fetching tracks…', loadError: 'old', skipFiltering: true });
+    const next = siftReducer(state, { type: 'CANCEL_LOAD' });
+    expect(next).toEqual({ ...state, phase: 'setup', loadProgress: 0, loadMessage: '', loadError: null, skipFiltering: false });
+  });
+
+  test('CANCEL_LOAD outside Loading changes nothing', () => {
+    for (const phase of ['setup', 'sifting', 'done'] as const) {
+      const state = makeState({ phase, loadProgress: 1, loadMessage: 'Sorting tracks…', skipFiltering: true });
+      expect(siftReducer(state, { type: 'CANCEL_LOAD' })).toBe(state);
+    }
+  });
+
   test('SET_PLAYBACK_POSITION updates playbackPosition', () => {
     const state = makeState({ playbackPosition: 0 });
     const next = siftReducer(state, { type: 'SET_PLAYBACK_POSITION', position: 42 });
