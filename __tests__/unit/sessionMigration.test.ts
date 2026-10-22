@@ -12,6 +12,8 @@ import v5State from '../fixtures/sessions/v5-compact-state.json';
 import v5Tracks from '../fixtures/sessions/v5-compact-tracks.json';
 import v6State from '../fixtures/sessions/v6-compact-pending-state.json';
 import v7State from '../fixtures/sessions/v7-compact-keeps-remembered-state.json';
+import v8State from '../fixtures/sessions/v8-compact-album-sort-state.json';
+import v8Tracks from '../fixtures/sessions/v8-compact-tracks-numbers.json';
 
 jest.mock('@sentry/react-native', () => ({
   captureException: jest.fn(),
@@ -160,6 +162,23 @@ describe('saved sessions from every build (#61)', () => {
     expectNoGoneFields(state);
     // Loading it records nothing: the held keep is sent by the screen it resumes to.
     await expect(loadReviewedIds(ROAD_TRIP)).resolves.toEqual(new Set());
+  });
+
+  test('Artist and Album sorts (#176): track numbers and the Album sort come back', async () => {
+    await AsyncStorage.setItem('sift_session_v2', JSON.stringify(v8State));
+    await AsyncStorage.setItem('sift_session_v2_tracks_b', JSON.stringify(v8Tracks));
+    const saved = await loadSession();
+    if (!saved) throw new Error('fixture did not load');
+    const state = resumeState(saved, { provider: 'apple-music', connectionStatus: 'connected' });
+    expect(state.sortOrder).toBe('album');
+    expect(state.tracks.map((t) => [t.trackNumber, t.discNumber])).toEqual([[6, 1], [3, 1], [1, 1], [10, 1]]);
+  });
+
+  test('older track lists, with no track numbers, still load', async () => {
+    await AsyncStorage.setItem('sift_session_v2', JSON.stringify(v7State));
+    await AsyncStorage.setItem('sift_session_v2_tracks_b', JSON.stringify(v5Tracks));
+    const saved = await loadSession();
+    expect(saved?.tracks.every((t) => t.trackNumber === undefined && t.discNumber === undefined)).toBe(true);
   });
 
   test('this build saves the current shape: the "- Sifted" fields are never written', async () => {
