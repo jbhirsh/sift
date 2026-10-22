@@ -88,10 +88,12 @@ describe('SetupScreen', () => {
   // Start Sifting and Start Over read the saved session from disk before
   // they decide whether to ask (#137), so a test's queued loadSession results
   // must not spill into the next test.
-  beforeEach(() => {
+  beforeEach(async () => {
     const { loadSession } = require('../../src/services/SessionStore');
     (loadSession as jest.Mock).mockReset();
     (loadSession as jest.Mock).mockResolvedValue(null);
+    // Setup's pickers save their choices (#175): each test starts from none.
+    await require('@react-native-async-storage/async-storage').default.removeItem('sift_preferences');
   });
 
   test('renders brand text', async () => {
@@ -142,6 +144,22 @@ describe('SetupScreen', () => {
     // Mock calls callback with index 1 ("Most Played") immediately
     await fireEvent.press(getByText('Least Played'));
     expect(getByText('Most Played')).toBeTruthy();
+    spy.mockRestore();
+  });
+
+  test('a sort or a Plays/Added pick is saved for the next launch (#175)', async () => {
+    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    let pick = 1;
+    const spy = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation((_opts, cb) => { cb(pick); });
+    const { getByText, getByTestId } = await renderWithProviders(<SetupScreen />);
+    await fireEvent.press(getByText('Least Played'));
+    pick = 2;
+    await fireEvent.press(getByTestId('filter-added'));
+    await waitFor(async () => {
+      const stored = JSON.parse((await AsyncStorage.getItem('sift_preferences')) as string);
+      expect(stored.sortOrder).toBe('most-played');
+      expect(stored.filter).toEqual({ maxPlays: null, addedYearsAgo: 3 });
+    });
     spy.mockRestore();
   });
 

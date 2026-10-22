@@ -116,8 +116,20 @@ export const PROVIDER_DISPLAY: Record<MusicProvider, string> = {
 export interface Preferences {
   /** Start each Apple Music track at its chorus instead of 0:00. */
   startAtChorus: boolean;
+  /** Setup's last sort order (#175). */
+  sortOrder: SortOrder;
+  /** Setup's last Plays and Added choices (#175). */
+  filter: TrackFilter;
 }
+
+/** Some preferences to save; the filter's two choices save separately. */
+export type PreferenceChanges = Partial<Omit<Preferences, 'filter'>> & { filter?: Partial<TrackFilter> };
+
+/** Each preference the user can change on its own. */
+export type PreferenceField = 'startAtChorus' | 'sortOrder' | keyof TrackFilter;
 
 export const DEFAULT_PREFERENCES: Preferences = {
   startAtChorus: false,
+  sortOrder: 'least-played',
+  filter: NO_FILTER,
 };
