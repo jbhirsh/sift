@@ -300,7 +300,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
   The Maestro iOS E2E job (macOS) also runs on every PR that can affect the
   app or the job, with `workflow_dispatch` available for manual runs. It
   skips PRs that only touch docs or repo tooling (other workflows, the
-  commit check, `scripts/` apart from its two runners, `stryker.config.json`;
+  commit check, `scripts/` apart from its three runners (`run-e2e.sh`,
+  `run-a11y-audit.sh`, `take-screenshots.sh`), `stryker.config.json`;
   the `code` filter in `ci.yml`, with `predicate-quantifier: 'every'` so its
   `!` patterns exclude). Its app build is cached on
   the native fingerprint plus a hash of the bundle's inputs (`src/`,
@@ -418,7 +419,12 @@ Makefile                Dev commands (test, lint, typecheck, check)
   `scripts/prVisuals.ts`) fails a UI change with no picture unless "No
   visible UI change" is ticked, and re-runs when the description is edited;
   Claude Review asks for a GIF when motion changes.
-  - Screenshot: `xcrun simctl io booted screenshot after.png`.
+  - Screenshot: `xcrun simctl io booted screenshot after.png`. Without a
+    Mac, use the E2E job's: it photographs Setup, the sort sheet, Sift,
+    the decisions list, Settings and Done in light and dark
+    (`e2e/screenshots/screens.yaml`, `scripts/take-screenshots.sh`) and
+    uploads them as the `ios-screenshots` artifact. Not a web export: it
+    can't draw SF Symbols, so every icon comes out an empty box.
   - GIF: `xcrun simctl io booted recordVideo --codec=h264 swipe.mov` (Ctrl-C
     stops it), then
     `ffmpeg -i swipe.mov -vf "fps=12,scale=320:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse" swipe.gif`.
