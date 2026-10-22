@@ -814,13 +814,14 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: SPACING.base,
   },
-  // 44 pt to hit, laid out as tall as its text, so the row keeps its height.
+  // 44 pt to hit; the row grows to fit it. (A negative vertical margin kept
+  // the old row height only at the default text size: larger text spilled
+  // into the rows above and below.)
   changeButton: {
     minHeight: 44,
     justifyContent: 'center',
     paddingHorizontal: SPACING.base,
     marginRight: -SPACING.base,
-    marginVertical: -13,
   },
   changeButtonText: {
     fontSize: 15,
