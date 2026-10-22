@@ -515,6 +515,228 @@ describe('useMusicProvider — observable state', () => {
     expect(Alert.alert).not.toHaveBeenCalled();
   });
 
+  describe('Cancel (#177)', () => {
+    /** A promise the test settles by hand. */
+    function deferred<T>() {
+      let resolve!: (value: T) => void;
+      let reject!: (err: Error) => void;
+      const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+      return { promise, resolve, reject };
+    }
+
+    /** Starts a load and returns it, wrapped: an async function would wait for it. */
+    async function startLoad(): Promise<{ pending: Promise<void> }> {
+      let pending!: Promise<void>;
+      await act(async () => {
+        pending = api.loadTracks();
+      });
+      expect(sift.state.phase).toBe('loading');
+      return { pending };
+    }
+
+    async function cancel() {
+      await act(async () => {
+        api.cancelLoad();
+      });
+      expect(sift.state.phase).toBe('setup');
+    }
+
+    function expectBackOnSetup() {
+      expect(sift.state.phase).toBe('setup');
+      expect(sift.state.tracks).toEqual([]);
+      expect(sift.state.loadError).toBeNull();
+      expect(sift.state.loadProgress).toBe(0);
+      expect(sift.state.loadMessage).toBe('');
+    }
+
+    test('during the access check: nothing is fetched', async () => {
+      const auth = deferred<boolean>();
+      mockProvider.isAuthorized.mockImplementationOnce(() => auth.promise);
+      await renderHarness();
+      const { pending } = await startLoad();
+      await cancel();
+      await act(async () => {
+        auth.resolve(true);
+        await pending;
+      });
+      expect(mockProvider.loadLibrary).not.toHaveBeenCalled();
+      expectBackOnSetup();
+    });
+
+    test('during the access prompt: a refusal after Cancel says nothing', async () => {
+      const prompt = deferred<boolean>();
+      mockProvider.isAuthorized.mockResolvedValueOnce(false);
+      mockProvider.requestAuthorization.mockImplementationOnce(() => prompt.promise);
+      await renderHarness();
+      const { pending } = await startLoad();
+      await cancel();
+      await act(async () => {
+        prompt.resolve(false);
+        await pending;
+      });
+      expect(Alert.alert).not.toHaveBeenCalled();
+      expect(sift.state.connectionStatus).not.toBe('disconnected');
+      expectBackOnSetup();
+    });
+
+    test('during the library fetch: its songs come too late to start a sift', async () => {
+      const library = deferred<Track[]>();
+      mockProvider.loadLibrary.mockImplementationOnce(() => library.promise);
+      await renderHarness();
+      const { pending } = await startLoad();
+      await act(async () => {});
+      expect(mockProvider.loadLibrary).toHaveBeenCalledTimes(1);
+      await cancel();
+      await act(async () => {
+        library.resolve([mockTrack, mockTrackB]);
+        await pending;
+      });
+      expectBackOnSetup();
+    });
+
+    test('during a playlist fetch: the rest of the load, the import included, never runs', async () => {
+      const tracks = deferred<Track[]>();
+      mockProvider.loadPlaylistTracks.mockImplementationOnce(() => tracks.promise);
+      await renderHarness([]);
+      await setPlaylistSource();
+      const { pending } = await startLoad();
+      await act(async () => {});
+      expect(mockProvider.loadPlaylistTracks).toHaveBeenCalledWith('p1');
+      await cancel();
+      await act(async () => {
+        tracks.resolve([mockTrack]);
+        await pending;
+      });
+      // The import looks for "My Playlist - Sifted" through loadPlaylists.
+      expect(mockProvider.loadPlaylists).not.toHaveBeenCalled();
+      expect(loadHistory).not.toHaveBeenCalled();
+      expectBackOnSetup();
+    });
+
+    test('a load that fails after Cancel shows no error', async () => {
+      const library = deferred<Track[]>();
+      mockProvider.loadLibrary.mockImplementationOnce(() => library.promise);
+      await renderHarness();
+      const { pending } = await startLoad();
+      await act(async () => {});
+      await cancel();
+      await act(async () => {
+        library.reject(new Error('network'));
+        await pending;
+      });
+      expectBackOnSetup();
+    });
+
+    test('a load that finds nothing after Cancel shows no error either', async () => {
+      const library = deferred<Track[]>();
+      mockProvider.loadLibrary.mockImplementationOnce(() => library.promise);
+      await renderHarness();
+      const { pending } = await startLoad();
+      await act(async () => {});
+      await cancel();
+      await act(async () => {
+        library.resolve([]);
+        await pending;
+      });
+      expectBackOnSetup();
+    });
+
+    test('a new load goes ahead at once, and the cancelled one\'s late songs don\'t replace its own', async () => {
+      const first = deferred<Track[]>();
+      mockProvider.loadLibrary.mockImplementationOnce(() => first.promise);
+      mockProvider.loadLibrary.mockResolvedValueOnce([mockTrackB]);
+      await renderHarness();
+      const { pending } = await startLoad();
+      await act(async () => {});
+      await cancel();
+      // Not turned away as "already in progress".
+      await act(async () => {
+        await api.loadTracks();
+      });
+      expect(mockProvider.loadLibrary).toHaveBeenCalledTimes(2);
+      expect(sift.state.phase).toBe('sifting');
+      expect(sift.state.tracks.map((t) => t.id)).toEqual(['2']);
+      await act(async () => {
+        first.resolve([mockTrack]);
+        await pending;
+      });
+      expect(sift.state.phase).toBe('sifting');
+      expect(sift.state.tracks.map((t) => t.id)).toEqual(['2']);
+    });
+
+    test('the cancelled load finishing doesn\'t free the lock the new one holds', async () => {
+      const first = deferred<Track[]>();
+      const second = deferred<Track[]>();
+      mockProvider.loadLibrary.mockImplementationOnce(() => first.promise);
+      mockProvider.loadLibrary.mockImplementationOnce(() => second.promise);
+      await renderHarness();
+      const { pending } = await startLoad();
+      await act(async () => {});
+      await cancel();
+      const { pending: next } = await startLoad();
+      await act(async () => {});
+      expect(mockProvider.loadLibrary).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        first.resolve([mockTrack]);
+        await pending;
+      });
+      // The new load is still under way: another is turned away.
+      await act(async () => {
+        await api.loadTracks();
+      });
+      expect(mockProvider.loadLibrary).toHaveBeenCalledTimes(2);
+      await act(async () => {
+        second.resolve([mockTrackB]);
+        await next;
+      });
+      expect(sift.state.tracks.map((t) => t.id)).toEqual(['2']);
+    });
+
+    test('a load still running when a newer one starts elsewhere is dropped too', async () => {
+      const first = deferred<Track[]>();
+      mockProvider.loadLibrary.mockImplementationOnce(() => first.promise);
+      mockProvider.loadLibrary.mockResolvedValueOnce([mockTrackB]);
+      let other!: ReturnType<typeof useMusicProvider>;
+      function Other() {
+        const current = useMusicProvider();
+        useEffect(() => {
+          other = current;
+        });
+        return null;
+      }
+      await render(
+        <SiftProvider>
+          <Harness />
+          <Other />
+        </SiftProvider>,
+      );
+      const { pending } = await startLoad();
+      await act(async () => {});
+      await act(async () => {
+        await other.loadTracks();
+      });
+      expect(sift.state.tracks.map((t) => t.id)).toEqual(['2']);
+      await act(async () => {
+        first.resolve([mockTrack]);
+        await pending;
+      });
+      expect(sift.state.tracks.map((t) => t.id)).toEqual(['2']);
+    });
+
+    test('Cancel after the load finished changes nothing', async () => {
+      await renderHarness();
+      await act(async () => {
+        await api.loadTracks();
+      });
+      expect(sift.state.phase).toBe('sifting');
+      await act(async () => {
+        api.cancelLoad();
+      });
+      expect(sift.state.phase).toBe('sifting');
+      expect(sift.state.tracks.map((t) => t.id)).toEqual(['1']);
+    });
+  });
+
   describe('Plays and Added (filters)', () => {
     const now = new Date();
     const yearsAgo = (years: number) => {

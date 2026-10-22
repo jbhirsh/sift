@@ -13,6 +13,7 @@ import { ACCESS_REQUIRED, keptSaveRetryable, loadFailureMessage, siftedPlaylistN
 import { isFiltering, matchesFilter } from '../utils/trackFilter';
 import { loadReviewedIds, markReviewed, unmarkReviewed } from '../services/ReviewedLedgerStore';
 import { importSiftedKeeps } from '../services/SiftedImport';
+import { trace } from '../services/trace';
 import type { MusicProvider, Playlist, SiftSource, Track } from '../types';
 
 const SKIP_SECONDS = 15;
@@ -97,6 +98,11 @@ const removalsInFlight = new Map<string, Promise<void>>();
 // button, then the decisions list) joins the first instead of adding the
 // song back twice.
 const restoresInFlight = new Map<string, Promise<boolean>>();
+// Which track load counts (#177). Each load takes the next number and
+// dispatches only while it's still the latest; Cancel moves the number on,
+// so a load that finishes after it changes nothing. Launch-wide, like the
+// rest: a new Loading screen's load supersedes one an earlier one started.
+let loadGeneration = 0;
 
 /** Forget the retry bookkeeping, as a fresh launch would. Exported for tests. */
 export function resetRemovalRetries(): void {
@@ -115,7 +121,8 @@ export function useMusicProvider() {
   const { state, dispatch } = useSift();
   const providerRef = useMusicProviderService();
 
-  const loadingInProgressRef = useRef(false);
+  // The load this instance has under way (its generation), if any.
+  const loadingInProgressRef = useRef<number | null>(null);
   // What a removal retry needs, read when it runs rather than when it was
   // scheduled. The source is the one the removed songs came from.
   const removalStateRef = useRef({
@@ -166,9 +173,11 @@ export function useMusicProvider() {
    * When access is refused, say so and offer Settings: iOS asks only once,
    * so after that Settings is the only way to grant it.
    */
-  const ensureAccess = useCallback(async (): Promise<boolean> => {
+  const ensureAccess = useCallback(async (stillWanted: () => boolean = () => true): Promise<boolean> => {
     if (await providerRef.current.isAuthorized()) return true;
     if (await providerRef.current.requestAuthorization()) return true;
+    // Asked for by a load that was cancelled since: say nothing.
+    if (!stillWanted()) return false;
     dispatch({ type: 'SET_CONNECTION_STATUS', status: 'disconnected' });
     Alert.alert(
       'Music Access Required',
@@ -276,7 +285,7 @@ export function useMusicProvider() {
   }, [providerRef]);
 
   const loadTracks = useCallback(async (options?: { skipFiltering?: boolean }) => {
-    if (loadingInProgressRef.current) {
+    if (loadingInProgressRef.current !== null) {
       Sentry.addBreadcrumb({
         category: 'music-provider',
         message: 'loadTracks skipped — already in progress',
@@ -284,23 +293,34 @@ export function useMusicProvider() {
       });
       return;
     }
-    loadingInProgressRef.current = true;
+    loadGeneration += 1;
+    const generation = loadGeneration;
+    loadingInProgressRef.current = generation;
+    // Every dispatch below goes through send: once Cancel (or a newer load)
+    // has moved the generation on, this load changes nothing.
+    const current = () => generation === loadGeneration;
+    const send: typeof dispatch = (action) => {
+      if (current()) dispatch(action);
+      // In the E2E trace, so a flow can show a late result was dropped.
+      else trace('load-dropped', { type: action.type });
+    };
 
     const shouldFilter = !options?.skipFiltering;
     const source = state.source;
     const filter = state.filter;
     const label = source.type === 'playlist' ? `"${source.playlist.name}"` : 'library';
 
-    dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0, message: `Loading ${label}…` });
-    dispatch({ type: 'SET_PHASE', phase: 'loading' });
+    send({ type: 'SET_LOAD_PROGRESS', progress: 0, message: `Loading ${label}…` });
+    send({ type: 'SET_PHASE', phase: 'loading' });
 
     try {
-      if (!(await ensureAccess())) {
-        dispatch({ type: 'SET_LOAD_ERROR', error: ACCESS_REQUIRED });
+      if (!(await ensureAccess(current))) {
+        send({ type: 'SET_LOAD_ERROR', error: ACCESS_REQUIRED });
         return;
       }
+      if (!current()) return;
 
-      dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0.3, message: 'Fetching tracks…' });
+      send({ type: 'SET_LOAD_PROGRESS', progress: 0.3, message: 'Fetching tracks…' });
 
       let tracks: Track[];
       let unfilteredCount: number;
@@ -314,6 +334,8 @@ export function useMusicProvider() {
         if (!result) throw new Error('This provider does not support playlist loading');
         tracks = result;
         unfilteredCount = tracks.length;
+        // Cancelled while it loaded: leave the rest (the import included).
+        if (!current()) return;
         // Keeps an older build saved to "<name> - Sifted", into the ledger
         // first (once per playlist), so the filter below counts them.
         await importSiftedKeeps(providerRef.current, state.provider, source, result);
@@ -417,20 +439,30 @@ export function useMusicProvider() {
                 : filteredAsRemoved > 0
                   ? 'Every song in your library was removed in a previous sift.'
                   : 'Your library has no tracks to sift.';
-        dispatch({ type: 'SET_LOAD_ERROR', error });
+        send({ type: 'SET_LOAD_ERROR', error });
         return;
       }
 
-      dispatch({ type: 'SET_LOAD_PROGRESS', progress: 0.9, message: 'Sorting tracks…' });
-      dispatch({ type: 'LOAD_TRACKS', tracks: sortTracks(tracks, state.sortOrder) });
+      send({ type: 'SET_LOAD_PROGRESS', progress: 0.9, message: 'Sorting tracks…' });
+      send({ type: 'LOAD_TRACKS', tracks: sortTracks(tracks, state.sortOrder) });
     } catch (err) {
       // The raw error goes to Sentry; the user gets plain words (#174).
       Sentry.captureException(err, { tags: { flow: 'load-tracks' } });
-      dispatch({ type: 'SET_LOAD_ERROR', error: loadFailureMessage(source, err) });
+      send({ type: 'SET_LOAD_ERROR', error: loadFailureMessage(source, err) });
     } finally {
-      loadingInProgressRef.current = false;
+      if (loadingInProgressRef.current === generation) loadingInProgressRef.current = null;
     }
   }, [providerRef, dispatch, ensureAccess, state.source, state.sortOrder, state.provider, state.filter]);
+
+  /**
+   * Loading's Cancel (#177): back to Setup, and whatever the load under way
+   * finds later is dropped (it no longer holds the latest generation).
+   */
+  const cancelLoad = useCallback(() => {
+    loadGeneration += 1;
+    loadingInProgressRef.current = null;
+    dispatch({ type: 'CANCEL_LOAD' });
+  }, [dispatch]);
 
   /**
    * Retry the removals that failed (#151). Each is checked first: a removal
@@ -781,6 +813,7 @@ export function useMusicProvider() {
     ensureAccess,
     loadPlaylists,
     loadTracks,
+    cancelLoad,
     play,
     pause,
     stop,

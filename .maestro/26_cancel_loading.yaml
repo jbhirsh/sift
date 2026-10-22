@@ -1,0 +1,66 @@
+appId: com.jessicahirsh.sift
+name: "Cancel on Loading"
+---
+
+# A long load has a way out (#177): Cancel goes back to Setup, and the load
+# finishing later must not start a sift. The mock's "Long Drive" playlist
+# takes 15 s to load (SLOW_PLAYLIST_LOAD_MS), long enough to press Cancel.
+- launchApp:
+    clearState: true
+
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
+
+- tapOn:
+    id: "source-playlist"
+- extendedWaitUntil:
+    visible:
+      id: "playlist-row-playlist-5"
+    timeout: 30000
+- tapOn:
+    id: "playlist-row-playlist-5"
+- extendedWaitUntil:
+    notVisible:
+      id: "playlist-picker-modal"
+    timeout: 30000
+
+- runFlow: shared/start_sifting.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: "loading-cancel"
+    timeout: 10000
+# For the PR's visuals: lands in the run's maestro-results artifact.
+- takeScreenshot: loading-cancel
+- tapOn:
+    id: "loading-cancel"
+
+- extendedWaitUntil:
+    visible:
+      id: "setup-start-sifting"
+    timeout: 10000
+
+# Outlast the load (15 s from Start Sifting). Waits for the first card,
+# which must never come: a late load that started a sift would show it.
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 20000
+    optional: true
+- assertNotVisible:
+    id: "card-track-name"
+- assertVisible:
+    id: "setup-start-sifting"
+- assertNotVisible:
+    id: "loading-cancel"
+
+# A new load goes ahead after a cancelled one: back to the library.
+- tapOn:
+    id: "source-library"
+- runFlow: shared/start_sifting.yaml
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000

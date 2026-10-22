@@ -5,6 +5,7 @@ import {
   Text,
   StyleSheet,
   Platform,
+  TouchableOpacity,
 } from 'react-native';
 import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
@@ -12,12 +13,13 @@ import { useMusicProvider } from '../hooks/useMusicProvider';
 import GlassBackground from '../components/GlassBackground';
 import GlassCard from '../components/GlassCard';
 import { useTraceScreen } from '../hooks/useTrace';
+import { SPACING } from '../theme';
 
 export default function LoadingScreen() {
   useTraceScreen('loading');
   const { state } = useSift();
   const { colors } = useTheme();
-  const { loadTracks } = useMusicProvider();
+  const { loadTracks, cancelLoad } = useMusicProvider();
 
   const { skipFiltering } = state;
   useEffect(() => {
@@ -78,6 +80,19 @@ export default function LoadingScreen() {
         >
           {state.loadMessage}
         </Text>
+
+        {/* A long load has a way out (#177): back to Setup, and whatever
+            the load finds later is dropped. */}
+        <TouchableOpacity
+          testID="loading-cancel"
+          onPress={cancelLoad}
+          style={styles.cancelButton}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityHint="Stops loading and goes back"
+        >
+          <Text style={[styles.cancelText, { color: colors.accent }]}>Cancel</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={{ flex: 1 }} />
@@ -123,5 +138,17 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: 16,
+  },
+  cancelButton: {
+    minHeight: 44,
+    minWidth: 88,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+    marginTop: SPACING.lg,
+  },
+  cancelText: {
+    fontSize: 17,
+    fontWeight: '600',
   },
 });
