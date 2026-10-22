@@ -12,12 +12,14 @@ import {
   SiftSource,
   PendingDecision,
   DEFAULT_PREFERENCES,
+  Preferences,
+  PreferenceField,
   NO_FILTER,
   TrackFilter,
 } from '../types';
 import { saveSession, clearSession } from '../services/SessionStore';
 import { MusicProviderHost } from './MusicProviderContext';
-import { loadPreferences, savePreferences } from '../services/PreferencesStore';
+import { loadPreferences, updatePreferences } from '../services/PreferencesStore';
 import { trace, tracing } from '../services/trace';
 import { describeAction } from '../utils/trace';
 import { sortTracks } from '../utils/sorting';
@@ -137,11 +139,17 @@ type SiftAction =
   | { type: 'RESTORE_TRACK'; trackId: string }
   | { type: 'SET_SOURCE'; source: SiftSource }
   | { type: 'SET_START_AT_CHORUS'; enabled: boolean }
+  /**
+   * The saved preferences, at launch (#175). `skip` names those the user
+   * changed before they loaded, which keep the user's choice.
+   */
+  | { type: 'APPLY_PREFERENCES'; preferences: Preferences; skip: readonly PreferenceField[] }
   | { type: 'RESUME_SESSION'; session: Omit<SiftState, TransientState> & { phase?: AppPhase } }
   | { type: 'SET_PLAYBACK_FAILED'; trackId: string | null }
   | { type: 'SONG_CACHE_WARMING' }
   | { type: 'SONG_CACHE_WARMED' }
-  | { type: 'SET_FILTER'; filter: TrackFilter }
+  /** One or both of Setup's Plays and Added choices. */
+  | { type: 'SET_FILTER'; filter: Partial<TrackFilter> }
   /** A decided card's decision changed (the decisions list). */
   | { type: 'REVISE'; trackId: string; decision: Decision }
   | { type: 'START_FRESH'; skipFiltering?: boolean }
@@ -286,7 +294,7 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
       return { ...state, songCacheWarming: true };
 
     case 'SET_FILTER':
-      return { ...state, filter: action.filter };
+      return { ...state, filter: { ...state.filter, ...action.filter } };
 
     case 'REVISE': {
       // Only a decided card, and only to another decision.
@@ -352,6 +360,23 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
 
     case 'SET_START_AT_CHORUS':
       return state.startAtChorus === action.enabled ? state : { ...state, startAtChorus: action.enabled };
+
+    case 'APPLY_PREFERENCES': {
+      const { preferences, skip } = action;
+      const next = { ...state };
+      if (!skip.includes('startAtChorus')) next.startAtChorus = preferences.startAtChorus;
+      // The sort and filter pick a new sift's songs, on Setup: a sift
+      // already in hand (resumed before they loaded) or one loading (started
+      // before, with the choices it read then) keeps its own.
+      if (state.phase === 'setup' && state.tracks.length === 0) {
+        if (!skip.includes('sortOrder')) next.sortOrder = preferences.sortOrder;
+        const filter = { ...state.filter };
+        if (!skip.includes('maxPlays')) filter.maxPlays = preferences.filter.maxPlays;
+        if (!skip.includes('addedYearsAgo')) filter.addedYearsAgo = preferences.filter.addedYearsAgo;
+        next.filter = filter;
+      }
+      return next;
+    }
 
     case 'RESUME_SESSION':
       return {
@@ -438,6 +463,10 @@ interface SiftContextValue {
   flushPendingSave: () => void;
   /** Change and persist the "Start at chorus" setting. */
   setStartAtChorus: (enabled: boolean) => void;
+  /** Change Setup's sort order, remembered for later launches (#175). */
+  setSortOrder: (sortOrder: SortOrder) => void;
+  /** Change Setup's Plays or Added choice, remembered for later launches (#175). */
+  setFilter: (filter: Partial<TrackFilter>) => void;
 }
 
 const SiftContext = createContext<SiftContextValue | null>(null);
@@ -459,16 +488,16 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
   }, []);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSessionRef = useRef<SiftSession | null>(null);
-  // Set once the user changes a preference, so a slow initial load can't
-  // overwrite their choice with the stored value.
-  const preferencesChangedRef = useRef(false);
+  // The preferences the user changed this launch, so a slow initial load
+  // can't overwrite their choice with the stored value.
+  const preferencesChangedRef = useRef(new Set<PreferenceField>());
 
   // Load saved preferences once.
   useEffect(() => {
     let cancelled = false;
     loadPreferences().then((preferences) => {
-      if (cancelled || preferencesChangedRef.current) return;
-      dispatch({ type: 'SET_START_AT_CHORUS', enabled: preferences.startAtChorus });
+      if (cancelled) return;
+      dispatch({ type: 'APPLY_PREFERENCES', preferences, skip: [...preferencesChangedRef.current] });
     });
     return () => {
       cancelled = true;
@@ -623,10 +652,30 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
 
   const setStartAtChorus = useCallback(
     (enabled: boolean) => {
-      preferencesChangedRef.current = true;
+      preferencesChangedRef.current.add('startAtChorus');
       Sentry.addBreadcrumb({ category: 'user-action', message: `Start at chorus: ${enabled}`, level: 'info' });
       dispatch({ type: 'SET_START_AT_CHORUS', enabled });
-      savePreferences({ startAtChorus: enabled });
+      void updatePreferences({ startAtChorus: enabled });
+    },
+    [dispatch]
+  );
+
+  // Only Setup's own choices are remembered: a resumed session brings its
+  // sort with it (RESUME_SESSION) without changing what's saved.
+  const setSortOrder = useCallback(
+    (sortOrder: SortOrder) => {
+      preferencesChangedRef.current.add('sortOrder');
+      dispatch({ type: 'SET_SORT_ORDER', sortOrder });
+      void updatePreferences({ sortOrder });
+    },
+    [dispatch]
+  );
+
+  const setFilter = useCallback(
+    (filter: Partial<TrackFilter>) => {
+      for (const field of Object.keys(filter) as (keyof TrackFilter)[]) preferencesChangedRef.current.add(field);
+      dispatch({ type: 'SET_FILTER', filter });
+      void updatePreferences({ filter });
     },
     [dispatch]
   );
@@ -645,8 +694,10 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
       resetToSetup,
       flushPendingSave,
       setStartAtChorus,
+      setSortOrder,
+      setFilter,
     }),
-    [state, dispatch, currentTrack, nextTrack, nextNextTrack, remaining, total, decide, startFresh, resetToSetup, flushPendingSave, setStartAtChorus]
+    [state, dispatch, currentTrack, nextTrack, nextNextTrack, remaining, total, decide, startFresh, resetToSetup, flushPendingSave, setStartAtChorus, setSortOrder, setFilter]
   );
 
   return (

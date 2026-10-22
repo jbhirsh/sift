@@ -43,7 +43,7 @@ function isString(value: unknown): value is string {
   return typeof value === 'string';
 }
 
-function isSortOrder(value: unknown): value is SortOrder {
+export function isSortOrder(value: unknown): value is SortOrder {
   return typeof value === 'string' && Object.hasOwn(SORT_ORDER_DISPLAY, value);
 }
 

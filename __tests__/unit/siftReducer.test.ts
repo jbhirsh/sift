@@ -256,6 +256,56 @@ describe('siftReducer', () => {
     expect(siftReducer(on, { type: 'SET_START_AT_CHORUS', enabled: false }).startAtChorus).toBe(false);
   });
 
+  describe('APPLY_PREFERENCES (#175)', () => {
+    const prefs = {
+      startAtChorus: true,
+      sortOrder: 'oldest' as const,
+      filter: { maxPlays: 5, addedYearsAgo: 3 },
+    };
+
+    test('applies the saved Start at chorus, sort and filter', () => {
+      const next = siftReducer(makeState({ phase: 'setup' }), { type: 'APPLY_PREFERENCES', preferences: prefs, skip: [] });
+      expect(next.startAtChorus).toBe(true);
+      expect(next.sortOrder).toBe('oldest');
+      expect(next.filter).toEqual({ maxPlays: 5, addedYearsAgo: 3 });
+    });
+
+    test('leaves alone what the user changed before they loaded', () => {
+      const state = makeState({ phase: 'setup', startAtChorus: false, sortOrder: 'random' });
+      const next = siftReducer(state, { type: 'APPLY_PREFERENCES', preferences: prefs, skip: ['startAtChorus', 'sortOrder'] });
+      expect(next.startAtChorus).toBe(false);
+      expect(next.sortOrder).toBe('random');
+      expect(next.filter).toEqual({ maxPlays: 5, addedYearsAgo: 3 });
+      // Plays and Added each on its own.
+      const plays = siftReducer(makeState({ phase: 'setup', filter: { maxPlays: 20, addedYearsAgo: null } }), {
+        type: 'APPLY_PREFERENCES', preferences: prefs, skip: ['maxPlays'],
+      });
+      expect(plays.filter).toEqual({ maxPlays: 20, addedYearsAgo: 3 });
+      expect(plays.sortOrder).toBe('oldest');
+      const added = siftReducer(makeState({ phase: 'setup', filter: { maxPlays: null, addedYearsAgo: 1 } }), {
+        type: 'APPLY_PREFERENCES', preferences: prefs, skip: ['addedYearsAgo'],
+      });
+      expect(added.filter).toEqual({ maxPlays: 5, addedYearsAgo: 1 });
+    });
+
+    test('a sift loading (started before they arrived) keeps the sort and filter it read', () => {
+      const state = makeState({ phase: 'loading', sortOrder: 'newest' });
+      const next = siftReducer(state, { type: 'APPLY_PREFERENCES', preferences: prefs, skip: [] });
+      expect(next.sortOrder).toBe('newest');
+      expect(next.filter).toEqual(state.filter);
+      expect(next.startAtChorus).toBe(true);
+    });
+
+    test('a sift already in hand keeps its sort, filter and track order; Start at chorus still applies', () => {
+      const state = makeState({ tracks: [trackA], sortOrder: 'newest' });
+      const next = siftReducer(state, { type: 'APPLY_PREFERENCES', preferences: prefs, skip: [] });
+      expect(next.sortOrder).toBe('newest');
+      expect(next.filter).toEqual(state.filter);
+      expect(next.tracks).toBe(state.tracks);
+      expect(next.startAtChorus).toBe(true);
+    });
+  });
+
   test('RESUME_SESSION never changes the start-at-chorus preference', () => {
     const state = makeState({ startAtChorus: true });
     const session = { ...makeState({ startAtChorus: false }), tracks: [trackA] };

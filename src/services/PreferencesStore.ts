@@ -1,36 +1,84 @@
 import * as Sentry from '@sentry/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { DEFAULT_PREFERENCES, Preferences } from '../types';
+import { DEFAULT_PREFERENCES, PreferenceChanges, Preferences, TrackFilter } from '../types';
+import { ADDED_AGES, PLAY_LIMITS } from '../utils/trackFilter';
+import { isSortOrder } from '../utils/validators';
 
 const PREFERENCES_KEY = 'sift_preferences';
 
+/** A stored filter, each choice kept only if Setup still offers it. */
+function readFilter(value: unknown): TrackFilter {
+  const saved = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
+  const offered = (choices: readonly (number | null)[], choice: unknown): number | null =>
+    choices.find((c) => c === choice) ?? null;
+  return {
+    maxPlays: offered(PLAY_LIMITS, saved.maxPlays),
+    addedYearsAgo: offered(ADDED_AGES, saved.addedYearsAgo),
+  };
+}
+
+/** Stored preferences over the defaults, from the stored JSON (or null). */
+function readPreferences(json: string | null): Preferences {
+  // Nothing saved reads as JSON null, which falls through to the defaults.
+  const parsed: unknown = JSON.parse(json ?? 'null');
+  const saved = typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {};
+  return {
+    startAtChorus:
+      typeof saved.startAtChorus === 'boolean' ? saved.startAtChorus : DEFAULT_PREFERENCES.startAtChorus,
+    sortOrder: isSortOrder(saved.sortOrder) ? saved.sortOrder : DEFAULT_PREFERENCES.sortOrder,
+    filter: readFilter(saved.filter),
+  };
+}
+
 /**
  * Load saved preferences over the defaults. Unknown keys are ignored and a
- * field with the wrong type keeps its default, so a preferences blob from
- * another build can never break the app; a failed read yields the defaults.
+ * field with the wrong type (or a choice Setup no longer offers) keeps its
+ * default, so a preferences blob from another build can never break the
+ * app; a failed read yields the defaults.
  */
 export async function loadPreferences(): Promise<Preferences> {
   try {
-    const json = await AsyncStorage.getItem(PREFERENCES_KEY);
-    // Nothing saved reads as JSON null, which falls through to the defaults.
-    const parsed: unknown = JSON.parse(json ?? 'null');
-    const saved = typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {};
-    return {
-      startAtChorus:
-        typeof saved.startAtChorus === 'boolean' ? saved.startAtChorus : DEFAULT_PREFERENCES.startAtChorus,
-    };
+    return readPreferences(await AsyncStorage.getItem(PREFERENCES_KEY));
   } catch (err) {
     Sentry.captureException(err, { tags: { flow: 'preferences-load' } });
     return { ...DEFAULT_PREFERENCES };
   }
 }
 
-export async function savePreferences(preferences: Preferences): Promise<void> {
-  try {
-    await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
-  } catch (err) {
-    Sentry.captureException(err, { tags: { flow: 'preferences-save' } });
-  }
+// Updates run one at a time: each reads what the last one wrote, so a sort
+// change and a Start at chorus toggle close together can't drop each other.
+let updates: Promise<void> = Promise.resolve();
+
+/**
+ * Save some preferences, keeping the others as stored (Plays and Added each
+ * on its own). A failed read writes nothing: writing over defaults would
+ * lose the other choices. A stored value that won't parse is written over,
+ * or no preference could ever be saved again.
+ */
+export function updatePreferences(changes: PreferenceChanges): Promise<void> {
+  updates = updates.then(async () => {
+    let json: string | null;
+    try {
+      json = await AsyncStorage.getItem(PREFERENCES_KEY);
+    } catch (err) {
+      Sentry.captureException(err, { tags: { flow: 'preferences-save' } });
+      return;
+    }
+    let current: Preferences;
+    try {
+      current = readPreferences(json);
+    } catch (err) {
+      Sentry.captureException(err, { tags: { flow: 'preferences-save' } });
+      current = DEFAULT_PREFERENCES;
+    }
+    const next: Preferences = { ...current, ...changes, filter: { ...current.filter, ...changes.filter } };
+    try {
+      await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(next));
+    } catch (err) {
+      Sentry.captureException(err, { tags: { flow: 'preferences-save' } });
+    }
+  });
+  return updates;
 }
 
 // Whether the one-time note on the first Apple Music library remove has been

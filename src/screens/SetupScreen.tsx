@@ -74,7 +74,7 @@ const SOURCE_DISPLAY: Record<typeof SOURCE_TYPES[number], string> = {
 
 export default function SetupScreen() {
   useTraceScreen('setup');
-  const { state, dispatch, startFresh, flushPendingSave } = useSift();
+  const { state, dispatch, startFresh, flushPendingSave, setSortOrder, setFilter } = useSift();
   const { colors, glass } = useTheme();
   const { loadPlaylists, warmCache, ensureAccess, rememberSiftedKeeps } = useMusicProvider();
   const openSortPicker = () => {
@@ -84,7 +84,7 @@ export default function SetupScreen() {
       { options, cancelButtonIndex: options.length - 1 },
       (index) => {
         if (index < SORT_ORDERS.length) {
-          dispatch({ type: 'SET_SORT_ORDER', sortOrder: SORT_ORDERS[index] });
+          setSortOrder(SORT_ORDERS[index]);
         }
       },
     );
@@ -101,10 +101,10 @@ export default function SetupScreen() {
     );
   };
   const openPlaysPicker = () => pickFrom(PLAY_LIMITS, playLimitLabel, (maxPlays) => {
-    dispatch({ type: 'SET_FILTER', filter: { ...state.filter, maxPlays } });
+    setFilter({ maxPlays });
   });
   const openAddedPicker = () => pickFrom(ADDED_AGES, addedAgeLabel, (addedYearsAgo) => {
-    dispatch({ type: 'SET_FILTER', filter: { ...state.filter, addedYearsAgo } });
+    setFilter({ addedYearsAgo });
   });
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);

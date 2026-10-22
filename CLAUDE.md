@@ -172,9 +172,15 @@ Makefile                Dev commands (test, lint, typecheck, check)
   intact) and each save writes a compact record of ids (`utils/sessionFormat`,
   #150); a pre-#150 `sift_session` blob still loads and is removed after the
   first compact save. `__tests__/fixtures/sessions` holds a frozen copy of
-  every saved shape: add one when the shape changes, never edit them. User settings (`startAtChorus`) are
-  preferences, not session state: `PreferencesStore` persists them and
-  `RESUME_SESSION` never touches them.
+  every saved shape: add one when the shape changes, never edit them. User settings (`startAtChorus`, and
+  Setup's last sort and Plays/Added choices, #175) are preferences, not
+  session state: `PreferencesStore` persists them (`updatePreferences`
+  saves one field over the rest, one update at a time) and they load at
+  launch (`APPLY_PREFERENCES`, only while Setup shows no sift).
+  `RESUME_SESSION` never touches the stored ones: a resumed session brings
+  its own sort without saving it (Setup shows that sort until the next
+  launch or a new pick), and a sift in hand or loading when they arrive
+  keeps its own.
 - **Reviewed ledger**: a Keep leaves the song in place and writes nothing to
   Apple Music, for a library or a playlist sift alike: `ReviewedLedgerStore`
   records kept ids per source (`utils/reviewedLedger` `ledgerKey`, one entry
