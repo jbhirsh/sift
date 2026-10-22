@@ -130,6 +130,11 @@ type SiftAction =
   | { type: 'LOAD_TRACKS'; tracks: Track[] }
   | { type: 'SET_LOAD_PROGRESS'; progress: number; message?: string }
   | { type: 'SET_LOAD_ERROR'; error: string }
+  /**
+   * Loading's Cancel (#177): back to Setup. The load's progress and any
+   * error go; a saved session Start Sifting already discarded stays gone.
+   */
+  | { type: 'CANCEL_LOAD' }
   | { type: 'SET_PLAYBACK_POSITION'; position: number }
   | { type: 'SET_IS_PLAYING'; isPlaying: boolean }
   | { type: 'SET_CONNECTION_STATUS'; status: ConnectionStatus }
@@ -277,6 +282,11 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
 
     case 'SET_LOAD_ERROR':
       return { ...state, loadError: action.error, phase: 'setup' };
+
+    case 'CANCEL_LOAD':
+      // Only from Loading: a late press must not pull a sift out from under it.
+      if (state.phase !== 'loading') return state;
+      return { ...state, phase: 'setup', loadProgress: 0, loadMessage: '', loadError: null, skipFiltering: false };
 
     case 'SET_PLAYBACK_POSITION':
       return { ...state, playbackPosition: action.position };

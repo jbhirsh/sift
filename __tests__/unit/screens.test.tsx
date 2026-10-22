@@ -1360,6 +1360,36 @@ describe('LoadingScreen', () => {
     expect(mockProvider.isAuthorized).toHaveBeenCalled();
   });
 
+  test('Cancel goes back to Setup, and the load finishing later changes nothing (#177)', async () => {
+    let resolveLibrary!: (tracks: typeof mockTrackA[]) => void;
+    mockProvider.loadLibrary.mockImplementationOnce(() => new Promise((res) => { resolveLibrary = res; }));
+    let api!: ReturnType<typeof useSift>;
+    const Probe = () => {
+      api = useSift();
+      return api.state.phase === 'loading' ? <LoadingScreen /> : <Text testID="probe-phase">{api.state.phase}</Text>;
+    };
+    const Start = () => {
+      const { dispatch } = useSift();
+      React.useEffect(() => {
+        dispatch({ type: 'START_FRESH' });
+      }, [dispatch]);
+      return <Probe />;
+    };
+    const { getByTestId } = await renderWithProviders(<Start />);
+    await act(async () => {});
+    expect(mockProvider.loadLibrary).toHaveBeenCalled();
+    const cancel = getByTestId('loading-cancel');
+    expect(cancel.props.accessibilityRole).toBe('button');
+    await fireEvent.press(cancel);
+    expect(getByTestId('probe-phase').props.children).toBe('setup');
+    await act(async () => {
+      resolveLibrary([mockTrackA]);
+    });
+    expect(getByTestId('probe-phase').props.children).toBe('setup');
+    expect(api.state.tracks).toEqual([]);
+    expect(api.state.loadError).toBeNull();
+  });
+
   test('the bar is a progress bar VoiceOver reads, and each step is announced (#174)', async () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => {});
     let api!: ReturnType<typeof useSift>;

@@ -124,13 +124,20 @@ const MOCK_PLAYLIST_TRACK_INDICES: Record<string, number[]> = {
   // an older build left, the first look at Road Trip remembers those two as
   // kept (services/SiftedImport).
   'playlist-4': [3, 6],
+  // Every song, slow to load (SLOW_PLAYLIST_LOAD_MS), so the E2E flow for
+  // Loading's Cancel (#177) has time to press it.
+  'playlist-5': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
 };
+
+/** How long "Long Drive" (playlist-5) takes to load. */
+export const SLOW_PLAYLIST_LOAD_MS = 15000;
 
 const MOCK_PLAYLISTS: Playlist[] = [
   { id: 'playlist-1', name: 'Chill Vibes', trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-1'].length },
   { id: 'playlist-2', name: 'Workout Mix', trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-2'].length },
   { id: 'playlist-3', name: 'Road Trip', trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-3'].length },
   { id: 'playlist-4', name: 'Road Trip - Sifted', trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-4'].length },
+  { id: 'playlist-5', name: 'Long Drive', trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-5'].length },
 ];
 
 // ── Failure injection (E2E / unit tests) ───────────────
@@ -325,7 +332,7 @@ export class MockMusicProvider implements MusicProviderService {
   }
 
   async loadPlaylistTracks(playlistID: string): Promise<Track[]> {
-    await delay(300);
+    await delay(playlistID === 'playlist-5' ? SLOW_PLAYLIST_LOAD_MS : 300);
     const indices = MOCK_PLAYLIST_TRACK_INDICES[playlistID];
     if (!indices) return [];
     return indices.map((i) => ({ ...MOCK_LIBRARY_TRACKS[i] }));

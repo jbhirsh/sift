@@ -1,4 +1,4 @@
-import { MockMusicProvider } from '../../src/services/MockMusicProvider';
+import { MockMusicProvider, SLOW_PLAYLIST_LOAD_MS } from '../../src/services/MockMusicProvider';
 
 describe('MockMusicProvider', () => {
   let provider: MockMusicProvider;
@@ -175,6 +175,18 @@ describe('MockMusicProvider', () => {
       expect(typeof track.artist).toBe('string');
       expect(typeof track.duration).toBe('number');
     }
+  });
+
+  test('"Long Drive" holds every song and takes SLOW_PLAYLIST_LOAD_MS to load, for Loading\'s Cancel (#177)', async () => {
+    const playlists = await flushAsync(provider.loadPlaylists());
+    expect(playlists.find((p) => p.id === 'playlist-5')).toEqual({ id: 'playlist-5', name: 'Long Drive', trackCount: 10 });
+    let tracks: { id: string }[] | undefined;
+    void provider.loadPlaylistTracks('playlist-5').then((t) => { tracks = t; });
+    await jest.advanceTimersByTimeAsync(SLOW_PLAYLIST_LOAD_MS - 1);
+    expect(tracks).toBeUndefined();
+    await jest.advanceTimersByTimeAsync(1);
+    expect(tracks).toHaveLength(10);
+    expect(SLOW_PLAYLIST_LOAD_MS).toBeGreaterThanOrEqual(10000);
   });
 
   test('loadPlaylistTracks returns empty array for unknown playlist ID', async () => {
