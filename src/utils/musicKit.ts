@@ -53,6 +53,8 @@ export function toTrack(raw: RawTrack): Track {
     playCount: raw.playCount ?? 0,
     dateAdded: raw.dateAdded ?? '',
     artworkURL: webArtworkURL(raw.artworkURL),
+    ...(raw.trackNumber != null && { trackNumber: raw.trackNumber }),
+    ...(raw.discNumber != null && { discNumber: raw.discNumber }),
   };
 }
 

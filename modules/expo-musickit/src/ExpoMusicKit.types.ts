@@ -11,6 +11,9 @@ export interface MusicKitTrack {
   playCount: number | null;
   dateAdded: string | null;
   artworkURL: string | null;
+  /** Its place on its album; missing from builds before #176. */
+  trackNumber?: number | null;
+  discNumber?: number | null;
   kind: 'song' | 'track';
 }
 

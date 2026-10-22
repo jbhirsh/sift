@@ -4,10 +4,10 @@ name: "Sort Picker - Action Sheet Changes Track Order"
 
 # The sort picker is a native ActionSheetIOS sheet. This flow verifies the
 # full path end-to-end: open the sheet, pick a different order, see the
-# label update, and confirm the loaded sift actually honors it — the mock
-# library's most-played track is "Bohemian Rhapsody" (playCount 142), which
-# must be the FIRST card under Most Played (the default Least Played would
-# lead with "Peaches", playCount 28).
+# label update, and confirm the loaded sift actually honors it. Under Artist
+# (#176), "The" and case ignored, the mock library starts with Doja Cat
+# ("Kiss Me More"), then Dua Lipa ("Levitating"); the default Least Played
+# would lead with "Peaches".
 - launchApp:
     clearState: true
 
@@ -19,24 +19,24 @@ name: "Sort Picker - Action Sheet Changes Track Order"
     timeout: 30000
 - assertVisible: "Least Played"
 
-# Open the native action sheet and pick Most Played.
+# Open the native action sheet and pick Artist.
 # Let the sheet finish sliding in before tapping: its buttons are in the
 # accessibility tree (so the wait above passes) while it is still animating,
 # and a tap landing mid-animation can dismiss the sheet without selecting —
-# seen in CI as the label never changing ('"Most Played" is visible' false).
+# seen in CI as the label never changing.
 - tapOn: "Least Played"
 - extendedWaitUntil:
-    visible: "Most Played"
+    visible: "Artist"
     timeout: 30000
 - waitForAnimationToEnd
-- tapOn: "Most Played"
+- tapOn: "Artist"
 
 # The sheet dismissed and the sort button label updated. Wait for the old
 # label to go (sheet dismissal animates) rather than asserting instantly.
 - extendedWaitUntil:
     notVisible: "Least Played"
     timeout: 30000
-- assertVisible: "Most Played"
+- assertVisible: "Artist"
 
 # Start a library sift and verify the order took effect
 - runFlow: shared/start_sifting.yaml
@@ -48,4 +48,4 @@ name: "Sort Picker - Action Sheet Changes Track Order"
 
 - assertVisible:
     id: "card-track-name"
-    text: "Bohemian Rhapsody"
+    text: "Kiss Me More"

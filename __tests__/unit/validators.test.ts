@@ -53,6 +53,10 @@ describe('isTrack', () => {
     expect(isTrack(stored({ ...track, artworkURL: 'a', previewURL: 'p' }))).toBe(true);
   });
 
+  test('accepts a track with its album order (#176)', () => {
+    expect(isTrack(stored({ ...track, trackNumber: 3, discNumber: 1 }))).toBe(true);
+  });
+
   test.each([
     ['null', null],
     ['an array', [track]],
@@ -66,6 +70,8 @@ describe('isTrack', () => {
     ['a numeric dateAdded', { ...track, dateAdded: 0 }],
     ['a null artworkURL', { ...track, artworkURL: null }],
     ['a numeric previewURL', { ...track, previewURL: 5 }],
+    ['a string trackNumber', { ...track, trackNumber: '3' }],
+    ['a null discNumber', { ...track, discNumber: null }],
   ])('rejects %s', (_label, value) => {
     expect(isTrack(value)).toBe(false);
   });
