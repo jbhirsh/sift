@@ -8,6 +8,9 @@ export interface Track {
   dateAdded: string; // ISO 8601
   artworkURL?: string;
   previewURL?: string;
+  /** Its place on its album (#176), when the service says. */
+  trackNumber?: number;
+  discNumber?: number;
 }
 
 export type Decision = 'keep' | 'remove' | 'skip';
@@ -27,7 +30,7 @@ export interface PendingDecision {
 
 export type AppPhase = 'setup' | 'loading' | 'sifting' | 'done';
 
-export type SortOrder = 'least-played' | 'most-played' | 'oldest' | 'newest' | 'random';
+export type SortOrder = 'least-played' | 'most-played' | 'oldest' | 'newest' | 'artist' | 'album' | 'random';
 
 /**
  * Apple Music only. Spotify was removed (#140): its token lacked the scope
@@ -105,6 +108,8 @@ export const SORT_ORDER_DISPLAY: Record<SortOrder, string> = {
   'most-played': 'Most Played',
   oldest: 'Oldest Added',
   newest: 'Newest Added',
+  artist: 'Artist',
+  album: 'Album',
   random: 'Random',
 };
 

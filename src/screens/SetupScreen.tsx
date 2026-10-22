@@ -63,6 +63,8 @@ const SORT_ORDERS: SortOrder[] = [
   'most-played',
   'oldest',
   'newest',
+  'artist',
+  'album',
   'random',
 ];
 

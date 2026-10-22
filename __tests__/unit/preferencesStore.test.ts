@@ -42,6 +42,13 @@ describe('PreferencesStore', () => {
     });
   });
 
+  it('remembers the Artist and Album sorts too (#176)', async () => {
+    for (const sortOrder of ['artist', 'album']) {
+      mockGetItem.mockResolvedValue(JSON.stringify({ sortOrder }));
+      await expect(loadPreferences()).resolves.toEqual({ ...DEFAULTS, sortOrder });
+    }
+  });
+
   it('an older build\'s preferences (Start at chorus only) load with the other defaults', async () => {
     mockGetItem.mockResolvedValue('{"startAtChorus":true}');
     await expect(loadPreferences()).resolves.toEqual({ ...DEFAULTS, startAtChorus: true });
