@@ -39,8 +39,8 @@ import { useHoldPendingDecision, useSendPending, wasSent } from '../hooks/usePen
 import { useRemovalRetry } from '../hooks/useRemovalRetry';
 import UndoPill from '../components/UndoPill';
 import DecisionsSheet from '../components/DecisionsSheet';
-import { useReviseDecision } from '../hooks/useReviseDecision';
-import { decidedLatestFirst, decisionFor } from '../utils/decisions';
+import { useDecisionsSheet } from '../hooks/useReviseDecision';
+import { decidedLatestFirst } from '../utils/decisions';
 import { compactCount } from '../utils/compactCount';
 import { cardSize, flyOffDistance } from '../utils/cardLayout';
 import { decisionHaptic, undoHaptic } from '../services/haptics';
@@ -94,13 +94,7 @@ export default function SiftScreen() {
   useHoldPendingDecision(sendPending);
   useRemovalRetry();
   // Every decision so far, changeable (beyond Undo's last one).
-  const revise = useReviseDecision(sendPending);
-  const [showDecisions, setShowDecisions] = useState(false);
-  const decisionOf = useCallback(
-    (trackId: string) =>
-      decisionFor(trackId, { kept: state.kept, removed: state.removed, skipped: state.skipped }),
-    [state.kept, state.removed, state.skipped],
-  );
+  const { revise, showDecisions, setShowDecisions, decisionOf } = useDecisionsSheet(sendPending);
   // The last card's decision goes now: Done has no Undo to hold it for.
   const sendIfLast = useCallback(
     (held: PendingDecision | null) => {
