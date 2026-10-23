@@ -26,7 +26,7 @@ import { lrclib, LyricsLookup } from './LrclibClient';
 // unreachable, the preview match erroring) is kept for this app session only,
 // so it is retried on the next launch rather than remembered forever.
 
-export type ChorusSource = 'lyrics' | 'preview' | 'estimate';
+type ChorusSource = 'lyrics' | 'preview' | 'estimate';
 
 export interface ChorusStart {
   /** Seconds from the start of the track. */

@@ -15,7 +15,7 @@ export interface LyricLine {
   sectionStart?: boolean;
 }
 
-export type ChorusMethod = 'title' | 'block' | 'line';
+type ChorusMethod = 'title' | 'block' | 'line';
 
 export interface ChorusMatch {
   /** Seconds from the start of the track where the chorus begins. */
@@ -25,13 +25,13 @@ export interface ChorusMatch {
 }
 
 /** Earliest a chorus may start, as a fraction of the track. */
-export const WINDOW_START = 0.1;
+const WINDOW_START = 0.1;
 /** Latest a chorus may start: later repeats are usually the outro. */
-export const WINDOW_END = 0.6;
+const WINDOW_END = 0.6;
 /** Never start closer than this to the end of the track. */
 export const END_MARGIN_SECONDS = 15;
 /** Tracks shorter than this always start at 0:00. */
-export const MIN_DURATION_SECONDS = 60;
+const MIN_DURATION_SECONDS = 60;
 /** Start this far before the chorus's first line so its first word isn't clipped. */
 export const LEAD_IN_SECONDS = 0.5;
 /** How far back from a title line a chorus block may extend. */

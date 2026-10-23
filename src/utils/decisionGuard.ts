@@ -13,8 +13,7 @@
  * Keep or Remove is turned away instead. No timers: a timer is what runs
  * late after a stall.
  */
-export type PressVerdict =
-  { verdict: 'go' } | { verdict: 'wait' } | { verdict: 'busy'; sinceMs: number };
+type PressVerdict = { verdict: 'go' } | { verdict: 'wait' } | { verdict: 'busy'; sinceMs: number };
 
 export interface DecisionGuard {
   /**
