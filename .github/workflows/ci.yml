@@ -396,7 +396,9 @@ jobs:
           mkdir -p maestro-results/samples
           # Warm the sampler's symbol cache first: the first samples of a run
           # came out empty while it built it.
-          sample "$(pgrep -x SpringBoard | head -1)" 3 -file maestro-results/samples/warmup.txt > /dev/null 2>&1 || true
+          # (On a throwaway process: sampling SpringBoard hid every screen
+          # from XCTest.)
+          sleep 30 & sample $! 3 -file maestro-results/samples/warmup.txt > /dev/null 2>&1 || true
           # The busiest processes every 2 s, to see what starves the runner.
           ( while true; do echo "== $(date -u +%T)"; ps -Ao pcpu,pid,comm -r | head -12; sleep 2; done ) > maestro-results/samples/cpu.txt 2>&1 &
           if [ "${STOP_APSD:-}" = 1 ]; then
