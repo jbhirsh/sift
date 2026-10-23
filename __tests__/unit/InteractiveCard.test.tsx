@@ -135,6 +135,19 @@ describe('InteractiveCard', () => {
     expect(queryByTestId('card-play-count')).toBeNull();
   });
 
+  test('the artwork is an image VoiceOver reads, so text on a cover is covered', async () => {
+    const { getByLabelText } = await renderCard();
+    const art = getByLabelText('Album art, Test Album');
+    expect(art.props.accessible).toBe(true);
+    expect(art.props.accessibilityRole).toBe('image');
+    expect(art.props.accessibilityElementsHidden).toBeUndefined();
+  });
+
+  test('artwork of a song with no album is just "Album art"', async () => {
+    const { getByLabelText } = await renderCard({ ...mockTrack, album: '' });
+    expect(getByLabelText('Album art').props.accessibilityRole).toBe('image');
+  });
+
   test('renders placeholder when no artwork URL', async () => {
     jest.mocked(useResolvedArtwork).mockReturnValueOnce(undefined);
     const trackNoArt = { ...mockTrack, artworkURL: undefined };
