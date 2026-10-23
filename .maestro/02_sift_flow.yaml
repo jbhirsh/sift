@@ -4,7 +4,9 @@ name: "Setup to Sifting - Full Flow"
 
 # Start fresh and go through setup → loading → sifting
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

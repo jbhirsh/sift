@@ -4,7 +4,9 @@ name: "App Launch - Setup Screen"
 
 # Verify the app launches to the setup screen
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

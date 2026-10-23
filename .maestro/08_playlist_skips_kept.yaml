@@ -7,7 +7,9 @@ name: "Playlist Sift Skips Kept Songs"
 # the switch that brings it back. Workout Mix has no "- Sifted" playlist, so
 # nothing is remembered from before (flow 09 covers one that has).
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

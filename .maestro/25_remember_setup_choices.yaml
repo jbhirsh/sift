@@ -5,7 +5,9 @@ name: "Setup Remembers Sort and Filters"
 # Setup's sort order and its Plays and Added choices are remembered across
 # launches (#175): pick them, relaunch, and they're still picked.
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

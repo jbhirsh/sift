@@ -4,7 +4,9 @@ name: "Playlist Source - Select and Sift"
 
 # Test selecting a playlist as the sift source and sifting through it
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

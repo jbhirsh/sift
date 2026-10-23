@@ -5,7 +5,9 @@ name: "Library Sift Skips Kept Songs"
 # Songs kept in one library sift are left out of the next (#143), and Setup
 # says so beside the switch that brings them back.
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

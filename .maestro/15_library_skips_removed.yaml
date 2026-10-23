@@ -12,7 +12,9 @@ name: "Library Sift Skips Removed Songs"
 # song removed in each launch, retries included (see flow 11), so Peaches'
 # removal fails and drivers license's succeeds.
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

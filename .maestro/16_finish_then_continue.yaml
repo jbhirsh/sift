@@ -5,7 +5,9 @@ name: "Finish Early, Then Continue"
 # A sift can end before the last card (#142): Finish shows Done with the
 # decisions so far, and Continue sifting picks up at the next card.
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

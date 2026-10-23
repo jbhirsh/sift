@@ -341,7 +341,7 @@ jobs:
       # of a fixed 25 s sleep, up to a minute, then lets it settle 3 s more.
       # This launch's lines lead trace.txt (their #1, #2... restart with flow
       # 01's launch). Best effort: a warm-up hiccup must never fail the job,
-      # and the first flow's clearState wipes any residual state.
+      # and the first flow's SiftResetState launch wipes any residual state.
       - name: Warm up the app (prime caches before the suite)
         if: env.RUN_SUITE == 'true'
         timeout-minutes: 3

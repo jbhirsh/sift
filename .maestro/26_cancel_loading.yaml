@@ -6,7 +6,9 @@ name: "Cancel on Loading"
 # finishing later must not start a sift. The mock's "Long Drive" playlist
 # takes 15 s to load (SLOW_PLAYLIST_LOAD_MS), long enough to press Cancel.
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - extendedWaitUntil:
     visible:

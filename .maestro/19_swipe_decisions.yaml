@@ -6,7 +6,9 @@ name: "Swipe to Keep and Remove"
 # swipe right keeps, a swipe left removes. The first card ever also says
 # which way is which, until the first decision.
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

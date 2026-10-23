@@ -6,7 +6,9 @@ name: "Plays and Added Filters"
 # mock library has been played more than 20 times, so "20 or fewer" leaves
 # none, and Setup says so instead of starting an empty sift.
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

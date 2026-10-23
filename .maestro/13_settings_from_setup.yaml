@@ -5,7 +5,9 @@ name: "Settings From Setup"
 # Settings opens from the Setup screen, before any song plays (#138), and
 # its Done button closes it.
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

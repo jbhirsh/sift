@@ -5,7 +5,9 @@ name: "Start Over Asks First"
 # A library Start Over with decisions asks before discarding them, and
 # Cancel leaves the sift intact (#137).
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

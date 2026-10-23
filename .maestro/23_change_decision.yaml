@@ -5,7 +5,9 @@ name: "Change an Earlier Decision"
 # Beyond Undo's last decision: the decisions list, from the Sift header,
 # changes any card's decision.
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

@@ -81,6 +81,14 @@ jest.mock('../../src/services', () => ({
   createMusicProvider: jest.fn(() => mockProviderInstance),
 }));
 
+// An E2E launch's reset (services/e2eReset): off unless a test turns it on.
+let mockResetRequested = false;
+let mockFinishReset: () => void = () => {};
+jest.mock('../../src/services/e2eReset', () => Object.defineProperties({}, {
+  resetRequested: { get: () => mockResetRequested },
+  resetAppData: { value: () => new Promise<void>((resolve) => { mockFinishReset = resolve; }) },
+}));
+
 jest.mock('../../src/hooks/useResolvedArtwork', () => ({
   useResolvedArtwork: jest.fn().mockReturnValue(null),
 }));
@@ -134,6 +142,30 @@ describe('App', () => {
     // (native crash reports skip the scrubber).
     expect(sentryConfig.tracePropagationTargets).toEqual([]);
     expect(sentryConfig.enableNetworkBreadcrumbs).toBe(false);
+  });
+
+  test('an E2E reset launch reads nothing saved until the reset has run', async () => {
+    const { loadSession } = jest.requireMock<{ loadSession: jest.Mock }>('../../src/services/SessionStore');
+    // SiftProvider reads preferences as it mounts; Setup reads the session.
+    const loadPreferences = jest.spyOn(
+      jest.requireActual<typeof import('../../src/services/PreferencesStore')>('../../src/services/PreferencesStore'),
+      'loadPreferences',
+    );
+    const reads = () => loadSession.mock.calls.length + loadPreferences.mock.calls.length;
+    mockResetRequested = true;
+    try {
+      const screen = await renderApp();
+      // The gate sits above every store: no screen, no read, while it clears.
+      expect(screen.queryByTestId('setup-brand')).toBeNull();
+      expect(reads()).toBe(0);
+      await act(async () => mockFinishReset());
+      expect(screen.getByTestId('setup-brand')).toBeTruthy();
+      expect(loadSession).toHaveBeenCalled();
+      expect(loadPreferences).toHaveBeenCalled();
+    } finally {
+      mockResetRequested = false;
+      loadPreferences.mockRestore();
+    }
   });
 
   test('renders SetupScreen initially', async () => {
