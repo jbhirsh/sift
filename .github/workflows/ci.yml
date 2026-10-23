@@ -390,7 +390,28 @@ jobs:
         # annotated as a warning. See scripts/run-e2e.sh for the policy.
         run: |
           export PATH="$HOME/.maestro/bin:$PATH"
-          scripts/run-e2e.sh .maestro
+          # EXPERIMENT (claude/stall-experiment-c, never merged): flow 19
+          # eight times with the in-app reset, sampling every swipe-left and
+          # logging the busiest processes, against the reinstall runs.
+          mkdir -p maestro-results/samples
+          sleep 30 & sample $! 3 -file maestro-results/samples/warmup.txt > /dev/null 2>&1 || true
+          ( while true; do echo "== $(date -u +%T)"; ps -Ao pcpu,pid,comm -r | head -12; sleep 2; done ) > maestro-results/samples/cpu.txt 2>&1 &
+          (
+            n=0
+            tail -n0 -F maestro-results/trace.txt 2>/dev/null | while IFS= read -r line; do
+              case "$line" in
+                *"guard-go input=swipe-remove"*)
+                  n=$((n+1))
+                  pid=$(pgrep -x Sift | head -1)
+                  echo "$(date -u +%T) remove $n pid=$pid" >> maestro-results/samples/log.txt
+                  [ -n "$pid" ] && sample "$pid" 10 2 -mayDie -file "maestro-results/samples/remove-$n.txt" >> maestro-results/samples/log.txt 2>&1 &
+                  ;;
+              esac
+            done
+          ) &
+          scripts/run-e2e.sh .maestro || status=$?
+          sleep 12
+          exit "${status:-0}"
 
       # Passing runs keep their trace too: it's the baseline a failure's is
       # read against. If the live stream lost its tail, the persisted log

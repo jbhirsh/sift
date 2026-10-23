@@ -1,0 +1,60 @@
+appId: com.jessicahirsh.sift
+name: "Swipe c"
+---
+
+# The card's own gesture, which every other flow skips for the buttons: a
+# swipe right keeps, a swipe left removes. The first card ever also says
+# which way is which, until the first decision.
+- launchApp:
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
+
+- waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
+
+- runFlow: shared/start_sifting.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+      text: "Peaches"
+    timeout: 30000
+
+- extendedWaitUntil:
+    visible:
+      id: "swipe-hint"
+    timeout: 10000
+
+- swipe:
+    from:
+      id: "card-track-name"
+    direction: RIGHT
+
+- extendedWaitUntil:
+    visible:
+      id: "stat-kept"
+      text: "1 kept"
+    timeout: 10000
+
+- assertNotVisible:
+    id: "swipe-hint"
+
+- swipe:
+    from:
+      id: "card-track-name"
+    direction: LEFT
+
+- extendedWaitUntil:
+    visible:
+      id: "stat-removed"
+      text: "1 removed"
+    timeout: 10000
+
+- assertVisible:
+    id: "remaining-count"
+    text: "8 left"
