@@ -546,9 +546,11 @@ export default function SetupScreen() {
           />
         )}
 
-        {/* Sort order picker */}
+        {/* How the sift goes: the order, then which songs it takes (the
+            least played, or the oldest). One card, three rows of the same
+            height, like a Settings group. */}
         <GlassCard intensity="thin" radius={RADIUS.md}>
-          <View style={styles.sortContainer}>
+          <View style={styles.optionRow}>
             <Text style={[styles.sectionLabel, { color: colors.text }]}>
               Sort by
             </Text>
@@ -567,11 +569,8 @@ export default function SetupScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-        </GlassCard>
-
-        {/* Which songs to go through: the least played, or the oldest. */}
-        <GlassCard intensity="thin" radius={RADIUS.md}>
-          <View style={styles.filterRow}>
+          <View style={[styles.optionDivider, { backgroundColor: colors.separator }]} />
+          <View style={styles.optionRow}>
             <Text style={[styles.sectionLabel, { color: colors.text }]}>Plays</Text>
             <View style={{ flex: 1 }} />
             <TouchableOpacity
@@ -587,8 +586,8 @@ export default function SetupScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-          <View style={[styles.filterDivider, { backgroundColor: colors.separator }]} />
-          <View style={styles.filterRow}>
+          <View style={[styles.optionDivider, { backgroundColor: colors.separator }]} />
+          <View style={styles.optionRow}>
             <Text style={[styles.sectionLabel, { color: colors.text }]}>Added</Text>
             <View style={{ flex: 1 }} />
             <TouchableOpacity
@@ -745,28 +744,25 @@ const styles = StyleSheet.create({
   segmentText: {
     fontSize: 15,
   },
-  // The value buttons are 44 pt tall (#174); the rows' padding shrinks to
-  // match, so the cards keep their height.
-  sortContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
+  // The value's hit area reaches past its text; the negative margin keeps
+  // the text 16 pt from the card's edge, like the label on the left.
   sortButton: {
     minHeight: 44,
     justifyContent: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: SPACING.base,
+    marginRight: -SPACING.base,
   },
-  filterRow: {
+  // Every row the same: the 44 pt value button (#174) plus 4 pt above and
+  // below, so Sort by, Plays and Added line up as one group.
+  optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 4,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.sm,
   },
-  filterDivider: {
+  optionDivider: {
     height: StyleSheet.hairlineWidth,
-    marginLeft: 16,
+    marginLeft: SPACING.xl,
   },
   sortButtonText: {
     fontSize: 17,
