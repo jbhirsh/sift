@@ -16,6 +16,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      without_expo_login:
+        description: Build as a Dependabot PR does, with no Expo login (prebuild + xcodebuild)
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -49,6 +54,7 @@ jobs:
               - 'package.json'
               - 'package-lock.json'
               - '.github/workflows/ios-build.yml'
+              - 'scripts/build-simulator-app.sh'
 
   build:
     name: Build iOS simulator app
@@ -63,6 +69,8 @@ jobs:
     # A cold build takes about 30 minutes; without a limit a stuck one would
     # hold a macOS runner for GitHub's 6-hour default.
     timeout-minutes: 60
+    env:
+      HAS_EXPO_TOKEN: ${{ secrets.EXPO_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v7
 
@@ -73,48 +81,28 @@ jobs:
 
       - run: npm ci
 
+      # Only the eas path needs the EAS CLI.
       - name: Setup EAS CLI
+        if: env.HAS_EXPO_TOKEN == 'true' && inputs.without_expo_login != true
         run: npm install -g eas-cli
 
-      # Dependabot-triggered runs receive Dependabot secrets, not Actions
-      # secrets — without EXPO_TOKEN there, eas can't authenticate, so skip
-      # green with a notice rather than run a build that can only fail.
-      # SENTRY_AUTH_TOKEN is only needed for the source-map upload inside the
-      # build: when absent, keep the compile check and disable the upload
-      # instead of skipping. Registering both as Dependabot secrets upgrades
-      # bot PRs to the full check.
-      - name: Check for EAS credentials
-        id: creds
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-        run: |
-          if [ -n "$EXPO_TOKEN" ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-            if [ -n "$SENTRY_AUTH_TOKEN" ]; then
-              echo "sentry_upload=false" >> "$GITHUB_OUTPUT"
-            else
-              echo "sentry_upload=true" >> "$GITHUB_OUTPUT"
-              echo "::notice::SENTRY_AUTH_TOKEN unavailable — building with source-map upload disabled."
-            fi
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::EXPO_TOKEN unavailable in this trigger context (Dependabot/fork) — skipping the iOS compile check."
-          fi
-
+      # Every PR really builds, Dependabot's included (#178): its runs get no
+      # Actions secrets, so without EXPO_TOKEN the script builds the same
+      # e2e-simulator app with no Expo or Apple login (expo prebuild +
+      # xcodebuild). A run by hand with without_expo_login takes that path
+      # on purpose, to check it. Without SENTRY_AUTH_TOKEN the source-map
+      # upload is turned off rather than the build skipped.
       - name: Build simulator app (compiles expo-musickit Swift)
-        if: steps.creds.outputs.present == 'true'
-        run: eas build --profile e2e-simulator --platform ios --local --non-interactive --output build/Sift-e2e.tar.gz
+        run: scripts/build-simulator-app.sh build/Sift-e2e.tar.gz
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_DISABLE_AUTO_UPLOAD: ${{ steps.creds.outputs.sentry_upload }}
+          SIFT_BUILD_WITHOUT_EXPO: ${{ inputs.without_expo_login == true && '1' || '' }}
           USE_CCACHE: '1'
 
       # The E2E job (ci.yml) can reuse this instead of rebuilding: download the
       # artifact from a recent run if the fingerprint matches.
       - uses: actions/upload-artifact@v7
-        if: steps.creds.outputs.present == 'true'
         with:
           name: sift-simulator-app
           path: build/Sift-e2e.tar.gz

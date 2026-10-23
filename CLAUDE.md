@@ -304,7 +304,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
   app or the job, with `workflow_dispatch` available for manual runs. It
   skips PRs that only touch docs or repo tooling (other workflows, the
   commit check, `scripts/` apart from its runners (`run-e2e.sh`,
-  `run-a11y-audit.sh`, `take-screenshots.sh`, `take-gifs.sh`),
+  `run-a11y-audit.sh`, `take-screenshots.sh`, `take-gifs.sh`,
+  `build-simulator-app.sh`),
   `stryker.config.json`;
   the `code` filter in `ci.yml`, with `predicate-quantifier: 'every'` so its
   `!` patterns exclude). Its app build is cached on
@@ -340,7 +341,12 @@ Makefile                Dev commands (test, lint, typecheck, check)
   auto-merge as each one opens, and the `main` rule does the gating: GitHub
   merges only once every required check is green. So the rule must list every
   check a PR runs, Claude Review included, and require review threads to be
-  resolved, or a bot PR merges past a failing or unreported gate.
+  resolved, or a bot PR merges past a failing or unreported gate. Bot PRs get
+  no Actions secrets, so no `EXPO_TOKEN`: the simulator app
+  (`scripts/build-simulator-app.sh`, used by `ios-build.yml` and the E2E
+  job) then builds with `expo prebuild` + `xcodebuild` and no Expo or Apple
+  login, so "Build iOS simulator app" really compiles on them too (#178).
+  Run `ios-build.yml` by hand with `without_expo_login` to check that path.
 - **The phone build follows `main`.** `.github/workflows/preview-deploy.yml`
   runs on every push to `main`. It fingerprints the native layer
   (`runtimeVersion.policy: fingerprint` in `app.json`) and looks for an EAS

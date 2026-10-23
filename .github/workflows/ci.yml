@@ -79,7 +79,7 @@ jobs:
               - '!.github/*'
               - '!.github/scripts/**'
               - '!.github/workflows/!(ci|ios-build).yml'
-              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh)'
+              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh)'
               - '!stryker.config.json'
 
       - uses: actions/setup-node@v7
@@ -134,10 +134,11 @@ jobs:
     # run rebuilds the simulator app (~20-30 min); warm runs restore it from
     # actions/cache keyed on the project fingerprint, or reuse the ios-build
     # artifact for the same head SHA (~1 min).
-    # Caveat: the build step needs EXPO_TOKEN, which dependabot-triggered PRs
-    # don't receive (they read Dependabot secrets, not Actions secrets) — on a
-    # cache miss those PRs fail here until the token is mirrored into
-    # Dependabot secrets.
+    # Dependabot's runs get no Actions secrets, so no EXPO_TOKEN: on a cache
+    # miss they reuse ios-build's artifact (every npm bump changes
+    # package-lock.json, so ios-build builds it), and failing that,
+    # scripts/build-simulator-app.sh builds the same app with no Expo login
+    # (#178).
     # Pinned (not macos-latest) so a runner-image migration can't silently
     # change simulator/Xcode behavior; bump deliberately. macos-26 is the
     # image the working builds resolve to (Xcode 26; Expo SDK 57 requires
@@ -169,6 +170,8 @@ jobs:
       # not github.sha (the temporary merge commit both workflows check out),
       # so look ios-build runs up by the head commit.
       RUN_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      # Without it (Dependabot's runs) the build needs no EAS CLI (#178).
+      HAS_EXPO_TOKEN: ${{ secrets.EXPO_TOKEN != '' }}
 
     steps:
       - uses: actions/checkout@v7
@@ -283,7 +286,7 @@ jobs:
       # Only a build needs the EAS CLI (about 30 s to install): a cache hit
       # or a reused ios-build artifact skips both.
       - name: Setup EAS CLI
-        if: steps.build-cache.outputs.cache-hit != 'true' && steps.reuse.outputs.hit != 'true'
+        if: steps.build-cache.outputs.cache-hit != 'true' && steps.reuse.outputs.hit != 'true' && env.HAS_EXPO_TOKEN == 'true'
         run: npm install -g eas-cli
 
       - name: Build simulator app
@@ -291,7 +294,8 @@ jobs:
         # A cold build takes about 30 minutes and ran past 40 on a slow runner
         # (#168): the same cap as ios-build's build job.
         timeout-minutes: 60
-        run: eas build --profile e2e-simulator --platform ios --local --non-interactive --output build/Sift-e2e.tar.gz
+        # eas with EXPO_TOKEN, otherwise prebuild + xcodebuild with no login.
+        run: scripts/build-simulator-app.sh build/Sift-e2e.tar.gz
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
