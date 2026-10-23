@@ -7,8 +7,8 @@ let resolveNative: ResolveArtworkFn | null = null;
 
 if (Platform.OS === 'ios') {
   try {
-    const mod = require('../../modules/expo-musickit/src/index');
-    resolveNative = mod.resolveArtworkURL as ResolveArtworkFn;
+    const mod: typeof import('../../modules/expo-musickit/src/index') = require('../../modules/expo-musickit/src/index');
+    resolveNative = mod.resolveArtworkURL;
   } catch {
     /* native module not available (e.g. Expo Go) */
   }

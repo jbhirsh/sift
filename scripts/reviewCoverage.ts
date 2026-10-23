@@ -210,7 +210,8 @@ export function toolCalls(execution: unknown): ToolCall[] {
 function resultText(content: unknown): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
-    return content
+    const parts: unknown[] = content;
+    return parts
       .map((part) =>
         part && typeof part === 'object' && typeof (part as { text?: unknown }).text === 'string'
           ? (part as { text: string }).text

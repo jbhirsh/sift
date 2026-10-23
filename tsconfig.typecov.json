@@ -1,0 +1,4 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["index.ts", "src", "modules/expo-musickit/src", "scripts/*.ts"]
+}

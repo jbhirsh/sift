@@ -115,7 +115,8 @@ export function createLrclibClient(options: LrclibClientOptions = {}): LrclibCli
         });
         if (response.status === 404) return { status: 404, body: null };
         if (!response.ok) throw new Error(`lrclib_error_${response.status}`);
-        return { status: response.status, body: await response.json() };
+        const body: unknown = await response.json();
+        return { status: response.status, body };
       } catch (err) {
         if (controller.signal.aborted) throw new Error('lrclib_timeout', { cause: err });
         throw err;

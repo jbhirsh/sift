@@ -40,7 +40,10 @@ const MAX_DEPTH = 5;
 function scrubValue(value: unknown, depth: number): unknown {
   if (typeof value === 'string') return scrubText(value);
   if (depth >= MAX_DEPTH || value == null || typeof value !== 'object') return value;
-  if (Array.isArray(value)) return value.map((v) => scrubValue(v, depth + 1));
+  if (Array.isArray(value)) {
+    const items: unknown[] = value;
+    return items.map((v) => scrubValue(v, depth + 1));
+  }
   return scrubData(value as Data, depth + 1);
 }
 

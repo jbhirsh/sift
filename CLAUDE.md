@@ -25,8 +25,10 @@ make test            # unit tests (Jest)
 make lint            # ESLint over the whole repo + the native bridge check
 make format          # Prettier: rewrite the tree (CI only checks it)
 make typecheck       # TypeScript type checking
+npm run typecov      # type coverage: fails on any expression typed `any`
 make check           # what CI's unit job runs: lint, format check, typecheck,
-                     # depcruise, the native bridge check, tests with coverage
+                     # type coverage, depcruise, the native bridge check,
+                     # tests with coverage
 ```
 
 `make check` is `npm run check`; `make lint` is `npm run lint` plus
@@ -100,6 +102,16 @@ amend, rebase, or force-push `main`. Never use `--no-verify`.**
   never call bare `tsc`/`npx tsc`: use `npm run typecheck` / `make typecheck`,
   which invoke TS 7 by path. Swap the alias back once typescript-eslint
   supports TS 7.
+- **No `any` anywhere** in the app code (src, the native module's TypeScript,
+  `scripts/*.ts`: `tsconfig.typecov.json`; tests aren't counted, their mocks
+  are `any` by nature). `npm run typecov` (`type-coverage` at 100%, in CI and
+  `make check`) fails on, and lists, any expression typed `any`, including the
+  ones TypeScript infers silently: a `JSON.parse` or `response.json()` result,
+  a `require()`, an array narrowed by `Array.isArray`, a `process.env` key
+  `src/types/env.d.ts` doesn't name. Type it where it enters (`const x:
+  unknown = JSON.parse(...)`, then narrow); no ignore comments, and no
+  `ignoreFiles` except generated code. `npm run typecov:strict` also counts
+  `as` casts and non-null assertions; CI shows that figure, as information.
 - **ESLint**: flat config in `eslint.config.mjs`. Fix all violations before committing.
   `eslint-plugin-jsdoc` holds JSDoc to the code where JSDoc exists: a `@param`
   naming an argument the function doesn't take, an unknown tag, or a type
@@ -335,7 +347,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
 
 ## CI/CD
 - CI runs in `.github/workflows/ci.yml` on GitHub-hosted runners: lint,
-  Prettier, typecheck, dependency-cruiser, Jest with coverage and a production
+  Prettier, typecheck, type coverage, dependency-cruiser, Jest with coverage and a production
   dependency audit on Ubuntu on every PR. The audit gates at critical, not
   high: Expo's build tooling carries high advisories only Expo can fix.
   The Maestro iOS E2E job (macOS) also runs on every PR that can affect the

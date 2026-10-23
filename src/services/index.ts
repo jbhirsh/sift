@@ -27,7 +27,9 @@ export function createMusicProvider(provider: MusicProvider): MusicProviderServi
       try {
         // AppleMusicProvider loads the native MusicKit module and throws
         // if it's unavailable (Expo Go, Android, web).
-        const { AppleMusicProvider } = require('./AppleMusicProvider');
+        const {
+          AppleMusicProvider,
+        }: typeof import('./AppleMusicProvider') = require('./AppleMusicProvider');
         const instance = new AppleMusicProvider();
         Sentry.addBreadcrumb({
           category: 'music-provider',

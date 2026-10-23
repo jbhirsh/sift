@@ -1,6 +1,11 @@
 import * as Sentry from '@sentry/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { mergeIntoLedger, parseLedger, removeFromLedger } from '../utils/reviewedLedger';
+import {
+  mergeIntoLedger,
+  parseLedger,
+  removeFromLedger,
+  type ReviewedLedger,
+} from '../utils/reviewedLedger';
 
 const LEDGER_KEY = 'sift_reviewed_ledger';
 
@@ -71,7 +76,7 @@ async function flush(): Promise<void> {
     pending.clear();
     pendingRemovals.clear();
     try {
-      let ledger;
+      let ledger: ReviewedLedger;
       try {
         ledger = parseLedger(await AsyncStorage.getItem(LEDGER_KEY));
       } catch (err) {

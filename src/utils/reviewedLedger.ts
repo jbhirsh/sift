@@ -26,9 +26,11 @@ export function parseLedger(json: string | null): ReviewedLedger {
   const parsed: unknown = JSON.parse(json ?? '{}');
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
   const ledger: ReviewedLedger = {};
-  for (const [key, value] of Object.entries(parsed)) {
+  const entries: [string, unknown][] = Object.entries(parsed);
+  for (const [key, value] of entries) {
     if (Array.isArray(value)) {
-      ledger[key] = value.filter((id): id is string => typeof id === 'string');
+      const ids: unknown[] = value;
+      ledger[key] = ids.filter((id): id is string => typeof id === 'string');
     }
   }
   return ledger;
