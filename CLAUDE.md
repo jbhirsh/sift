@@ -426,6 +426,18 @@ Makefile                Dev commands (test, lint, typecheck, check)
   sweep's, from the Actions cache) and re-test only mutants whose code or
   tests changed. The weekly sweep tests everything and refreshes that
   baseline.
+- **The weekly audit** (`weekly-audit.yml`, the same Monday slot, or by hand)
+  runs what needs the whole repository at once: knip (`knip.json`: unused
+  files, exports and dependencies), jscpd (`.jscpd.json`: duplicated blocks),
+  lychee (every markdown link, local file, image and `#anchor`; `.lycheeignore`
+  for a link that only refuses scripts) and dependency-cruiser's whole graph
+  as an `architecture-graph` artifact (its rules already gate every PR). Each
+  finding category keeps one issue labelled `weekly-audit` ("Dead code",
+  "Duplicated code", "Broken links"), updated weekly and closed by the first
+  clean sweep (`scripts/weekly-audit.mjs`, rules in `scripts/weeklyAudit.ts`).
+  Findings never fail the run, a broken tool does. Run `npx knip` or
+  `npx jscpd` locally to see the same; when knip is wrong about something
+  (a file only a native build or a script reaches), say so in `knip.json`.
 - **Required status checks.** The `main` branch rule requires these job names
   (from GitHub Actions, whichever workflow file they live in), so renaming a
   job's `name:` silently un-gates it. Update the rule in the same PR as any

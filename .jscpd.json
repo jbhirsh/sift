@@ -1,0 +1,11 @@
+{
+  "path": ["src", "scripts", "modules/expo-musickit/src", "modules/expo-musickit/ios"],
+  "format": ["typescript", "tsx", "javascript", "swift"],
+  "ignore": ["**/node_modules/**", "**/*.d.ts"],
+  "minTokens": 60,
+  "minLines": 8,
+  "reporters": ["console", "json"],
+  "output": "reports/jscpd",
+  "gitignore": true,
+  "absolute": true
+}
