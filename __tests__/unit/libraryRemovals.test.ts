@@ -1,4 +1,4 @@
-import { collectedRemovalIds, collectsRemovals } from '../../src/utils/libraryRemovals';
+import { collectedRemovalIds, collectsRemovals, deletedInMusicNote, deletionCandidates } from '../../src/utils/libraryRemovals';
 import type { MusicProvider, RemovalRecord, Track } from '../../src/types';
 
 const track = (id: string, name: string): Track => ({
@@ -61,5 +61,40 @@ describe('collectsRemovals', () => {
 
   test('another provider does not', () => {
     expect(collectsRemovals('spotify' as unknown as MusicProvider)).toBe(false);
+  });
+});
+
+describe('deletionCandidates (#183)', () => {
+  const roadTrip = { type: 'playlist' as const, playlist: { id: 'p1', name: 'Road Trip', trackCount: 3 } };
+
+  test('the collected library songs, each once', () => {
+    const peaches = track('a1', 'Peaches');
+    const stay = track('a2', 'Stay');
+    const candidates = deletionCandidates([
+      record(peaches),
+      record(stay, { source: roadTrip, collected: true }),
+      // Removed again from a playlist sift: still one song.
+      record(peaches, { source: roadTrip, collected: true }),
+    ], 'apple-music');
+    expect(candidates).toEqual([peaches, stay]);
+  });
+
+  test('not a playlist entry that isn\'t a library song: a lookup can\'t tell it was deleted', () => {
+    const video = { ...track('v1', 'A Video'), dateAdded: '' };
+    expect(deletionCandidates([record(video, { source: roadTrip, collected: true })], 'apple-music')).toEqual([]);
+  });
+
+  test('not an older playlist removal that never left the playlist, nor another provider\'s', () => {
+    expect(deletionCandidates([
+      record(track('a1', 'Peaches'), { source: roadTrip }),
+      record(track('a2', 'Stay'), { provider: 'spotify' as MusicProvider }),
+    ], 'apple-music')).toEqual([]);
+  });
+});
+
+describe('deletedInMusicNote (#183)', () => {
+  test('says how many songs were deleted, one or more', () => {
+    expect(deletedInMusicNote(1)).toBe('You deleted 1 song from your library in Music.');
+    expect(deletedInMusicNote(12)).toBe('You deleted 12 songs from your library in Music.');
   });
 });

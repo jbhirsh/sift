@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
+  AccessibilityInfo,
   View,
   Text,
   TouchableOpacity,
@@ -29,6 +30,8 @@ import { warmUpOrder } from '../utils/warmUpOrder';
 import { ADDED_AGES, addedAgeLabel, PLAY_LIMITS, playLimitLabel } from '../utils/trackFilter';
 import { clearArtworkCache } from '../hooks/useResolvedArtwork';
 import { clearHistoryForSource } from '../services/RemovalHistoryStore';
+import { deletedInMusicNote } from '../utils/libraryRemovals';
+import { markDeletedInMusicShown } from '../services/DeletedInMusic';
 import { loadReviewedIds } from '../services/ReviewedLedgerStore';
 import { ledgerKey, reviewedNote } from '../utils/reviewedLedger';
 import { COLORS, CONTENT_COLUMN, RADIUS, SPACING } from '../theme';
@@ -78,7 +81,7 @@ export default function SetupScreen() {
   useTraceScreen('setup');
   const { state, dispatch, startFresh, flushPendingSave, setSortOrder, setFilter } = useSift();
   const { colors, glass } = useTheme();
-  const { loadPlaylists, warmCache, ensureAccess, rememberSiftedKeeps } = useMusicProvider();
+  const { loadPlaylists, warmCache, ensureAccess, rememberSiftedKeeps, deletedInMusic: countDeletedInMusic } = useMusicProvider();
   const openSortPicker = () => {
     if (Platform.OS !== 'ios') return;
     const options = [...SORT_ORDERS.map((o) => SORT_ORDER_DISPLAY[o]), 'Cancel'];
@@ -122,6 +125,22 @@ export default function SetupScreen() {
   const [reviewed, setReviewed] = useState({ key: '', count: 0 });
   const reviewedCount = reviewed.key === sourceLedgerKey ? reviewed.count : 0;
   const selectedSource = state.source;
+  // Songs Sift collected that the user has since deleted from their library
+  // in Music (#183): said once. Marked shown only once this Setup shows it,
+  // so one that goes away before the look finishes leaves it for the next.
+  const [deletedInMusic, setDeletedInMusic] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    countDeletedInMusic().then((count) => {
+      if (cancelled || count === 0) return;
+      setDeletedInMusic(count);
+      AccessibilityInfo.announceForAccessibility(deletedInMusicNote(count));
+      void markDeletedInMusicShown();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [countDeletedInMusic]);
   useEffect(() => {
     let cancelled = false;
     // A playlist's count includes keeps an older build saved to
@@ -423,6 +442,15 @@ export default function SetupScreen() {
           </Text>
         </View>
 
+        {deletedInMusic > 0 ? (
+          <View style={styles.deletedNote}>
+            <SymbolView name="checkmark.circle.fill" size={16} tintColor={COLORS.keep} accessibilityElementsHidden />
+            <Text testID="deleted-in-music-note" style={[styles.deletedNoteText, { color: colors.textSecondary }]}>
+              {deletedInMusicNote(deletedInMusic)}
+            </Text>
+          </View>
+        ) : null}
+
         {/* Error display */}
         {state.loadError ? (
           <View style={styles.errorContainer}>
@@ -714,6 +742,19 @@ const styles = StyleSheet.create({
   errorContainer: {
     paddingHorizontal: 16,
     marginBottom: 24,
+  },
+  deletedNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    marginBottom: SPACING['2xl'],
+  },
+  deletedNoteText: {
+    fontSize: 15,
+    textAlign: 'center',
+    flexShrink: 1,
   },
   errorText: {
     fontSize: 16,

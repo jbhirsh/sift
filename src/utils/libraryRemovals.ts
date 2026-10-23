@@ -1,4 +1,4 @@
-import type { MusicProvider, RemovalRecord } from '../types';
+import type { MusicProvider, RemovalRecord, Track } from '../types';
 
 /**
  * Where an Apple Music Remove puts a song. MusicKit can't delete library
@@ -42,4 +42,25 @@ export function collectedRemovalIds(history: readonly RemovalRecord[], provider:
       .filter((r) => r.provider === provider && (r.source.type === 'library' || r.collected === true))
       .map((r) => r.track.id),
   );
+}
+
+/**
+ * The collected songs a later launch checks for having been deleted from
+ * the library in Music (#183), once each: library songs only. A playlist
+ * entry with no library song (a music video, say) comes without a date
+ * added (utils/musicKit toTrack), and a library lookup that can't find it
+ * says nothing about whether the user deleted it.
+ */
+export function deletionCandidates(history: readonly RemovalRecord[], provider: MusicProvider): Track[] {
+  const ids = collectedRemovalIds(history, provider);
+  const byId = new Map<string, Track>();
+  for (const record of history) {
+    if (ids.has(record.track.id) && record.track.dateAdded !== '') byId.set(record.track.id, record.track);
+  }
+  return [...byId.values()];
+}
+
+/** Setup's note once songs Sift collected were deleted in Music (#183). */
+export function deletedInMusicNote(count: number): string {
+  return `You deleted ${count} ${count === 1 ? 'song' : 'songs'} from your library in Music.`;
 }

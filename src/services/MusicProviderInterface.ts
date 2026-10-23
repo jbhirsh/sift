@@ -72,6 +72,16 @@ export interface MusicProviderService {
   restoreRemoved?(trackIDs: string[]): Promise<number>;
 
   /**
+   * Of these songs Sift put in "Sift — Removed", the ids of the ones the
+   * user has since deleted from their library in Music (#183): no longer in
+   * "Sift — Removed" (deleting a song takes it out of every playlist) and
+   * not found as a library song. One only taken out of the playlist is
+   * still in the library, and doesn't count; nor does one whose lookup
+   * failed.
+   */
+  deletedFromLibrary?(tracks: Track[]): Promise<string[]>;
+
+  /**
    * Whether a removal from this source already landed, for retrying a
    * failed one safely (#151): a removal can fail after taking effect, and
    * repeating a Remove would add the song to "Sift — Removed" twice. For a

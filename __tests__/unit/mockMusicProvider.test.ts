@@ -465,3 +465,41 @@ describe('MockMusicProvider failure injection (EXPO_PUBLIC_MOCK_FAIL_ADDS / _REM
     await expect(new Fresh().addToPlaylist('p1', ['t1'])).resolves.toBeUndefined();
   });
 });
+
+describe('MockMusicProvider: songs deleted in Music (#183, SiftDeletedInMusic)', () => {
+  const song = (id: string) => ({
+    id, name: id, artist: 'Artist', album: 'Album', duration: 200, playCount: 0, dateAdded: '2020-01-01T00:00:00Z',
+  });
+
+  /** A fresh mock module, as an E2E build launched with these arguments sees it. */
+  function launchedWith(args: Record<string, unknown>, tracing = true): typeof import('../../src/services/MockMusicProvider') {
+    let mod: typeof import('../../src/services/MockMusicProvider') | undefined;
+    jest.isolateModules(() => {
+      jest.doMock('react-native/Libraries/Settings/Settings', () => ({
+        __esModule: true,
+        default: { get: (key: string) => args[key] },
+      }));
+      jest.doMock('../../src/services/trace', () => ({ tracing, trace: jest.fn() }));
+      mod = require('../../src/services/MockMusicProvider');
+    });
+    if (!mod) throw new Error('module did not load');
+    return mod;
+  }
+
+  test('by default none of them is', async () => {
+    const { MockMusicProvider: Mock } = launchedWith({});
+    await expect(new Mock().deletedFromLibrary([song('mock-1')])).resolves.toEqual([]);
+  });
+
+  test('launched with it, every song an earlier launch collected is; one collected this launch isn\'t', async () => {
+    const { MockMusicProvider: Mock } = launchedWith({ SiftDeletedInMusic: 'true' });
+    const mock = new Mock();
+    await mock.removeFromLibrary(['mock-2']);
+    await expect(mock.deletedFromLibrary([song('mock-1'), song('mock-2')])).resolves.toEqual(['mock-1']);
+  });
+
+  test('only the E2E build reads it', async () => {
+    const { MockMusicProvider: Mock } = launchedWith({ SiftDeletedInMusic: 'true' }, false);
+    await expect(new Mock().deletedFromLibrary([song('mock-1')])).resolves.toEqual([]);
+  });
+});

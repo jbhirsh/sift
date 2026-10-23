@@ -4,6 +4,7 @@ import type { MusicProviderService } from './MusicProviderInterface';
 import type { Playlist, SiftSource, Track } from '../types';
 import { APPLE_REMOVED_PLAYLIST } from '../utils/libraryRemovals';
 import { createSerialQueue } from '../utils/serialQueue';
+import { TrackIndex } from '../utils/trackIdentity';
 import {
   AddShortfallError,
   batches,
@@ -204,6 +205,25 @@ export class AppleMusicProvider implements MusicProviderService {
       if ((await this.native.loadPlaylistItems(id)).some((item) => item.id === trackID)) return true;
     }
     return false;
+  }
+
+  async deletedFromLibrary(tracks: Track[]): Promise<string[]> {
+    if (tracks.length === 0) return [];
+    // Still in a "Sift — Removed" (by id or by song, as playlists can file
+    // a song under another id): not deleted.
+    const listed = new TrackIndex();
+    for (const id of await this.native.findPlaylistsByName(APPLE_REMOVED_PLAYLIST, RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE)) {
+      for (const item of await this.native.loadPlaylistItems(id)) listed.add(toTrack(item));
+    }
+    const unlisted = tracks.filter((track) => !listed.has(track));
+    // Gone from the library too: the lookup found no song, and didn't fail.
+    const gone = new Set<string>();
+    for (const batch of batches(unlisted.map((track) => track.id), LOOKUP_BATCH_SIZE)) {
+      for (const result of await this.native.lookupLibrarySongs(batch)) {
+        if (!result.failed && result.song == null) gone.add(result.id);
+      }
+    }
+    return unlisted.filter((track) => gone.has(track.id)).map((track) => track.id);
   }
 
   addToLibrary(trackIDs: string[]): Promise<void> {

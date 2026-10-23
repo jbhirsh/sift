@@ -13,6 +13,7 @@ import { ACCESS_REQUIRED, keptSaveRetryable, loadFailureMessage, siftedPlaylistN
 import { isFiltering, matchesFilter } from '../utils/trackFilter';
 import { loadReviewedIds, markReviewed, unmarkReviewed } from '../services/ReviewedLedgerStore';
 import { importSiftedKeeps } from '../services/SiftedImport';
+import { deletedInMusicCount } from '../services/DeletedInMusic';
 import { loadPlaylistTracksOnce } from '../services/playlistLoads';
 import { trace } from '../services/trace';
 import type { MusicProvider, Playlist, SiftSource, Track } from '../types';
@@ -787,6 +788,16 @@ export function useMusicProvider() {
     [providerRef, state.provider],
   );
 
+  /**
+   * Setup's count of songs Sift collected that the user has since deleted
+   * from their library in Music (#183), until a Setup shows it
+   * (services/DeletedInMusic markDeletedInMusicShown). Never rejects.
+   */
+  const deletedInMusic = useCallback(
+    (): Promise<number> => deletedInMusicCount(providerRef.current, state.provider),
+    [providerRef, state.provider],
+  );
+
   const warmCache = useCallback(async (trackIDs: string[], playlistID?: string): Promise<void> => {
     try {
       const isAuth = await providerRef.current.isAuthorized();
@@ -827,6 +838,7 @@ export function useMusicProvider() {
     skipBackward,
     saveKeptPlaylist,
     rememberSiftedKeeps,
+    deletedInMusic,
     keepTrack,
     unkeepTrack,
     removeTrack,
