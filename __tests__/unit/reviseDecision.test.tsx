@@ -4,7 +4,7 @@ import * as Sentry from '@sentry/react-native';
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
 import { resetRemovalRetries } from '../../src/hooks/useMusicProvider';
 import { useSendPending } from '../../src/hooks/usePendingDecision';
-import { useReviseDecision } from '../../src/hooks/useReviseDecision';
+import { useDecisionsSheet, useReviseDecision } from '../../src/hooks/useReviseDecision';
 import { forgetRemovals, logRemoval } from '../../src/services/RemovalHistoryStore';
 import { markReviewed, unmarkReviewed } from '../../src/services/ReviewedLedgerStore';
 import type { Decision, PendingDecision, SiftSource, Track } from '../../src/types';
@@ -323,5 +323,55 @@ describe('changing a decision', () => {
     expect(markReviewed).not.toHaveBeenCalled();
     expect(unmarkReviewed).not.toHaveBeenCalled();
     expect(sift.state.kept).toEqual([trackA]);
+  });
+});
+
+describe('useDecisionsSheet', () => {
+  let sheet!: ReturnType<typeof useDecisionsSheet>;
+
+  function SheetHarness() {
+    const currentSift = useSift();
+    const currentSheet = useDecisionsSheet(useSendPending());
+    useEffect(() => {
+      sift = currentSift;
+      sheet = currentSheet;
+    });
+    return null;
+  }
+
+  test('starts closed, opens and closes, and reads each card as it stands', async () => {
+    await render(
+      <SiftProvider initialTracks={[trackA, trackB, trackC]}>
+        <SheetHarness />
+      </SiftProvider>,
+    );
+    expect(sheet.showDecisions).toBe(false);
+    expect(sheet.decisionOf('a')).toBeNull();
+
+    await act(async () => {
+      sift.decide('remove');
+    });
+    await act(async () => {
+      sift.decide('skip');
+    });
+    expect(sheet.decisionOf('a')).toBe('remove');
+    expect(sheet.decisionOf('b')).toBe('skip');
+    expect(sheet.decisionOf('c')).toBeNull();
+
+    await act(async () => {
+      sheet.setShowDecisions(true);
+    });
+    expect(sheet.showDecisions).toBe(true);
+
+    // Its revise is useReviseDecision's: a held decision just changes.
+    await act(async () => {
+      await sheet.revise(trackB, 'keep');
+    });
+    expect(sheet.decisionOf('b')).toBe('keep');
+
+    await act(async () => {
+      sheet.setShowDecisions(false);
+    });
+    expect(sheet.showDecisions).toBe(false);
   });
 });

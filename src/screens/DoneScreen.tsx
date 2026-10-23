@@ -20,9 +20,9 @@ import { useTheme } from '../theme/ThemeContext';
 import { useMusicProvider } from '../hooks/useMusicProvider';
 import { useSendPending } from '../hooks/usePendingDecision';
 import { useRemovalRetry } from '../hooks/useRemovalRetry';
-import { useReviseDecision } from '../hooks/useReviseDecision';
+import { useDecisionsSheet } from '../hooks/useReviseDecision';
 import DecisionsSheet from '../components/DecisionsSheet';
-import { decidedLatestFirst, decisionFor } from '../utils/decisions';
+import { decidedLatestFirst } from '../utils/decisions';
 import { clearHistoryForSource } from '../services/RemovalHistoryStore';
 import { loadReviewedIds } from '../services/ReviewedLedgerStore';
 import { ledgerKey } from '../utils/reviewedLedger';
@@ -73,13 +73,7 @@ export default function DoneScreen() {
   const sendPending = useSendPending();
   useRemovalRetry();
   // Every decision of the sift, changeable here too.
-  const revise = useReviseDecision(sendPending);
-  const [showDecisions, setShowDecisions] = useState(false);
-  const decisionOf = useCallback(
-    (trackId: string) =>
-      decisionFor(trackId, { kept: state.kept, removed: state.removed, skipped: state.skipped }),
-    [state.kept, state.removed, state.skipped],
-  );
+  const { revise, showDecisions, setShowDecisions, decisionOf } = useDecisionsSheet(sendPending);
   useEffect(() => {
     sendPending(state.pending);
   }, [state.pending, sendPending]);

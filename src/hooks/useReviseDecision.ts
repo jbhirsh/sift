@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSift } from '../context/SiftContext';
 import { useMusicProvider } from './useMusicProvider';
 import { wasSent } from './usePendingDecision';
@@ -58,4 +58,21 @@ export function useReviseDecision(
     },
     [dispatch, restoreTrack, unkeepTrack, send],
   );
+}
+
+/**
+ * The decisions list as a screen (Sift, Done) wires it: whether it's open,
+ * each card's decision as it stands, and changing one through the screen's
+ * `send` (useReviseDecision).
+ */
+export function useDecisionsSheet(send: (pending: PendingDecision) => void) {
+  const { state } = useSift();
+  const revise = useReviseDecision(send);
+  const [showDecisions, setShowDecisions] = useState(false);
+  const { kept, removed, skipped } = state;
+  const decisionOf = useCallback(
+    (trackId: string) => decisionFor(trackId, { kept, removed, skipped }),
+    [kept, removed, skipped],
+  );
+  return { revise, showDecisions, setShowDecisions, decisionOf };
 }
