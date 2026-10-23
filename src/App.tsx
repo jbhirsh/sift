@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SiftProvider, useSift } from './context/SiftContext';
 import GlassCard from './components/GlassCard';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import ResetGate from './components/ResetGate';
 import { touchTraceProps, useJsStallWatch } from './hooks/useTrace';
 import SetupScreen from './screens/SetupScreen';
 import LoadingScreen from './screens/LoadingScreen';
@@ -113,17 +114,21 @@ function PhaseRouter() {
 function App() {
   return (
     <GestureHandlerRootView style={styles.container}>
-      <SafeAreaProvider>
-        <ThemeProvider>
-          {/* Inside ThemeProvider so the fallback can use theme colors;
-              around SiftProvider so Restart remounts it into setup. */}
-          <ErrorBoundary>
-            <SiftProvider>
-              <PhaseRouter />
-            </SiftProvider>
-          </ErrorBoundary>
-        </ThemeProvider>
-      </SafeAreaProvider>
+      {/* An E2E launch with SiftResetState clears what the app saves before
+          anything reads it (services/e2eReset); any other launch passes. */}
+      <ResetGate>
+        <SafeAreaProvider>
+          <ThemeProvider>
+            {/* Inside ThemeProvider so the fallback can use theme colors;
+                around SiftProvider so Restart remounts it into setup. */}
+            <ErrorBoundary>
+              <SiftProvider>
+                <PhaseRouter />
+              </SiftProvider>
+            </ErrorBoundary>
+          </ThemeProvider>
+        </SafeAreaProvider>
+      </ResetGate>
     </GestureHandlerRootView>
   );
 }

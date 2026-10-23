@@ -10,7 +10,9 @@ name: "Screenshots"
 # On Sift the playing song's time keeps changing, so a wait for the screen
 # to settle there is capped at 3 s instead of its default 15.
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - extendedWaitUntil:
     visible:

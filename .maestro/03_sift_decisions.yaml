@@ -4,7 +4,9 @@ name: "Sift Decisions - Keep, Remove, Skip"
 
 # Test that tapping each decision button advances to the next track
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

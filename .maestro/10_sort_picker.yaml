@@ -9,7 +9,9 @@ name: "Sort Picker - Action Sheet Changes Track Order"
 # ("Kiss Me More"), then Dua Lipa ("Levitating"); the default Least Played
 # would lead with "Peaches".
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

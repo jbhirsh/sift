@@ -23,7 +23,9 @@ name: "Failed Removal Shows the Removal-Errors Warning"
 # counts (removal intent is always logged), but the native removal fails and
 # is queued into removalErrors for the Done screen's warning block.
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

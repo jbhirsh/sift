@@ -8,7 +8,9 @@ name: "Remove and Restore in a Playlist Sift"
 # (EXPO_PUBLIC_MOCK_FAIL_REMOVES=1), so this covers a removal that failed
 # and one that landed, and Restore for both.
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

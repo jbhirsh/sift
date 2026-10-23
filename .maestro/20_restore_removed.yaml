@@ -5,7 +5,9 @@ name: "Restore a Removed Song on Done"
 # Done lists the songs removed in this sift, each with Restore, which puts
 # it back and counts it as kept.
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

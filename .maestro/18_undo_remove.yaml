@@ -6,7 +6,9 @@ name: "Undo a Remove"
 # service, and Undo takes it back: the same card returns, and nothing was
 # removed (#152).
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

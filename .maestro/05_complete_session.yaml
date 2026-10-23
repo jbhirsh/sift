@@ -4,12 +4,14 @@ name: "Complete All Tracks"
 
 # Sift through all 10 mock tracks to reach the done screen
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 
 # Wait for the setup screen before tapping Start Sifting: on a cold,
-# clearState launch the button can render before the screen is ready, and
+# fresh launch the button can render before the screen is ready, and
 # a tap landing then is lost (flow 05 hit this in CI: no card within 30s).
 - extendedWaitUntil:
     visible:

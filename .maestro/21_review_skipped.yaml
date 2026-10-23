@@ -5,7 +5,9 @@ name: "Review Skipped Songs"
 # Once every card is decided, Done offers to go through just the skipped
 # songs again (#142).
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

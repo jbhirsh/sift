@@ -8,7 +8,9 @@ name: "Start at Chorus Setting"
 # can't start before 10% of the track (minus a 0.5 s lead-in), and the
 # estimate (used when the simulator can't reach LRCLIB) is at least 0:30.
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 

@@ -21,10 +21,12 @@ name: "Save Failure Shows Retry, Retry Recovers"
 #   add #3 (Retry)                    succeeds -> saved confirmation
 # Each step waits for a state only that step can produce (the error, the
 # button's title), so no tap lands while a save is still running.
-# Scoping injection to exactly one flow at runtime (e.g. launch arguments)
-# needs a launch-arg mechanism in the app and is deliberate follow-up work.
+# Scoping injection to exactly one flow at runtime could now use a launch
+# argument, as SiftResetState does (services/e2eReset); not done yet.
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 
