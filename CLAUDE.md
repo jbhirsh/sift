@@ -427,7 +427,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
   tests changed. The weekly sweep tests everything and refreshes that
   baseline.
 - **The weekly audit** (`weekly-audit.yml`, the same Monday slot, or by hand)
-  runs what needs the whole repository at once: knip (`knip.json`: unused
+  runs what needs the whole repository at once: knip (`knip.jsonc`: unused
   files, exports and dependencies), jscpd (`.jscpd.json`: duplicated blocks),
   lychee (every markdown link, local file, image and `#anchor`; `.lycheeignore`
   for a link that only refuses scripts) and dependency-cruiser's whole graph
@@ -437,7 +437,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
   clean sweep (`scripts/weekly-audit.mjs`, rules in `scripts/weeklyAudit.ts`).
   Findings never fail the run, a broken tool does. Run `npx knip` or
   `npx jscpd` locally to see the same; when knip is wrong about something
-  (a file only a native build or a script reaches), say so in `knip.json`.
+  (a file only a native build or a script reaches), say so in `knip.jsonc`.
 - **Required status checks.** The `main` branch rule requires these job names
   (from GitHub Actions, whichever workflow file they live in), so renaming a
   job's `name:` silently un-gates it. Update the rule in the same PR as any
@@ -690,8 +690,12 @@ Semantic colors are defined in `COLORS.light` and `COLORS.dark`, accessed via `u
 
 ## Icon System
 
-- Use `expo-symbols` (`SymbolView`) for SF Symbols on iOS
-- Use `@expo/vector-icons` as fallback for cross-platform icons
-- Do not install additional icon packages (lint rejects importing a package
+- Use `expo-symbols` (`SymbolView`) for SF Symbols on iOS; every icon in the
+  app is one. Their names are typed by `sf-symbols-typescript` (`SFSymbol`).
+- `@expo/vector-icons` is the one sanctioned fallback, should an icon ever
+  need to work beyond SF Symbols. It isn't installed (nothing used it, so the
+  weekly audit's knip flagged it): add it back with `npx expo install
+  @expo/vector-icons` when something does.
+- Do not install other icon packages (lint rejects importing a package
   whose name mentions "icon", other than `@expo/vector-icons`, and the common
   icon libraries that don't: lucide, Font Awesome, Phosphor, Feather)
