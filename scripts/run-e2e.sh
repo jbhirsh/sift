@@ -19,6 +19,14 @@
 #   - A flow that failed ONLY with a driver/transport error gets one isolated
 #     re-run, surfaced as a ::warning:: annotation so infra flakes stay
 #     visible instead of silently absorbed.
+#   - So does a flow during which the Simulator itself lost a tap (LOST_TOUCH
+#     below), proved by the Simulator's own log, not guessed from the
+#     failure: XCTest taps through a virtual touchscreen it adds for each
+#     tap; backboardd, rarely, registers it twice, drops the touch-up as
+#     belonging to neither, and cancels the still-held touch when XCTest
+#     removes the touchscreen. The app sees a cancel, never a press (1 tap
+#     in ~3,700 across two runs, flow 05 in PR #194's). Nothing in the app
+#     or the flow can bring that tap back.
 #   - If an isolated re-run ALSO dies on a driver error, the driver is down,
 #     not flaky: stop and fail fast rather than burn a 5-minute driver-startup
 #     timeout on every remaining flow (which would outlast the job timeout and
@@ -41,6 +49,13 @@ INFRA_RE='DeviceUnreachableException|IOSDriverTimeoutException|Transport unreach
 # App-level failures. If any of these appear, the failure is treated as real
 # even when a transport error shows up alongside it.
 APP_RE='Element not found|Assertion is false|App crashed|app crashed|stopped unexpectedly'
+# The Simulator cancelling a touch XCTest still held down because XCTest's
+# virtual touchscreen went away: the tap's touch-up was lost below the app.
+# Matched in the failed flow's own Simulator log (Maestro's
+# device-simulator.log covers only that flow).
+# A crash is never put down to a lost touch, whatever the log shows.
+CRASH_RE='App crashed|app crashed|stopped unexpectedly'
+LOST_TOUCH_RE='cancel -- digitizer did disappear.*contacts: \[pathIndex: [0-9]+; touchIdentifier: [0-9]+; touching'
 
 screenshot() {
   if command -v xcrun >/dev/null 2>&1; then
@@ -73,10 +88,20 @@ screenshot "$OUT_DIR/suite-end.png"
 # unparseable report means the session died before reporting anything — the
 # driver-startup case — so every flow is an infra casualty.
 classified="$OUT_DIR/classified.txt"
-python3 - "$suite_xml" "$FLOW_DIR" "$INFRA_RE" "$APP_RE" > "$classified" <<'EOF'
+python3 - "$suite_xml" "$FLOW_DIR" "$INFRA_RE" "$APP_RE" "$LOST_TOUCH_RE" "$OUT_DIR/suite-debug" "$CRASH_RE" > "$classified" <<'EOF'
 import glob, os, re, sys
 import xml.etree.ElementTree as ET
-xml_path, flow_dir, infra_re, app_re = sys.argv[1:5]
+xml_path, flow_dir, infra_re, app_re, lost_touch_re, debug_dir, crash_re = sys.argv[1:8]
+
+def lost_a_touch(case):
+    # Maestro names each flow's debug folder after the flow's `name:`.
+    log = os.path.join(debug_dir, case.get("name") or "", "logs", "device-simulator.log")
+    try:
+        with open(log, errors="replace") as f:
+            return any(re.search(lost_touch_re, line) for line in f)
+    except OSError:
+        return False
+
 flows = sorted(glob.glob(os.path.join(flow_dir, "[0-9]*.yaml")))
 try:
     cases = ET.parse(xml_path).getroot().iter("testcase")
@@ -90,7 +115,13 @@ for case in cases:
         continue
     text = (failure.text or "") + " " + (failure.get("message") or "")
     is_infra = re.search(infra_re, text) and not re.search(app_re, text)
-    print("infra" if is_infra else "app", case.get("file") or case.get("name"))
+    if is_infra:
+        cls = "infra"
+    elif not re.search(crash_re, text) and lost_a_touch(case):
+        cls = "touch"
+    else:
+        cls = "app"
+    print(cls, case.get("file") or case.get("name"))
 EOF
 
 failed=()
@@ -112,7 +143,11 @@ while read -r class flow; do
   fi
 
   # ── Pass 2: isolated re-run on a fresh driver, infra casualties only ──
-  echo "::warning title=E2E driver retry::$name failed with a driver/transport error in the suite run, not an app assertion — re-running it alone on a fresh driver."
+  if [ "$class" = "touch" ]; then
+    echo "::warning title=E2E lost touch::$name failed after the Simulator lost one of its taps (its device-simulator.log: \"cancel -- digitizer did disappear\" with the touch still down), not because of the app — re-running it alone."
+  else
+    echo "::warning title=E2E driver retry::$name failed with a driver/transport error in the suite run, not an app assertion — re-running it alone on a fresh driver."
+  fi
   retried+=("$name")
   log="$OUT_DIR/$name.retry.log"
   rm -f "$OUT_DIR/$name.retry.xml"
@@ -142,8 +177,8 @@ if [ ! -s "$classified" ]; then
   echo "::error::maestro exited $suite_status but reported no failed flow — see $OUT_DIR/suite.log."
   exit 1
 fi
-echo "E2E summary: ${#failed[@]} failed, ${#retried[@]} re-run after a driver error."
-[ ${#retried[@]} -gt 0 ] && echo "Re-run after driver error: ${retried[*]}"
+echo "E2E summary: ${#failed[@]} failed, ${#retried[@]} re-run after a driver error or a lost touch."
+[ ${#retried[@]} -gt 0 ] && echo "Re-run: ${retried[*]}"
 if [ ${#failed[@]} -gt 0 ]; then
   echo "Failed: ${failed[*]}"
   exit 1

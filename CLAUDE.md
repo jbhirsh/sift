@@ -119,7 +119,8 @@ src/
                         InteractiveCard, PlayerControls, PlaylistPicker,
                         ResumeSessionModal, SessionStatRow, UndoPill,
                         DecisionsSheet, ErrorBoundary, TouchOverlay:
-                        a PR GIF's drawn touches)
+                        a PR GIF's drawn touches, ResetGate: holds
+                        an E2E launch until its reset has run)
     screens/            SetupScreen, LoadingScreen, SiftScreen,
                         DoneScreen, SettingsScreen
     context/            SiftContext (useReducer state management),
@@ -130,7 +131,8 @@ src/
                         ReviewedLedgerStore, SiftedImport, haptics,
                         trace (E2E trace),
                         ChorusFinder + LrclibClient ("Start at chorus"),
-                        touchOverlay (whether a GIF's touches are drawn)
+                        touchOverlay (whether a GIF's touches are drawn),
+                        e2eReset (an E2E flow's fresh start, SiftResetState)
     hooks/              useMusicProvider, usePendingDecision (Undo),
                         useReviseDecision, useRemovalRetry,
                         useResolvedArtwork, useChorusStart,
@@ -391,11 +393,25 @@ Makefile                Dev commands (test, lint, typecheck, check)
 - **E2E runner.** `scripts/run-e2e.sh` runs the whole Maestro suite in one
   session, then re-runs alone, on a fresh XCUITest driver, only the flows
   whose failure was a driver/transport error (so one driver death can't
-  fail every flow). Assertion failures and app crashes are never retried.
-  Each re-run is flagged with a `::warning::` annotation, and if a re-run
-  also hits a driver error the runner stops. Don't switch to one
+  fail every flow), and the flows during which the Simulator lost a tap:
+  XCTest taps through a virtual touchscreen it adds per tap, and backboardd
+  rarely drops the touch-up and cancels the held touch when XCTest removes
+  it (`LOST_TOUCH_RE`, matched in the failed flow's own
+  `device-simulator.log`, never guessed from the failure). Any other
+  assertion failure, and any app crash (lost touch or not), is never
+  retried. Each re-run is flagged
+  with a `::warning::` annotation, and if a re-run also hits a driver error
+  the runner stops. Don't switch to one
   invocation per flow: restarting the driver per flow caused lost taps
-  right after launch. A flow starts a sift through
+  right after launch. A flow starts fresh by launching with the
+  `SiftResetState` argument (quoted `"true"`), not `clearState`: on iOS
+  Maestro's `clearState` reinstalls the app, which took 7-30 s per launch on
+  CI, and once the app took 52 s to show Setup after it. The E2E build clears
+  everything it saves before anything reads it (`services/e2eReset`,
+  `components/ResetGate`, which shows `reset-failed` if it can't); a later
+  launch without the argument keeps the data, for flows that test what
+  survives a relaunch. Caches (images, network) aren't cleared, so later
+  flows load artwork faster; no assertion depends on them. A flow starts a sift through
   `.maestro/shared/start_sifting.yaml` (`runFlow`), which fails at the tap
   if Setup doesn't go away; only a tap meant to stay on Setup (an error, a
   "Discard?" alert) taps `setup-start-sifting` itself. `shared/` holds subflows, not flows (Maestro
