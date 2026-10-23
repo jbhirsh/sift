@@ -101,6 +101,10 @@ amend, rebase, or force-push `main`. Never use `--no-verify`.**
   which invoke TS 7 by path. Swap the alias back once typescript-eslint
   supports TS 7.
 - **ESLint**: flat config in `eslint.config.mjs`. Fix all violations before committing.
+  `eslint-plugin-jsdoc` holds JSDoc to the code where JSDoc exists: a `@param`
+  naming an argument the function doesn't take, an unknown tag, or a type
+  TypeScript already states fails lint. Nothing requires JSDoc; plain comments
+  stay the norm.
 - **Prettier** formats the code (TypeScript, JavaScript, JSON; `.prettierrc.json`):
   `make format` writes it, CI's Format step and the pre-commit hook check it.
   `eslint-config-prettier`, last in the ESLint config, turns off the style rules
