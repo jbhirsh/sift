@@ -128,6 +128,24 @@ describe('saved sessions from every build (#61)', () => {
     await expect(loadReviewedIds(ROAD_TRIP)).resolves.toEqual(new Set(['a']));
   });
 
+  test('the "- Sifted" an old playlist session named is remembered for the playlist\'s import (#179)', async () => {
+    // Found by id, so its keeps still come over if either playlist was
+    // renamed since (services/SiftedImport).
+    const legacy = {
+      ...v5State,
+      source: { type: 'playlist', playlist: { id: 'p1', name: 'Road Trip', trackCount: 4 } },
+      pendingKeeps: [],
+      siftedPlaylistId: 'sifted-1',
+    };
+    await AsyncStorage.setItem('sift_session_v2', JSON.stringify(legacy));
+    await AsyncStorage.setItem('sift_session_v2_tracks_b', JSON.stringify(v5Tracks));
+    await loadSession();
+    for (let i = 0; i < 20 && !(await AsyncStorage.getItem('sift_sifted_ids')); i += 1) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+    expect(JSON.parse((await AsyncStorage.getItem('sift_sifted_ids')) ?? 'null')).toEqual({ [ROAD_TRIP]: ['sifted-1'] });
+  });
+
   test('an old playlist session: the keeps it sent to "- Sifted" are remembered, not the one held for Undo', async () => {
     // Its build copied each sent keep into "Road Trip - Sifted" and recorded
     // none: they go to the ledger, where a keep goes now. The held keep (c)

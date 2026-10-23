@@ -6,9 +6,16 @@ import { ledgerKey } from '../utils/reviewedLedger';
 import { siftedPlaylistName } from '../utils/sessionCopy';
 import { TrackIndex } from '../utils/trackIdentity';
 import { markReviewed, storedReviewedIds, takenBack } from './ReviewedLedgerStore';
+import { loadPlaylistTracksOnce } from './playlistLoads';
 
 /** The ledger keys of the playlists already looked at, as a JSON array. */
 const IMPORTED_KEY = 'sift_sifted_imported';
+/**
+ * The "- Sifted" playlists older builds' saved sessions named, by ledger
+ * key, as a JSON object of id lists: found by id, they still count after
+ * the playlist or its "- Sifted" copy was renamed (#179).
+ */
+const REMEMBERED_IDS_KEY = 'sift_sifted_ids';
 
 // One look per playlist at a time: Setup and the sift's load can both ask.
 const running = new Map<string, Promise<void>>();
@@ -20,13 +27,66 @@ async function storedKeys(): Promise<string[]> {
   return Array.isArray(parsed) ? parsed.filter((key): key is string => typeof key === 'string') : [];
 }
 
+/** Runs a storage write after the ones before it. */
+function inTurn(write: () => Promise<void>): Promise<void> {
+  const run = flagWrites.then(write);
+  flagWrites = run.catch(() => undefined);
+  return run;
+}
+
 function rememberImported(key: string): Promise<void> {
-  const write = flagWrites.then(async () => {
+  return inTurn(async () => {
     const keys = await storedKeys().catch((): string[] => []);
     if (!keys.includes(key)) await AsyncStorage.setItem(IMPORTED_KEY, JSON.stringify([...keys, key]));
   });
-  flagWrites = write.catch(() => undefined);
-  return write;
+}
+
+async function storedIdLists(): Promise<Record<string, string[]>> {
+  const parsed: unknown = JSON.parse((await AsyncStorage.getItem(REMEMBERED_IDS_KEY)) ?? '{}');
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
+  const lists: Record<string, string[]> = {};
+  for (const [key, ids] of Object.entries(parsed)) {
+    if (Array.isArray(ids)) lists[key] = ids.filter((id): id is string => typeof id === 'string');
+  }
+  return lists;
+}
+
+/**
+ * Remember the "- Sifted" playlist an older build's saved session named for
+ * its playlist (its siftedPlaylistId), and look at that playlist again on
+ * its next sift: the one-time look found "- Sifted" by name, and missed it
+ * if either playlist was renamed. Never rejects.
+ */
+export function rememberSiftedPlaylist(provider: MusicProvider, source: SiftSource, siftedId: string): Promise<void> {
+  if (source.type !== 'playlist') return Promise.resolve();
+  const key = ledgerKey(provider, source);
+  return inTurn(async () => {
+    const lists = await storedIdLists().catch((): Record<string, string[]> => ({}));
+    const ids = lists[key] ?? [];
+    if (ids.includes(siftedId)) return;
+    await AsyncStorage.setItem(REMEMBERED_IDS_KEY, JSON.stringify({ ...lists, [key]: [...ids, siftedId] }));
+    // Looked at before by name only: look again, with this one.
+    const keys = await storedKeys().catch((): string[] => []);
+    if (keys.includes(key)) await AsyncStorage.setItem(IMPORTED_KEY, JSON.stringify(keys.filter((k) => k !== key)));
+  }).catch((err: unknown) => {
+    Sentry.captureException(err, { tags: { flow: 'sifted-import' } });
+  });
+}
+
+/**
+ * The "- Sifted" playlists to look in: the ones named after the playlist,
+ * and any an older build's session named that are still in the library (a
+ * deleted one is no keeps, not a failed look to retry forever).
+ */
+async function siftedPlaylistIds(service: MusicProviderService, key: string, name: string): Promise<string[]> {
+  const byName = service.findPlaylists
+    ? await service.findPlaylists(name)
+    : (await service.loadPlaylists?.() ?? []).filter((p) => p.name === name).map((p) => p.id);
+  const remembered = (await storedIdLists().catch((): Record<string, string[]> => ({})))[key] ?? [];
+  const extra = remembered.filter((id) => !byName.includes(id));
+  if (extra.length === 0 || !service.loadPlaylists) return byName;
+  const listed = new Set((await service.loadPlaylists()).map((p) => p.id));
+  return [...byName, ...extra.filter((id) => listed.has(id))];
 }
 
 async function importNow(
@@ -36,22 +96,23 @@ async function importNow(
   sourceTracks: readonly Track[] | undefined,
 ): Promise<void> {
   try {
+    // After any flag or id write under way: an old session's "- Sifted"
+    // remembered at launch reopens a playlist already looked at.
+    await flagWrites;
     // An unreadable flag list counts as empty: looking again is harmless.
     if ((await storedKeys().catch((): string[] => [])).includes(key)) return;
     // Not yet allowed to ask (Setup before sign-in): look next time.
     if (!(await service.isAuthorized())) return;
-    const name = siftedPlaylistName(source.playlist.name);
-    const ids = service.findPlaylists
-      ? await service.findPlaylists(name)
-      : (await service.loadPlaylists?.() ?? []).filter((p) => p.name === name).map((p) => p.id);
+    const ids = await siftedPlaylistIds(service, key, siftedPlaylistName(source.playlist.name));
     if (ids.length > 0) {
       const saved = new TrackIndex();
       for (const id of ids) {
         for (const track of await service.loadPlaylistTracks?.(id) ?? []) saved.add(track);
       }
       // By song: Apple Music files a song under a new id in each playlist.
-      // The ledger takes the id the playlist's own load gives it.
-      const tracks = sourceTracks ?? await service.loadPlaylistTracks?.(source.playlist.id) ?? [];
+      // The ledger takes the id the playlist's own load gives it, shared
+      // with a sift's load of it under way (#179).
+      const tracks = sourceTracks ?? await loadPlaylistTracksOnce(service, source.playlist.id) ?? [];
       // Not a keep the user took back this launch (a resumed old session's
       // keep changed while this ran): that change stands.
       const undone = takenBack(key);

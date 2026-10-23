@@ -8,10 +8,12 @@ import {
   isSiftSession,
   isStoredTracks,
   legacyPendingKeeps,
+  legacySiftedPlaylistId,
   migrateLegacySession,
   savedBeforeKeepsRemembered,
 } from '../utils/validators';
 import { markReviewed } from './ReviewedLedgerStore';
+import { rememberSiftedPlaylist } from './SiftedImport';
 
 // The compact format (#150): the track list once, under its own key, and a
 // small record of ids per decision. See utils/sessionFormat.
@@ -130,11 +132,16 @@ async function loadQueued(): Promise<SiftSession | null> {
  * goes now: later sifts leave them out and Done's "Save kept songs"
  * includes them. Whether the session is then resumed or discarded, they
  * aren't lost. Repeats harmlessly until the session's next save, which no
- * longer writes those fields.
+ * longer writes those fields. The "- Sifted" playlist it named is
+ * remembered too, so the one-time import of its earlier sifts' keeps finds
+ * it by id after a rename (#179).
  */
 function rememberLegacyKeeps(session: SiftSession, stored: unknown, legacy = savedBeforeKeepsRemembered(stored)): void {
   if (session.source?.type !== 'playlist' || !legacy) return;
-  const key = ledgerKey(session.provider ?? 'apple-music', session.source);
+  const provider = session.provider ?? 'apple-music';
+  const key = ledgerKey(provider, session.source);
+  const siftedId = legacySiftedPlaylistId(stored);
+  if (siftedId) void rememberSiftedPlaylist(provider, session.source, siftedId);
   // A keep still held for Undo isn't sent: Resume sends it, or Undo takes it back.
   const held = session.pending?.trackId;
   const sent = session.kept.filter((track) => track.id !== held);
