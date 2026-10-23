@@ -77,7 +77,12 @@ jobs:
     # runs the mutation job rather than skipping it (skipped reads as passing).
     if: ${{ !cancelled() && (github.event_name != 'pull_request' || needs.changes.result == 'failure' || needs.changes.outputs.relevant == 'true') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    # 300, not 120, for the one PR that reformats the tree with Prettier: it
+    # changes nearly every mutable file, so its run is a near-full sweep
+    # (the last weekly one took ~118 min), and a timed-out job saves no
+    # incremental results, so a retry would start over. Lower it back to 120
+    # once that PR has merged.
+    timeout-minutes: 300
 
     steps:
       - uses: actions/checkout@v7
