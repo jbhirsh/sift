@@ -117,7 +117,7 @@ export function knipFindings(report: { issues?: KnipIssue[] }): string | null {
       `### ${KNIP_LABELS[type] ?? type} (${entries.length})\n\n${entries.map((e) => `- ${e}`).join('\n')}`,
   );
   return [
-    '[knip](https://knip.dev) found code and dependencies nothing uses. Delete them, or, if something does use them in a way knip can’t see, say so in `knip.json`.',
+    '[knip](https://knip.dev) found code and dependencies nothing uses. Delete them, or, if something does use them in a way knip can’t see, say so in `knip.jsonc`.',
     ...sections,
   ].join('\n\n');
 }

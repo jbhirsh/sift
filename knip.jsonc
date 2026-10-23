@@ -1,0 +1,19 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // Command-line tools run by hand or by workflows, not imported by anything.
+  "entry": ["scripts/*.mjs"],
+  // Autolinked as a native module (package.json "expo.autolinking"), and
+  // loaded with require() by path, never imported by its package name.
+  // expo-system-ui: Expo needs it for app.json's userInterfaceStyle on
+  // Android only, and Sift is iOS-only (CLAUDE.md, "App Identity").
+  "ignoreDependencies": ["expo-musickit", "expo-system-ui"],
+  // The native module's wrappers are required by path as one object
+  // (AppleMusicProvider, useResolvedArtwork), which knip can't follow; the
+  // native bridge check (scripts/check-native-bridge.mjs) holds them to the
+  // Swift module instead.
+  "ignoreIssues": {
+    "modules/expo-musickit/src/index.ts": ["exports", "types"],
+  },
+  // A system tool scripts/pr-gifs.mjs runs, not an npm package.
+  "ignoreBinaries": ["ffmpeg"],
+}

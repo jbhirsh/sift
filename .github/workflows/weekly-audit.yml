@@ -5,7 +5,7 @@
 # (scripts/weekly-audit.mjs, rules in scripts/weeklyAudit.ts). Findings never
 # fail the run; a tool that breaks does.
 #
-#   - Dead code: knip (knip.json), unused files, exports and dependencies.
+#   - Dead code: knip (knip.jsonc), unused files, exports and dependencies.
 #   - Duplicated code: jscpd (.jscpd.json).
 #   - Broken links: lychee over every markdown file, local files, images and
 #     #anchors included.
