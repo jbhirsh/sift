@@ -145,7 +145,9 @@ src/
     components/         Reusable UI (Button, GlassCard, GlassBackground,
                         InteractiveCard, PlayerControls, PlaylistPicker,
                         ResumeSessionModal, SessionStatRow, UndoPill,
-                        DecisionsSheet, ErrorBoundary, TouchOverlay:
+                        DecisionsSheet, BottomSheet: the sliding sheet
+                        and its header those three sheets share,
+                        ErrorBoundary, TouchOverlay:
                         a PR GIF's drawn touches, ResetGate: holds
                         an E2E launch until its reset has run,
                         SwitchRow: a row that is one switch; use it,
