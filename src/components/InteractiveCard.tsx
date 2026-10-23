@@ -143,9 +143,13 @@ export default function InteractiveCard({
           <View style={styles.artworkContainer}>
             {resolvedArtworkURL ? (
               <Image
-                // Decorative: the song's name, artist and album are read.
-                accessible={false}
-                accessibilityElementsHidden
+                // An image VoiceOver can reach, not a hidden one: a cover
+                // often carries words ("JUSTICE" across Peaches'), and
+                // Xcode's accessibility audit fails text on screen that no
+                // element covers. The name, artist and album are read below.
+                accessible
+                accessibilityRole="image"
+                accessibilityLabel={track.album ? `Album art, ${track.album}` : 'Album art'}
                 source={resolvedArtworkURL}
                 style={styles.artwork}
                 contentFit="cover"
