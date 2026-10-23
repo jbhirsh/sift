@@ -1,0 +1,137 @@
+# Keeps the README's screenshots (docs/screenshots/setup, sift, done) up to
+# date. When a PR merges, its CI run's E2E job has already photographed the
+# app on the iOS Simulator with the mock library (scripts/take-screenshots.sh,
+# the ios-screenshots artifact), so this takes the three the README shows from
+# there: no macOS minutes of its own. Each that looks different enough
+# (scripts/readme-screenshots.mjs, rules in scripts/readmeScreenshots.ts)
+# replaces the README's, and the lot goes in one bot PR from
+# bot/readme-screenshots, opened or updated, with auto-merge on.
+#
+# BOT_PR_TOKEN (a fine-grained token on this repo: Contents and Pull requests,
+# read and write) opens the PR as a person would. With only the Actions token
+# GitHub runs no workflow on the PR, so its required checks never report and
+# it waits for someone to push to it or close and reopen it.
+#
+# Not a gate (no PR runs it), so the merged-only filter lives in the job.
+name: README screenshots
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    name: Refresh README screenshots
+    # Merged PRs only, and never the bot's own (its run takes no screenshots:
+    # it changes only docs/, which the E2E job skips).
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref != 'bot/readme-screenshots'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      # The PR's last CI run, filed under its head commit. A run whose E2E
+      # job was skipped (a docs-only PR) or whose screenshots failed has no
+      # artifact: then there's nothing to refresh.
+      - name: Fetch the PR's screenshots
+        id: shots
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          run_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$HEAD_SHA&event=pull_request&per_page=1" --jq '.workflow_runs[0].id // empty')
+          if [ -n "$run_id" ] && gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name ios-screenshots --dir shots; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "run_url=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id" >> "$GITHUB_OUTPUT"
+          else
+            echo "No ios-screenshots artifact for $HEAD_SHA; nothing to refresh."
+          fi
+
+      - uses: actions/setup-node@v7
+        if: steps.shots.outputs.found == 'true'
+        with:
+          node-version: 24
+
+      - name: Install ImageMagick
+        if: steps.shots.outputs.found == 'true'
+        run: sudo apt-get update -q && sudo apt-get install -y -q imagemagick
+
+      - name: Replace the screenshots that changed
+        id: update
+        if: steps.shots.outputs.found == 'true'
+        run: |
+          # A crash must fail the step, not pass for "nothing changed".
+          set -o pipefail
+          updated=$(node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/readme-screenshots.mjs update shots | paste -sd' ' -)
+          echo "files=$updated" >> "$GITHUB_OUTPUT"
+
+      # main's rule wants a branch up to date before it merges. When this
+      # merge changed no README screen, an open bot PR would otherwise sit
+      # behind main for good: bring it up to date (create-pull-request below
+      # does that itself when there are new shots).
+      - name: Bring an open bot PR up to date
+        if: steps.update.outputs.files == ''
+        env:
+          GH_TOKEN: ${{ secrets.BOT_PR_TOKEN || github.token }}
+        run: |
+          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head bot/readme-screenshots --state open --json number --jq '.[0].number // empty')
+          if [ -n "$pr" ]; then
+            gh pr update-branch "$pr" --repo "$GITHUB_REPOSITORY" --rebase \
+              || echo "::warning::Couldn't bring the README screenshots PR #$pr up to date with main."
+          fi
+
+      - name: Open or update the PR
+        id: pr
+        if: steps.update.outputs.files != ''
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7.0.11
+        with:
+          token: ${{ secrets.BOT_PR_TOKEN || github.token }}
+          branch: bot/readme-screenshots
+          base: main
+          add-paths: docs/screenshots/*.png
+          title: Refresh the README screenshots
+          commit-message: |
+            Refresh the README screenshots
+
+            The screens the README shows changed in #${{ github.event.pull_request.number }}; these are the iOS
+            Simulator shots its CI run took (mock library), at the README's
+            size. Made by readme-screenshots.yml.
+          body: The README's screenshots, refreshed from #${{ github.event.pull_request.number }}. The pictures follow once the commit exists.
+          delete-branch: true
+
+      # The pictures link by commit, so a later push can't change what this
+      # PR shows: written once the commit exists.
+      - name: Describe the PR and turn on auto-merge
+        if: steps.pr.outputs.pull-request-number != '' && steps.pr.outputs.pull-request-operation != 'none'
+        env:
+          GH_TOKEN: ${{ secrets.BOT_PR_TOKEN || github.token }}
+          PR: ${{ steps.pr.outputs.pull-request-number }}
+          HEAD_SHA: ${{ steps.pr.outputs.pull-request-head-sha }}
+          SOURCE_PR: ${{ github.event.pull_request.number }}
+          FILES: ${{ steps.update.outputs.files }}
+          RUN_URL: ${{ steps.shots.outputs.run_url }}
+        run: |
+          base=$(git rev-parse HEAD)
+          # FILES is a space-separated list of paths: unquoted on purpose.
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/readme-screenshots.mjs body "$base" "$HEAD_SHA" "$SOURCE_PR" $FILES > body.md
+          gh pr edit "$PR" --body-file body.md
+          # Squash, like Dependabot's (dependabot-merge.yml); GitHub merges
+          # once every required check is green.
+          gh pr merge "$PR" --auto --squash

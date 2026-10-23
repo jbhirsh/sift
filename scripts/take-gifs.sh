@@ -26,10 +26,17 @@ if [ "${#flows[@]}" -eq 0 ]; then
   exit 0
 fi
 
+# The same status bar as the screenshots (take-screenshots.sh): Apple's
+# 9:41, full signal and battery.
+xcrun simctl status_bar booted override --time "9:41" --dataNetwork wifi \
+  --wifiMode active --wifiBars 3 --cellularMode active --cellularBars 4 \
+  --batteryState charged --batteryLevel 100 || true
+
 if ! maestro test --debug-output "$OUT_DIR/debug" --flatten-debug-output \
   e2e/gifs > "$OUT_DIR/maestro.log" 2>&1; then
   echo "::warning::A GIF scenario stopped early. See maestro.log in the ios-gif-videos artifact."
 fi
+xcrun simctl status_bar booted clear || true
 
 # Maestro names each flow's debug folder after its `name:`, and an artifact
 # path can't hold a colon or any of "<>|*? (GitHub refuses the whole

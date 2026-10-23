@@ -17,7 +17,7 @@ Sift is a production-quality React Native (Expo) app built in TypeScript, with a
 
 Settings: the optional **Start at chorus** switch (Apple Music).
 
-> Rendered from the real app running on Expo Web with a local mock music provider (native Apple Music access is device-only).
+> Setup, Sift and Done keep themselves current: when a merged PR changes how they look, the iOS Simulator shots CI took of it (the mock music library; native Apple Music access is device-only) come back as a bot PR ([`readme-screenshots.yml`](.github/workflows/readme-screenshots.yml)). The Settings crop is rendered from Expo Web with the same mock provider.
 
 ---
 
