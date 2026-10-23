@@ -33,7 +33,8 @@ make check           # what CI's unit job runs: lint, typecheck, depcruise,
 
 Git hooks (installed by the `prepare` script via `core.hooksPath`) run these
 automatically: **pre-commit** runs lint, typecheck, depcruise and the native
-bridge check; **pre-push** runs the unit-test suite under coverage. Both
+bridge check; **pre-push** runs the unit-test suite under coverage (not
+for a push of only the `screenshots` branch: pictures, no code). Both
 no-op when `$CI` is set. CI re-runs everything.
 
 **Testing pyramid:**
@@ -117,7 +118,8 @@ src/
     components/         Reusable UI (Button, GlassCard, GlassBackground,
                         InteractiveCard, PlayerControls, PlaylistPicker,
                         ResumeSessionModal, SessionStatRow, UndoPill,
-                        DecisionsSheet, ErrorBoundary)
+                        DecisionsSheet, ErrorBoundary, TouchOverlay:
+                        a PR GIF's drawn touches)
     screens/            SetupScreen, LoadingScreen, SiftScreen,
                         DoneScreen, SettingsScreen
     context/            SiftContext (useReducer state management),
@@ -127,7 +129,8 @@ src/
                         SessionStore, RemovalHistoryStore, PreferencesStore,
                         ReviewedLedgerStore, SiftedImport, haptics,
                         trace (E2E trace),
-                        ChorusFinder + LrclibClient ("Start at chorus")
+                        ChorusFinder + LrclibClient ("Start at chorus"),
+                        touchOverlay (whether a GIF's touches are drawn)
     hooks/              useMusicProvider, usePendingDecision (Undo),
                         useReviseDecision, useRemovalRetry,
                         useResolvedArtwork, useChorusStart,
@@ -300,8 +303,9 @@ Makefile                Dev commands (test, lint, typecheck, check)
   The Maestro iOS E2E job (macOS) also runs on every PR that can affect the
   app or the job, with `workflow_dispatch` available for manual runs. It
   skips PRs that only touch docs or repo tooling (other workflows, the
-  commit check, `scripts/` apart from its three runners (`run-e2e.sh`,
-  `run-a11y-audit.sh`, `take-screenshots.sh`), `stryker.config.json`;
+  commit check, `scripts/` apart from its runners (`run-e2e.sh`,
+  `run-a11y-audit.sh`, `take-screenshots.sh`, `take-gifs.sh`),
+  `stryker.config.json`;
   the `code` filter in `ci.yml`, with `predicate-quantifier: 'every'` so its
   `!` patterns exclude). Its app build is cached on
   the native fingerprint plus a hash of the bundle's inputs (`src/`,
@@ -428,15 +432,39 @@ Makefile                Dev commands (test, lint, typecheck, check)
     (`e2e/screenshots/screens.yaml`, `scripts/take-screenshots.sh`) and
     uploads them as the `ios-screenshots` artifact. Not a web export: it
     can't draw SF Symbols, so every icon comes out an empty box.
-  - GIF: `xcrun simctl io booted recordVideo --codec=h264 swipe.mov` (Ctrl-C
-    stops it), then
-    `ffmpeg -i swipe.mov -vf "fps=12,scale=320:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse" swipe.gif`.
+  - GIF: the real app on the Simulator, with each touch drawn (a ring
+    where a finger presses, a fading trail where it drags:
+    `components/TouchOverlay`, only in the E2E build and only when
+    launched with `SiftShowTouches`, quoted `"true"`). A scenario is a
+    Maestro flow, `e2e/gifs/<name>.yaml`: it launches the app with that
+    argument, gets to where the GIF starts, then `startRecording: <name>`,
+    the taps and swipes (with pauses to follow them by), `stopRecording`
+    and `takeScreenshot: <name>-end`, which says every step ran. Add or
+    edit one for the motion a PR changes. The E2E job runs them all in one
+    Maestro session (`scripts/take-gifs.sh`, artifact `ios-gif-videos`);
+    one that stops early is set aside, never made into a GIF. A drag a
+    gesture handler owns (the card swipe, the seek bar) feeds the trail
+    from its own pan (`followTouch`), since React Native's touch is
+    cancelled once the pan takes over. Then
+    `node scripts/pr-gifs.mjs <pr>` (rules in `scripts/prGifs.ts`) does the
+    rest:
+    1. It waits for the PR's run.
+    2. It runs CI by hand on `main` with `gifs_only` and the PR's
+       scenarios, for the "before".
+    3. It makes the GIFs: idle ends trimmed, still frames dropped at real
+       timing, scaled sharp.
+    4. It commits them to the `screenshots` branch and prints the Before |
+       After table to paste.
+    `--side-by-side` adds one labelled GIF per pair; `--no-before` is for
+    a screen `main` doesn't have. On a Mac by hand:
+    `xcrun simctl io booted recordVideo --codec=h264 swipe.mov`.
   - Host them by dragging them into the PR description, or commit them to
     a folder named for the topic on the `screenshots` branch (one branch
     for every PR's pictures, each set a commit on it; no workflow runs on
-    it) and link their
-    `raw.githubusercontent.com/jbhirsh/sift/screenshots/<topic>/...` URLs.
-    Don't start a new branch per topic.
+    it). Link them by that commit's SHA,
+    `raw.githubusercontent.com/jbhirsh/sift/<sha>/<topic>/...`, so a later
+    push can't change what an old PR shows. Don't start a new branch per
+    topic.
 
 ---
 
