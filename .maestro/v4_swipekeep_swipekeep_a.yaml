@@ -6,9 +6,7 @@ name: "v4_swipekeep_swipekeep a"
 # swipe right keeps, a swipe left removes. The first card ever also says
 # which way is which, until the first decision.
 - launchApp:
-    # A fresh start without a reinstall (services/e2eReset).
-    arguments:
-      SiftResetState: "true"
+    clearState: true
 
 - waitForAnimationToEnd
 
