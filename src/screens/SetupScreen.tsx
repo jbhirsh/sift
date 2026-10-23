@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Switch,
   Platform,
   ActionSheetIOS,
   Alert,
@@ -20,6 +19,7 @@ import GlassCard from '../components/GlassCard';
 import PlaylistPicker from '../components/PlaylistPicker';
 import ResumeSessionModal from '../components/ResumeSessionModal';
 import SessionStatRow from '../components/SessionStatRow';
+import SwitchRow from '../components/SwitchRow';
 import { Button } from '../components/Button';
 import { APPLE_REMOVED_PLAYLIST, decisionCounts, discardConfirmation, playlistStartOverMessage, removeExplanation } from '../utils/sessionCopy';
 import { resumeState } from '../context/resumeSession';
@@ -510,18 +510,17 @@ export default function SetupScreen() {
           {showIncludeSifted && (
             <>
               <GlassCard intensity="thin" radius={RADIUS.md}>
-                <View style={styles.switchRow}>
+                <SwitchRow
+                  testID="include-sifted-switch"
+                  label="Include songs I've already sifted"
+                  value={includeSifted}
+                  onValueChange={setIncludeSifted}
+                  style={styles.switchRow}
+                >
                   <Text style={[styles.switchLabel, { color: colors.text }]}>
                     Include songs I{'\u2019'}ve already sifted
                   </Text>
-                  <Switch
-                    testID="include-sifted-switch"
-                    accessibilityLabel="Include songs I've already sifted"
-                    value={includeSifted}
-                    onValueChange={setIncludeSifted}
-                    trackColor={{ true: colors.accent, false: colors.quaternary }}
-                  />
-                </View>
+                </SwitchRow>
               </GlassCard>
               <Text testID="reviewed-note" style={[styles.footnote, { color: colors.textSecondary }]}>
                 {reviewedNote(reviewedCount, includeSifted)}

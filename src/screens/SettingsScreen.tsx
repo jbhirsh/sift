@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   Linking,
   StyleSheet,
-  Switch,
 } from 'react-native';
 import Constants from 'expo-constants';
 import { SymbolView } from 'expo-symbols';
@@ -15,9 +14,14 @@ import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
 import { useMusicProvider } from '../hooks/useMusicProvider';
 import GlassCard from '../components/GlassCard';
+import SwitchRow from '../components/SwitchRow';
 import { COLORS, RADIUS, SPACING } from '../theme';
 import { PROVIDER_DISPLAY } from '../types';
 import { useTraceScreen } from '../hooks/useTrace';
+
+/** Start at chorus, said under its name and read by VoiceOver after it. */
+const START_AT_CHORUS_DESCRIPTION =
+  "Begin each song at its chorus instead of the start. Finds it with timed lyrics from LRCLIB and Shazam's song matching.";
 
 // The running app's version (an update carries its own config).
 const appVersion = Constants.expoConfig?.version ?? null;
@@ -211,7 +215,14 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
       {state.provider === 'apple-music' && (
         <View style={styles.section}>
           <GlassCard intensity="regular" radius={RADIUS.md}>
-            <View style={styles.settingRow}>
+            <SwitchRow
+              testID="start-at-chorus-switch"
+              label="Start at chorus"
+              hint={START_AT_CHORUS_DESCRIPTION}
+              value={state.startAtChorus}
+              onValueChange={setStartAtChorus}
+              style={styles.settingRow}
+            >
               <SymbolView
                 accessibilityElementsHidden
                 name="music.mic"
@@ -223,18 +234,10 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
                   Start at chorus
                 </Text>
                 <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
-                  Begin each song at its chorus instead of the start. Finds it
-                  with timed lyrics from LRCLIB and Shazam's song matching.
+                  {START_AT_CHORUS_DESCRIPTION}
                 </Text>
               </View>
-              <Switch
-                testID="start-at-chorus-switch"
-                accessibilityLabel="Start at chorus"
-                value={state.startAtChorus}
-                onValueChange={setStartAtChorus}
-                trackColor={{ true: colors.accent, false: colors.quaternary }}
-              />
-            </View>
+            </SwitchRow>
           </GlassCard>
         </View>
       )}

@@ -1145,7 +1145,7 @@ describe('SetupScreen: songs sifted before (#143)', () => {
     await act(async () => {});
     expect(getByTestId('reviewed-note').props.children).toBe('3 songs you’ve already kept are left out of new sifts.');
     await act(async () => {
-      await fireEvent(getByTestId('include-sifted-switch'), 'valueChange', true);
+      await fireEvent.press(getByTestId('include-sifted-switch'));
     });
     expect(getByTestId('reviewed-note').props.children).toBe('Songs you’ve already kept are included in new sifts. Songs you removed stay out.');
     await act(async () => {
@@ -1209,7 +1209,7 @@ describe('SetupScreen: songs sifted before (#143)', () => {
     });
     expect(getByTestId('reviewed-note').props.children).toBe('2 songs you’ve already kept are left out of new sifts.');
     await act(async () => {
-      await fireEvent(getByTestId('include-sifted-switch'), 'valueChange', true);
+      await fireEvent.press(getByTestId('include-sifted-switch'));
     });
     await act(async () => {
       await fireEvent.press(getByTestId('setup-start-sifting'));
@@ -1223,7 +1223,7 @@ describe('SetupScreen: songs sifted before (#143)', () => {
     const { getByTestId } = await renderWithProviders(<><SetupScreen /><SkipProbe /></>);
     await act(async () => {});
     await act(async () => {
-      await fireEvent(getByTestId('include-sifted-switch'), 'valueChange', true);
+      await fireEvent.press(getByTestId('include-sifted-switch'));
     });
     await act(async () => {
       await fireEvent.press(getByTestId('source-playlist'));
@@ -1300,7 +1300,7 @@ describe('SetupScreen: Start Over and songs sifted before (#143)', () => {
     await act(async () => {});
     if (on) {
       await act(async () => {
-        await fireEvent(getByTestId('include-sifted-switch'), 'valueChange', true);
+        await fireEvent.press(getByTestId('include-sifted-switch'));
       });
     }
     await act(async () => {
@@ -1331,7 +1331,7 @@ describe('SetupScreen: Start Over and songs sifted before (#143)', () => {
     // Shown beside the resume block too: it decides what Start Over loads.
     if (on) {
       await act(async () => {
-        await fireEvent(getByTestId('include-sifted-switch'), 'valueChange', true);
+        await fireEvent.press(getByTestId('include-sifted-switch'));
       });
     }
     await act(async () => {
@@ -2370,13 +2370,13 @@ describe('SettingsScreen', () => {
     );
     expect(getByText('Start at chorus')).toBeTruthy();
     const toggle = getByTestId('start-at-chorus-switch');
-    expect(toggle.props.value).toBe(false);
+    expect(toggle.props.accessibilityState).toEqual({ checked: false });
 
-    await fireEvent(toggle, 'valueChange', true);
+    await fireEvent.press(toggle);
     expect(getByTestId('start-at-chorus-value').props.children).toBe('true');
-    expect(getByTestId('start-at-chorus-switch').props.value).toBe(true);
+    expect(getByTestId('start-at-chorus-switch').props.accessibilityState).toEqual({ checked: true });
 
-    await fireEvent(getByTestId('start-at-chorus-switch'), 'valueChange', false);
+    await fireEvent.press(getByTestId('start-at-chorus-switch'));
     expect(getByTestId('start-at-chorus-value').props.children).toBe('false');
   });
 
