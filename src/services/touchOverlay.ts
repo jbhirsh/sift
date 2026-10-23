@@ -3,12 +3,12 @@ import {
   NO_MARKS,
   prune,
   touchDown,
-  touchesRequested,
   touchFollow,
   touchMove,
   touchUp,
   type TouchMarks,
 } from '../utils/touchMarks';
+import { launchFlagOn } from '../utils/launchArgs';
 import { tracing } from './trace';
 
 // The touches a PR GIF shows (components/TouchOverlay, utils/touchMarks).
@@ -20,7 +20,7 @@ import { tracing } from './trace';
 
 function launchedWithTouches(): boolean {
   try {
-    return touchesRequested(Settings.get('SiftShowTouches'));
+    return launchFlagOn(Settings.get('SiftShowTouches'));
   } catch {
     return false;
   }

@@ -107,11 +107,3 @@ export function pressLook(press: Press, now: number): { scale: number; opacity: 
 export function dotOpacity(dot: Dot, now: number): number {
   return 1 - clamp01((now - dot.at) / TRAIL_FADE_MS);
 }
-
-/**
- * Whether a launch argument asks for touches: iOS hands `-SiftShowTouches
- * true` (or YES, or 1) to the app's user defaults as a string or a boolean.
- */
-export function touchesRequested(value: unknown): boolean {
-  return value === true || value === 1 || (typeof value === 'string' && /^(true|yes|1)$/i.test(value));
-}
