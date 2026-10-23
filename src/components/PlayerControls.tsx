@@ -23,6 +23,7 @@ import { formatTime } from '../utils/formatTime';
 import { RADIUS, SPACING } from '../theme';
 import { Track } from '../types';
 import { trace } from '../services/trace';
+import { followTouch, liftTouch, showTouches } from '../services/touchOverlay';
 
 const SEEK_ACTIONS = [{ name: 'increment' }, { name: 'decrement' }];
 
@@ -150,10 +151,15 @@ export default function PlayerControls() {
 
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
+      // A PR GIF's drawn ring follows the scrub (services/touchOverlay).
+      if (showTouches) runOnJS(followTouch)(event.absoluteX, event.absoluteY);
       if (sliderWidth.value <= 0) return;
       const ratio = Math.max(0, Math.min(1, event.x / sliderWidth.value));
       const position = ratio * maxDuration;
       runOnJS(seekTo)(position);
+    })
+    .onFinalize((event) => {
+      if (showTouches) runOnJS(liftTouch)(event.absoluteX, event.absoluteY);
     });
 
   const composed = Gesture.Race(panGesture, tapGesture);

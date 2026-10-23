@@ -22,6 +22,7 @@ import DoneScreen from './screens/DoneScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { SETTINGS_BUTTON, SPACING } from './theme';
 import { scrubBreadcrumb, scrubEvent } from './utils/sentryScrub';
+import TouchOverlay from './components/TouchOverlay';
 
 Sentry.init({
   // DSN is read from the EXPO_PUBLIC_SENTRY_DSN env var (see .env.example).
@@ -99,8 +100,11 @@ function PhaseRouter() {
         onRequestClose={() => setSettingsVisible(false)}
       >
         <SettingsScreen onClose={() => setSettingsVisible(false)} />
+        <TouchOverlay inModal />
       </Modal>
 
+      {/* Draws touches for PR GIFs only (components/TouchOverlay). */}
+      <TouchOverlay />
       <StatusBar style="auto" />
     </View>
   );

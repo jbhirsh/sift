@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState } from 'react';
 import type { GestureResponderEvent } from 'react-native';
 import { currentScreen, enterScreen, trace, traceTouch, tracing } from '../services/trace';
+import { showTouches, touchMarks } from '../services/touchOverlay';
 import { STALL_TICK_MS, stallGap } from '../utils/trace';
 
 /**
@@ -35,13 +36,19 @@ export function useTraceScreen(name: string): void {
 type TouchHandler = (event: GestureResponderEvent) => void;
 type TouchTraceProps = {
   onTouchStartCapture?: TouchHandler;
+  onTouchMoveCapture?: TouchHandler;
   onTouchEndCapture?: TouchHandler;
   onTouchCancelCapture?: TouchHandler;
 };
 
-const touchHandler = (phase: string): TouchHandler => (event) => {
+// What a touch phase does to the drawn marks of a PR GIF (TouchOverlay).
+const markPhase = { start: touchMarks.down, move: touchMarks.move, end: touchMarks.up, cancel: touchMarks.up };
+
+const touchHandler = (phase: keyof typeof markPhase): TouchHandler => (event) => {
   const { pageX, pageY, timestamp } = event.nativeEvent;
-  traceTouch(phase, pageX, pageY, timestamp);
+  // Moves would bury the trace; only the overlay wants them.
+  if (phase !== 'move') traceTouch(phase, pageX, pageY, timestamp);
+  if (showTouches) markPhase[phase](pageX, pageY, performance.now());
 };
 
 /**
@@ -50,11 +57,14 @@ const touchHandler = (phase: string): TouchHandler => (event) => {
  * tree), with where it landed and how late JavaScript saw it. A touch on a
  * disabled button is still recorded, so "no line" means JavaScript never saw
  * it. Capturing only watches: it doesn't take the touch from anything.
- * Nothing in builds that don't trace.
+ * When a GIF recording asked for it, the same handlers draw each touch
+ * (components/TouchOverlay). Nothing in builds that don't trace.
  */
 export const touchTraceProps: TouchTraceProps = tracing
   ? {
     onTouchStartCapture: touchHandler('start'),
+    // Only a GIF recording follows the finger (services/touchOverlay).
+    ...(showTouches && { onTouchMoveCapture: touchHandler('move') }),
     onTouchEndCapture: touchHandler('end'),
     onTouchCancelCapture: touchHandler('cancel'),
   }

@@ -13,6 +13,7 @@ import { CONTENT_COLUMN, SPACING, RADIUS } from '../theme';
 import GlassCard from './GlassCard';
 import { Playlist } from '../types';
 import { useTraceScreen } from '../hooks/useTrace';
+import TouchOverlay from './TouchOverlay';
 
 interface PlaylistPickerProps {
   playlists: Playlist[];
@@ -93,6 +94,7 @@ export default function PlaylistPicker({
           </GlassCard>
         </View>
       </View>
+      <TouchOverlay inModal />
     </Modal>
   );
 }

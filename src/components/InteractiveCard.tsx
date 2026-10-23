@@ -24,6 +24,7 @@ import { DRAG_THRESHOLD, swipeDecision } from '../utils/cardLayout';
 import { useTheme } from '../theme/ThemeContext';
 import { useResolvedArtwork } from '../hooks/useResolvedArtwork';
 import { thresholdHaptic } from '../services/haptics';
+import { followTouch, liftTouch, showTouches } from '../services/touchOverlay';
 
 const CARD_ACTIONS = [
   { name: 'keep', label: 'Keep' },
@@ -77,6 +78,8 @@ export default function InteractiveCard({
     .minDistance(10)
     .enabled(!disabled)
     .onUpdate((event) => {
+      // A PR GIF's drawn ring follows the swipe (services/touchOverlay).
+      if (showTouches) runOnJS(followTouch)(event.absoluteX, event.absoluteY);
       dragX.value = event.translationX;
       dragY.value = event.translationY;
       const past = Math.abs(event.translationX) > DRAG_THRESHOLD;
@@ -95,6 +98,9 @@ export default function InteractiveCard({
       }
       dragX.value = withSpring(0, { damping: 12, stiffness: 120 });
       dragY.value = withSpring(0, { damping: 12, stiffness: 120 });
+    })
+    .onFinalize((event) => {
+      if (showTouches) runOnJS(liftTouch)(event.absoluteX, event.absoluteY);
     });
 
   const cardStyle = useAnimatedStyle(() => {

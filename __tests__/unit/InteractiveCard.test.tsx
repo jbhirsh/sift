@@ -34,6 +34,7 @@ jest.mock('react-native-reanimated', () => ({
 type GestureCallback = (event: Record<string, unknown>) => void;
 let panOnUpdate: GestureCallback | undefined;
 let panOnEnd: GestureCallback | undefined;
+let panOnFinalize: GestureCallback | undefined;
 let panEnabled: boolean | undefined;
 
 jest.mock('react-native-gesture-handler', () => ({
@@ -49,7 +50,12 @@ jest.mock('react-native-gesture-handler', () => ({
               return {
                 onEnd: (fn: GestureCallback) => {
                   panOnEnd = fn;
-                  return {};
+                  return {
+                    onFinalize: (fn: GestureCallback) => {
+                      panOnFinalize = fn;
+                      return {};
+                    },
+                  };
                 },
               };
             },
@@ -61,6 +67,16 @@ jest.mock('react-native-gesture-handler', () => ({
 }));
 
 jest.mock('../../src/services/haptics', () => ({ thresholdHaptic: jest.fn() }));
+
+// Whether a PR GIF recording draws touches: a switch here.
+let mockShowTouches = false;
+const mockFollowTouch = jest.fn();
+const mockLiftTouch = jest.fn();
+jest.mock('../../src/services/touchOverlay', () => Object.defineProperties({}, {
+  showTouches: { get: () => mockShowTouches },
+  followTouch: { value: (x: number, y: number) => mockFollowTouch(x, y) },
+  liftTouch: { value: (x: number, y: number) => mockLiftTouch(x, y) },
+}));
 
 jest.mock('../../src/hooks/useResolvedArtwork', () => ({
   useResolvedArtwork: jest.fn().mockReturnValue('https://example.com/art.jpg'),
@@ -131,6 +147,25 @@ describe('InteractiveCard', () => {
     expect(panOnUpdate).toBeDefined();
     // Should not throw when called
     panOnUpdate?.({ translationX: 50, translationY: 10 });
+  });
+
+  test('a GIF recording\'s drawn ring follows the swipe and lets go with it; nothing otherwise', async () => {
+    // The gesture's worklets take the switch as it was when it was built.
+    await renderCard();
+    panOnUpdate?.({ translationX: 50, translationY: 10, absoluteX: 250, absoluteY: 410 });
+    panOnFinalize?.({ absoluteX: 260, absoluteY: 412 });
+    expect(mockFollowTouch).not.toHaveBeenCalled();
+    expect(mockLiftTouch).not.toHaveBeenCalled();
+    mockShowTouches = true;
+    try {
+      await renderCard();
+      panOnUpdate?.({ translationX: 50, translationY: 10, absoluteX: 250, absoluteY: 410 });
+      panOnFinalize?.({ absoluteX: 260, absoluteY: 412 });
+      expect(mockFollowTouch.mock.calls).toEqual([[250, 410]]);
+      expect(mockLiftTouch.mock.calls).toEqual([[260, 412]]);
+    } finally {
+      mockShowTouches = false;
+    }
   });
 
   test('pan gesture beyond threshold right triggers keep', async () => {
