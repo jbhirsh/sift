@@ -26,7 +26,7 @@ name: "Screenshots"
     timeout: 10000
 - waitForAnimationToEnd
 - takeScreenshot: ${MODE}-02-sort-sheet
-- tapOn: "Cancel"
+- tapOn: "Artist"
 - extendedWaitUntil:
     notVisible: "Cancel"
     timeout: 10000
