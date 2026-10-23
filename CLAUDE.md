@@ -136,6 +136,7 @@ src/
                         trace (E2E trace),
                         ChorusFinder + LrclibClient ("Start at chorus"),
                         touchOverlay (whether a GIF's touches are drawn),
+                        DeletedInMusic (Setup's once-a-launch note, #183),
                         e2eReset (an E2E flow's fresh start, SiftResetState)
     hooks/              useMusicProvider, usePendingDecision (Undo),
                         useReviseDecision, useRemovalRetry,
@@ -270,7 +271,18 @@ Makefile                Dev commands (test, lint, typecheck, check)
   whenever anything was removed.
   Removed songs are left out of every later sift (`collectedRemovalIds`, a
   playlist record carries `collected: true`); Restore takes the song back
-  out (`restoreRemoved`) and forgets every record of it. Start Over clears
+  out (`restoreRemoved`) and forgets every record of it. Once a launch,
+  Setup says how many collected songs the user has since deleted from
+  their library in Music (#183, `services/DeletedInMusic`, silent without
+  library access): a library song gone from "Sift — Removed" and not found
+  in the library (`deletedFromLibrary`; one only taken out of the
+  playlist is still in the library). Once a Setup has shown it, those
+  songs are recorded as reported (`sift_deleted_in_music_reported`), so
+  it's said once; their removal records stay, as a lapsed subscription or
+  library sync hides catalog songs until it's back, and they must still
+  be left out of sifts then. The E2E mock counts every song an earlier
+  launch collected as deleted when launched with `SiftDeletedInMusic`
+  (flow 27). Start Over clears
   a playlist's other records but never un-removes. Sift edits only
   playlists it created ("- Sifted", "Sift — Removed"): MusicKit's edit
   throws on any other, so a "Sift — Removed" the user made is skipped.

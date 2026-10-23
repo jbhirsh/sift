@@ -674,6 +674,53 @@ describe('AppleMusicProvider', () => {
     });
   });
 
+  describe('deletedFromLibrary (#183)', () => {
+    // A song as Sift collected it: a library song.
+    const collected = (id: string) => ({
+      id, name: `Song ${id}`, artist: 'Artist', album: 'Album', duration: 200, playCount: 10, dateAdded: '2020-01-01T00:00:00Z',
+    });
+
+    test('a song gone from "Sift — Removed" and from the library was deleted', async () => {
+      fake.playlists.set('removed', { name: 'Sift — Removed', items: ['kept-there'] });
+      fake.library.set('kept-there', rawSong('kept-there'));
+      await expect(provider.deletedFromLibrary([collected('gone'), collected('kept-there')])).resolves.toEqual(['gone']);
+      expect(mockNative.findPlaylistsByName).toHaveBeenLastCalledWith('Sift — Removed', RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE);
+      // One still in the playlist isn't looked up at all.
+      expect(mockNative.lookupLibrarySongs).toHaveBeenCalledWith(['gone']);
+    });
+
+    test('one only taken out of the playlist is still in the library: not deleted', async () => {
+      fake.playlists.set('removed', { name: 'Sift — Removed', items: [] });
+      fake.library.set('a', rawSong('a'));
+      await expect(provider.deletedFromLibrary([collected('a')])).resolves.toEqual([]);
+    });
+
+    test('still in "Sift — Removed" under another id (the same song) is not deleted', async () => {
+      fake.playlists.set('removed', { name: 'Sift — Removed', items: ['i.a'] });
+      await expect(provider.deletedFromLibrary([{ ...collected('a'), name: 'Song i.a' }])).resolves.toEqual([]);
+      expect(mockNative.lookupLibrarySongs).not.toHaveBeenCalled();
+    });
+
+    test('a lookup that failed counts as not deleted', async () => {
+      fake.failLibraryLookups.add('a');
+      await expect(provider.deletedFromLibrary([collected('a')])).resolves.toEqual([]);
+    });
+
+    test('with no "Sift — Removed" left, the library alone decides; looked up in batches', async () => {
+      const many = Array.from({ length: 150 }, (_, i) => collected(`s${i}`));
+      fake.library.set('s3', rawSong('s3'));
+      const deleted = await provider.deletedFromLibrary(many);
+      expect(deleted).toHaveLength(149);
+      expect(deleted).not.toContain('s3');
+      expect(mockNative.lookupLibrarySongs.mock.calls.map(([batch]) => batch.length)).toEqual([100, 50]);
+    });
+
+    test('nothing to look up: nothing asked', async () => {
+      await expect(provider.deletedFromLibrary([])).resolves.toEqual([]);
+      expect(mockNative.findPlaylistsByName).not.toHaveBeenCalled();
+    });
+  });
+
   describe('restoreRemoved', () => {
     test('takes the songs out of "Sift — Removed", reporting how many came out', async () => {
       fake.playlists.set('removed', { name: 'Sift — Removed', items: ['a', 'b'] });

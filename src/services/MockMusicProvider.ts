@@ -1,4 +1,7 @@
+import { Settings } from 'react-native';
 import type { MusicProviderService } from './MusicProviderInterface';
+import { tracing } from './trace';
+import { launchFlagOn } from '../utils/launchArgs';
 import type { Playlist, SiftSource, Track } from '../types';
 
 /**
@@ -197,6 +200,19 @@ const failingRemoveIds = new Set<string>();
 /** Songs whose library removal landed: "in Sift — Removed". */
 const landedRemoveIds = new Set<string>();
 
+// E2E only (#183): launched with SiftDeletedInMusic ("true"), every song an
+// earlier launch collected in "Sift — Removed" counts as deleted from the
+// library in Music since, for the flow that shows Setup's note. A launch
+// argument rather than EXPO_PUBLIC_*, so it applies to that flow alone.
+function launchedDeletedInMusic(): boolean {
+  try {
+    return launchFlagOn(Settings.get('SiftDeletedInMusic'));
+  } catch {
+    return false;
+  }
+}
+const deletedInMusic = tracing && launchedDeletedInMusic();
+
 function requestedFailures(raw: string | undefined): number {
   if (!raw) return 0;
   const parsed = Number.parseInt(raw, 10);
@@ -303,6 +319,12 @@ export class MockMusicProvider implements MusicProviderService {
     await delay(100);
     // Like Apple Music: a removed song from any sift is in "Sift — Removed".
     return landedRemoveIds.has(trackID);
+  }
+
+  async deletedFromLibrary(tracks: Track[]): Promise<string[]> {
+    await delay(100);
+    // One collected this launch is still in "Sift — Removed".
+    return deletedInMusic ? tracks.filter((t) => !landedRemoveIds.has(t.id)).map((t) => t.id) : [];
   }
 
   async removeFromPlaylist(_playlistID: string, trackIDs: string[]): Promise<number> {

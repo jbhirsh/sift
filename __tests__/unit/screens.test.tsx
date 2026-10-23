@@ -58,6 +58,15 @@ jest.mock('../../src/services/RemovalHistoryStore', () => ({
   clearHistoryForSource: jest.fn(() => Promise.resolve(true)),
 }));
 
+// Setup's once-a-launch look at songs deleted in Music (#183): none unless
+// a test says.
+const mockDeletedInMusicCount = jest.fn(async (..._args: unknown[]) => 0);
+const mockMarkDeletedInMusicShown = jest.fn(async () => undefined);
+jest.mock('../../src/services/DeletedInMusic', () => ({
+  deletedInMusicCount: (...args: unknown[]) => mockDeletedInMusicCount(...args),
+  markDeletedInMusicShown: () => mockMarkDeletedInMusicShown(),
+}));
+
 // The app's config, as the running app gets it: Settings shows its version.
 jest.mock('expo-constants', () => ({
   __esModule: true,
@@ -1119,6 +1128,45 @@ describe('SetupScreen', () => {
     });
     expect(queryByText('Start Sifting')).toBeTruthy();
     expect(queryByText('Resume Sifting')).toBeNull();
+  });
+});
+
+describe('SetupScreen: songs deleted in Music (#183)', () => {
+  beforeEach(() => {
+    mockDeletedInMusicCount.mockClear();
+    mockMarkDeletedInMusicShown.mockClear();
+  });
+
+  test('says how many songs Sift collected were deleted from the library since, and tells VoiceOver', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    mockDeletedInMusicCount.mockResolvedValueOnce(3);
+    const { findByTestId, toJSON } = await renderWithProviders(<SetupScreen />);
+    expect(await findByTestId('deleted-in-music-note')).toHaveTextContent('You deleted 3 songs from your library in Music.');
+    expect(mockDeletedInMusicCount).toHaveBeenCalledWith(mockProvider, 'apple-music');
+    expect(announce).toHaveBeenCalledWith('You deleted 3 songs from your library in Music.');
+    // Shown, so it's said no more.
+    expect(mockMarkDeletedInMusicShown).toHaveBeenCalledTimes(1);
+    expect(a11yViolations(toJSON())).toEqual([]);
+    announce.mockRestore();
+  });
+
+  test('says nothing when none were', async () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
+    const { queryByTestId } = await renderWithProviders(<SetupScreen />);
+    await waitFor(() => expect(mockDeletedInMusicCount).toHaveBeenCalled());
+    expect(queryByTestId('deleted-in-music-note')).toBeNull();
+    expect(announce).not.toHaveBeenCalled();
+    expect(mockMarkDeletedInMusicShown).not.toHaveBeenCalled();
+    announce.mockRestore();
+  });
+
+  test('a Setup gone before the count arrives doesn\'t mark it shown, so the next Setup says it', async () => {
+    let answer: (count: number) => void = () => {};
+    mockDeletedInMusicCount.mockImplementationOnce(() => new Promise<number>((resolve) => { answer = resolve; }));
+    const { unmount } = await renderWithProviders(<SetupScreen />);
+    await unmount();
+    await act(async () => answer(2));
+    expect(mockMarkDeletedInMusicShown).not.toHaveBeenCalled();
   });
 });
 
