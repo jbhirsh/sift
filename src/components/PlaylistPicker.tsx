@@ -5,15 +5,13 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
-  Modal,
   StyleSheet,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
-import { CONTENT_COLUMN, SPACING, RADIUS } from '../theme';
-import GlassCard from './GlassCard';
+import { SPACING } from '../theme';
+import BottomSheet, { SheetHeader } from './BottomSheet';
 import { Playlist } from '../types';
 import { useTraceScreen } from '../hooks/useTrace';
-import TouchOverlay from './TouchOverlay';
 
 interface PlaylistPickerProps {
   playlists: Playlist[];
@@ -50,79 +48,41 @@ export default function PlaylistPicker({
   );
 
   return (
-    <Modal visible transparent animationType="slide">
-      <View style={styles.overlay} testID="playlist-picker-modal">
-        <View style={styles.sheetContainer}>
-          <GlassCard intensity="thick" radius={RADIUS.lg} style={styles.sheet}>
-            <View style={styles.header}>
-              <Text style={[styles.title, { color: colors.text }]}>Choose a Playlist</Text>
-              <TouchableOpacity
-                onPress={onCancel}
-                activeOpacity={0.7}
-                testID="playlist-picker-cancel"
-                accessibilityRole="button"
-              >
-                <Text style={[styles.cancelText, { color: colors.accent }]}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
+    <BottomSheet testID="playlist-picker-modal" maxHeight="70%">
+      <SheetHeader
+        title="Choose a Playlist"
+        actionLabel="Cancel"
+        onAction={onCancel}
+        actionTestID="playlist-picker-cancel"
+      />
 
-            {loading ? (
-              <View style={styles.centered} testID="playlist-picker-loading">
-                <ActivityIndicator size="large" color={colors.accent} />
-                <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-                  Loading playlists…
-                </Text>
-              </View>
-            ) : playlists.length === 0 ? (
-              <View style={styles.centered} testID="playlist-picker-empty">
-                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                  No playlists found
-                </Text>
-              </View>
-            ) : (
-              <FlatList
-                data={playlists}
-                keyExtractor={(item) => item.id}
-                renderItem={renderItem}
-                style={styles.list}
-                testID="playlist-picker-list"
-              />
-            )}
-          </GlassCard>
+      {loading ? (
+        <View style={styles.centered} testID="playlist-picker-loading">
+          <ActivityIndicator size="large" color={colors.accent} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            Loading playlists…
+          </Text>
         </View>
-      </View>
-      <TouchOverlay inModal />
-    </Modal>
+      ) : playlists.length === 0 ? (
+        <View style={styles.centered} testID="playlist-picker-empty">
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            No playlists found
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={playlists}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          style={styles.list}
+          testID="playlist-picker-list"
+        />
+      )}
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
-  },
-  sheetContainer: {
-    ...CONTENT_COLUMN,
-    maxHeight: '70%',
-  },
-  sheet: {
-    paddingBottom: SPACING['4xl'],
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING['2xl'],
-    paddingVertical: SPACING.xl,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  cancelText: {
-    fontSize: 17,
-  },
   list: {
     flexGrow: 0,
   },

@@ -2,18 +2,16 @@ import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
-import { CONTENT_COLUMN, RADIUS, SPACING } from '../theme';
-import GlassCard from './GlassCard';
+import { RADIUS, SPACING } from '../theme';
+import BottomSheet from './BottomSheet';
 import type { Decision, Track } from '../types';
 import { useTraceScreen } from '../hooks/useTrace';
-import TouchOverlay from './TouchOverlay';
 
 const CHOICES: { decision: Decision; label: string }[] = [
   { decision: 'keep', label: 'Keep' },
@@ -147,56 +145,37 @@ export default function DecisionsSheet({
   };
 
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.overlay} testID="decisions-sheet">
-        <View style={styles.sheetContainer}>
-          <GlassCard intensity="thick" radius={RADIUS.lg} style={styles.sheet}>
-            <View style={styles.header}>
-              <Text style={[styles.title, { color: colors.text }]} accessibilityRole="header">
-                Your decisions
-              </Text>
-              <TouchableOpacity
-                onPress={onClose}
-                activeOpacity={0.7}
-                testID="decisions-done"
-                accessibilityRole="button"
-                style={styles.doneButton}
-              >
-                <Text style={[styles.doneText, { color: colors.accent }]}>Done</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={[styles.note, { color: colors.textSecondary }]}>
-              Change any of them: Sift updates your library to match.
-            </Text>
-            <FlatList
-              data={tracks}
-              keyExtractor={(item) => item.id}
-              renderItem={renderItem}
-              extraData={[busyIds, failedIds, decisionFor, disabled]}
-              style={styles.list}
-              testID="decisions-list"
-            />
-          </GlassCard>
-        </View>
+    <BottomSheet testID="decisions-sheet" maxHeight="80%" onRequestClose={onClose}>
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: colors.text }]} accessibilityRole="header">
+          Your decisions
+        </Text>
+        <TouchableOpacity
+          onPress={onClose}
+          activeOpacity={0.7}
+          testID="decisions-done"
+          accessibilityRole="button"
+          style={styles.doneButton}
+        >
+          <Text style={[styles.doneText, { color: colors.accent }]}>Done</Text>
+        </TouchableOpacity>
       </View>
-      <TouchOverlay inModal />
-    </Modal>
+      <Text style={[styles.note, { color: colors.textSecondary }]}>
+        Change any of them: Sift updates your library to match.
+      </Text>
+      <FlatList
+        data={tracks}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        extraData={[busyIds, failedIds, decisionFor, disabled]}
+        style={styles.list}
+        testID="decisions-list"
+      />
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    justifyContent: 'flex-end',
-  },
-  sheetContainer: {
-    ...CONTENT_COLUMN,
-    maxHeight: '80%',
-  },
-  sheet: {
-    paddingBottom: SPACING['4xl'],
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
