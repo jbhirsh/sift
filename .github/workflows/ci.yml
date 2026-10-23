@@ -390,7 +390,28 @@ jobs:
         # annotated as a warning. See scripts/run-e2e.sh for the policy.
         run: |
           export PATH="$HOME/.maestro/bin:$PATH"
-          scripts/run-e2e.sh .maestro
+          # EXPERIMENT (claude/stall-experiment, never merged): sample every
+          # thread of the app for 14 s from each swipe-left, to see what the
+          # JavaScript thread does in the freeze after it (#198 flow 19).
+          mkdir -p maestro-results/samples
+          (
+            n=0
+            tail -n0 -F maestro-results/trace.txt 2>/dev/null | while IFS= read -r line; do
+              case "$line" in
+                *"guard-go input=swipe-remove"*)
+                  n=$((n+1))
+                  pid=$(pgrep -x Sift | head -1)
+                  echo "$(date -u +%T) remove $n pid=$pid" >> maestro-results/samples/log.txt
+                  if [ -n "$pid" ]; then
+                    sample "$pid" 14 2 -mayDie -file "maestro-results/samples/remove-$n.txt" >> maestro-results/samples/log.txt 2>&1 &
+                  fi
+                  ;;
+              esac
+            done
+          ) &
+          scripts/run-e2e.sh .maestro || status=$?
+          sleep 16
+          exit "${status:-0}"
 
       # Passing runs keep their trace too: it's the baseline a failure's is
       # read against. If the live stream lost its tail, the persisted log
