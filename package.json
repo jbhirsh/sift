@@ -12,9 +12,11 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "node node_modules/@typescript/native/bin/tsc --noEmit",
+    "typecov": "node --max-old-space-size=6144 node_modules/type-coverage/bin/type-coverage",
+    "typecov:strict": "node --max-old-space-size=6144 node_modules/type-coverage/bin/type-coverage --strict --at-least 0",
     "depcruise": "depcruise src",
     "bridge": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-bridge.mjs",
-    "check": "npm run lint && npm run format:check && npm run typecheck && npm run depcruise && npm run bridge && npm run test:coverage",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm run typecov && npm run depcruise && npm run bridge && npm run test:coverage",
     "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
@@ -63,6 +65,7 @@
     "jest-expo": "~57.0.6",
     "prettier": "^3.9.10",
     "test-renderer": "~1.2.0",
+    "type-coverage": "^2.30.4",
     "typescript": "npm:@typescript/typescript6@~6.0.2",
     "typescript-eslint": "^8.71.2"
   },
@@ -76,5 +79,11 @@
       ]
     }
   },
-  "private": true
+  "private": true,
+  "typeCoverage": {
+    "project": "tsconfig.typecov.json",
+    "atLeast": 100,
+    "ignoreCatch": true,
+    "detail": true
+  }
 }

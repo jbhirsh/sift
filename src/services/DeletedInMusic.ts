@@ -41,9 +41,10 @@ async function storedReported(): Promise<Record<string, string[]>> {
     unknown
   >;
   const lists: Record<string, string[]> = {};
-  for (const [provider, ids] of Object.entries(parsed)) {
-    if (Array.isArray(ids))
-      lists[provider] = ids.filter((id): id is string => typeof id === 'string');
+  for (const [provider, value] of Object.entries(parsed)) {
+    if (!Array.isArray(value)) continue;
+    const ids: unknown[] = value;
+    lists[provider] = ids.filter((id): id is string => typeof id === 'string');
   }
   return lists;
 }

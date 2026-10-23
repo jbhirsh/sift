@@ -24,9 +24,9 @@ let flagWrites: Promise<void> = Promise.resolve();
 
 async function storedKeys(): Promise<string[]> {
   const parsed: unknown = JSON.parse((await AsyncStorage.getItem(IMPORTED_KEY)) ?? '[]');
-  return Array.isArray(parsed)
-    ? parsed.filter((key): key is string => typeof key === 'string')
-    : [];
+  if (!Array.isArray(parsed)) return [];
+  const keys: unknown[] = parsed;
+  return keys.filter((key): key is string => typeof key === 'string');
 }
 
 /** Runs a storage write after the ones before it. */
@@ -48,8 +48,11 @@ async function storedIdLists(): Promise<Record<string, string[]>> {
   const parsed: unknown = JSON.parse((await AsyncStorage.getItem(REMEMBERED_IDS_KEY)) ?? '{}');
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
   const lists: Record<string, string[]> = {};
-  for (const [key, ids] of Object.entries(parsed)) {
-    if (Array.isArray(ids)) lists[key] = ids.filter((id): id is string => typeof id === 'string');
+  const entries: [string, unknown][] = Object.entries(parsed);
+  for (const [key, value] of entries) {
+    if (!Array.isArray(value)) continue;
+    const ids: unknown[] = value;
+    lists[key] = ids.filter((id): id is string => typeof id === 'string');
   }
   return lists;
 }

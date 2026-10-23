@@ -49,7 +49,7 @@ function getNativeModule(): NativeMusicKit {
     );
   }
 
-  const mod = require('../../modules/expo-musickit/src/index');
+  const mod: NativeMusicKit | undefined = require('../../modules/expo-musickit/src/index');
   if (!mod) {
     throw new Error(
       'Native MusicKit module is not available. ' +

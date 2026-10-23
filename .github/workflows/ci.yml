@@ -100,6 +100,17 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # No `any` anywhere in the app code (src, the native module's
+      # TypeScript, scripts/*.ts: tsconfig.typecov.json): type-coverage must
+      # find every expression typed (package.json "typeCoverage"). Its strict
+      # figure, which also counts `as` casts, non-null assertions and `any`
+      # inside generics, goes in the summary for information only.
+      - name: Type coverage
+        run: |
+          npm run -s typecov
+          strict=$(npm run -s typecov:strict | grep -o '[0-9.]*%' | tail -1)
+          echo "Strict type coverage (information only): $strict" | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Dependency graph
         run: npm run depcruise
 

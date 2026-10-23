@@ -143,7 +143,8 @@ export function migrateLegacySession(value: unknown): unknown {
   for (const key of ['tracks', 'kept', 'removed', 'skipped', 'pendingKeeps']) {
     const list = value[key];
     if (Array.isArray(list)) {
-      migrated[key] = list.filter((item) => !isIdlessTrack(item));
+      const items: unknown[] = list;
+      migrated[key] = items.filter((item) => !isIdlessTrack(item));
     }
   }
   return migrated;

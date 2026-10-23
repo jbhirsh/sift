@@ -13,7 +13,36 @@ import type {
 // A thin bridge: each function asks MusicKit, ShazamKit or the player one
 // thing. The decisions live in src/utils/musicKit and AppleMusicProvider.
 
-const ExpoMusicKit = requireNativeModule('ExpoMusicKit');
+// What the Swift module answers, function by function: each takes and
+// returns exactly what its wrapper below does.
+interface ExpoMusicKitModule {
+  requestAuthorization: typeof requestAuthorization;
+  getAuthorizationStatus: typeof getAuthorizationStatus;
+  loadLibraryPage: typeof loadLibraryPage;
+  loadPlaylistsPage: typeof loadPlaylistsPage;
+  loadPlaylistItems: typeof loadPlaylistItems;
+  lookupLibrarySongs: typeof lookupLibrarySongs;
+  lookupCatalogSongs: typeof lookupCatalogSongs;
+  aliasCachedItem: typeof aliasCachedItem;
+  cachedKinds: typeof cachedKinds;
+  play: typeof play;
+  pause: typeof pause;
+  resume: typeof resume;
+  seek: typeof seek;
+  getPlaybackState: typeof getPlaybackState;
+  createEmptyPlaylist: typeof createEmptyPlaylist;
+  findPlaylistsByName: typeof findPlaylistsByName;
+  addEachToPlaylist: typeof addEachToPlaylist;
+  removeFromPlaylist: typeof removeFromPlaylist;
+  addEachToLibrary: typeof addEachToLibrary;
+  previewInfo: typeof previewInfo;
+  catalogPreviewForISRC: typeof catalogPreviewForISRC;
+  searchCatalogSongs: typeof searchCatalogSongs;
+  shazamOffset: typeof shazamOffset;
+  resolveArtworkURL: typeof resolveArtworkURL;
+}
+
+const ExpoMusicKit = requireNativeModule<ExpoMusicKitModule>('ExpoMusicKit');
 
 export async function requestAuthorization(): Promise<boolean> {
   return ExpoMusicKit.requestAuthorization();
