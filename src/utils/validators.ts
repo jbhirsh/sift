@@ -159,16 +159,16 @@ function isPendingDecision(value: unknown): value is PendingDecision {
   );
 }
 
-export function isSiftSession(value: unknown): value is SiftSession {
+/**
+ * The fields a full session and a compact one (#150) share, checked the same
+ * way for both: the cursor, the sort, when it was saved and the optional
+ * rest.
+ */
+function hasSessionFields(value: UnknownRecord): boolean {
   return (
-    isObject(value) &&
-    isArrayOf(value.tracks, isTrack) &&
     isFiniteNumber(value.cursor) &&
     Number.isInteger(value.cursor) &&
     value.cursor >= 0 &&
-    isArrayOf(value.kept, isTrack) &&
-    isArrayOf(value.removed, isTrack) &&
-    isArrayOf(value.skipped, isTrack) &&
     isSortOrder(value.sortOrder) &&
     typeof value.savedAt === 'string' &&
     (value.provider === undefined || isMusicProvider(value.provider)) &&
@@ -176,6 +176,17 @@ export function isSiftSession(value: unknown): value is SiftSession {
     (value.removalErrors === undefined || isArrayOf(value.removalErrors, isString)) &&
     (value.failedRemovalIds === undefined || isArrayOf(value.failedRemovalIds, isString)) &&
     (value.pending === undefined || value.pending === null || isPendingDecision(value.pending))
+  );
+}
+
+export function isSiftSession(value: unknown): value is SiftSession {
+  return (
+    isObject(value) &&
+    isArrayOf(value.tracks, isTrack) &&
+    isArrayOf(value.kept, isTrack) &&
+    isArrayOf(value.removed, isTrack) &&
+    isArrayOf(value.skipped, isTrack) &&
+    hasSessionFields(value)
   );
 }
 
@@ -216,19 +227,10 @@ export function isCompactSession(value: unknown): value is CompactSession {
     value.v === 2 &&
     (value.tracksSlot === 'a' || value.tracksSlot === 'b') &&
     typeof value.tracksVersion === 'string' &&
-    isFiniteNumber(value.cursor) &&
-    Number.isInteger(value.cursor) &&
-    value.cursor >= 0 &&
     isArrayOf(value.keptIds, isString) &&
     isArrayOf(value.removedIds, isString) &&
     isArrayOf(value.skippedIds, isString) &&
-    isSortOrder(value.sortOrder) &&
-    typeof value.savedAt === 'string' &&
-    (value.provider === undefined || isMusicProvider(value.provider)) &&
-    (value.source === undefined || isSiftSource(value.source)) &&
-    (value.removalErrors === undefined || isArrayOf(value.removalErrors, isString)) &&
-    (value.failedRemovalIds === undefined || isArrayOf(value.failedRemovalIds, isString)) &&
-    (value.pending === undefined || value.pending === null || isPendingDecision(value.pending))
+    hasSessionFields(value)
   );
 }
 
