@@ -2,6 +2,7 @@ import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import eslintComments from '@eslint-community/eslint-plugin-eslint-comments';
+import jsdoc from 'eslint-plugin-jsdoc';
 import prettier from 'eslint-config-prettier/flat';
 
 export default tseslint.config(
@@ -151,6 +152,32 @@ export default tseslint.config(
         module: 'writable',
         require: 'readonly',
       },
+    },
+  },
+  {
+    // JSDoc must be right where it exists, not exist everywhere: a @param
+    // naming an argument the function no longer takes, an unknown tag or a
+    // type that TypeScript already states is an error, while code with no
+    // JSDoc (most of it, documented by plain comments) is fine. So the
+    // TypeScript set's checks stay and every rule demanding a comment, a
+    // tag or a description is off.
+    ...jsdoc.configs['flat/recommended-typescript-error'],
+    files: ['**/*.{ts,tsx,js,mjs}'],
+  },
+  {
+    files: ['**/*.{ts,tsx,js,mjs}'],
+    rules: {
+      'jsdoc/require-jsdoc': 'off',
+      'jsdoc/require-param': 'off',
+      'jsdoc/require-param-description': 'off',
+      'jsdoc/require-property': 'off',
+      'jsdoc/require-property-description': 'off',
+      'jsdoc/require-returns': 'off',
+      'jsdoc/require-returns-description': 'off',
+      'jsdoc/require-yields': 'off',
+      'jsdoc/require-next-type': 'off',
+      'jsdoc/require-yields-type': 'off',
+      'jsdoc/require-throws-type': 'off',
     },
   },
   // Last: turns off every rule that would fight Prettier's formatting
