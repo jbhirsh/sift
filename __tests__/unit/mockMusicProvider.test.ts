@@ -42,6 +42,18 @@ describe('MockMusicProvider', () => {
     }
   });
 
+  test('every library song has its album\'s cover, from Apple\'s artwork server', async () => {
+    const tracks = await flushAsync(provider.loadLibrary());
+    for (const track of tracks) {
+      expect(track.artworkURL).toMatch(/^https:\/\/is1-ssl\.mzstatic\.com\/image\/thumb\/.+\/1000x1000bb\.jpg$/);
+    }
+    // Two songs off one album share its cover.
+    const sour = tracks.filter((track) => track.album === 'SOUR');
+    expect(sour).toHaveLength(2);
+    expect(sour[0].artworkURL).toBe(sour[1].artworkURL);
+    expect(new Set(tracks.map((track) => track.artworkURL)).size).toBe(tracks.length - 1);
+  });
+
   test('loadLibrary tracks have valid durations', async () => {
     const tracks = await flushAsync(provider.loadLibrary());
     for (const track of tracks) {

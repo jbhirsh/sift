@@ -2,9 +2,14 @@ import type { MusicProviderService } from './MusicProviderInterface';
 import type { Playlist, SiftSource, Track } from '../types';
 
 /**
- * Mock tracks matching the Swift SimulatorMusicService.
- * Used for development and testing without a native module.
+ * A small library of real songs, for development and the E2E build (no
+ * native module, or EXPO_PUBLIC_USE_MOCK_PROVIDER). Each has its album's
+ * real cover, linked from Apple's own artwork server (found through the
+ * iTunes Search API) rather than copied into the repo, so screenshots and
+ * GIFs show the card as it looks with a real library.
  */
+const cover = (path: string) => `https://is1-ssl.mzstatic.com/image/thumb/${path}/1000x1000bb.jpg`;
+
 const MOCK_LIBRARY_TRACKS: Track[] = [
   {
     id: 'mock-1',
@@ -14,7 +19,7 @@ const MOCK_LIBRARY_TRACKS: Track[] = [
     duration: 354,
     playCount: 142,
     dateAdded: '2019-03-15T10:30:00.000Z',
-    artworkURL: undefined,
+    artworkURL: cover('Music211/v4/dd/86/92/dd86925d-484d-8ee7-3985-ef3264214269/602527644264.jpg'),
   },
   {
     id: 'mock-2',
@@ -24,7 +29,7 @@ const MOCK_LIBRARY_TRACKS: Track[] = [
     duration: 200,
     playCount: 87,
     dateAdded: '2020-11-22T14:15:00.000Z',
-    artworkURL: undefined,
+    artworkURL: cover('Music125/v4/6f/bc/e6/6fbce6c4-c38c-72d8-4fd0-66cfff32f679/20UMGIM12176.rgb.jpg'),
   },
   {
     id: 'mock-3',
@@ -34,7 +39,7 @@ const MOCK_LIBRARY_TRACKS: Track[] = [
     duration: 203,
     playCount: 64,
     dateAdded: '2021-01-10T09:45:00.000Z',
-    artworkURL: undefined,
+    artworkURL: cover('Music116/v4/6c/11/d6/6c11d681-aa3a-d59e-4c2e-f77e181026ab/190295092665.jpg'),
   },
   {
     id: 'mock-4',
@@ -46,7 +51,7 @@ const MOCK_LIBRARY_TRACKS: Track[] = [
     duration: 242,
     playCount: 31,
     dateAdded: '2021-05-18T16:20:00.000Z',
-    artworkURL: undefined,
+    artworkURL: cover('Music115/v4/02/ed/8c/02ed8cab-c089-2fdd-7ce6-ab334a9a4e19/21UMGIM26093.rgb.jpg'),
   },
   {
     id: 'mock-5',
@@ -56,7 +61,7 @@ const MOCK_LIBRARY_TRACKS: Track[] = [
     duration: 141,
     playCount: 53,
     dateAdded: '2021-07-09T11:00:00.000Z',
-    artworkURL: undefined,
+    artworkURL: cover('Music115/v4/a8/3a/22/a83a22f7-af18-7ef6-a7de-74816c532a44/886449475421.jpg'),
   },
   {
     id: 'mock-6',
@@ -68,7 +73,7 @@ const MOCK_LIBRARY_TRACKS: Track[] = [
     duration: 178,
     playCount: 45,
     dateAdded: '2021-05-18T16:25:00.000Z',
-    artworkURL: undefined,
+    artworkURL: cover('Music115/v4/02/ed/8c/02ed8cab-c089-2fdd-7ce6-ab334a9a4e19/21UMGIM26093.rgb.jpg'),
   },
   {
     id: 'mock-7',
@@ -78,7 +83,7 @@ const MOCK_LIBRARY_TRACKS: Track[] = [
     duration: 198,
     playCount: 28,
     dateAdded: '2021-03-19T08:30:00.000Z',
-    artworkURL: undefined,
+    artworkURL: cover('Music115/v4/e0/92/da/e092da2d-9f6d-11dc-7843-2021e95a2b61/21UMGIM17518.rgb.jpg'),
   },
   {
     id: 'mock-8',
@@ -88,7 +93,7 @@ const MOCK_LIBRARY_TRACKS: Track[] = [
     duration: 137,
     playCount: 39,
     dateAdded: '2021-09-17T13:10:00.000Z',
-    artworkURL: undefined,
+    artworkURL: cover('Music115/v4/4b/42/21/4b422136-2cfd-222c-ca7c-7573bf23139c/886449537204.jpg'),
   },
   {
     id: 'mock-9',
@@ -98,7 +103,7 @@ const MOCK_LIBRARY_TRACKS: Track[] = [
     duration: 208,
     playCount: 56,
     dateAdded: '2021-06-25T15:45:00.000Z',
-    artworkURL: undefined,
+    artworkURL: cover('Music116/v4/4f/4b/ee/4f4bee71-d197-67ab-2a42-913dc416df0d/886449138869.jpg'),
   },
   {
     id: 'mock-10',
@@ -108,7 +113,7 @@ const MOCK_LIBRARY_TRACKS: Track[] = [
     duration: 238,
     playCount: 72,
     dateAdded: '2020-08-07T12:00:00.000Z',
-    artworkURL: undefined,
+    artworkURL: cover('Music115/v4/da/8b/77/da8b7731-6f4f-eacf-5e74-8b23389eefa1/20UMGIM03371.rgb.jpg'),
   },
 ];
 
@@ -200,8 +205,7 @@ function requestedFailures(raw: string | undefined): number {
 
 /**
  * Mock music provider for development and testing.
- * Simulates playback with a timer-based position counter,
- * similar to the Swift SimulatorMusicService.
+ * Simulates playback with a timer-based position counter.
  */
 export class MockMusicProvider implements MusicProviderService {
   private position = 0;
