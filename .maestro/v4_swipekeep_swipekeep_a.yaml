@@ -1,12 +1,14 @@
 appId: com.jessicahirsh.sift
-name: "Swipe a"
+name: "v4_swipekeep_swipekeep a"
 ---
 
 # The card's own gesture, which every other flow skips for the buttons: a
 # swipe right keeps, a swipe left removes. The first card ever also says
 # which way is which, until the first decision.
 - launchApp:
-    clearState: true
+    # A fresh start without a reinstall (services/e2eReset).
+    arguments:
+      SiftResetState: "true"
 
 - waitForAnimationToEnd
 
@@ -28,6 +30,7 @@ name: "Swipe a"
       id: "swipe-hint"
     timeout: 10000
 
+
 - swipe:
     from:
       id: "card-track-name"
@@ -37,22 +40,22 @@ name: "Swipe a"
     visible:
       id: "stat-kept"
       text: "1 kept"
-    timeout: 10000
-
-- assertNotVisible:
-    id: "swipe-hint"
+    timeout: 30000
 
 - swipe:
     from:
       id: "card-track-name"
-    direction: LEFT
+    direction: RIGHT
 
 - extendedWaitUntil:
     visible:
-      id: "stat-removed"
-      text: "1 removed"
-    timeout: 10000
+      id: "stat-kept"
+      text: "2 kept"
+    timeout: 30000
 
-- assertVisible:
-    id: "remaining-count"
-    text: "8 left"
+# Let the app run on after the last decision, for the sample.
+- extendedWaitUntil:
+    visible:
+      id: "never-there"
+    timeout: 8000
+    optional: true

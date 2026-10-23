@@ -394,6 +394,9 @@ jobs:
           # thread of the app for 14 s from each swipe-left, to see what the
           # JavaScript thread does in the freeze after it (#198 flow 19).
           mkdir -p maestro-results/samples
+          # Warm the sampler's symbol cache first: the first samples of a run
+          # came out empty while it built it.
+          sample "$(pgrep -x SpringBoard | head -1)" 3 -file maestro-results/samples/warmup.txt > /dev/null 2>&1 || true
           # The busiest processes every 2 s, to see what starves the runner.
           ( while true; do echo "== $(date -u +%T)"; ps -Ao pcpu,pid,comm -r | head -12; sleep 2; done ) > maestro-results/samples/cpu.txt 2>&1 &
           if [ "${STOP_APSD:-}" = 1 ]; then
@@ -410,12 +413,12 @@ jobs:
             n=0
             tail -n0 -F maestro-results/trace.txt 2>/dev/null | while IFS= read -r line; do
               case "$line" in
-                *"guard-go input=swipe-remove"*)
+                *"guard-go input="*)
                   n=$((n+1))
                   pid=$(pgrep -x Sift | head -1)
-                  echo "$(date -u +%T) remove $n pid=$pid" >> maestro-results/samples/log.txt
+                  echo "$(date -u +%T) decision $n pid=$pid ${line##*guard-go }" >> maestro-results/samples/log.txt
                   if [ -n "$pid" ]; then
-                    sample "$pid" 14 2 -mayDie -file "maestro-results/samples/remove-$n.txt" >> maestro-results/samples/log.txt 2>&1 &
+                    sample "$pid" 8 2 -mayDie -file "maestro-results/samples/remove-$n.txt" >> maestro-results/samples/log.txt 2>&1 &
                   fi
                   ;;
               esac
