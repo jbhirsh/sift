@@ -394,6 +394,18 @@ jobs:
           # thread of the app for 14 s from each swipe-left, to see what the
           # JavaScript thread does in the freeze after it (#198 flow 19).
           mkdir -p maestro-results/samples
+          # The busiest processes every 2 s, to see what starves the runner.
+          ( while true; do echo "== $(date -u +%T)"; ps -Ao pcpu,pid,comm -r | head -12; sleep 2; done ) > maestro-results/samples/cpu.txt 2>&1 &
+          if [ "${STOP_APSD:-}" = 1 ]; then
+            # Variant B: stop the Simulator's push daemon, which retries its
+            # connection in a tight loop (thousands of log lines a second).
+            for cmd in "launchctl disable system/com.apple.apsd" "launchctl bootout system/com.apple.apsd" "launchctl kill SIGKILL system/com.apple.apsd"; do
+              echo "\$ $cmd" >> maestro-results/samples/apsd.txt
+              xcrun simctl spawn booted $cmd >> maestro-results/samples/apsd.txt 2>&1 || echo "exit $?" >> maestro-results/samples/apsd.txt
+            done
+            sleep 3
+            echo "apsd after: $(pgrep -l apsd || echo none)" >> maestro-results/samples/apsd.txt
+          fi
           (
             n=0
             tail -n0 -F maestro-results/trace.txt 2>/dev/null | while IFS= read -r line; do
