@@ -382,6 +382,7 @@ jobs:
           # No analytics network call — one less nondeterministic dependency.
           MAESTRO_CLI_NO_ANALYTICS: "1"
           E2E_OUT_DIR: maestro-results
+          STOP_APSD: "1"
         # The whole suite runs in one session; then only the flows that died
         # of a driver/transport error are re-run alone on a fresh driver, so
         # one driver death can't cascade into every remaining flow (main run
