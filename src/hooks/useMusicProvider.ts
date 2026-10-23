@@ -25,6 +25,7 @@ import {
   siftedPlaylistName,
 } from '../utils/sessionCopy';
 import { isFiltering, matchesFilter } from '../utils/trackFilter';
+import { withoutIds } from '../utils/withoutIds';
 import { loadReviewedIds, markReviewed, unmarkReviewed } from '../services/ReviewedLedgerStore';
 import { importSiftedKeeps } from '../services/SiftedImport';
 import { deletedInMusicCount } from '../services/DeletedInMusic';
@@ -384,9 +385,7 @@ export function useMusicProvider() {
             // library sift does (#143): a keep leaves the song in the playlist.
             // By id: the ids the keeps recorded came from this same load.
             const reviewedIds = await loadReviewedIds(ledgerKey(state.provider, source));
-            const beforeReviewedFilter = tracks.length;
-            tracks = tracks.filter((t) => !reviewedIds.has(t.id));
-            filteredAsReviewed = beforeReviewedFilter - tracks.length;
+            ({ tracks, dropped: filteredAsReviewed } = withoutIds(tracks, reviewedIds));
 
             if (!collectsRemovals(state.provider)) {
               // Exclude tracks previously removed from this playlist
@@ -399,9 +398,7 @@ export function useMusicProvider() {
                   )
                   .map((r) => r.track.id),
               );
-              const beforeRemovedFilter = tracks.length;
-              tracks = tracks.filter((t) => !removedIds.has(t.id));
-              filteredAsRemoved = beforeRemovedFilter - tracks.length;
+              ({ tracks, dropped: filteredAsRemoved } = withoutIds(tracks, removedIds));
             }
           }
           if (collectsRemovals(state.provider)) {
@@ -410,9 +407,7 @@ export function useMusicProvider() {
             // whatever the sift). Applies with skipFiltering, as for the
             // library: starting over un-removes nothing.
             const removedIds = collectedRemovalIds(await loadHistory(), state.provider);
-            const beforeRemovedFilter = tracks.length;
-            tracks = tracks.filter((t) => !removedIds.has(t.id));
-            filteredAsRemoved = beforeRemovedFilter - tracks.length;
+            ({ tracks, dropped: filteredAsRemoved } = withoutIds(tracks, removedIds));
           }
         } else {
           tracks = await providerRef.current.loadLibrary();
@@ -426,9 +421,7 @@ export function useMusicProvider() {
             // deletes the song wouldn't need this: a song back in its library
             // was re-added on purpose.
             const removedIds = collectedRemovalIds(await loadHistory(), state.provider);
-            const beforeRemovedFilter = tracks.length;
-            tracks = tracks.filter((t) => !removedIds.has(t.id));
-            filteredAsRemoved = beforeRemovedFilter - tracks.length;
+            ({ tracks, dropped: filteredAsRemoved } = withoutIds(tracks, removedIds));
           }
           if (shouldFilter) {
             // Leave out songs kept in earlier library sifts (#143), so a big
@@ -437,9 +430,7 @@ export function useMusicProvider() {
             // back. Setup's "Include songs I've already sifted" switch passes
             // skipFiltering to bring them all back.
             const reviewedIds = await loadReviewedIds(ledgerKey(state.provider, source));
-            const beforeReviewedFilter = tracks.length;
-            tracks = tracks.filter((t) => !reviewedIds.has(t.id));
-            filteredAsReviewed = beforeReviewedFilter - tracks.length;
+            ({ tracks, dropped: filteredAsReviewed } = withoutIds(tracks, reviewedIds));
           }
         }
 
