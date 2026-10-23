@@ -358,7 +358,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
   commit check, `scripts/` apart from its runners (`run-e2e.sh`,
   `run-a11y-audit.sh`, `take-screenshots.sh`, `take-gifs.sh`,
   `build-simulator-app.sh`),
-  `stryker.config.json`;
+  `stryker.config.json`, and the formatter's, the weekly audit's and type
+  coverage's config files;
   the `code` filter in `ci.yml`, with `predicate-quantifier: 'every'` so its
   `!` patterns exclude). Its app build is cached on
   the native fingerprint plus a hash of the bundle's inputs (`src/`,
