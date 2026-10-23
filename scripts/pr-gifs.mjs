@@ -18,22 +18,27 @@
 // 4. Commits them to the `screenshots` branch under pr-<n>/<scenario>/ and
 //    prints the Visual changes table, linked by that commit's SHA.
 import process from 'node:process';
+import { Buffer } from 'node:buffer';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, basename } from 'node:path';
 import {
   activeWindow,
+  cutFilter,
   finalDelayCs,
   gifFilter,
+  keptStretches,
   keptTimes,
   lastChangeIn,
   markdownTable,
   parseArgs,
   rawUrl,
+  ringPixels,
   sideBySideFilter,
   sizeWarning,
+  touchSpans,
 } from './prGifs.ts';
 
 const POLL_MS = 30_000;
@@ -123,6 +128,51 @@ async function beforeRun(repo, sha) {
     if (Date.now() - startedAt > 5 * 60 * 1000) throw new Error('The run on main never started');
     await sleep(5000);
   }
+}
+
+/** Each frame's ring-pixel count, streamed from ffmpeg at a third of the size. */
+async function ringCounts(video) {
+  const [w, h] = run('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height',
+    '-of', 'csv=p=0', video]).stdout.trim().split(',').map(Number);
+  const width = 2 * Math.round(w / 6);
+  const height = 2 * Math.round(h / 6);
+  const frameBytes = width * height * 3;
+  const times = run('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'frame=pts_time',
+    '-of', 'csv=p=0', video]).stdout.split(/\s+/).filter(Boolean).map((t) => Number(t.replace(/,$/, '')));
+  const counts = [];
+  const decoder = spawn('ffmpeg', ['-v', 'error', '-i', video, '-vf', `scale=${width}:${height}`, '-fps_mode', 'passthrough',
+    '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-']);
+  let pending = Buffer.alloc(0);
+  for await (const chunk of decoder.stdout) {
+    pending = Buffer.concat([pending, chunk]);
+    while (pending.length >= frameBytes) {
+      counts.push(ringPixels(pending.subarray(0, frameBytes)));
+      pending = pending.subarray(frameBytes);
+    }
+  }
+  const code = await new Promise((resolve) => decoder.on('close', resolve));
+  if (code !== 0) throw new Error(`decoding ${basename(video)} failed`);
+  return { times: times.slice(0, counts.length), counts };
+}
+
+/**
+ * The video with the waits between its touches cut (prGifs.ts), or the
+ * video itself when no touch shows in it.
+ */
+async function cutWaits(video) {
+  const duration = Number(run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', video]).stdout);
+  const { times, counts } = await ringCounts(video);
+  const stretches = keptStretches(touchSpans(times, counts), duration);
+  if (!stretches) {
+    log(`  ${basename(video)}: no drawn touch found (was it launched with SiftShowTouches?); keeping its whole length`);
+    return video;
+  }
+  const out = video.replace(/\.mp4$/, '.cut.mp4');
+  run('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-y', '-i', video, '-filter_complex', cutFilter(stretches),
+    '-map', '[cut]', '-fps_mode', 'vfr', '-c:v', 'libx264', '-crf', '12', '-preset', 'veryfast', out]);
+  const kept = stretches.reduce((sum, w) => sum + w.end - w.start, 0);
+  log(`  ${basename(video)}: ${stretches.length} touch stretch(es) kept, ${kept.toFixed(1)} s of ${duration.toFixed(1)} s`);
+  return out;
 }
 
 /** Where a video changes, and the window worth keeping. */
@@ -223,6 +273,17 @@ async function main() {
     const beforeVideos = beforeDone ? downloadVideos(repo, beforeDone.id, mkdtempSync(join(work, 'before-'))) : {};
     const names = Object.keys(afterVideos).sort();
     if (names.length === 0) throw new Error('The PR run recorded no GIF scenarios (e2e/gifs)');
+
+    // Cut each recording's waits for Maestro, found by its drawn touches.
+    for (const videos of [afterVideos, beforeVideos]) {
+      for (const [name, video] of Object.entries(videos)) {
+        try {
+          videos[name] = await cutWaits(video);
+        } catch (err) {
+          log(`  warning: ${name}: cutting its waits failed (${err.message}); keeping it whole`);
+        }
+      }
+    }
 
     const files = [];
     const scenarios = [];
