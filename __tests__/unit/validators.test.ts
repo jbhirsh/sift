@@ -5,6 +5,7 @@ import {
   isLegacyLocalFileRecord,
   isSiftSession,
   legacyPendingKeeps,
+  legacySiftedPlaylistId,
   migrateLegacySession,
   savedBeforeKeepsRemembered,
 } from '../../src/utils/validators';
@@ -216,6 +217,21 @@ describe('legacyPendingKeeps', () => {
     expect(legacyPendingKeeps({ ...session, pendingKeeps: 'x' })).toEqual([]);
     expect(legacyPendingKeeps(null)).toEqual([]);
     expect(legacyPendingKeeps([track])).toEqual([]);
+  });
+});
+
+describe('legacySiftedPlaylistId (#179)', () => {
+  test('the "- Sifted" playlist an old session named', () => {
+    expect(legacySiftedPlaylistId({ ...session, siftedPlaylistId: 'p.s9' })).toBe('p.s9');
+  });
+
+  test('none when it named none, or not as an id', () => {
+    for (const siftedPlaylistId of [null, '', 7, undefined]) {
+      expect(legacySiftedPlaylistId({ ...session, siftedPlaylistId })).toBeNull();
+    }
+    expect(legacySiftedPlaylistId(session)).toBeNull();
+    expect(legacySiftedPlaylistId(null)).toBeNull();
+    expect(legacySiftedPlaylistId([{ siftedPlaylistId: 'p.s9' }])).toBeNull();
   });
 });
 

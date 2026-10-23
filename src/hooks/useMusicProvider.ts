@@ -13,6 +13,7 @@ import { ACCESS_REQUIRED, keptSaveRetryable, loadFailureMessage, siftedPlaylistN
 import { isFiltering, matchesFilter } from '../utils/trackFilter';
 import { loadReviewedIds, markReviewed, unmarkReviewed } from '../services/ReviewedLedgerStore';
 import { importSiftedKeeps } from '../services/SiftedImport';
+import { loadPlaylistTracksOnce } from '../services/playlistLoads';
 import { trace } from '../services/trace';
 import type { MusicProvider, Playlist, SiftSource, Track } from '../types';
 
@@ -330,7 +331,9 @@ export function useMusicProvider() {
       let filteredAsRemoved = 0;
       let filteredAsReviewed = 0;
       if (source.type === 'playlist') {
-        const result = await providerRef.current.loadPlaylistTracks?.(source.playlist.id);
+        // Shared with Setup's "- Sifted" import of it, if that's loading
+        // it now (#179): the playlist is fetched once.
+        const result = await loadPlaylistTracksOnce(providerRef.current, source.playlist.id);
         if (!result) throw new Error('This provider does not support playlist loading');
         tracks = result;
         unfilteredCount = tracks.length;

@@ -1,5 +1,6 @@
 import type * as SiftedImportModule from '../../src/services/SiftedImport';
 import type * as LedgerModule from '../../src/services/ReviewedLedgerStore';
+import type * as PlaylistLoadsModule from '../../src/services/playlistLoads';
 import type { MusicProviderService } from '../../src/services/MusicProviderInterface';
 import type { SiftSource, Track } from '../../src/types';
 
@@ -39,6 +40,8 @@ const AsyncStorage = asyncStorageModule.default as {
 };
 const Sentry = jest.requireMock('@sentry/react-native') as { captureException: jest.Mock };
 let importSiftedKeeps: typeof SiftedImportModule.importSiftedKeeps;
+let rememberSiftedPlaylist: typeof SiftedImportModule.rememberSiftedPlaylist;
+let loadPlaylistTracksOnce: typeof PlaylistLoadsModule.loadPlaylistTracksOnce;
 let loadReviewedIds: typeof LedgerModule.loadReviewedIds;
 let markReviewed: typeof LedgerModule.markReviewed;
 let unmarkReviewed: typeof LedgerModule.unmarkReviewed;
@@ -51,7 +54,8 @@ beforeEach(async () => {
     jest.doMock('@sentry/react-native', () => Sentry);
     const ledger: typeof LedgerModule = require('../../src/services/ReviewedLedgerStore');
     ({ loadReviewedIds, markReviewed, unmarkReviewed } = ledger);
-    ({ importSiftedKeeps } = require('../../src/services/SiftedImport') as typeof SiftedImportModule);
+    ({ importSiftedKeeps, rememberSiftedPlaylist } = require('../../src/services/SiftedImport') as typeof SiftedImportModule);
+    ({ loadPlaylistTracksOnce } = require('../../src/services/playlistLoads') as typeof PlaylistLoadsModule);
   });
 });
 
@@ -213,5 +217,145 @@ describe('importSiftedKeeps', () => {
     await importSiftedKeeps(music, 'apple-music', ROAD_TRIP);
     await expect(loadReviewedIds(KEY)).resolves.toEqual(new Set(['a']));
     expect(music.findPlaylists).toHaveBeenCalledTimes(2);
+  });
+  describe('the playlist loads once when a sift loads it too (#179)', () => {
+    /** Road Trip's own load waits for `release`; its "- Sifted" loads at once. */
+    function slowRoadTrip() {
+      let release: () => void = () => {};
+      const loaded = new Promise<void>((resolve) => { release = resolve; });
+      const music = service(
+        { s1: { name: 'Road Trip - Sifted', tracks: [{ ...stay, id: 'i.2' }] } },
+        {
+          loadPlaylistTracks: jest.fn(async (id: string) => {
+            if (id !== 'p1') return [{ ...stay, id: 'i.2' }];
+            await loaded;
+            return [peaches, stay, intro];
+          }),
+        },
+      );
+      return { music, release };
+    }
+    const p1Loads = (music: ReturnType<typeof service>) =>
+      music.loadPlaylistTracks.mock.calls.filter(([id]) => id === 'p1').length;
+
+    test('Start Sifting while Setup\'s import is loading the playlist: one load', async () => {
+      const { music, release } = slowRoadTrip();
+      const look = importSiftedKeeps(music, 'apple-music', ROAD_TRIP);
+      for (let i = 0; i < 50 && p1Loads(music) === 0; i += 1) await new Promise<void>((r) => setImmediate(r));
+      expect(p1Loads(music)).toBe(1);
+      const sift = loadPlaylistTracksOnce(music, 'p1');
+      release();
+      await expect(sift).resolves.toEqual([peaches, stay, intro]);
+      await look;
+      expect(p1Loads(music)).toBe(1);
+      await expect(loadReviewedIds(KEY)).resolves.toEqual(new Set(['b']));
+    });
+
+    test('the import reaching the playlist while a sift loads it: one load', async () => {
+      const { music, release } = slowRoadTrip();
+      const sift = loadPlaylistTracksOnce(music, 'p1');
+      const look = importSiftedKeeps(music, 'apple-music', ROAD_TRIP);
+      // Past its "- Sifted" and on to the playlist, which is still loading.
+      const loadedSifted = () => music.loadPlaylistTracks.mock.calls.some(([id]) => id === 's1');
+      for (let i = 0; i < 50 && !loadedSifted(); i += 1) await new Promise<void>((r) => setImmediate(r));
+      for (let i = 0; i < 10; i += 1) await new Promise<void>((r) => setImmediate(r));
+      release();
+      await Promise.all([sift, look]);
+      expect(p1Loads(music)).toBe(1);
+      await expect(loadReviewedIds(KEY)).resolves.toEqual(new Set(['b']));
+    });
+  });
+
+  describe('a "- Sifted" an older build\'s session named, found by id (#179)', () => {
+    /** Road Trip, and its "- Sifted" copy from before a rename. */
+    const renamed = (overrides: Partial<MusicProviderService> = {}) => service(
+      { p1: roadTrip, s9: { name: 'Roadtrip 2019 - Sifted', tracks: [{ ...peaches, id: 'i.1' }] } },
+      {
+        loadPlaylists: jest.fn(async () => [
+          { id: 'p1', name: 'Road Trip', trackCount: 3 },
+          { id: 's9', name: 'Roadtrip 2019 - Sifted', trackCount: 1 },
+        ]),
+        ...overrides,
+      },
+    ) as ReturnType<typeof service> & { loadPlaylists: jest.Mock };
+
+    test('a renamed playlist\'s keeps still come over', async () => {
+      const music = renamed();
+      await rememberSiftedPlaylist('apple-music', ROAD_TRIP, 's9');
+      await importSiftedKeeps(music, 'apple-music', ROAD_TRIP);
+      expect(music.findPlaylists).toHaveBeenCalledWith('Road Trip - Sifted');
+      await expect(loadReviewedIds(KEY)).resolves.toEqual(new Set(['a']));
+    });
+
+    test('one that also has the expected name is looked in once', async () => {
+      const music = service({ p1: roadTrip, s1: { name: 'Road Trip - Sifted', tracks: [{ ...peaches, id: 'i.1' }] } });
+      await rememberSiftedPlaylist('apple-music', ROAD_TRIP, 's1');
+      await importSiftedKeeps(music, 'apple-music', ROAD_TRIP);
+      expect(music.loadPlaylistTracks.mock.calls.filter(([id]) => id === 's1')).toHaveLength(1);
+      await expect(loadReviewedIds(KEY)).resolves.toEqual(new Set(['a']));
+    });
+
+    test('one deleted since is no keeps, not a look that fails forever', async () => {
+      const music = renamed();
+      await rememberSiftedPlaylist('apple-music', ROAD_TRIP, 'gone');
+      await importSiftedKeeps(music, 'apple-music', ROAD_TRIP);
+      expect(music.loadPlaylistTracks).not.toHaveBeenCalledWith('gone');
+      expect(Sentry.captureException).not.toHaveBeenCalled();
+      expect(JSON.parse((await AsyncStorage.getItem('sift_sifted_imported')) ?? 'null')).toEqual([KEY]);
+    });
+
+    test('a playlist already looked at by name is looked at again with it, once', async () => {
+      const music = renamed();
+      await importSiftedKeeps(music, 'apple-music', ROAD_TRIP);
+      await expect(loadReviewedIds(KEY)).resolves.toEqual(new Set());
+      await rememberSiftedPlaylist('apple-music', ROAD_TRIP, 's9');
+      await importSiftedKeeps(music, 'apple-music', ROAD_TRIP);
+      await expect(loadReviewedIds(KEY)).resolves.toEqual(new Set(['a']));
+      // The same session loading again (until its next save) changes nothing.
+      await rememberSiftedPlaylist('apple-music', ROAD_TRIP, 's9');
+      await importSiftedKeeps(music, 'apple-music', ROAD_TRIP);
+      expect(music.findPlaylists).toHaveBeenCalledTimes(2);
+      expect(JSON.parse((await AsyncStorage.getItem('sift_sifted_ids')) ?? 'null')).toEqual({ [KEY]: ['s9'] });
+    });
+
+    test('a look started while one is being remembered waits for it', async () => {
+      const music = renamed();
+      await importSiftedKeeps(music, 'apple-music', ROAD_TRIP);
+      // An old session loading at launch as Setup picks its playlist.
+      void rememberSiftedPlaylist('apple-music', ROAD_TRIP, 's9');
+      await importSiftedKeeps(music, 'apple-music', ROAD_TRIP);
+      await expect(loadReviewedIds(KEY)).resolves.toEqual(new Set(['a']));
+    });
+
+    test('another playlist\'s remembered one isn\'t looked in', async () => {
+      const music = renamed();
+      await rememberSiftedPlaylist('apple-music', { type: 'playlist', playlist: { id: 'p2', name: 'Chill', trackCount: 0 } }, 's9');
+      await importSiftedKeeps(music, 'apple-music', ROAD_TRIP);
+      await expect(loadReviewedIds(KEY)).resolves.toEqual(new Set());
+      expect(music.loadPlaylists).not.toHaveBeenCalled();
+    });
+
+    test('a library session has none to remember', async () => {
+      await rememberSiftedPlaylist('apple-music', { type: 'library' }, 's9');
+      expect(await AsyncStorage.getItem('sift_sifted_ids')).toBeNull();
+    });
+
+    test('an unreadable list of them counts as empty; a failed write is reported, never rejects', async () => {
+      await AsyncStorage.setItem('sift_sifted_ids', '{not json');
+      await rememberSiftedPlaylist('apple-music', ROAD_TRIP, 's9');
+      expect(JSON.parse((await AsyncStorage.getItem('sift_sifted_ids')) ?? 'null')).toEqual({ [KEY]: ['s9'] });
+      AsyncStorage.setItem.mockImplementationOnce(async () => {
+        throw new Error('disk full');
+      });
+      await expect(rememberSiftedPlaylist('apple-music', ROAD_TRIP, 's10')).resolves.toBeUndefined();
+      expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'sifted-import' } });
+    });
+
+    test('entries that aren\'t lists of ids count only their ids', async () => {
+      await AsyncStorage.setItem('sift_sifted_ids', JSON.stringify({ [KEY]: ['s9', 7], other: 'x' }));
+      const music = renamed();
+      await importSiftedKeeps(music, 'apple-music', ROAD_TRIP);
+      await expect(loadReviewedIds(KEY)).resolves.toEqual(new Set(['a']));
+    });
   });
 });

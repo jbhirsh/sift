@@ -186,6 +186,16 @@ export function legacyPendingKeeps(value: unknown): Track[] {
 }
 
 /**
+ * The "<name> - Sifted" playlist a session saved by those builds named (its
+ * siftedPlaylistId), or null when it named none usable.
+ */
+export function legacySiftedPlaylistId(value: unknown): string | null {
+  if (!isObject(value)) return null;
+  const id = value.siftedPlaylistId;
+  return typeof id === 'string' && id !== '' ? id : null;
+}
+
+/**
  * Whether a session was saved by a build that copied playlist keeps into
  * "<name> - Sifted" rather than remembering them (it carries that build's
  * pendingKeeps or siftedPlaylistId).

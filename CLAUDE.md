@@ -131,7 +131,8 @@ src/
                         resumeSession (a saved session's defaults)
     services/           MusicProviderInterface, AppleMusicProvider, MockMusicProvider,
                         SessionStore, RemovalHistoryStore, PreferencesStore,
-                        ReviewedLedgerStore, SiftedImport, haptics,
+                        ReviewedLedgerStore, SiftedImport, playlistLoads
+                        (one load of a playlist at a time), haptics,
                         trace (E2E trace),
                         ChorusFinder + LrclibClient ("Start at chorus"),
                         touchOverlay (whether a GIF's touches are drawn),
@@ -224,7 +225,12 @@ Makefile                Dev commands (test, lint, typecheck, check)
   is picked or loaded, the songs of it found (by song) in its
   "<name> - Sifted" go to the ledger, and `sift_sifted_imported` records
   that it was looked at (`services/SiftedImport`; a failed look is tried
-  again next time). A session saved by those builds (with
+  again next time). It also looks in the "- Sifted" playlist an old saved
+  session named (its `siftedPlaylistId`, kept in `sift_sifted_ids`), if
+  that is still in the library, so a renamed playlist's keeps still come
+  over (#179). The playlist's own songs come from a load shared with a
+  sift's load of it under way (`services/playlistLoads`), so Start
+  Sifting during the look fetches it once. A session saved by those builds (with
   `pendingKeeps`/`siftedPlaylistId`) still loads: its sent keeps and the
   ones that never reached "- Sifted" go to the ledger (not a keep still
   held for Undo) and both fields are dropped (`SessionStore`).
