@@ -120,7 +120,10 @@ src/
                         ResumeSessionModal, SessionStatRow, UndoPill,
                         DecisionsSheet, ErrorBoundary, TouchOverlay:
                         a PR GIF's drawn touches, ResetGate: holds
-                        an E2E launch until its reset has run)
+                        an E2E launch until its reset has run,
+                        SwitchRow: a row that is one switch; use it,
+                        not a bare Switch, whose toggle a busy main
+                        thread can lose)
     screens/            SetupScreen, LoadingScreen, SiftScreen,
                         DoneScreen, SettingsScreen
     context/            SiftContext (useReducer state management),
