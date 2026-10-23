@@ -23,17 +23,18 @@ npx expo start       # subsequent launches (use after first build)
 ```bash
 make test            # unit tests (Jest)
 make lint            # ESLint over the whole repo + the native bridge check
+make format          # Prettier: rewrite the tree (CI only checks it)
 make typecheck       # TypeScript type checking
-make check           # what CI's unit job runs: lint, typecheck, depcruise,
-                     # the native bridge check, tests with coverage
+make check           # what CI's unit job runs: lint, format check, typecheck,
+                     # depcruise, the native bridge check, tests with coverage
 ```
 
 `make check` is `npm run check`; `make lint` is `npm run lint` plus
 `npm run bridge`. Lint covers the whole repo (`eslint .`), as CI does.
 
 Git hooks (installed by the `prepare` script via `core.hooksPath`) run these
-automatically: **pre-commit** runs lint, typecheck, depcruise and the native
-bridge check; **pre-push** runs the unit-test suite under coverage (not
+automatically: **pre-commit** runs lint, Prettier on the staged files,
+typecheck, depcruise and the native bridge check; **pre-push** runs the unit-test suite under coverage (not
 for a push of only the `screenshots` branch: pictures, no code). Both
 no-op when `$CI` is set. CI re-runs everything.
 
@@ -100,6 +101,16 @@ amend, rebase, or force-push `main`. Never use `--no-verify`.**
   which invoke TS 7 by path. Swap the alias back once typescript-eslint
   supports TS 7.
 - **ESLint**: flat config in `eslint.config.mjs`. Fix all violations before committing.
+- **Prettier** formats the code (TypeScript, JavaScript, JSON; `.prettierrc.json`):
+  `make format` writes it, CI's Format step and the pre-commit hook check it.
+  `eslint-config-prettier`, last in the ESLint config, turns off the style rules
+  that would fight it. Markdown, YAML, `app.json`/`eas.json` (the native
+  fingerprint) and the frozen session fixtures keep their own formatting
+  (`.prettierignore`). The one-time reformat belongs in
+  `.git-blame-ignore-revs` by its SHA on main, listed once it has merged (a
+  rebase merge gives every commit a new SHA). GitHub's blame skips what that
+  file lists; for local blame, `git config blame.ignoreRevsFile
+  .git-blame-ignore-revs`.
 - **Testing**: Jest + React Native Testing Library 14. In RNTL 14, `render`,
   `renderHook`, `rerender`, `unmount`, `fireEvent.*` and `act` are async:
   always `await` them (and any helper that wraps them, like
@@ -320,7 +331,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
 
 ## CI/CD
 - CI runs in `.github/workflows/ci.yml` on GitHub-hosted runners: lint,
-  typecheck, dependency-cruiser, Jest with coverage and a production
+  Prettier, typecheck, dependency-cruiser, Jest with coverage and a production
   dependency audit on Ubuntu on every PR. The audit gates at critical, not
   high: Expo's build tooling carries high advisories only Expo can fix.
   The Maestro iOS E2E job (macOS) also runs on every PR that can affect the

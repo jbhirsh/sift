@@ -35,6 +35,10 @@ lint:
 	npm run -s lint
 	npm run -s bridge
 
+# Format with Prettier (CI and `make check` only check it)
+format:
+	npm run -s format
+
 # Type check
 typecheck:
 	npm run -s typecheck
@@ -47,9 +51,9 @@ build-ios:
 doctor:
 	npx expo-doctor@latest
 
-# Check everything CI's unit job does: lint, types, layering, the native
-# bridge and tests with coverage. The same steps as `npm run check`.
+# Check everything CI's unit job does: lint, formatting, types, layering,
+# the native bridge and tests with coverage. The same steps as `npm run check`.
 check:
 	npm run -s check
 
-.PHONY: test test-coverage test-watch test-mutation build-e2e test-e2e test-all lint typecheck build-ios check doctor
+.PHONY: test test-coverage test-watch test-mutation build-e2e test-e2e test-all lint format typecheck build-ios check doctor

@@ -1,6 +1,7 @@
 #!/bin/sh
-# Fast local sensors before a commit — the static half of CI (lint + typecheck
-# + dependency-cruiser layering rules + the native bridge check), so failures surface here instead of
+# Fast local sensors before a commit — the static half of CI (lint + Prettier
+# on the staged files + typecheck + dependency-cruiser layering rules + the
+# native bridge check), so failures surface here instead of
 # after a push. The slower coverage suite runs in pre-push; the full matrix
 # runs in CI.
 # Install: git config core.hooksPath .githooks (done automatically by the
@@ -14,6 +15,12 @@
 set -e
 echo "▶ pre-commit: lint"
 npm run lint
+echo "▶ pre-commit: format (staged files)"
+# Only what this commit stages; CI checks the whole tree. --ignore-unknown
+# skips files Prettier can't parse (Swift, images), and .prettierignore
+# still applies to the paths named here.
+git diff --cached --name-only --diff-filter=ACMR -z |
+  xargs -0 -r npx prettier --check --ignore-unknown
 echo "▶ pre-commit: typecheck"
 npm run typecheck
 echo "▶ pre-commit: depcruise"
