@@ -4,7 +4,18 @@
 # (jest.config.js). sift has no lightweight JS bundle build to add here — the
 # only build is the native iOS build, which runs in its own macOS CI job.
 #
-# No-op in CI (see pre-commit).
+# No-op in CI (see pre-commit), and for a push of only the `screenshots`
+# branch: PR pictures (scripts/pr-gifs.mjs), no code to test.
 [ -n "$CI" ] && exit 0
+
+pictures_only=
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  if [ "$remote_ref" = "refs/heads/screenshots" ]; then
+    [ -z "$pictures_only" ] && pictures_only=yes
+  else
+    pictures_only=no
+  fi
+done
+[ "$pictures_only" = yes ] && exit 0
 
 exec "$(git rev-parse --show-toplevel)/scripts/check_coverage.sh"

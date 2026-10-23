@@ -1,0 +1,72 @@
+appId: com.jessicahirsh.sift
+name: "GIF: swipe to keep, skip, undo"
+---
+# A PR GIF (scripts/take-gifs.sh, scripts/pr-gifs.mjs). Not a test: it
+# waits only as much as it needs to reach the next step. No fixed pause
+# between steps: playback's clock keeps the screen moving, so a
+# waitForAnimationToEnd always runs its whole timeout, and Maestro finding
+# the next element already leaves a person's pause. Only the end holds
+# still for a moment, so the loop doesn't jump straight back.
+# Everything before startRecording gets the app to where the GIF begins;
+# the recording is named after this file. It must end with the `-end` screenshot, which
+# says the steps all ran (take-gifs.sh drops a recording without one).
+
+# The launch argument turns on the drawn touches (components/TouchOverlay),
+# which only the E2E build has. Keep "true" quoted: Maestro passes an
+# unquoted boolean in a form iOS doesn't read, and nothing would be drawn.
+- launchApp:
+    clearState: true
+    arguments:
+      SiftShowTouches: "true"
+
+- extendedWaitUntil:
+    visible:
+      id: "setup-brand"
+    timeout: 30000
+
+- runFlow: ../../.maestro/shared/start_sifting.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: "card-track-name"
+    timeout: 30000
+
+- startRecording: swipe-and-undo
+
+# Keep, by swiping the card right, at a person's speed: Maestro's default
+# is quicker than a hand, and the drag would be a few frames.
+- swipe:
+    from:
+      id: "card-track-name"
+    direction: RIGHT
+    duration: 800
+- extendedWaitUntil:
+    visible:
+      id: "stat-kept"
+      text: "1 kept"
+    timeout: 10000
+
+# Skip, by the button.
+- tapOn:
+    text: "Skip"
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: "stat-skipped"
+      text: "1 skipped"
+    timeout: 10000
+
+# Undo brings the skipped card back.
+- tapOn:
+    id: "undo-pill"
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: "stat-skipped"
+      text: "0 skipped"
+    timeout: 10000
+- waitForAnimationToEnd:
+    timeout: 1500
+
+- stopRecording
+- takeScreenshot: swipe-and-undo-end
