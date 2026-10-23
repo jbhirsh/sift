@@ -1,0 +1,29 @@
+# Prettier formats the code: TypeScript, JavaScript and JSON. Markdown and
+# YAML (docs, workflows, Maestro flows) keep their hand formatting.
+*.md
+*.yml
+*.yaml
+
+# Generated, or written by a tool that owns the format.
+package-lock.json
+package.json
+coverage/
+reports/
+.stryker-tmp/
+build/
+dist/
+ios/
+android/
+.expo/
+.claude/
+
+# Frozen copies of every saved session shape: never edited (CLAUDE.md).
+__tests__/fixtures/sessions/
+
+# Part of the native fingerprint (app.json, eas.json): a reformat would
+# need a new build for nothing.
+app.json
+eas.json
+
+# Images and the native module's Swift aren't Prettier's.
+assets/

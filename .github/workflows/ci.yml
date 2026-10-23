@@ -93,6 +93,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Prettier over the whole tree (.prettierrc.json, .prettierignore).
+      - name: Format
+        run: npm run format:check
+
       - name: Typecheck
         run: npm run typecheck
 

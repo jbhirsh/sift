@@ -2,13 +2,23 @@ import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import eslintComments from '@eslint-community/eslint-plugin-eslint-comments';
+import prettier from 'eslint-config-prettier/flat';
 
 export default tseslint.config(
   {
     ignores: [
-      'node_modules/', 'ios/', 'android/', '.expo/', '*.config.js', '.dependency-cruiser.cjs',
+      'node_modules/',
+      'ios/',
+      'android/',
+      '.expo/',
+      '*.config.js',
+      '.dependency-cruiser.cjs',
       // Generated: test and mutation reports, a leftover Stryker sandbox, builds.
-      'coverage/', 'reports/', '.stryker-tmp/', 'build/', 'dist/',
+      'coverage/',
+      'reports/',
+      '.stryker-tmp/',
+      'build/',
+      'dist/',
       // Other checkouts of this repo (agent worktrees): jest.config.js skips
       // them too, and their own tsconfig would confuse the type-aware rules.
       '.claude/',
@@ -76,10 +86,7 @@ export default tseslint.config(
     // hard-coded rgba caption was near-invisible in dark mode (#136). Applied
     // to files already free of color literals, so the whole-tree lint in the
     // pre-commit hook stays green; add each file here as it is cleaned.
-    files: [
-      'src/screens/SiftScreen.tsx',
-      'src/screens/SettingsScreen.tsx',
-    ],
+    files: ['src/screens/SiftScreen.tsx', 'src/screens/SettingsScreen.tsx'],
     rules: {
       'no-restricted-syntax': [
         'error',
@@ -146,4 +153,7 @@ export default tseslint.config(
       },
     },
   },
+  // Last: turns off every rule that would fight Prettier's formatting
+  // (.prettierrc.json), which `npm run format:check` enforces instead.
+  prettier,
 );
