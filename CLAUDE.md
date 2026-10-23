@@ -549,6 +549,21 @@ Makefile                Dev commands (test, lint, typecheck, check)
     `raw.githubusercontent.com/jbhirsh/sift/<sha>/<topic>/...`, so a later
     push can't change what an old PR shows. Don't start a new branch per
     topic.
+- **The README's screenshots refresh themselves.** When a PR merges,
+  `readme-screenshots.yml` takes the light Setup, Sift and Done shots its CI
+  run's E2E job took (the `ios-screenshots` artifact; the status bar is
+  pinned to 9:41, as in the GIFs), shrinks them to the README's 780 px, and replaces each
+  `docs/screenshots/` image where more than 0.5% of pixels differ
+  (`scripts/readme-screenshots.mjs`, rules in `scripts/readmeScreenshots.ts`;
+  ImageMagick). The changes go in one PR from `bot/readme-screenshots`,
+  opened or updated, with auto-merge on (squash), its pictures linked by
+  commit; a merge that changes no screen still brings an open one up to
+  date with main, which the rule requires. That workflow-owned branch is the one exception to "no new
+  branches". It opens the PR with the `BOT_PR_TOKEN` secret (a fine-grained
+  token on this repo with Contents and Pull requests read/write); without
+  it, the Actions token opens it but GitHub runs no workflow on it, so the
+  required checks never report. A docs-only PR's run has no E2E screenshots,
+  so nothing refreshes; Settings (a hand-picked crop) isn't refreshed.
 
 ---
 

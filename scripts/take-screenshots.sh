@@ -13,6 +13,13 @@ mkdir -p "$OUT_DIR"
 OUT_DIR="$(cd "$OUT_DIR" && pwd)"
 MARKER="$(mktemp)"
 
+# The same status bar in every run (Apple's 9:41, full signal and battery),
+# so the README's shots (readme-screenshots.yml) only change when the app
+# does.
+xcrun simctl status_bar booted override --time "9:41" --dataNetwork wifi \
+  --wifiMode active --wifiBars 3 --cellularMode active --cellularBars 4 \
+  --batteryState charged --batteryLevel 100 || true
+
 for mode in light dark; do
   xcrun simctl ui booted appearance "$mode"
   if ! maestro test \
@@ -23,6 +30,7 @@ for mode in light dark; do
   fi
 done
 xcrun simctl ui booted appearance light
+xcrun simctl status_bar booted clear || true
 
 # Maestro writes each takeScreenshot under its output folder (2.8+:
 # debug-<mode>/.../takeScreenshot/; older ones the working directory):
