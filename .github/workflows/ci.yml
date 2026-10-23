@@ -62,7 +62,8 @@ jobs:
       # `every`: a file counts as code only if it matches every pattern, so
       # each `!` pattern excludes. (The default, `some`, lets '**' match
       # everything, which made the exclusions dead.) Excluded: docs, repo
-      # config, and tooling that can't change the app or this job: other
+      # config (the formatter's, the audits' and type coverage's included),
+      # and tooling that can't change the app or this job: other
       # workflows (ci.yml is this job; E2E reuses ios-build's app), the
       # commit check, and scripts/ apart from the E2E job's runners (suite,
       # audit, screenshots, GIFs).
@@ -81,6 +82,13 @@ jobs:
               - '!.github/workflows/!(ci|ios-build).yml'
               - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh)'
               - '!stryker.config.json'
+              - '!.prettierrc.json'
+              - '!.prettierignore'
+              - '!.git-blame-ignore-revs'
+              - '!knip.jsonc'
+              - '!.jscpd.json'
+              - '!.lycheeignore'
+              - '!tsconfig.typecov.json'
 
       - uses: actions/setup-node@v7
         with:
