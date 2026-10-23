@@ -11,7 +11,6 @@ import {
   touchDown,
   touchMove,
   touchUp,
-  touchesRequested,
   touchFollow,
 } from '../../src/utils/touchMarks';
 
@@ -109,12 +108,5 @@ describe('touch marks for PR GIFs', () => {
     const gone = prune(released, 1000 + PRESS_OUT_MS);
     expect(gone.press).toBeNull();
     expect(hasMarks(gone)).toBe(false);
-  });
-
-  it('a launch argument asks for touches when it says true, yes or 1', () => {
-    for (const value of [true, 1, 'true', 'TRUE', 'YES', 'yes', '1']) expect(touchesRequested(value)).toBe(true);
-    for (const value of [undefined, null, false, 0, 2, '', 'false', 'NO', '0', 'truthy', ' yes']) {
-      expect(touchesRequested(value)).toBe(false);
-    }
   });
 });

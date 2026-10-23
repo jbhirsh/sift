@@ -11,12 +11,13 @@ name: "GIF: swipe to keep, skip, undo"
 # the recording is named after this file. It must end with the `-end` screenshot, which
 # says the steps all ran (take-gifs.sh drops a recording without one).
 
-# The launch argument turns on the drawn touches (components/TouchOverlay),
-# which only the E2E build has. Keep "true" quoted: Maestro passes an
-# unquoted boolean in a form iOS doesn't read, and nothing would be drawn.
+# SiftShowTouches turns on the drawn touches (components/TouchOverlay) and
+# SiftResetState starts fresh without a reinstall (services/e2eReset); only
+# the E2E build reads either. Keep "true" quoted: Maestro passes an
+# unquoted boolean in a form iOS doesn't read.
 - launchApp:
-    clearState: true
     arguments:
+      SiftResetState: "true"
       SiftShowTouches: "true"
 
 - extendedWaitUntil:
