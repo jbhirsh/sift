@@ -1,0 +1,74 @@
+{
+  "arrow.clockwise" : [
+    15,
+    17
+  ],
+  "arrow.counterclockwise" : [
+    15,
+    17
+  ],
+  "arrow.right.circle" : [
+    16,
+    16
+  ],
+  "arrow.uturn.backward" : [
+    17,
+    15
+  ],
+  "arrow.uturn.backward.circle.fill" : [
+    16,
+    16
+  ],
+  "checkmark.circle.fill" : [
+    16,
+    16
+  ],
+  "chevron.backward" : [
+    11,
+    14
+  ],
+  "exclamationmark.triangle.fill" : [
+    17,
+    15
+  ],
+  "gearshape" : [
+    17,
+    17
+  ],
+  "gobackward.15" : [
+    16,
+    18
+  ],
+  "goforward.15" : [
+    16,
+    18
+  ],
+  "music.mic" : [
+    17,
+    17
+  ],
+  "music.note" : [
+    13,
+    16
+  ],
+  "music.note.list" : [
+    18,
+    16
+  ],
+  "pause.fill" : [
+    13,
+    14
+  ],
+  "play.fill" : [
+    13,
+    14
+  ],
+  "questionmark.circle" : [
+    16,
+    16
+  ],
+  "xmark.circle.fill" : [
+    16,
+    16
+  ]
+}
