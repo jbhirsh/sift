@@ -13,6 +13,7 @@ import { CONTENT_COLUMN, RADIUS, SPACING } from '../theme';
 import GlassCard from './GlassCard';
 import type { Decision, Track } from '../types';
 import { useTraceScreen } from '../hooks/useTrace';
+import TouchOverlay from './TouchOverlay';
 
 const CHOICES: { decision: Decision; label: string }[] = [
   { decision: 'keep', label: 'Keep' },
@@ -139,6 +140,7 @@ export default function DecisionsSheet({ tracks, decisionFor, onRevise, onClose,
           </GlassCard>
         </View>
       </View>
+      <TouchOverlay inModal />
     </Modal>
   );
 }

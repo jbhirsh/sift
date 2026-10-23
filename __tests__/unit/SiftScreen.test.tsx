@@ -43,8 +43,8 @@ jest.mock('react-native-gesture-handler', () => ({
   GestureDetector: ({ children }: { children: React.ReactNode }) => children,
   Gesture: {
     Pan: () => ({
-      minDistance: () => ({ enabled: () => ({ onUpdate: () => ({ onEnd: () => ({}) }) }) }),
-      onUpdate: () => ({}),
+      minDistance: () => ({ enabled: () => ({ onUpdate: () => ({ onEnd: () => ({ onFinalize: () => ({}) }) }) }) }),
+      onUpdate: () => ({ onFinalize: () => ({}) }),
     }),
     Tap: () => ({ onEnd: () => ({}) }),
     Race: () => ({}),

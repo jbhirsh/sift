@@ -13,6 +13,7 @@ import { Button } from './Button';
 import SessionStatRow from './SessionStatRow';
 import type { SiftSession } from '../types';
 import { useTraceScreen } from '../hooks/useTrace';
+import TouchOverlay from './TouchOverlay';
 
 interface ResumeSessionModalProps {
   session: SiftSession;
@@ -102,6 +103,7 @@ export default function ResumeSessionModal({
           </GlassCard>
         </View>
       </View>
+      <TouchOverlay inModal />
     </Modal>
   );
 }

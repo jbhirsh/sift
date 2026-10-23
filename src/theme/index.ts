@@ -54,6 +54,9 @@ export const COLORS = {
   keep: '#34C759', // System green
   remove: '#FF3B30', // System red
   skip: '#FF9500', // System orange
+  // The touches a PR GIF draws (components/TouchOverlay): rose, not
+  // Remove's red, so a press never reads as a Remove.
+  touch: '#E11D48',
   // Light mode
   light: {
     text: '#000000',

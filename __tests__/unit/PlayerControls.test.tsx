@@ -30,6 +30,7 @@ jest.mock('react-native-reanimated', () => ({
 type GestureCallback = (event: Record<string, unknown>) => void;
 let tapOnEnd: GestureCallback | undefined;
 let panOnUpdate: GestureCallback | undefined;
+let panOnFinalize: GestureCallback | undefined;
 
 jest.mock('react-native-gesture-handler', () => ({
   GestureDetector: ({ children }: { children: React.ReactNode }) => children,
@@ -43,11 +44,26 @@ jest.mock('react-native-gesture-handler', () => ({
     Pan: () => ({
       onUpdate: (fn: GestureCallback) => {
         panOnUpdate = fn;
-        return {};
+        return {
+          onFinalize: (fn: GestureCallback) => {
+            panOnFinalize = fn;
+            return {};
+          },
+        };
       },
     }),
     Race: () => ({}),
   },
+}));
+
+// Whether a PR GIF recording draws touches: a switch here.
+let mockShowTouches = false;
+const mockFollowTouch = jest.fn();
+const mockLiftTouch = jest.fn();
+jest.mock('../../src/services/touchOverlay', () => Object.defineProperties({}, {
+  showTouches: { get: () => mockShowTouches },
+  followTouch: { value: (x: number, y: number) => mockFollowTouch(x, y) },
+  liftTouch: { value: (x: number, y: number) => mockLiftTouch(x, y) },
 }));
 
 const mockPlay = jest.fn().mockResolvedValue(undefined);
@@ -298,5 +314,24 @@ describe('PlayerControls', () => {
     expect(panOnUpdate).toBeDefined();
     panOnUpdate?.({ x: 100 });
     expect(mockSeek).toHaveBeenCalled();
+  });
+
+  test('a GIF recording\'s drawn ring follows a scrub and lets go with it; nothing otherwise', async () => {
+    // The gesture's worklets take the switch as it was when it was built.
+    await render(<PlayerControls />);
+    panOnUpdate?.({ x: 100, absoluteX: 120, absoluteY: 600 });
+    panOnFinalize?.({ absoluteX: 130, absoluteY: 601 });
+    expect(mockFollowTouch).not.toHaveBeenCalled();
+    expect(mockLiftTouch).not.toHaveBeenCalled();
+    mockShowTouches = true;
+    try {
+      await render(<PlayerControls />);
+      panOnUpdate?.({ x: 100, absoluteX: 120, absoluteY: 600 });
+      panOnFinalize?.({ absoluteX: 130, absoluteY: 601 });
+      expect(mockFollowTouch.mock.calls).toEqual([[120, 600]]);
+      expect(mockLiftTouch.mock.calls).toEqual([[130, 601]]);
+    } finally {
+      mockShowTouches = false;
+    }
   });
 });
