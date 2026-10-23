@@ -11,6 +11,12 @@
 // - Real speed: the video is real time. Repeated still frames are dropped
 //   (mpdecimate) but each kept frame keeps its own timestamp, and the GIF is
 //   written with variable frame timing, so a pause lasts as long as it did.
+// - Waits cut: a recording spends most of its time on Maestro finding the
+//   next element (the playing clock keeps the screen from ever settling, so
+//   it waits out its timeouts). The touches are found by the drawn ring's
+//   colour, and only the time around each (TOUCH_LEAD_S before, TOUCH_AFTER_S
+//   after, to see what it did) is kept; the waits between are cut. A
+//   recording with no ring keeps its whole length, idle ends trimmed.
 // - Idle ends trimmed: the GIF keeps from LEAD_S before the first change on
 //   screen to TAIL_S after the last. No frame is held longer than it was on
 //   screen: a forced hold freezes whatever moves (the playback clock) and
@@ -27,6 +33,26 @@ export const DEFAULT_WIDTH = 360;
 export const DEFAULT_FPS = 15;
 /** Over this a PR description may not show a GIF. */
 export const MAX_GIF_BYTES = 5 * 1024 * 1024;
+
+/**
+ * The drawn ring's colour (theme COLORS.touch, components/TouchOverlay) and
+ * how close a recorded pixel must be to count. Remove's red (#FF3B30) is
+ * about 48 away, so 28 keeps it out while the video's compression keeps
+ * the ring in.
+ */
+export const RING_RGB: readonly [number, number, number] = [0xe1, 0x1d, 0x48];
+export const RING_TOLERANCE = 28;
+/** A frame shows a touch once this many ring pixels show, at 1/3 scale. */
+export const RING_MIN_PIXELS = 30;
+/** Kept before a touch, and after it (to see what it did). */
+export const TOUCH_LEAD_S = 0.4;
+export const TOUCH_AFTER_S = 1.2;
+/** Kept after the last touch: the end holds a moment before the loop. */
+export const END_HOLD_S = 1.5;
+/** Touch frames closer than this are one touch (a drag, a ring fading). */
+export const TOUCH_JOIN_S = 0.5;
+/** A wait shorter than this between kept stretches isn't worth a cut. */
+export const MIN_CUT_S = 0.6;
 
 export interface GifOptions {
   width: number;
@@ -76,6 +102,62 @@ export function finalDelayCs(lastChange: number, end: number): number {
 export function lastChangeIn(times: number[], window: Window): number {
   const inside = times.slice(1).filter((t) => t >= window.start && t <= window.end);
   return round3((inside.length > 0 ? inside[inside.length - 1] : window.start) - window.start);
+}
+
+/** How many pixels of an RGB frame are the drawn ring's colour. */
+export function ringPixels(rgb: Uint8Array, tolerance = RING_TOLERANCE): number {
+  const [r, g, b] = RING_RGB;
+  const limit = tolerance * tolerance;
+  let count = 0;
+  for (let i = 0; i + 2 < rgb.length; i += 3) {
+    const dr = rgb[i] - r;
+    const dg = rgb[i + 1] - g;
+    const db = rgb[i + 2] - b;
+    if (dr * dr + dg * dg + db * db < limit) count += 1;
+  }
+  return count;
+}
+
+/** The stretches of the video where a touch shows, from each frame's ring count. */
+export function touchSpans(times: number[], counts: number[], minPixels = RING_MIN_PIXELS): Window[] {
+  const spans: Window[] = [];
+  times.forEach((t, i) => {
+    if (counts[i] < minPixels) return;
+    const last = spans[spans.length - 1];
+    if (last && t - last.end <= TOUCH_JOIN_S) last.end = t;
+    else spans.push({ start: t, end: t });
+  });
+  return spans;
+}
+
+/**
+ * The stretches to keep: each touch with TOUCH_LEAD_S before and
+ * TOUCH_AFTER_S after (END_HOLD_S after the last), joined where the wait
+ * between them is shorter than MIN_CUT_S. Null when there's no touch.
+ */
+export function keptStretches(spans: Window[], duration: number): Window[] | null {
+  if (spans.length === 0) return null;
+  const kept: Window[] = [];
+  spans.forEach((span, i) => {
+    const after = i === spans.length - 1 ? END_HOLD_S : TOUCH_AFTER_S;
+    const next = { start: Math.max(0, span.start - TOUCH_LEAD_S), end: Math.min(duration, span.end + after) };
+    const last = kept[kept.length - 1];
+    if (last && next.start - last.end < MIN_CUT_S) last.end = Math.max(last.end, next.end);
+    else kept.push(next);
+  });
+  return kept.map((w) => ({ start: round3(w.start), end: round3(w.end) }));
+}
+
+/**
+ * An ffmpeg filter graph joining the kept stretches of input 0 into [cut].
+ * The Simulator records a frame only when the screen changes, so each
+ * stretch is first made a steady frame rate: cut as it is, one would end at
+ * its last change and lose the still time after it.
+ */
+export function cutFilter(stretches: Window[]): string {
+  const parts = stretches.map((w, i) => `[0:v]fps=30,trim=start=${w.start}:end=${w.end},setpts=PTS-STARTPTS[s${i}]`);
+  const inputs = stretches.map((_, i) => `[s${i}]`).join('');
+  return `${parts.join(';')};${inputs}concat=n=${stretches.length}:v=1:a=0[cut]`;
 }
 
 /** The palette steps shared by every GIF: one palette, rewrite what changed. */

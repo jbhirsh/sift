@@ -451,8 +451,10 @@ Makefile                Dev commands (test, lint, typecheck, check)
     1. It waits for the PR's run.
     2. It runs CI by hand on `main` with `gifs_only` and the PR's
        scenarios, for the "before".
-    3. It makes the GIFs: idle ends trimmed, still frames dropped at real
-       timing, scaled sharp.
+    3. It makes the GIFs: the waits between touches cut (Maestro spends
+       seconds finding each element; the touches are found by the drawn
+       ring's colour, and each keeps a lead-in and its result), idle ends
+       trimmed, still frames dropped at real timing, scaled sharp.
     4. It commits them to the `screenshots` branch and prints the Before |
        After table to paste.
     `--side-by-side` adds one labelled GIF per pair; `--no-before` is for

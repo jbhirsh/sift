@@ -1,19 +1,32 @@
+import { COLORS } from '../../src/theme';
 import {
   DEFAULT_FPS,
+  END_HOLD_S,
   DEFAULT_WIDTH,
   LEAD_S,
   MAX_GIF_BYTES,
+  MIN_CUT_S,
+  RING_MIN_PIXELS,
+  RING_RGB,
+  RING_TOLERANCE,
   TAIL_S,
+  TOUCH_AFTER_S,
+  TOUCH_JOIN_S,
+  TOUCH_LEAD_S,
   activeWindow,
+  cutFilter,
   finalDelayCs,
   gifFilter,
+  keptStretches,
   keptTimes,
   lastChangeIn,
   markdownTable,
   parseArgs,
   rawUrl,
+  ringPixels,
   sideBySideFilter,
   sizeWarning,
+  touchSpans,
 } from '../../scripts/prGifs';
 
 const PALETTE =
@@ -75,6 +88,59 @@ describe('finalDelayCs and lastChangeIn', () => {
   it('counts a change right on either edge of the window as inside it', () => {
     expect(lastChangeIn([0, 2, 5], { start: 2, end: 5 })).toBe(3);
     expect(lastChangeIn([0, 2, 6], { start: 2, end: 5 })).toBe(0);
+  });
+});
+
+describe('cutting the waits between touches', () => {
+  it('looks for the ring in the colour the overlay draws it', () => {
+    const hex = RING_RGB.map((c) => c.toString(16).padStart(2, '0')).join('');
+    expect(`#${hex}`.toUpperCase()).toBe(COLORS.touch.toUpperCase());
+  });
+
+  it('counts the ring\'s pixels, near enough for compression, and never Remove\'s red', () => {
+    const pixels = (...rgb: number[][]) => Uint8Array.from(rgb.flat());
+    const ring = [...RING_RGB];
+    const blurred = [ring[0] + 10, ring[1] + 12, ring[2] - 8];
+    const removeRed = [0xff, 0x3b, 0x30];
+    expect(ringPixels(pixels(ring, blurred, removeRed, [255, 255, 255], [0, 0, 0]))).toBe(2);
+    expect(ringPixels(pixels([ring[0] + RING_TOLERANCE, ring[1], ring[2]]))).toBe(0);
+    expect(ringPixels(new Uint8Array(0))).toBe(0);
+  });
+
+  it('finds each touch as a stretch of frames showing the ring', () => {
+    const times = [0, 1, 1.1, 1.3, 1.5, 3, 3.1, 5];
+    const many = RING_MIN_PIXELS;
+    const counts = [0, many, many, many - 1, many, 0, many, many - 1];
+    // 1.3 shows too little, but 1.5 is within TOUCH_JOIN_S of 1.1: one drag.
+    expect(1.5 - 1.1).toBeLessThanOrEqual(TOUCH_JOIN_S);
+    expect(touchSpans(times, counts)).toEqual([{ start: 1, end: 1.5 }, { start: 3.1, end: 3.1 }]);
+    // Further apart than that, two touches.
+    expect(touchSpans([0, 0.6], [many, many])).toEqual([{ start: 0, end: 0 }, { start: 0.6, end: 0.6 }]);
+    expect(touchSpans(times, counts.map(() => 0))).toEqual([]);
+  });
+
+  it('keeps each touch with a lead-in and its result, the last with a closing hold, and cuts the waits', () => {
+    const kept = keptStretches([{ start: 2, end: 2.5 }, { start: 8, end: 8.1 }], 20);
+    expect(kept).toEqual([
+      { start: 2 - TOUCH_LEAD_S, end: 2.5 + TOUCH_AFTER_S },
+      { start: 8 - TOUCH_LEAD_S, end: 8.1 + END_HOLD_S },
+    ]);
+  });
+
+  it('joins stretches a short wait apart, and stays inside the video', () => {
+    const gap = MIN_CUT_S / 2;
+    const first = { start: 0.1, end: 1 };
+    const second = { start: 1 + TOUCH_AFTER_S + TOUCH_LEAD_S + gap, end: 4 };
+    expect(keptStretches([first, second], 4.5)).toEqual([{ start: 0, end: 4.5 }]);
+    expect(keptStretches([], 10)).toBeNull();
+  });
+
+  it('joins the kept stretches at a steady frame rate', () => {
+    expect(cutFilter([{ start: 1, end: 2.5 }, { start: 6, end: 7 }])).toBe(
+      '[0:v]fps=30,trim=start=1:end=2.5,setpts=PTS-STARTPTS[s0];' +
+        '[0:v]fps=30,trim=start=6:end=7,setpts=PTS-STARTPTS[s1];' +
+        '[s0][s1]concat=n=2:v=1:a=0[cut]',
+    );
   });
 });
 
