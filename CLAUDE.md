@@ -112,6 +112,8 @@ amend, rebase, or force-push `main`. Never use `--no-verify`.**
   unknown = JSON.parse(...)`, then narrow); no ignore comments, and no
   `ignoreFiles` except generated code. `npm run typecov:strict` also counts
   `as` casts and non-null assertions; CI shows that figure, as information.
+  `catch (e)` variables aren't counted (`ignoreCatch`): narrow `e` before
+  using it all the same.
 - **ESLint**: flat config in `eslint.config.mjs`. Fix all violations before committing.
   `eslint-plugin-jsdoc` holds JSDoc to the code where JSDoc exists: a `@param`
   naming an argument the function doesn't take, an unknown tag, or a type
