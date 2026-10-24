@@ -322,15 +322,18 @@ describe('SiftScreen', () => {
     const { getByTestId, getByLabelText } = await renderWithProviders(<FinishAndCheck />, {
       initialTracks: tracks,
     });
-    await fireEvent.press(getByLabelText('Skip'));
+    // Each press carries when its finger lifted, as the guard judges it, so
+    // a slow machine can't stretch the gap between them past the window.
+    const t0 = Date.now();
+    await fireEvent.press(getByLabelText('Skip'), pressAt(t0));
     // Mid-decision (the skip's settle window), Finish does nothing: a
     // Keep/Remove decides only when its animation ends.
-    await fireEvent.press(getByTestId('finish-button'));
+    await fireEvent.press(getByTestId('finish-button'), pressAt(t0 + 100));
     expect(getByTestId('current-phase').props.children).toBe('sifting');
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 350));
     });
-    await fireEvent.press(getByTestId('finish-button'));
+    await fireEvent.press(getByTestId('finish-button'), pressAt(t0 + 350));
     expect(getByTestId('current-phase').props.children).toBe('done');
     // Where it stopped is kept, so Continue sifting picks up there.
     expect(getByTestId('current-cursor').props.children).toBe(1);
