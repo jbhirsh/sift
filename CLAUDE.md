@@ -124,9 +124,9 @@ amend, rebase, or force-push `main`. Never use `--no-verify`.**
   `eslint-config-prettier`, last in the ESLint config, turns off the style rules
   that would fight it. Markdown, YAML, `app.json`/`eas.json` (the native
   fingerprint) and the frozen session fixtures keep their own formatting
-  (`.prettierignore`). The one-time reformat belongs in
-  `.git-blame-ignore-revs` by its SHA on main, listed once it has merged (a
-  rebase merge gives every commit a new SHA). GitHub's blame skips what that
+  (`.prettierignore`). The one-time reformat (#200) is listed in
+  `.git-blame-ignore-revs` by its SHA on main (a rebase merge gives every
+  commit a new SHA, so a branch's never fits). GitHub's blame skips what that
   file lists; for local blame, `git config blame.ignoreRevsFile
   .git-blame-ignore-revs`.
 - **Testing**: Jest + React Native Testing Library 14. In RNTL 14, `render`,

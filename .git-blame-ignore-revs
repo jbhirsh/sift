@@ -1,0 +1,7 @@
+# Commits `git blame` skips: formatting-only changes that touched every line
+# they reflowed. GitHub's blame reads this file; for local blame, run
+# `git config blame.ignoreRevsFile .git-blame-ignore-revs`. List a commit by
+# its SHA on main (a rebase merge gives every commit a new one).
+
+# Reformat with Prettier (#200)
+66e644df4bfe6654e3c269d5a57c588faa3c874b
