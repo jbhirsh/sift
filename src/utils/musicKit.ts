@@ -104,7 +104,10 @@ export function uniqueInOrder(ids: readonly string[]): string[] {
 }
 
 /** Playlist entries, each replaced by its library song when one was found. */
-export function preferSongs(items: readonly RawTrack[], songs: ReadonlyMap<string, RawTrack>): RawTrack[] {
+export function preferSongs(
+  items: readonly RawTrack[],
+  songs: ReadonlyMap<string, RawTrack>,
+): RawTrack[] {
   return items.map((item) => songs.get(item.id) ?? item);
 }
 
@@ -125,7 +128,15 @@ export class AddShortfallError extends Error {
   readonly failed: number;
   readonly requested: number;
 
-  constructor({ added, unresolved, failed }: { added: number; unresolved: number; failed: number }) {
+  constructor({
+    added,
+    unresolved,
+    failed,
+  }: {
+    added: number;
+    unresolved: number;
+    failed: number;
+  }) {
     const requested = added + unresolved + failed;
     super(`${requested - added} of ${requested} tracks could not be added to the playlist`);
     this.name = 'AddShortfallError';
@@ -138,7 +149,11 @@ export class AddShortfallError extends Error {
   /** The shortfall in a per-item add's results, or null when all landed. */
   static of(results: readonly AddResult[]): AddShortfallError | null {
     const count = (kind: AddResult) => results.filter((result) => result === kind).length;
-    const counts = { added: count('added'), unresolved: count('unresolved'), failed: count('failed') };
+    const counts = {
+      added: count('added'),
+      unresolved: count('unresolved'),
+      failed: count('failed'),
+    };
     return counts.added === results.length ? null : new AddShortfallError(counts);
   }
 }
@@ -234,7 +249,11 @@ export function loadFailureKind(error: unknown): LoadFailure {
   const text = error instanceof Error ? error.message : '';
   if (text.includes(NO_TRACKS_FOUND)) return 'gone';
   if (text.includes(NOT_AUTHORIZED)) return 'denied';
-  if (/offline|internet connection|network connection|network error|timed out|could not connect to the server|hostname could not be found/i.test(text)) {
+  if (
+    /offline|internet connection|network connection|network error|timed out|could not connect to the server|hostname could not be found/i.test(
+      text,
+    )
+  ) {
     return 'offline';
   }
   return 'other';

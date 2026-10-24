@@ -20,28 +20,98 @@ jest.mock('../../src/theme/ThemeContext', () => ({
 
 jest.mock('../../src/components/GlassCard', () => {
   const { View } = require('react-native');
-  return function MockGlassCard({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) {
+  return function MockGlassCard({
+    children,
+    ...props
+  }: {
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) {
     return <View {...props}>{children}</View>;
   };
 });
 
 const session: SiftSession = {
   tracks: [
-    { id: '1', name: 'A', artist: 'A', album: 'A', duration: 200, playCount: 10, dateAdded: '2020-01-01T00:00:00Z' },
-    { id: '2', name: 'B', artist: 'B', album: 'B', duration: 180, playCount: 5, dateAdded: '2020-02-01T00:00:00Z' },
-    { id: '3', name: 'C', artist: 'C', album: 'C', duration: 240, playCount: 3, dateAdded: '2020-03-01T00:00:00Z' },
-    { id: '4', name: 'D', artist: 'D', album: 'D', duration: 190, playCount: 8, dateAdded: '2020-04-01T00:00:00Z' },
-    { id: '5', name: 'E', artist: 'E', album: 'E', duration: 210, playCount: 1, dateAdded: '2020-05-01T00:00:00Z' },
+    {
+      id: '1',
+      name: 'A',
+      artist: 'A',
+      album: 'A',
+      duration: 200,
+      playCount: 10,
+      dateAdded: '2020-01-01T00:00:00Z',
+    },
+    {
+      id: '2',
+      name: 'B',
+      artist: 'B',
+      album: 'B',
+      duration: 180,
+      playCount: 5,
+      dateAdded: '2020-02-01T00:00:00Z',
+    },
+    {
+      id: '3',
+      name: 'C',
+      artist: 'C',
+      album: 'C',
+      duration: 240,
+      playCount: 3,
+      dateAdded: '2020-03-01T00:00:00Z',
+    },
+    {
+      id: '4',
+      name: 'D',
+      artist: 'D',
+      album: 'D',
+      duration: 190,
+      playCount: 8,
+      dateAdded: '2020-04-01T00:00:00Z',
+    },
+    {
+      id: '5',
+      name: 'E',
+      artist: 'E',
+      album: 'E',
+      duration: 210,
+      playCount: 1,
+      dateAdded: '2020-05-01T00:00:00Z',
+    },
   ],
   cursor: 3,
   kept: [
-    { id: '1', name: 'A', artist: 'A', album: 'A', duration: 200, playCount: 10, dateAdded: '2020-01-01T00:00:00Z' },
+    {
+      id: '1',
+      name: 'A',
+      artist: 'A',
+      album: 'A',
+      duration: 200,
+      playCount: 10,
+      dateAdded: '2020-01-01T00:00:00Z',
+    },
   ],
   removed: [
-    { id: '2', name: 'B', artist: 'B', album: 'B', duration: 180, playCount: 5, dateAdded: '2020-02-01T00:00:00Z' },
+    {
+      id: '2',
+      name: 'B',
+      artist: 'B',
+      album: 'B',
+      duration: 180,
+      playCount: 5,
+      dateAdded: '2020-02-01T00:00:00Z',
+    },
   ],
   skipped: [
-    { id: '3', name: 'C', artist: 'C', album: 'C', duration: 240, playCount: 3, dateAdded: '2020-03-01T00:00:00Z' },
+    {
+      id: '3',
+      name: 'C',
+      artist: 'C',
+      album: 'C',
+      duration: 240,
+      playCount: 3,
+      dateAdded: '2020-03-01T00:00:00Z',
+    },
   ],
   sortOrder: 'least-played',
   savedAt: '2026-04-09T12:00:00Z',
@@ -89,7 +159,10 @@ describe('ResumeSessionModal', () => {
   });
 
   test('compacts a big count, keeping the exact number for VoiceOver (#142)', async () => {
-    const big = { ...session, tracks: Array.from({ length: 12_400 }, (_, i) => ({ ...session.tracks[0], id: `t${i}` })) };
+    const big = {
+      ...session,
+      tracks: Array.from({ length: 12_400 }, (_, i) => ({ ...session.tracks[0], id: `t${i}` })),
+    };
     const { getByTestId } = await render(
       <ResumeSessionModal
         session={big}
@@ -188,7 +261,12 @@ describe('ResumeSessionModal', () => {
 describe('VoiceOver scan (#146)', () => {
   test('the resume sheet', async () => {
     const { toJSON } = await render(
-      <ResumeSessionModal session={session} onResume={jest.fn()} onStartOver={jest.fn()} onCancel={jest.fn()} />,
+      <ResumeSessionModal
+        session={session}
+        onResume={jest.fn()}
+        onStartOver={jest.fn()}
+        onCancel={jest.fn()}
+      />,
     );
     expect(a11yViolations(toJSON())).toEqual([]);
   });

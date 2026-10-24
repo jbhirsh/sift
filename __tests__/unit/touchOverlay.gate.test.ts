@@ -9,7 +9,11 @@ function showTouchesWith(tracing: boolean, launchArgument: () => unknown): boole
       __esModule: true,
       default: { get: (key: string) => (key === 'SiftShowTouches' ? launchArgument() : undefined) },
     }));
-    result = (jest.requireActual('../../src/services/touchOverlay') as typeof import('../../src/services/touchOverlay')).showTouches;
+    result = (
+      jest.requireActual(
+        '../../src/services/touchOverlay',
+      ) as typeof import('../../src/services/touchOverlay')
+    ).showTouches;
   });
   return result;
 }
@@ -23,12 +27,14 @@ test('no launch argument, or one that says no, draws nothing', () => {
   expect(showTouchesWith(true, () => 'false')).toBe(false);
 });
 
-test('a build that doesn\'t trace never draws, whatever it was launched with', () => {
+test("a build that doesn't trace never draws, whatever it was launched with", () => {
   expect(showTouchesWith(false, () => 'true')).toBe(false);
 });
 
-test('a launch argument that can\'t be read draws nothing', () => {
-  expect(showTouchesWith(true, () => {
-    throw new Error('no user defaults');
-  })).toBe(false);
+test("a launch argument that can't be read draws nothing", () => {
+  expect(
+    showTouchesWith(true, () => {
+      throw new Error('no user defaults');
+    }),
+  ).toBe(false);
 });

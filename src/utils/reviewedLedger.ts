@@ -35,7 +35,11 @@ export function parseLedger(json: string | null): ReviewedLedger {
 }
 
 /** Add ids to a source's entry, without duplicates. Returns a new ledger. */
-export function mergeIntoLedger(ledger: ReviewedLedger, key: string, ids: Iterable<string>): ReviewedLedger {
+export function mergeIntoLedger(
+  ledger: ReviewedLedger,
+  key: string,
+  ids: Iterable<string>,
+): ReviewedLedger {
   const merged = new Set(ledger[key] ?? []);
   for (const id of ids) merged.add(id);
   return { ...ledger, [key]: [...merged] };
@@ -45,7 +49,11 @@ export function mergeIntoLedger(ledger: ReviewedLedger, key: string, ids: Iterab
  * Take ids out of a source's entry (a keep changed to something else).
  * Returns a new ledger; an entry left empty is dropped.
  */
-export function removeFromLedger(ledger: ReviewedLedger, key: string, ids: Iterable<string>): ReviewedLedger {
+export function removeFromLedger(
+  ledger: ReviewedLedger,
+  key: string,
+  ids: Iterable<string>,
+): ReviewedLedger {
   const drop = new Set(ids);
   const kept = (ledger[key] ?? []).filter((id) => !drop.has(id));
   const { [key]: _old, ...rest } = ledger;
@@ -54,7 +62,8 @@ export function removeFromLedger(ledger: ReviewedLedger, key: string, ids: Itera
 
 /** Setup's footnote under "Include songs I've already sifted". */
 export function reviewedNote(count: number, included: boolean): string {
-  if (included) return 'Songs you’ve already kept are included in new sifts. Songs you removed stay out.';
+  if (included)
+    return 'Songs you’ve already kept are included in new sifts. Songs you removed stay out.';
   const n = count.toLocaleString('en-US');
   return count === 1
     ? '1 song you’ve already kept is left out of new sifts.'

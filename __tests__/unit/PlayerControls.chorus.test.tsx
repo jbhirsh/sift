@@ -12,7 +12,13 @@ jest.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: { View: 'View', createAnimatedComponent: (comp: unknown) => comp },
   useSharedValue: (val: number) => {
-    const sv = { value: val, get: () => sv.value, set: (v: number) => { sv.value = v; } };
+    const sv = {
+      value: val,
+      get: () => sv.value,
+      set: (v: number) => {
+        sv.value = v;
+      },
+    };
     return sv;
   },
   useAnimatedStyle: (fn: () => unknown) => fn(),
@@ -50,8 +56,13 @@ jest.mock('../../src/hooks/useChorusStart', () => ({
 }));
 
 const trackA: Track = {
-  id: 'a', name: 'Track A', artist: 'Artist', album: 'Album',
-  duration: 200, playCount: 0, dateAdded: '',
+  id: 'a',
+  name: 'Track A',
+  artist: 'Artist',
+  album: 'Album',
+  duration: 200,
+  playCount: 0,
+  dateAdded: '',
 };
 const trackB: Track = { ...trackA, id: 'b', name: 'Track B' };
 
@@ -64,7 +75,13 @@ jest.mock('../../src/context/SiftContext', () => ({
 }));
 jest.mock('../../src/theme/ThemeContext', () => ({
   useTheme: () => ({
-    colors: { text: '#000', textSecondary: '#666', textTertiary: '#999', accent: '#007AFF', quaternary: 'rgba(0,0,0,0.04)' },
+    colors: {
+      text: '#000',
+      textSecondary: '#666',
+      textTertiary: '#999',
+      accent: '#007AFF',
+      quaternary: 'rgba(0,0,0,0.04)',
+    },
     glass: { tint: 'light', borderColor: 'rgba(255,255,255,0.5)' },
   }),
 }));
@@ -73,7 +90,9 @@ import PlayerControls from '../../src/components/PlayerControls';
 
 function deferred<T>() {
   let resolve: (value: T) => void = () => {};
-  const promise = new Promise<T>((r) => { resolve = r; });
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
   return { promise, resolve };
 }
 
@@ -147,7 +166,9 @@ describe('PlayerControls with "Start at chorus"', () => {
 
   it('drops a chorus that resolves after the card was swiped away', async () => {
     const slow = deferred<number>();
-    mockChorus.startPositionFor.mockImplementation((t: Track) => (t.id === 'a' ? slow.promise : Promise.resolve(30)));
+    mockChorus.startPositionFor.mockImplementation((t: Track) =>
+      t.id === 'a' ? slow.promise : Promise.resolve(30),
+    );
     const { rerender } = await render(<PlayerControls />);
     mockSift.currentTrack = trackB;
     await rerender(<PlayerControls />);
@@ -192,7 +213,9 @@ describe('PlayerControls with "Start at chorus"', () => {
   it('keeps a newer pending start when an older one lands', async () => {
     const first = deferred<number>();
     const second = deferred<number>();
-    mockChorus.startPositionFor.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    mockChorus.startPositionFor
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
     const { rerender, getByTestId } = await render(<PlayerControls />);
     mockSift.currentTrack = trackB;
     await rerender(<PlayerControls />);

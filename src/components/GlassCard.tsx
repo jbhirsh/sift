@@ -23,12 +23,10 @@ export default function GlassCard({
   const material = GLASS[intensity];
 
   return (
-    <View style={[styles.container, { borderRadius: radius, borderColor: glass.borderColor }, style]}>
-      <BlurView
-        intensity={material.intensity}
-        tint={glass.tint}
-        style={StyleSheet.absoluteFill}
-      />
+    <View
+      style={[styles.container, { borderRadius: radius, borderColor: glass.borderColor }, style]}
+    >
+      <BlurView intensity={material.intensity} tint={glass.tint} style={StyleSheet.absoluteFill} />
       <View
         style={[
           StyleSheet.absoluteFill,

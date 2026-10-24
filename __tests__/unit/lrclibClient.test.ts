@@ -19,8 +19,17 @@ function response(status: number, body: unknown = null): Response {
   } as Response;
 }
 
-function record(overrides: Partial<{ duration: number; instrumental: boolean; syncedLyrics: string | null }> = {}) {
-  return { id: 1, duration: 222, instrumental: false, syncedLyrics: '[00:01.00]hi', plainLyrics: 'hi', ...overrides };
+function record(
+  overrides: Partial<{ duration: number; instrumental: boolean; syncedLyrics: string | null }> = {},
+) {
+  return {
+    id: 1,
+    duration: 222,
+    instrumental: false,
+    syncedLyrics: '[00:01.00]hi',
+    plainLyrics: 'hi',
+    ...overrides,
+  };
 }
 
 function setup(...responses: (Response | Error)[]) {
@@ -45,13 +54,18 @@ describe('searchTitle', () => {
 describe('LrclibClient.lookup', () => {
   it('asks /get with title, artist, album and rounded duration, identifying the app', async () => {
     const { client, fetch } = setup(response(200, record()));
-    await expect(client.lookup(track)).resolves.toEqual({ status: 'synced', lyrics: '[00:01.00]hi' });
+    await expect(client.lookup(track)).resolves.toEqual({
+      status: 'synced',
+      lyrics: '[00:01.00]hi',
+    });
     expect(fetch).toHaveBeenCalledTimes(1);
     const [url, init] = fetch.mock.calls[0];
     expect(url).toBe(
       'https://lrclib.net/api/get?track_name=Mr.%20Brightside&artist_name=The%20Killers&duration=222&album_name=Hot%20Fuss',
     );
-    expect(init.headers['User-Agent']).toMatch(/^Sift\/\S+ \(https:\/\/github\.com\/jbhirsh\/sift\)$/);
+    expect(init.headers['User-Agent']).toMatch(
+      /^Sift\/\S+ \(https:\/\/github\.com\/jbhirsh\/sift\)$/,
+    );
     expect(init.signal).toBeDefined();
   });
 
@@ -95,20 +109,32 @@ describe('LrclibClient.lookup', () => {
       response(200, record({ syncedLyrics: null })),
       response(200, [record({ syncedLyrics: 'from search' })]),
     );
-    await expect(client.lookup(track)).resolves.toEqual({ status: 'synced', lyrics: 'from search' });
+    await expect(client.lookup(track)).resolves.toEqual({
+      status: 'synced',
+      lyrics: 'from search',
+    });
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it('searches when /get answers with an unexpected shape', async () => {
-    const { client } = setup(response(200, { message: 'odd' }), response(200, [record({ syncedLyrics: 'ok' })]));
+    const { client } = setup(
+      response(200, { message: 'odd' }),
+      response(200, [record({ syncedLyrics: 'ok' })]),
+    );
     await expect(client.lookup(track)).resolves.toEqual({ status: 'synced', lyrics: 'ok' });
   });
 
   it('search: an instrumental within tolerance, or nothing usable', async () => {
-    const instrumental = setup(response(404), response(200, [record({ instrumental: true, syncedLyrics: null })]));
+    const instrumental = setup(
+      response(404),
+      response(200, [record({ instrumental: true, syncedLyrics: null })]),
+    );
     await expect(instrumental.client.lookup(track)).resolves.toEqual({ status: 'instrumental' });
 
-    const outOfRange = setup(response(404), response(200, [record({ duration: 226 }), record({ duration: 218 })]));
+    const outOfRange = setup(
+      response(404),
+      response(200, [record({ duration: 226 }), record({ duration: 218 })]),
+    );
     await expect(outOfRange.client.lookup(track)).resolves.toEqual({ status: 'not-found' });
 
     const notArray = setup(response(404), response(200, { error: 'x' }));
@@ -119,7 +145,10 @@ describe('LrclibClient.lookup', () => {
   });
 
   it('accepts durations exactly at the tolerance', async () => {
-    const { client } = setup(response(404), response(200, [record({ duration: 225.4, syncedLyrics: 'edge' })]));
+    const { client } = setup(
+      response(404),
+      response(200, [record({ duration: 225.4, syncedLyrics: 'edge' })]),
+    );
     await expect(client.lookup(track)).resolves.toEqual({ status: 'synced', lyrics: 'edge' });
   });
 
@@ -127,7 +156,9 @@ describe('LrclibClient.lookup', () => {
     await expect(setup(response(429)).client.lookup(track)).rejects.toThrow('lrclib_error_429');
     await expect(setup(response(503)).client.lookup(track)).rejects.toThrow('lrclib_error_503');
     await expect(setup(new Error('offline')).client.lookup(track)).rejects.toThrow('offline');
-    await expect(setup(response(404), response(500)).client.lookup(track)).rejects.toThrow('lrclib_error_500');
+    await expect(setup(response(404), response(500)).client.lookup(track)).rejects.toThrow(
+      'lrclib_error_500',
+    );
   });
 
   it('times out a request that never answers', async () => {
@@ -139,7 +170,11 @@ describe('LrclibClient.lookup', () => {
             init.signal?.addEventListener('abort', () => reject(new Error('aborted')));
           }),
       );
-      const client = createLrclibClient({ fetch: fetch as unknown as typeof globalThis.fetch, gapMs: 0, timeoutMs: 50 });
+      const client = createLrclibClient({
+        fetch: fetch as unknown as typeof globalThis.fetch,
+        gapMs: 0,
+        timeoutMs: 50,
+      });
       const pending = client.lookup(track);
       const assertion = expect(pending).rejects.toThrow('lrclib_timeout');
       await jest.advanceTimersByTimeAsync(50);
@@ -172,9 +207,17 @@ describe('LrclibClient.lookup', () => {
     jest.useFakeTimers();
     try {
       const fetch = jest.fn((url: string) =>
-        Promise.resolve(url.includes('track_name=urgent&') && url.includes('/get?') ? response(404) : response(200, record())),
+        Promise.resolve(
+          url.includes('track_name=urgent&') && url.includes('/get?')
+            ? response(404)
+            : response(200, record()),
+        ),
       );
-      const client = createLrclibClient({ fetch: fetch as unknown as typeof globalThis.fetch, gapMs: 100, timeoutMs: 1000 });
+      const client = createLrclibClient({
+        fetch: fetch as unknown as typeof globalThis.fetch,
+        gapMs: 100,
+        timeoutMs: 1000,
+      });
       const lookups = ['first', 'second', 'urgent', 'third'].map((name) =>
         client.lookup({ ...track, id: name, name, album: '' }),
       );
@@ -186,7 +229,13 @@ describe('LrclibClient.lookup', () => {
         const name = /track_name=([^&]+)/.exec(url)?.[1];
         return `${url.includes('/search?') ? 'search' : 'get'}:${name}`;
       });
-      expect(order).toEqual(['get:first', 'get:urgent', 'search:urgent', 'get:second', 'get:third']);
+      expect(order).toEqual([
+        'get:first',
+        'get:urgent',
+        'search:urgent',
+        'get:second',
+        'get:third',
+      ]);
     } finally {
       jest.useRealTimers();
     }
@@ -198,8 +247,13 @@ describe('LrclibClient.lookup', () => {
       const fetch = jest.fn().mockResolvedValue(response(200, record()));
       const client = createLrclibClient({ fetch, gapMs: 100, timeoutMs: 1000 });
       client.prioritize('a');
-      await client.lookup({ ...track, id: 'a', name: 'a', album: '' }).then(() => undefined, () => undefined);
-      const later = ['b', 'a'].map((name) => client.lookup({ ...track, id: name, name, album: '' }));
+      await client.lookup({ ...track, id: 'a', name: 'a', album: '' }).then(
+        () => undefined,
+        () => undefined,
+      );
+      const later = ['b', 'a'].map((name) =>
+        client.lookup({ ...track, id: name, name, album: '' }),
+      );
       await jest.advanceTimersByTimeAsync(1000);
       await Promise.all(later);
       const names = fetch.mock.calls.map(([url]) => /track_name=([^&]+)/.exec(url)?.[1]);
@@ -212,7 +266,10 @@ describe('LrclibClient.lookup', () => {
   it('keeps the queue moving after a failed request', async () => {
     const { client } = setup(new Error('offline'), response(200, record()));
     await expect(client.lookup(track)).rejects.toThrow('offline');
-    await expect(client.lookup(track)).resolves.toEqual({ status: 'synced', lyrics: '[00:01.00]hi' });
+    await expect(client.lookup(track)).resolves.toEqual({
+      status: 'synced',
+      lyrics: '[00:01.00]hi',
+    });
   });
 
   it('uses the global fetch by default', async () => {

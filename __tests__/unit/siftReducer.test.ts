@@ -121,7 +121,13 @@ describe('siftReducer', () => {
   });
 
   test('FINISH ends a sift early at Done, keeping every decision (#142)', () => {
-    const state = makeState({ phase: 'sifting', tracks: [trackA, trackB], cursor: 1, kept: [trackA], isPlaying: true });
+    const state = makeState({
+      phase: 'sifting',
+      tracks: [trackA, trackB],
+      cursor: 1,
+      kept: [trackA],
+      isPlaying: true,
+    });
     const next = siftReducer(state, { type: 'FINISH' });
     expect(next.phase).toBe('done');
     expect(next.isPlaying).toBe(false);
@@ -195,7 +201,11 @@ describe('siftReducer', () => {
 
   test('SET_LOAD_PROGRESS updates loadMessage when provided', () => {
     const state = makeState({ loadProgress: 0, loadMessage: 'Initial' });
-    const next = siftReducer(state, { type: 'SET_LOAD_PROGRESS', progress: 0.5, message: 'Updated' });
+    const next = siftReducer(state, {
+      type: 'SET_LOAD_PROGRESS',
+      progress: 0.5,
+      message: 'Updated',
+    });
     expect(next.loadProgress).toBe(0.5);
     expect(next.loadMessage).toBe('Updated');
   });
@@ -208,14 +218,32 @@ describe('siftReducer', () => {
   });
 
   test('CANCEL_LOAD goes back to Setup as if the load never began (#177)', () => {
-    const state = makeState({ phase: 'loading', loadProgress: 0.3, loadMessage: 'Fetching tracks…', loadError: 'old', skipFiltering: true });
+    const state = makeState({
+      phase: 'loading',
+      loadProgress: 0.3,
+      loadMessage: 'Fetching tracks…',
+      loadError: 'old',
+      skipFiltering: true,
+    });
     const next = siftReducer(state, { type: 'CANCEL_LOAD' });
-    expect(next).toEqual({ ...state, phase: 'setup', loadProgress: 0, loadMessage: '', loadError: null, skipFiltering: false });
+    expect(next).toEqual({
+      ...state,
+      phase: 'setup',
+      loadProgress: 0,
+      loadMessage: '',
+      loadError: null,
+      skipFiltering: false,
+    });
   });
 
   test('CANCEL_LOAD outside Loading changes nothing', () => {
     for (const phase of ['setup', 'sifting', 'done'] as const) {
-      const state = makeState({ phase, loadProgress: 1, loadMessage: 'Sorting tracks…', skipFiltering: true });
+      const state = makeState({
+        phase,
+        loadProgress: 1,
+        loadMessage: 'Sorting tracks…',
+        skipFiltering: true,
+      });
       expect(siftReducer(state, { type: 'CANCEL_LOAD' })).toBe(state);
     }
   });
@@ -266,7 +294,9 @@ describe('siftReducer', () => {
     const on = siftReducer(state, { type: 'SET_START_AT_CHORUS', enabled: true });
     expect(on.startAtChorus).toBe(true);
     expect(siftReducer(on, { type: 'SET_START_AT_CHORUS', enabled: true })).toBe(on);
-    expect(siftReducer(on, { type: 'SET_START_AT_CHORUS', enabled: false }).startAtChorus).toBe(false);
+    expect(siftReducer(on, { type: 'SET_START_AT_CHORUS', enabled: false }).startAtChorus).toBe(
+      false,
+    );
   });
 
   describe('APPLY_PREFERENCES (#175)', () => {
@@ -277,7 +307,11 @@ describe('siftReducer', () => {
     };
 
     test('applies the saved Start at chorus, sort and filter', () => {
-      const next = siftReducer(makeState({ phase: 'setup' }), { type: 'APPLY_PREFERENCES', preferences: prefs, skip: [] });
+      const next = siftReducer(makeState({ phase: 'setup' }), {
+        type: 'APPLY_PREFERENCES',
+        preferences: prefs,
+        skip: [],
+      });
       expect(next.startAtChorus).toBe(true);
       expect(next.sortOrder).toBe('oldest');
       expect(next.filter).toEqual({ maxPlays: 5, addedYearsAgo: 3 });
@@ -285,19 +319,33 @@ describe('siftReducer', () => {
 
     test('leaves alone what the user changed before they loaded', () => {
       const state = makeState({ phase: 'setup', startAtChorus: false, sortOrder: 'random' });
-      const next = siftReducer(state, { type: 'APPLY_PREFERENCES', preferences: prefs, skip: ['startAtChorus', 'sortOrder'] });
+      const next = siftReducer(state, {
+        type: 'APPLY_PREFERENCES',
+        preferences: prefs,
+        skip: ['startAtChorus', 'sortOrder'],
+      });
       expect(next.startAtChorus).toBe(false);
       expect(next.sortOrder).toBe('random');
       expect(next.filter).toEqual({ maxPlays: 5, addedYearsAgo: 3 });
       // Plays and Added each on its own.
-      const plays = siftReducer(makeState({ phase: 'setup', filter: { maxPlays: 20, addedYearsAgo: null } }), {
-        type: 'APPLY_PREFERENCES', preferences: prefs, skip: ['maxPlays'],
-      });
+      const plays = siftReducer(
+        makeState({ phase: 'setup', filter: { maxPlays: 20, addedYearsAgo: null } }),
+        {
+          type: 'APPLY_PREFERENCES',
+          preferences: prefs,
+          skip: ['maxPlays'],
+        },
+      );
       expect(plays.filter).toEqual({ maxPlays: 20, addedYearsAgo: 3 });
       expect(plays.sortOrder).toBe('oldest');
-      const added = siftReducer(makeState({ phase: 'setup', filter: { maxPlays: null, addedYearsAgo: 1 } }), {
-        type: 'APPLY_PREFERENCES', preferences: prefs, skip: ['addedYearsAgo'],
-      });
+      const added = siftReducer(
+        makeState({ phase: 'setup', filter: { maxPlays: null, addedYearsAgo: 1 } }),
+        {
+          type: 'APPLY_PREFERENCES',
+          preferences: prefs,
+          skip: ['addedYearsAgo'],
+        },
+      );
       expect(added.filter).toEqual({ maxPlays: 5, addedYearsAgo: 1 });
     });
 
@@ -341,11 +389,16 @@ describe('siftReducer', () => {
     };
     const next = siftReducer(state, { type: 'SET_SOURCE', source: playlistSource });
     expect(next.source).toEqual(playlistSource);
-    expect(siftReducer(next, { type: 'SET_SOURCE', source: { type: 'library' } }).source).toEqual({ type: 'library' });
+    expect(siftReducer(next, { type: 'SET_SOURCE', source: { type: 'library' } }).source).toEqual({
+      type: 'library',
+    });
   });
 
   test('START_FRESH preserves selected source', () => {
-    const playlistSource = { type: 'playlist' as const, playlist: { id: 'p1', name: 'My Playlist', trackCount: 10 } };
+    const playlistSource = {
+      type: 'playlist' as const,
+      playlist: { id: 'p1', name: 'My Playlist', trackCount: 10 },
+    };
     const state = makeState({ source: playlistSource });
     const next = siftReducer(state, { type: 'START_FRESH' });
     expect(next.source).toEqual(playlistSource);
@@ -410,11 +463,17 @@ describe('siftReducer', () => {
 
   test('ADD_REMOVAL_ERROR records a failed removal by id too', () => {
     const state = makeState({ failedRemovalIds: ['1'] });
-    const next = siftReducer(state, { type: 'ADD_REMOVAL_ERROR', error: 'Intro', failedRemovalId: '2' });
+    const next = siftReducer(state, {
+      type: 'ADD_REMOVAL_ERROR',
+      error: 'Intro',
+      failedRemovalId: '2',
+    });
     expect(next.removalErrors).toEqual(['Intro']);
     expect(next.failedRemovalIds).toEqual(['1', '2']);
     // A restore failure carries no id.
-    expect(siftReducer(next, { type: 'ADD_REMOVAL_ERROR', error: 'Intro: offline' }).failedRemovalIds).toEqual(['1', '2']);
+    expect(
+      siftReducer(next, { type: 'ADD_REMOVAL_ERROR', error: 'Intro: offline' }).failedRemovalIds,
+    ).toEqual(['1', '2']);
   });
 
   test('ADD_REMOVAL_ERROR on empty array', () => {
@@ -562,7 +621,6 @@ describe('siftReducer', () => {
     const next = siftReducer(state, { type: 'START_FRESH' });
     expect(next.activeSource).toBeNull();
   });
-
 });
 
 describe('held-back decisions and Undo (#152)', () => {
@@ -577,18 +635,23 @@ describe('held-back decisions and Undo (#152)', () => {
     const held = siftReducer(makeState({ tracks }), { type: 'DECIDE', decision: 'remove', at: 42 });
     expect(siftReducer(held, { type: 'PENDING_SENT', trackId: trackA.id, at: 41 })).toBe(held);
     expect(siftReducer(held, { type: 'PENDING_SENT', trackId: trackB.id, at: 42 })).toBe(held);
-    expect(siftReducer(held, { type: 'PENDING_SENT', trackId: trackA.id, at: 42 }).pending).toBeNull();
+    expect(
+      siftReducer(held, { type: 'PENDING_SENT', trackId: trackA.id, at: 42 }).pending,
+    ).toBeNull();
   });
 
-  test.each(['keep', 'remove', 'skip'] as const)('UNDO_LAST takes back a %s and brings the card back', (decision) => {
-    const held = siftReducer(makeState({ tracks }), { type: 'DECIDE', decision, at: 1 });
-    const undone = siftReducer(held, { type: 'UNDO_LAST' });
-    expect(undone.cursor).toBe(0);
-    expect(undone.kept).toEqual([]);
-    expect(undone.removed).toEqual([]);
-    expect(undone.skipped).toEqual([]);
-    expect(undone.pending).toBeNull();
-  });
+  test.each(['keep', 'remove', 'skip'] as const)(
+    'UNDO_LAST takes back a %s and brings the card back',
+    (decision) => {
+      const held = siftReducer(makeState({ tracks }), { type: 'DECIDE', decision, at: 1 });
+      const undone = siftReducer(held, { type: 'UNDO_LAST' });
+      expect(undone.cursor).toBe(0);
+      expect(undone.kept).toEqual([]);
+      expect(undone.removed).toEqual([]);
+      expect(undone.skipped).toEqual([]);
+      expect(undone.pending).toBeNull();
+    },
+  );
 
   test('UNDO_LAST of the last card goes back to sifting', () => {
     let state = siftReducer(makeState({ tracks }), { type: 'DECIDE', decision: 'keep', at: 1 });
@@ -627,17 +690,27 @@ describe('held-back decisions and Undo (#152)', () => {
 
 describe('CLEAR_REMOVAL_FAILURE', () => {
   test('drops the id and one error entry for that song', () => {
-    const state = makeState({ failedRemovalIds: ['a', 'b'], removalErrors: ['Intro', 'Intro', 'Outro'] });
-    const next = siftReducer(state, { type: 'CLEAR_REMOVAL_FAILURE', trackId: 'a', error: 'Intro' });
+    const state = makeState({
+      failedRemovalIds: ['a', 'b'],
+      removalErrors: ['Intro', 'Intro', 'Outro'],
+    });
+    const next = siftReducer(state, {
+      type: 'CLEAR_REMOVAL_FAILURE',
+      trackId: 'a',
+      error: 'Intro',
+    });
     expect(next.failedRemovalIds).toEqual(['b']);
     expect(next.removalErrors).toEqual(['Intro', 'Outro']);
   });
 
-  test('an error entry that isn\'t there is left alone; an id that isn\'t failed changes nothing', () => {
+  test("an error entry that isn't there is left alone; an id that isn't failed changes nothing", () => {
     const state = makeState({ failedRemovalIds: ['a'], removalErrors: ['Other'] });
-    expect(siftReducer(state, { type: 'CLEAR_REMOVAL_FAILURE', trackId: 'a', error: 'Intro' }))
-      .toMatchObject({ failedRemovalIds: [], removalErrors: ['Other'] });
-    expect(siftReducer(state, { type: 'CLEAR_REMOVAL_FAILURE', trackId: 'z', error: 'Other' })).toBe(state);
+    expect(
+      siftReducer(state, { type: 'CLEAR_REMOVAL_FAILURE', trackId: 'a', error: 'Intro' }),
+    ).toMatchObject({ failedRemovalIds: [], removalErrors: ['Other'] });
+    expect(
+      siftReducer(state, { type: 'CLEAR_REMOVAL_FAILURE', trackId: 'z', error: 'Other' }),
+    ).toBe(state);
   });
 });
 
@@ -654,7 +727,9 @@ describe('playback failures and the song cache', () => {
   test('SET_PLAYBACK_FAILED names the track that failed, and clears it', () => {
     const failed = siftReducer(makeState(), { type: 'SET_PLAYBACK_FAILED', trackId: '1' });
     expect(failed.playbackFailedId).toBe('1');
-    expect(siftReducer(failed, { type: 'SET_PLAYBACK_FAILED', trackId: null }).playbackFailedId).toBeNull();
+    expect(
+      siftReducer(failed, { type: 'SET_PLAYBACK_FAILED', trackId: null }).playbackFailedId,
+    ).toBeNull();
   });
 
   test('SET_PLAYBACK_FAILED with no change keeps the same state', () => {
@@ -663,7 +738,9 @@ describe('playback failures and the song cache', () => {
   });
 
   test('a warm-up marks the cache warming, then counts itself finished', () => {
-    const warming = siftReducer(makeState({ songCacheGeneration: 2 }), { type: 'SONG_CACHE_WARMING' });
+    const warming = siftReducer(makeState({ songCacheGeneration: 2 }), {
+      type: 'SONG_CACHE_WARMING',
+    });
     expect(warming.songCacheWarming).toBe(true);
     expect(warming.songCacheGeneration).toBe(2);
     const warmed = siftReducer(warming, { type: 'SONG_CACHE_WARMED' });
@@ -671,17 +748,25 @@ describe('playback failures and the song cache', () => {
     expect(warmed.songCacheGeneration).toBe(3);
   });
 
-  test('a new sift or going back to Setup isn\'t held up by an old warm-up', () => {
+  test("a new sift or going back to Setup isn't held up by an old warm-up", () => {
     const warming = makeState({ songCacheWarming: true });
     expect(siftReducer(warming, { type: 'START_FRESH' }).songCacheWarming).toBe(false);
     expect(siftReducer(warming, { type: 'RESET_TO_SETUP' }).songCacheWarming).toBe(false);
   });
 
   test('a resumed session starts with no playback failure', () => {
-    const { phase: _phase, startAtChorus: _chorus, playbackFailedId: _failed, songCacheWarming: _warming,
-      songCacheGeneration: _generation, filter: _filter, ...session } = makeState();
+    const {
+      phase: _phase,
+      startAtChorus: _chorus,
+      playbackFailedId: _failed,
+      songCacheWarming: _warming,
+      songCacheGeneration: _generation,
+      filter: _filter,
+      ...session
+    } = makeState();
     const resumed = siftReducer(makeState({ playbackFailedId: 'old', songCacheGeneration: 4 }), {
-      type: 'RESUME_SESSION', session,
+      type: 'RESUME_SESSION',
+      session,
     });
     expect(resumed.playbackFailedId).toBeNull();
     expect(resumed.songCacheGeneration).toBe(4);
@@ -689,12 +774,19 @@ describe('playback failures and the song cache', () => {
 });
 
 describe('SET_FILTER', () => {
-  test('sets the next load\'s filter, and a resume keeps it', () => {
+  test("sets the next load's filter, and a resume keeps it", () => {
     const filter = { maxPlays: 5, addedYearsAgo: 3 };
     const state = siftReducer(makeState(), { type: 'SET_FILTER', filter });
     expect(state.filter).toEqual(filter);
-    const { phase: _p, startAtChorus: _c, playbackFailedId: _f, songCacheWarming: _w, songCacheGeneration: _g,
-      filter: _filter, ...session } = makeState();
+    const {
+      phase: _p,
+      startAtChorus: _c,
+      playbackFailedId: _f,
+      songCacheWarming: _w,
+      songCacheGeneration: _g,
+      filter: _filter,
+      ...session
+    } = makeState();
     expect(siftReducer(state, { type: 'RESUME_SESSION', session }).filter).toEqual(filter);
   });
 });
@@ -702,9 +794,15 @@ describe('SET_FILTER', () => {
 describe('REVISE (changing a decided card)', () => {
   const t = (id: string, name = id): Track => ({ ...trackA, id, name });
   const [a, b, c, d] = [t('a'), t('b'), t('c'), t('d')];
-  const decided = (over: Partial<SiftState> = {}) => makeState({
-    tracks: [a, b, c, d], cursor: 3, kept: [a], removed: [b], skipped: [c], ...over,
-  });
+  const decided = (over: Partial<SiftState> = {}) =>
+    makeState({
+      tracks: [a, b, c, d],
+      cursor: 3,
+      kept: [a],
+      removed: [b],
+      skipped: [c],
+      ...over,
+    });
 
   test('moves a decided card to its new decision', () => {
     const next = siftReducer(decided(), { type: 'REVISE', trackId: 'a', decision: 'remove' });
@@ -729,10 +827,13 @@ describe('REVISE (changing a decided card)', () => {
 
   test('a held decision changes with it, so the new one is what goes out', () => {
     const state = decided({ pending: { trackId: 'c', decision: 'skip', at: 5 } });
-    expect(siftReducer(state, { type: 'REVISE', trackId: 'c', decision: 'remove' }).pending)
-      .toEqual({ trackId: 'c', decision: 'remove', at: 5 });
+    expect(
+      siftReducer(state, { type: 'REVISE', trackId: 'c', decision: 'remove' }).pending,
+    ).toEqual({ trackId: 'c', decision: 'remove', at: 5 });
     // Another card's change doesn't touch it.
-    expect(siftReducer(state, { type: 'REVISE', trackId: 'a', decision: 'skip' }).pending).toBe(state.pending);
+    expect(siftReducer(state, { type: 'REVISE', trackId: 'a', decision: 'skip' }).pending).toBe(
+      state.pending,
+    );
   });
 
   test('a failed removal changed to something else is no longer owed', () => {
@@ -740,15 +841,22 @@ describe('REVISE (changing a decided card)', () => {
     const next = siftReducer(state, { type: 'REVISE', trackId: 'b', decision: 'keep' });
     expect(next.failedRemovalIds).toEqual([]);
     expect(next.removalErrors).toEqual(['x']);
-    const other = siftReducer(decided({ failedRemovalIds: ['b'], removalErrors: ['b'] }), { type: 'REVISE', trackId: 'a', decision: 'skip' });
+    const other = siftReducer(decided({ failedRemovalIds: ['b'], removalErrors: ['b'] }), {
+      type: 'REVISE',
+      trackId: 'a',
+      decision: 'skip',
+    });
     expect(other.failedRemovalIds).toEqual(['b']);
     expect(other.removalErrors).toEqual(['b']);
   });
 
   test('a failure with no message left to drop just goes', () => {
-    const next = siftReducer(decided({ failedRemovalIds: ['b'], removalErrors: ['x'] }), { type: 'REVISE', trackId: 'b', decision: 'skip' });
+    const next = siftReducer(decided({ failedRemovalIds: ['b'], removalErrors: ['x'] }), {
+      type: 'REVISE',
+      trackId: 'b',
+      decision: 'skip',
+    });
     expect(next.failedRemovalIds).toEqual([]);
     expect(next.removalErrors).toEqual(['x']);
   });
-
 });

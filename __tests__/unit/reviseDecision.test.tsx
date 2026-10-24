@@ -65,8 +65,13 @@ jest.mock('../../src/services', () => ({
 }));
 
 const track = (id: string): Track => ({
-  id, name: `Track ${id}`, artist: 'Artist', album: 'Album',
-  duration: 200, playCount: 1, dateAdded: '2020-01-01T00:00:00.000Z',
+  id,
+  name: `Track ${id}`,
+  artist: 'Artist',
+  album: 'Album',
+  duration: 200,
+  playCount: 1,
+  dateAdded: '2020-01-01T00:00:00.000Z',
 });
 const [trackA, trackB, trackC] = [track('a'), track('b'), track('c')];
 const mix: SiftSource = { type: 'playlist', playlist: { id: 'p1', name: 'Mix', trackCount: 3 } };
@@ -88,7 +93,11 @@ function Harness() {
 }
 
 async function renderSift(source: SiftSource = { type: 'library' }) {
-  await render(<SiftProvider initialTracks={[trackA, trackB, trackC]}><Harness /></SiftProvider>);
+  await render(
+    <SiftProvider initialTracks={[trackA, trackB, trackC]}>
+      <Harness />
+    </SiftProvider>,
+  );
   if (source.type === 'playlist') {
     await act(async () => {
       sift.dispatch({ type: 'SET_SOURCE', source });
@@ -152,7 +161,7 @@ describe('changing a decision', () => {
     expect(sift.state.removed).toEqual([]);
   });
 
-  test('changing the latest decision after it was sent: it isn\'t sent again, nor offered for Undo', async () => {
+  test("changing the latest decision after it was sent: it isn't sent again, nor offered for Undo", async () => {
     await renderSift();
     let held: PendingDecision | null = null;
     await act(async () => {
@@ -164,8 +173,15 @@ describe('changing a decision', () => {
     // Sent, but held again, as a session saved before the send was
     // cleared comes back.
     await act(async () => {
-      const { phase: _p, startAtChorus: _c, playbackFailedId: _f, songCacheWarming: _w, songCacheGeneration: _g,
-        filter: _filter, ...session } = sift.state;
+      const {
+        phase: _p,
+        startAtChorus: _c,
+        playbackFailedId: _f,
+        songCacheWarming: _w,
+        songCacheGeneration: _g,
+        filter: _filter,
+        ...session
+      } = sift.state;
       sift.dispatch({ type: 'RESUME_SESSION', session: { ...session, pending: held } });
     });
     expect(sift.state.pending).toEqual(held);
@@ -203,7 +219,7 @@ describe('changing a decision', () => {
     expect(sift.state.kept).toEqual([trackA]);
   });
 
-  test('a sent playlist Keep changed to Skip comes out of that playlist\'s ledger; nothing is written', async () => {
+  test("a sent playlist Keep changed to Skip comes out of that playlist's ledger; nothing is written", async () => {
     await renderSift(mix);
     await decideAndSend('keep');
     expect(markReviewed).toHaveBeenCalledWith('apple-music:playlist:p1', 'a');
@@ -256,7 +272,7 @@ describe('changing a decision', () => {
     }
   });
 
-  test('if the Remove can\'t be undone, nothing changes', async () => {
+  test("if the Remove can't be undone, nothing changes", async () => {
     await renderSift(mix);
     await decideAndSend('remove');
     mockProvider.restoreRemoved.mockRejectedValueOnce(new Error('offline'));
@@ -298,7 +314,7 @@ describe('changing a decision', () => {
     expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
-  test('an undecided card can\'t be changed; the same decision is no change', async () => {
+  test("an undecided card can't be changed; the same decision is no change", async () => {
     await renderSift();
     await decideAndSend('keep');
     (markReviewed as jest.Mock).mockClear();
@@ -308,5 +324,4 @@ describe('changing a decision', () => {
     expect(unmarkReviewed).not.toHaveBeenCalled();
     expect(sift.state.kept).toEqual([trackA]);
   });
-
 });

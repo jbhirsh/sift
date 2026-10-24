@@ -32,7 +32,10 @@ function compareByDateAdded(a: Track, b: Track, direction: 1 | -1): number {
  * no name.
  */
 export function sortName(name: string): string {
-  return name.trim().replace(/^the\s+/i, '').toLocaleLowerCase('en-US');
+  return name
+    .trim()
+    .replace(/^the\s+/i, '')
+    .toLocaleLowerCase('en-US');
 }
 
 const collator = new Intl.Collator('en-US', { sensitivity: 'base', numeric: true });
@@ -54,7 +57,8 @@ function compareNames(a: string, b: string): number {
   return collator.compare(x, y);
 }
 
-const compareArtists = (a: Track, b: Track) => compareNames(primaryArtist(a.artist), primaryArtist(b.artist));
+const compareArtists = (a: Track, b: Track) =>
+  compareNames(primaryArtist(a.artist), primaryArtist(b.artist));
 
 /**
  * Album order: disc, then track. A song without a track number (a playlist
@@ -66,9 +70,11 @@ function compareTrackOrder(a: Track, b: Track): number {
     const unnumbered = (a.trackNumber == null ? 1 : 0) - (b.trackNumber == null ? 1 : 0);
     return unnumbered || collator.compare(a.name, b.name);
   }
-  return (a.discNumber ?? 1) - (b.discNumber ?? 1)
-    || a.trackNumber - b.trackNumber
-    || collator.compare(a.name, b.name);
+  return (
+    (a.discNumber ?? 1) - (b.discNumber ?? 1) ||
+    a.trackNumber - b.trackNumber ||
+    collator.compare(a.name, b.name)
+  );
 }
 
 export function sortTracks(tracks: Track[], order: SortOrder): Track[] {
@@ -84,13 +90,15 @@ export function sortTracks(tracks: Track[], order: SortOrder): Track[] {
       return copy.sort((a, b) => compareByDateAdded(a, b, -1));
     // An artist's songs together, album by album, each in album order.
     case 'artist':
-      return copy.sort((a, b) =>
-        compareArtists(a, b) || compareNames(a.album, b.album) || compareTrackOrder(a, b));
+      return copy.sort(
+        (a, b) => compareArtists(a, b) || compareNames(a.album, b.album) || compareTrackOrder(a, b),
+      );
     // An album's songs together, in album order. Two albums with the same
     // title (two "Greatest Hits") stay apart, by (main) artist.
     case 'album':
-      return copy.sort((a, b) =>
-        compareNames(a.album, b.album) || compareArtists(a, b) || compareTrackOrder(a, b));
+      return copy.sort(
+        (a, b) => compareNames(a.album, b.album) || compareArtists(a, b) || compareTrackOrder(a, b),
+      );
     case 'random':
       for (let i = copy.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));

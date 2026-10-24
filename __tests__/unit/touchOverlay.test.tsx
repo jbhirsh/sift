@@ -12,9 +12,13 @@ const FADED_MS = PRESS_OUT_MS + 150;
 // argument; here a switch stands in for it.
 let mockShowTouches = false;
 jest.mock('../../src/services/touchOverlay', () => {
-  const actual = jest.requireActual<typeof import('../../src/services/touchOverlay')>('../../src/services/touchOverlay');
+  const actual = jest.requireActual<typeof import('../../src/services/touchOverlay')>(
+    '../../src/services/touchOverlay',
+  );
   // A getter defined on its own: an object spread would read it once, here.
-  return Object.defineProperty({ __esModule: true, ...actual }, 'showTouches', { get: () => mockShowTouches });
+  return Object.defineProperty({ __esModule: true, ...actual }, 'showTouches', {
+    get: () => mockShowTouches,
+  });
 });
 
 describe('the touch mark store', () => {
@@ -33,7 +37,7 @@ describe('the touch mark store', () => {
     expect(seen).toHaveLength(3);
   });
 
-  it('follow carries a cancelled press on, as a gesture\'s update', () => {
+  it("follow carries a cancelled press on, as a gesture's update", () => {
     const store = createTouchMarkStore();
     store.down(0, 0, 0);
     store.up(0, 0, 10);
@@ -99,7 +103,9 @@ describe('TouchOverlay', () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
     });
     const ring = screen.getByTestId('touch-ring', { includeHiddenElements: true });
-    expect(ring.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ left: 140 - 17, top: 200 - 17 })]));
+    expect(ring.props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ left: 140 - 17, top: 200 - 17 })]),
+    );
     expect(screen.toJSON()).toMatchObject({ children: [expect.anything(), expect.anything()] });
     expect(a11yViolations(screen.toJSON())).toEqual([]);
     // Released, the ring scales out and goes.
@@ -131,12 +137,18 @@ describe('TouchOverlay', () => {
     }
   });
 
-  it('only one overlay draws: a Modal\'s while it\'s up, the root\'s otherwise', async () => {
+  it("only one overlay draws: a Modal's while it's up, the root's otherwise", async () => {
     mockShowTouches = true;
     const screen = await render(<TouchOverlay />);
-    const layers = () => screen.queryAllByTestId('touch-overlay', { includeHiddenElements: true }).length;
+    const layers = () =>
+      screen.queryAllByTestId('touch-overlay', { includeHiddenElements: true }).length;
     expect(layers()).toBe(1);
-    await screen.rerender(<><TouchOverlay /><TouchOverlay inModal /></>);
+    await screen.rerender(
+      <>
+        <TouchOverlay />
+        <TouchOverlay inModal />
+      </>,
+    );
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
     });
@@ -156,10 +168,17 @@ describe('TouchOverlay', () => {
       touchMarks.down(50, 60, performance.now());
       touchMarks.up(50, 60, performance.now());
     });
-    await screen.rerender(<><TouchOverlay /><TouchOverlay inModal /></>);
+    await screen.rerender(
+      <>
+        <TouchOverlay />
+        <TouchOverlay inModal />
+      </>,
+    );
     const opacity = () => {
       const ring = screen.getByTestId('touch-ring', { includeHiddenElements: true });
-      return (ring.props.style as { opacity?: number }[]).find((style) => style.opacity !== undefined)?.opacity;
+      return (ring.props.style as { opacity?: number }[]).find(
+        (style) => style.opacity !== undefined,
+      )?.opacity;
     };
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 30));

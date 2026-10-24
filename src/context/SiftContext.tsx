@@ -1,4 +1,13 @@
-import React, { createContext, useContext, useReducer, useMemo, useCallback, useEffect, useRef, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useReducer,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+  ReactNode,
+} from 'react';
 import * as Sentry from '@sentry/react-native';
 import { AppState } from 'react-native';
 import {
@@ -86,7 +95,12 @@ export interface SiftState {
 
 /** State that lives for the app session only, never saved or resumed. */
 type TransientState =
-  | 'phase' | 'startAtChorus' | 'playbackFailedId' | 'songCacheWarming' | 'songCacheGeneration' | 'filter';
+  | 'phase'
+  | 'startAtChorus'
+  | 'playbackFailedId'
+  | 'songCacheWarming'
+  | 'songCacheGeneration'
+  | 'filter';
 
 const initialState: SiftState = {
   phase: 'setup',
@@ -162,7 +176,9 @@ type SiftAction =
 
 /** Two sources are the same sift source: library, or the same playlist. */
 function sameSource(a: SiftSource, b: SiftSource): boolean {
-  return a.type === 'playlist' && b.type === 'playlist' ? a.playlist.id === b.playlist.id : a.type === b.type;
+  return a.type === 'playlist' && b.type === 'playlist'
+    ? a.playlist.id === b.playlist.id
+    : a.type === b.type;
 }
 
 // ── Reducer ────────────────────────────────────────────
@@ -286,7 +302,14 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
     case 'CANCEL_LOAD':
       // Only from Loading: a late press must not pull a sift out from under it.
       if (state.phase !== 'loading') return state;
-      return { ...state, phase: 'setup', loadProgress: 0, loadMessage: '', loadError: null, skipFiltering: false };
+      return {
+        ...state,
+        phase: 'setup',
+        loadProgress: 0,
+        loadMessage: '',
+        loadError: null,
+        skipFiltering: false,
+      };
 
     case 'SET_PLAYBACK_POSITION':
       return { ...state, playbackPosition: action.position };
@@ -298,7 +321,9 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
       return { ...state, connectionStatus: action.status };
 
     case 'SET_PLAYBACK_FAILED':
-      return state.playbackFailedId === action.trackId ? state : { ...state, playbackFailedId: action.trackId };
+      return state.playbackFailedId === action.trackId
+        ? state
+        : { ...state, playbackFailedId: action.trackId };
 
     case 'SONG_CACHE_WARMING':
       return { ...state, songCacheWarming: true };
@@ -312,8 +337,13 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
       if (index < 0 || index >= state.cursor) return state;
       const track = state.tracks[index];
       const without = (list: Track[]) => list.filter((t) => t.id !== track.id);
-      const lists = { kept: without(state.kept), removed: without(state.removed), skipped: without(state.skipped) };
-      const target = action.decision === 'keep' ? 'kept' : action.decision === 'remove' ? 'removed' : 'skipped';
+      const lists = {
+        kept: without(state.kept),
+        removed: without(state.removed),
+        skipped: without(state.skipped),
+      };
+      const target =
+        action.decision === 'keep' ? 'kept' : action.decision === 'remove' ? 'removed' : 'skipped';
       if (lists[target].length < state[target].length) return state;
       lists[target] = [...lists[target], track];
       // A removal that failed is no longer owed once it isn't a removal.
@@ -324,14 +354,26 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         ...lists,
         // Still held (not sent; useReviseDecision clears a sent one first):
         // it goes out as the new decision.
-        pending: state.pending?.trackId === track.id ? { ...state.pending, decision: action.decision } : state.pending,
-        failedRemovalIds: wasFailed ? state.failedRemovalIds.filter((id) => id !== track.id) : state.failedRemovalIds,
-        removalErrors: errorIndex < 0 ? state.removalErrors : state.removalErrors.filter((_, i) => i !== errorIndex),
+        pending:
+          state.pending?.trackId === track.id
+            ? { ...state.pending, decision: action.decision }
+            : state.pending,
+        failedRemovalIds: wasFailed
+          ? state.failedRemovalIds.filter((id) => id !== track.id)
+          : state.failedRemovalIds,
+        removalErrors:
+          errorIndex < 0
+            ? state.removalErrors
+            : state.removalErrors.filter((_, i) => i !== errorIndex),
       };
     }
 
     case 'SONG_CACHE_WARMED':
-      return { ...state, songCacheWarming: false, songCacheGeneration: state.songCacheGeneration + 1 };
+      return {
+        ...state,
+        songCacheWarming: false,
+        songCacheGeneration: state.songCacheGeneration + 1,
+      };
 
     case 'ADD_REMOVAL_ERROR':
       return {
@@ -349,9 +391,10 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
       return {
         ...state,
         failedRemovalIds: state.failedRemovalIds.filter((id) => id !== action.trackId),
-        removalErrors: errorIndex < 0
-          ? state.removalErrors
-          : state.removalErrors.filter((_, i) => i !== errorIndex),
+        removalErrors:
+          errorIndex < 0
+            ? state.removalErrors
+            : state.removalErrors.filter((_, i) => i !== errorIndex),
       };
     }
 
@@ -369,7 +412,9 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
       return { ...state, source: action.source };
 
     case 'SET_START_AT_CHORUS':
-      return state.startAtChorus === action.enabled ? state : { ...state, startAtChorus: action.enabled };
+      return state.startAtChorus === action.enabled
+        ? state
+        : { ...state, startAtChorus: action.enabled };
 
     case 'APPLY_PREFERENCES': {
       const { preferences, skip } = action;
@@ -382,7 +427,8 @@ export function siftReducer(state: SiftState, action: SiftAction): SiftState {
         if (!skip.includes('sortOrder')) next.sortOrder = preferences.sortOrder;
         const filter = { ...state.filter };
         if (!skip.includes('maxPlays')) filter.maxPlays = preferences.filter.maxPlays;
-        if (!skip.includes('addedYearsAgo')) filter.addedYearsAgo = preferences.filter.addedYearsAgo;
+        if (!skip.includes('addedYearsAgo'))
+          filter.addedYearsAgo = preferences.filter.addedYearsAgo;
         next.filter = filter;
       }
       return next;
@@ -481,7 +527,13 @@ interface SiftContextValue {
 
 const SiftContext = createContext<SiftContextValue | null>(null);
 
-export function SiftProvider({ children, initialTracks }: { children: ReactNode; initialTracks?: Track[] }) {
+export function SiftProvider({
+  children,
+  initialTracks,
+}: {
+  children: ReactNode;
+  initialTracks?: Track[];
+}) {
   const init = initialTracks
     ? { ...initialState, tracks: initialTracks, phase: 'sifting' as AppPhase }
     : initialState;
@@ -507,7 +559,11 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     let cancelled = false;
     loadPreferences().then((preferences) => {
       if (cancelled) return;
-      dispatch({ type: 'APPLY_PREFERENCES', preferences, skip: [...preferencesChangedRef.current] });
+      dispatch({
+        type: 'APPLY_PREFERENCES',
+        preferences,
+        skip: [...preferencesChangedRef.current],
+      });
     });
     return () => {
       cancelled = true;
@@ -526,16 +582,26 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
       skipped: state.skipped.length,
       sortOrder: state.sortOrder,
     });
-  }, [state.phase, state.provider, state.cursor, state.tracks.length, state.kept.length, state.removed.length, state.skipped.length, state.sortOrder]);
+  }, [
+    state.phase,
+    state.provider,
+    state.cursor,
+    state.tracks.length,
+    state.kept.length,
+    state.removed.length,
+    state.skipped.length,
+    state.sortOrder,
+  ]);
 
   // Auto-save session after every decision (debounced to avoid rapid-fire writes during fast swiping)
   useEffect(() => {
     // Setup with tracks is a sift backed out of: still saved, so a held
     // decision sent on the way out (#152) isn't left on disk to come back.
     // Only while Setup shows that sift's own source.
-    const backedOut = state.phase === 'setup'
-      && state.activeSource != null
-      && sameSource(state.activeSource, state.source);
+    const backedOut =
+      state.phase === 'setup' &&
+      state.activeSource != null &&
+      sameSource(state.activeSource, state.source);
     if (state.phase !== 'sifting' && state.phase !== 'done' && !backedOut) return;
     if (state.tracks.length === 0) return;
 
@@ -570,7 +636,21 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [state.cursor, state.kept, state.removed, state.skipped, state.tracks, state.phase, state.sortOrder, state.provider, state.source, state.activeSource, state.removalErrors, state.failedRemovalIds, state.pending]);
+  }, [
+    state.cursor,
+    state.kept,
+    state.removed,
+    state.skipped,
+    state.tracks,
+    state.phase,
+    state.sortOrder,
+    state.provider,
+    state.source,
+    state.activeSource,
+    state.removalErrors,
+    state.failedRemovalIds,
+    state.pending,
+  ]);
 
   // Flush a debounced session write immediately (see SiftContextValue docs).
   const flushPendingSave = useCallback(() => {
@@ -630,7 +710,7 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     },
     // Not keyed on the tracks array: every LOAD_TRACKS makes a new one, and
     // decide's identity would change with it.
-    [dispatch, state.tracks.length, state.cursor]
+    [dispatch, state.tracks.length, state.cursor],
   );
 
   // Drop a debounced save that hasn't been written: the session it holds is
@@ -644,13 +724,20 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
     pendingSessionRef.current = null;
   }, []);
 
-  const startFresh = useCallback((skipFiltering?: boolean) => {
-    Sentry.addBreadcrumb({ category: 'user-action', message: 'Started fresh session', level: 'info' });
-    dropPendingSave();
-    clearSession().then(() => {
-      dispatch({ type: 'START_FRESH', skipFiltering });
-    });
-  }, [dispatch, dropPendingSave]);
+  const startFresh = useCallback(
+    (skipFiltering?: boolean) => {
+      Sentry.addBreadcrumb({
+        category: 'user-action',
+        message: 'Started fresh session',
+        level: 'info',
+      });
+      dropPendingSave();
+      clearSession().then(() => {
+        dispatch({ type: 'START_FRESH', skipFiltering });
+      });
+    },
+    [dispatch, dropPendingSave],
+  );
 
   const resetToSetup = useCallback(() => {
     Sentry.addBreadcrumb({ category: 'user-action', message: 'Reset to setup', level: 'info' });
@@ -663,11 +750,15 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
   const setStartAtChorus = useCallback(
     (enabled: boolean) => {
       preferencesChangedRef.current.add('startAtChorus');
-      Sentry.addBreadcrumb({ category: 'user-action', message: `Start at chorus: ${enabled}`, level: 'info' });
+      Sentry.addBreadcrumb({
+        category: 'user-action',
+        message: `Start at chorus: ${enabled}`,
+        level: 'info',
+      });
       dispatch({ type: 'SET_START_AT_CHORUS', enabled });
       void updatePreferences({ startAtChorus: enabled });
     },
-    [dispatch]
+    [dispatch],
   );
 
   // Only Setup's own choices are remembered: a resumed session brings its
@@ -678,16 +769,17 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
       dispatch({ type: 'SET_SORT_ORDER', sortOrder });
       void updatePreferences({ sortOrder });
     },
-    [dispatch]
+    [dispatch],
   );
 
   const setFilter = useCallback(
     (filter: Partial<TrackFilter>) => {
-      for (const field of Object.keys(filter) as (keyof TrackFilter)[]) preferencesChangedRef.current.add(field);
+      for (const field of Object.keys(filter) as (keyof TrackFilter)[])
+        preferencesChangedRef.current.add(field);
       dispatch({ type: 'SET_FILTER', filter });
       void updatePreferences({ filter });
     },
-    [dispatch]
+    [dispatch],
   );
 
   const value = useMemo<SiftContextValue>(
@@ -707,7 +799,22 @@ export function SiftProvider({ children, initialTracks }: { children: ReactNode;
       setSortOrder,
       setFilter,
     }),
-    [state, dispatch, currentTrack, nextTrack, nextNextTrack, remaining, total, decide, startFresh, resetToSetup, flushPendingSave, setStartAtChorus, setSortOrder, setFilter]
+    [
+      state,
+      dispatch,
+      currentTrack,
+      nextTrack,
+      nextNextTrack,
+      remaining,
+      total,
+      decide,
+      startFresh,
+      resetToSetup,
+      flushPendingSave,
+      setStartAtChorus,
+      setSortOrder,
+      setFilter,
+    ],
   );
 
   return (

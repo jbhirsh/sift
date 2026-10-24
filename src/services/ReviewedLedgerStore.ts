@@ -26,7 +26,12 @@ function idsIn(batches: Map<string, Set<string>>[], key: string): string[] {
 }
 
 /** Move an id from one batch of pending changes to the other. */
-function queue(to: Map<string, Set<string>>, from: Map<string, Set<string>>, key: string, trackId: string): void {
+function queue(
+  to: Map<string, Set<string>>,
+  from: Map<string, Set<string>>,
+  key: string,
+  trackId: string,
+): void {
   const undone = from.get(key);
   undone?.delete(trackId);
   if (undone?.size === 0) from.delete(key);

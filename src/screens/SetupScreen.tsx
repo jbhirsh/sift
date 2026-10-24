@@ -22,7 +22,13 @@ import ResumeSessionModal from '../components/ResumeSessionModal';
 import SessionStatRow from '../components/SessionStatRow';
 import SwitchRow from '../components/SwitchRow';
 import { Button } from '../components/Button';
-import { APPLE_REMOVED_PLAYLIST, decisionCounts, discardConfirmation, playlistStartOverMessage, removeExplanation } from '../utils/sessionCopy';
+import {
+  APPLE_REMOVED_PLAYLIST,
+  decisionCounts,
+  discardConfirmation,
+  playlistStartOverMessage,
+  removeExplanation,
+} from '../utils/sessionCopy';
 import { resumeState } from '../context/resumeSession';
 import { loadSession } from '../services/SessionStore';
 import { useSendSavedPending } from '../hooks/usePendingDecision';
@@ -35,13 +41,7 @@ import { markDeletedInMusicShown } from '../services/DeletedInMusic';
 import { loadReviewedIds } from '../services/ReviewedLedgerStore';
 import { ledgerKey, reviewedNote } from '../utils/reviewedLedger';
 import { COLORS, CONTENT_COLUMN, RADIUS, SPACING } from '../theme';
-import {
-  Playlist,
-  SiftSession,
-  SiftSource,
-  SortOrder,
-  SORT_ORDER_DISPLAY,
-} from '../types';
+import { Playlist, SiftSession, SiftSource, SortOrder, SORT_ORDER_DISPLAY } from '../types';
 import { useTraceScreen } from '../hooks/useTrace';
 
 function sourceMatches(a: SiftSource, b: SiftSource): boolean {
@@ -55,10 +55,12 @@ function inMemoryResumableFor(
   state: { tracks: readonly unknown[]; cursor: number; activeSource: SiftSource | null },
   source: SiftSource,
 ): boolean {
-  return state.tracks.length > 0
-    && state.cursor < state.tracks.length
-    && state.activeSource != null
-    && sourceMatches(source, state.activeSource);
+  return (
+    state.tracks.length > 0 &&
+    state.cursor < state.tracks.length &&
+    state.activeSource != null &&
+    sourceMatches(source, state.activeSource)
+  );
 }
 
 const SORT_ORDERS: SortOrder[] = [
@@ -72,7 +74,7 @@ const SORT_ORDERS: SortOrder[] = [
 ];
 
 const SOURCE_TYPES = ['library', 'playlist'] as const;
-const SOURCE_DISPLAY: Record<typeof SOURCE_TYPES[number], string> = {
+const SOURCE_DISPLAY: Record<(typeof SOURCE_TYPES)[number], string> = {
   library: 'Library',
   playlist: 'Playlist',
 };
@@ -81,7 +83,13 @@ export default function SetupScreen() {
   useTraceScreen('setup');
   const { state, dispatch, startFresh, flushPendingSave, setSortOrder, setFilter } = useSift();
   const { colors, glass } = useTheme();
-  const { loadPlaylists, warmCache, ensureAccess, rememberSiftedKeeps, deletedInMusic: countDeletedInMusic } = useMusicProvider();
+  const {
+    loadPlaylists,
+    warmCache,
+    ensureAccess,
+    rememberSiftedKeeps,
+    deletedInMusic: countDeletedInMusic,
+  } = useMusicProvider();
   const openSortPicker = () => {
     if (Platform.OS !== 'ios') return;
     const options = [...SORT_ORDERS.map((o) => SORT_ORDER_DISPLAY[o]), 'Cancel'];
@@ -95,7 +103,11 @@ export default function SetupScreen() {
     );
   };
   // Plays and Added: which songs the sift takes, picked like the sort.
-  const pickFrom = <T,>(choices: readonly T[], label: (choice: T) => string, onPick: (choice: T) => void) => {
+  const pickFrom = <T,>(
+    choices: readonly T[],
+    label: (choice: T) => string,
+    onPick: (choice: T) => void,
+  ) => {
     if (Platform.OS !== 'ios') return;
     const options = [...choices.map(label), 'Cancel'];
     ActionSheetIOS.showActionSheetWithOptions(
@@ -105,12 +117,14 @@ export default function SetupScreen() {
       },
     );
   };
-  const openPlaysPicker = () => pickFrom(PLAY_LIMITS, playLimitLabel, (maxPlays) => {
-    setFilter({ maxPlays });
-  });
-  const openAddedPicker = () => pickFrom(ADDED_AGES, addedAgeLabel, (addedYearsAgo) => {
-    setFilter({ addedYearsAgo });
-  });
+  const openPlaysPicker = () =>
+    pickFrom(PLAY_LIMITS, playLimitLabel, (maxPlays) => {
+      setFilter({ maxPlays });
+    });
+  const openAddedPicker = () =>
+    pickFrom(ADDED_AGES, addedAgeLabel, (addedYearsAgo) => {
+      setFilter({ addedYearsAgo });
+    });
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loadingPlaylists, setLoadingPlaylists] = useState(false);
   const [showPlaylistPicker, setShowPlaylistPicker] = useState(false);
@@ -261,7 +275,10 @@ export default function SetupScreen() {
     // big library, and a song that really won't play must say so. A
     // playlist sift reloads its playlist too: its music videos come back no
     // other way (#54).
-    const { upNext, rest } = warmUpOrder(savedSession.tracks.map((t) => t.id), savedSession.cursor);
+    const { upNext, rest } = warmUpOrder(
+      savedSession.tracks.map((t) => t.id),
+      savedSession.cursor,
+    );
     const source = savedSession.source;
     await warmCache(upNext, source?.type === 'playlist' ? source.playlist.id : undefined);
     dispatch({ type: 'SONG_CACHE_WARMED' });
@@ -290,7 +307,10 @@ export default function SetupScreen() {
         // after a failed clear would lose the sift while the history stays.
         const historyCleared = await clearHistoryForSource(source.playlist.id);
         if (!historyCleared) {
-          dispatch({ type: 'SET_LOAD_ERROR', error: 'Could not clear the removal history. Try again.' });
+          dispatch({
+            type: 'SET_LOAD_ERROR',
+            error: 'Could not clear the removal history. Try again.',
+          });
           return;
         }
       }
@@ -351,47 +371,63 @@ export default function SetupScreen() {
     });
   };
 
-  const handleStartOver = () => withDiscardCheck(async () => {
-    // Not while a previous Start Over is still running.
-    if (startOverBlocked) return;
-    // The resume modal (when open) is the first affordance — dismiss it
-    // before the confirmation so the two prompts never stack.
-    setShowResumeModal(false);
-    const source = state.source;
-    const risk = await sessionAtRisk();
-    const start = () => { performStartOver(); };
-    // One tap must never silently erase decisions (#137), whichever source
-    // they belong to: the saved sift may be another source's.
-    if (risk && sourceMatches(source, risk.source)) {
-      confirmDiscard(discardConfirmation(risk.provider, source, risk.counts, 'start-over'), start);
-    } else if (risk) {
-      confirmDiscard(discardConfirmation(risk.provider, risk.source, risk.counts, 'new-sift'), start);
-    } else if (source.type === 'playlist') {
-      // No decisions to lose, but a playlist's Start Over still says what
-      // it does (and doesn't) undo, exactly like DoneScreen's.
-      confirmDiscard({
-        title: 'Start Over?',
-        message: playlistStartOverMessage(state.provider, source.playlist.name),
-        confirm: 'Start Over',
-      }, start);
-    } else {
-      // No decisions to lose.
-      start();
-    }
-  });
+  const handleStartOver = () =>
+    withDiscardCheck(async () => {
+      // Not while a previous Start Over is still running.
+      if (startOverBlocked) return;
+      // The resume modal (when open) is the first affordance — dismiss it
+      // before the confirmation so the two prompts never stack.
+      setShowResumeModal(false);
+      const source = state.source;
+      const risk = await sessionAtRisk();
+      const start = () => {
+        performStartOver();
+      };
+      // One tap must never silently erase decisions (#137), whichever source
+      // they belong to: the saved sift may be another source's.
+      if (risk && sourceMatches(source, risk.source)) {
+        confirmDiscard(
+          discardConfirmation(risk.provider, source, risk.counts, 'start-over'),
+          start,
+        );
+      } else if (risk) {
+        confirmDiscard(
+          discardConfirmation(risk.provider, risk.source, risk.counts, 'new-sift'),
+          start,
+        );
+      } else if (source.type === 'playlist') {
+        // No decisions to lose, but a playlist's Start Over still says what
+        // it does (and doesn't) undo, exactly like DoneScreen's.
+        confirmDiscard(
+          {
+            title: 'Start Over?',
+            message: playlistStartOverMessage(state.provider, source.playlist.name),
+            confirm: 'Start Over',
+          },
+          start,
+        );
+      } else {
+        // No decisions to lose.
+        start();
+      }
+    });
 
   // Starting a sift replaces the one saved session, whatever its source
   // (#137). If that would throw away an unfinished sift's decisions, ask.
-  const handleStartSifting = () => withDiscardCheck(async () => {
-    const risk = await sessionAtRisk();
-    if (!risk) {
-      await replaceSavedSession(includeReviewed);
-      return;
-    }
-    confirmDiscard(discardConfirmation(risk.provider, risk.source, risk.counts, 'new-sift'), () => {
-      void replaceSavedSession(includeReviewed);
+  const handleStartSifting = () =>
+    withDiscardCheck(async () => {
+      const risk = await sessionAtRisk();
+      if (!risk) {
+        await replaceSavedSession(includeReviewed);
+        return;
+      }
+      confirmDiscard(
+        discardConfirmation(risk.provider, risk.source, risk.counts, 'new-sift'),
+        () => {
+          void replaceSavedSession(includeReviewed);
+        },
+      );
     });
-  });
 
   const openPlaylistPicker = () => {
     // Opening the picker is an explicit source interaction too (reachable
@@ -406,11 +442,12 @@ export default function SetupScreen() {
   };
 
   const canResumeInMemory = inMemoryResumableFor(state, state.source);
-  const canResumeFromSaved = !canResumeInMemory
-    && savedSession != null
-    && savedSession.source != null
-    && sourceMatches(state.source, savedSession.source)
-    && savedSession.cursor < savedSession.tracks.length;
+  const canResumeFromSaved =
+    !canResumeInMemory &&
+    savedSession != null &&
+    savedSession.source != null &&
+    sourceMatches(state.source, savedSession.source) &&
+    savedSession.cursor < savedSession.tracks.length;
 
   return (
     <View style={styles.container}>
@@ -444,8 +481,16 @@ export default function SetupScreen() {
 
         {deletedInMusic > 0 ? (
           <View style={styles.deletedNote}>
-            <SymbolView name="checkmark.circle.fill" size={16} tintColor={COLORS.keep} accessibilityElementsHidden />
-            <Text testID="deleted-in-music-note" style={[styles.deletedNoteText, { color: colors.textSecondary }]}>
+            <SymbolView
+              name="checkmark.circle.fill"
+              size={16}
+              tintColor={COLORS.keep}
+              accessibilityElementsHidden
+            />
+            <Text
+              testID="deleted-in-music-note"
+              style={[styles.deletedNoteText, { color: colors.textSecondary }]}
+            >
               {deletedInMusicNote(deletedInMusic)}
             </Text>
           </View>
@@ -455,7 +500,12 @@ export default function SetupScreen() {
         {state.loadError ? (
           <View style={styles.errorContainer}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <SymbolView name="exclamationmark.triangle.fill" size={16} tintColor={COLORS.skip} accessibilityElementsHidden />
+              <SymbolView
+                name="exclamationmark.triangle.fill"
+                size={16}
+                tintColor={COLORS.skip}
+                accessibilityElementsHidden
+              />
               <Text testID="setup-error" style={[styles.errorText, { color: colors.removeText }]}>
                 {state.loadError}
               </Text>
@@ -465,9 +515,7 @@ export default function SetupScreen() {
 
         {/* Sift source picker */}
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: colors.text }]}>
-            Sift source
-          </Text>
+          <Text style={[styles.sectionLabel, { color: colors.text }]}>Sift source</Text>
           <GlassCard intensity="thin" radius={RADIUS.sm}>
             <View style={styles.segmentedControl} accessibilityRole="tabbar">
               {SOURCE_TYPES.map((sourceType) => {
@@ -525,14 +573,15 @@ export default function SetupScreen() {
                 accessibilityRole="button"
                 accessibilityHint="Picks another playlist to sift"
               >
-                <Text style={[styles.changeButtonText, { color: colors.accent }]}>
-                  Change
-                </Text>
+                <Text style={[styles.changeButtonText, { color: colors.accent }]}>Change</Text>
               </TouchableOpacity>
             </View>
           )}
           {/* What Remove will do, before the first irreversible swipe (#141). */}
-          <Text testID="remove-explanation" style={[styles.footnote, { color: colors.textSecondary }]}>
+          <Text
+            testID="remove-explanation"
+            style={[styles.footnote, { color: colors.textSecondary }]}
+          >
             {removeExplanation(state.provider, state.source)}
           </Text>
           {showIncludeSifted && (
@@ -550,7 +599,10 @@ export default function SetupScreen() {
                   </Text>
                 </SwitchRow>
               </GlassCard>
-              <Text testID="reviewed-note" style={[styles.footnote, { color: colors.textSecondary }]}>
+              <Text
+                testID="reviewed-note"
+                style={[styles.footnote, { color: colors.textSecondary }]}
+              >
                 {reviewedNote(reviewedCount, includeSifted)}
               </Text>
             </>
@@ -563,7 +615,9 @@ export default function SetupScreen() {
             // playlist") and "Sift — Removed" are outputs of sifting, not
             // sources: offering them would let a sift save to
             // "<x> - Sifted - Sifted", or sift songs already removed.
-            playlists={playlists.filter((p) => !p.name.endsWith(' - Sifted') && p.name !== APPLE_REMOVED_PLAYLIST)}
+            playlists={playlists.filter(
+              (p) => !p.name.endsWith(' - Sifted') && p.name !== APPLE_REMOVED_PLAYLIST,
+            )}
             loading={loadingPlaylists}
             onSelect={(playlist) => {
               const source: SiftSource = { type: 'playlist', playlist };
@@ -580,9 +634,7 @@ export default function SetupScreen() {
             height, like a Settings group. */}
         <GlassCard intensity="thin" radius={RADIUS.md}>
           <View style={styles.optionRow}>
-            <Text style={[styles.sectionLabel, { color: colors.text }]}>
-              Sort by
-            </Text>
+            <Text style={[styles.sectionLabel, { color: colors.text }]}>Sort by</Text>
             <View style={{ flex: 1 }} />
             <TouchableOpacity
               onPress={openSortPicker}
@@ -637,7 +689,9 @@ export default function SetupScreen() {
         {showResumeModal && savedSession && (
           <ResumeSessionModal
             session={savedSession}
-            onResume={() => { handleResume(); }}
+            onResume={() => {
+              handleResume();
+            }}
             onStartOver={handleStartOver}
             onCancel={() => {
               setShowResumeModal(false);
@@ -665,20 +719,30 @@ export default function SetupScreen() {
                   <Button
                     title="Resume Sifting"
                     size="large"
-                    onPress={canResumeInMemory
-                      ? () => dispatch({ type: 'SET_PHASE', phase: 'sifting' })
-                      : () => { handleResume(); }}
+                    onPress={
+                      canResumeInMemory
+                        ? () => dispatch({ type: 'SET_PHASE', phase: 'sifting' })
+                        : () => {
+                            handleResume();
+                          }
+                    }
                   />
                   {/* End the sift where it is and see its summary (#142). */}
                   <TouchableOpacity
                     testID="setup-finish"
                     style={styles.finishLink}
                     accessibilityRole="button"
-                    onPress={canResumeInMemory
-                      ? () => dispatch({ type: 'SET_PHASE', phase: 'done' })
-                      : () => { handleResume({ finish: true }); }}
+                    onPress={
+                      canResumeInMemory
+                        ? () => dispatch({ type: 'SET_PHASE', phase: 'done' })
+                        : () => {
+                            handleResume({ finish: true });
+                          }
+                    }
                   >
-                    <Text style={[styles.finishLinkText, { color: colors.accent }]}>Finish and see summary</Text>
+                    <Text style={[styles.finishLinkText, { color: colors.accent }]}>
+                      Finish and see summary
+                    </Text>
                   </TouchableOpacity>
                   {/* Destructive: kept clear of Resume Sifting (#137). */}
                   <View style={styles.startOverGap} />
@@ -699,7 +763,9 @@ export default function SetupScreen() {
                 title="Start Sifting"
                 testID="setup-start-sifting"
                 size="large"
-                onPress={() => { handleStartSifting(); }}
+                onPress={() => {
+                  handleStartSifting();
+                }}
               />
             );
           })()}

@@ -1,5 +1,11 @@
 import * as Sentry from '@sentry/react-native';
-import { BREADCRUMB_EVENTS, formatTraceLine, traceMode, type TraceData, type TraceMode } from '../utils/trace';
+import {
+  BREADCRUMB_EVENTS,
+  formatTraceLine,
+  traceMode,
+  type TraceData,
+  type TraceMode,
+} from '../utils/trace';
 
 // The E2E trace (CLAUDE.md, "A flaky E2E flow is a bug"): in the E2E build
 // each event is a line in the iOS system log, which CI records for the whole
@@ -69,7 +75,8 @@ const tracer = createTracer(
   // A touch's timestamp counts on this clock too.
   () => performance.now(),
   (line) => console.info(line),
-  (event, data) => Sentry.addBreadcrumb({ category: 'ui.trace', message: event, data, level: 'info' }),
+  (event, data) =>
+    Sentry.addBreadcrumb({ category: 'ui.trace', message: event, data, level: 'info' }),
 );
 
 /** Whether this build writes trace lines (the E2E build). */

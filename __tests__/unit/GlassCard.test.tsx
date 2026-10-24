@@ -20,7 +20,7 @@ function renderCard(props: { intensity?: 'thin' | 'regular' | 'thick'; radius?: 
       <GlassCard {...props}>
         <Text testID="child">Content</Text>
       </GlassCard>
-    </ThemeProvider>
+    </ThemeProvider>,
   );
 }
 

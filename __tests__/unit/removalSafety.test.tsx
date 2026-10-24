@@ -4,7 +4,11 @@ import { render, act } from '@testing-library/react-native';
 import * as Sentry from '@sentry/react-native';
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
 import { resetRemovalRetries, useMusicProvider } from '../../src/hooks/useMusicProvider';
-import { forgetRemovals, logRemoval, removeFromHistory } from '../../src/services/RemovalHistoryStore';
+import {
+  forgetRemovals,
+  logRemoval,
+  removeFromHistory,
+} from '../../src/services/RemovalHistoryStore';
 import type { MusicProvider, SiftSource, Track } from '../../src/types';
 
 // Removals and restores that overlap, a removal that failed, decisions from
@@ -67,8 +71,13 @@ jest.mock('../../src/services', () => ({
 }));
 
 const trackA: Track = {
-  id: 'a', name: 'Track A', artist: 'Artist', album: 'Album',
-  duration: 200, playCount: 1, dateAdded: '2020-01-01T00:00:00.000Z',
+  id: 'a',
+  name: 'Track A',
+  artist: 'Artist',
+  album: 'Album',
+  duration: 200,
+  playCount: 1,
+  dateAdded: '2020-01-01T00:00:00.000Z',
 };
 const trackB: Track = { ...trackA, id: 'b', name: 'Track B' };
 const mix: SiftSource = { type: 'playlist', playlist: { id: 'p1', name: 'Mix', trackCount: 2 } };
@@ -90,8 +99,15 @@ function Harness() {
   return null;
 }
 
-async function renderSift(source: SiftSource = { type: 'library' }, provider: MusicProvider = 'apple-music') {
-  await render(<SiftProvider initialTracks={[trackA, trackB]}><Harness /></SiftProvider>);
+async function renderSift(
+  source: SiftSource = { type: 'library' },
+  provider: MusicProvider = 'apple-music',
+) {
+  await render(
+    <SiftProvider initialTracks={[trackA, trackB]}>
+      <Harness />
+    </SiftProvider>,
+  );
   await act(async () => {
     if (provider !== 'apple-music') sift.dispatch({ type: 'SET_PROVIDER', provider });
     if (source.type === 'playlist') sift.dispatch({ type: 'SET_SOURCE', source });
@@ -139,8 +155,9 @@ describe('Restore while the removal is still running', () => {
       await Promise.all([removing, restoring]);
     });
     expect(mockProvider.restoreRemoved).toHaveBeenCalledWith(['a']);
-    expect(mockProvider.restoreRemoved.mock.invocationCallOrder[0])
-      .toBeGreaterThan(mockProvider.removeFromLibrary.mock.invocationCallOrder[0]);
+    expect(mockProvider.restoreRemoved.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mockProvider.removeFromLibrary.mock.invocationCallOrder[0],
+    );
     // The playlist itself is never edited.
     expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
     expect(mockProvider.addToPlaylist).not.toHaveBeenCalled();
@@ -148,7 +165,7 @@ describe('Restore while the removal is still running', () => {
     expect(sift.state.kept).toEqual([trackA]);
   });
 
-  test('a Restore of another song doesn\'t wait for it', async () => {
+  test("a Restore of another song doesn't wait for it", async () => {
     await renderSift(mix);
     await act(async () => {
       sift.decide('remove');
@@ -289,7 +306,7 @@ describe('Restore after a removal that failed, with a provider that edits playli
     expect(sift.state.failedRemovalIds).toEqual(['a']);
   }
 
-  test('a song still in the playlist isn\'t added a second time', async () => {
+  test("a song still in the playlist isn't added a second time", async () => {
     await renderSift(mix, editing);
     await failRemoval();
     mockProvider.removalLanded.mockResolvedValueOnce(false);
@@ -357,24 +374,28 @@ describe('Restore after a removal that failed, with a provider that edits playli
 });
 
 describe('decisions from a saved session being discarded', () => {
-  test('a Remove goes to that session\'s source, and a failure stays out of state', async () => {
+  test("a Remove goes to that session's source, and a failure stays out of state", async () => {
     await renderSift();
     mockProvider.removeFromLibrary.mockRejectedValueOnce(new Error('offline'));
     await act(async () => {
       await api.removeTrack(trackA, { source: mix, provider: 'apple-music' });
     });
     // Recorded for that playlist, collected in "Sift — Removed" like any Remove.
-    expect(logRemoval).toHaveBeenCalledWith(expect.objectContaining({ track: trackA, source: mix, collected: true }));
+    expect(logRemoval).toHaveBeenCalledWith(
+      expect.objectContaining({ track: trackA, source: mix, collected: true }),
+    );
     expect(mockProvider.removeFromLibrary).toHaveBeenCalledWith(['a']);
     expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
     // Its record is dropped: the song never left.
     expect(removeFromHistory).toHaveBeenCalledWith('a', mix);
-    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'remove-track' } });
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'remove-track' },
+    });
     expect(sift.state.failedRemovalIds).toEqual([]);
     expect(sift.state.removalErrors).toEqual([]);
   });
 
-  test('one that lands doesn\'t retry the sift in state\'s failures', async () => {
+  test("one that lands doesn't retry the sift in state's failures", async () => {
     await renderSift();
     await act(async () => {
       sift.decide('remove');
@@ -390,7 +411,6 @@ describe('decisions from a saved session being discarded', () => {
     expect(mockProvider.removalLanded).not.toHaveBeenCalled();
     expect(sift.state.failedRemovalIds).toEqual(['a']);
   });
-
 });
 
 describe('ensureAccess', () => {
@@ -427,10 +447,9 @@ describe('ensureAccess', () => {
     });
     expect(ok).toBe(false);
     expect(sift.state.connectionStatus).toBe('disconnected');
-    expect(Alert.alert).toHaveBeenCalledWith(
-      'Music Access Required',
-      expect.any(String),
-      [expect.objectContaining({ text: 'Cancel' }), expect.objectContaining({ text: 'Open Settings' })],
-    );
+    expect(Alert.alert).toHaveBeenCalledWith('Music Access Required', expect.any(String), [
+      expect.objectContaining({ text: 'Cancel' }),
+      expect.objectContaining({ text: 'Open Settings' }),
+    ]);
   });
 });

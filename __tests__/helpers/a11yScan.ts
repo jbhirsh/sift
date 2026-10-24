@@ -23,7 +23,11 @@ interface HostNode {
 type Rendered = HostNode | HostNode[] | null;
 
 const IMAGE_TYPES = new Set(['Image', 'SymbolView', 'ExpoImage']);
-const SELECTABLE_ROLES: Record<string, 'selected' | 'checked'> = { tab: 'selected', radio: 'checked', checkbox: 'checked' };
+const SELECTABLE_ROLES: Record<string, 'selected' | 'checked'> = {
+  tab: 'selected',
+  radio: 'checked',
+  checkbox: 'checked',
+};
 
 function textOf(node: HostNode | string): string {
   if (typeof node === 'string') return node;
@@ -68,7 +72,8 @@ export function a11yViolations(tree: Rendered): string[] {
     if (role && role in SELECTABLE_ROLES) {
       const key = SELECTABLE_ROLES[role];
       const state = (p.accessibilityState ?? {}) as Record<string, unknown>;
-      if (typeof state[key] !== 'boolean') out.push(`${describe(node)}: ${role} without accessibilityState.${key}`);
+      if (typeof state[key] !== 'boolean')
+        out.push(`${describe(node)}: ${role} without accessibilityState.${key}`);
     }
     if (IMAGE_TYPES.has(node.type) && !grouped && !p.accessibilityLabel && p.accessible !== false) {
       out.push(`${describe(node)}: image without a label or hidden flag`);

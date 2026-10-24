@@ -45,8 +45,7 @@ export const RECENT_PLAYLIST_SECONDS = 60;
 function getNativeModule(): NativeMusicKit {
   if (Platform.OS !== 'ios') {
     throw new Error(
-      'AppleMusicProvider is only available on iOS. ' +
-        `Current platform: ${Platform.OS}`
+      'AppleMusicProvider is only available on iOS. ' + `Current platform: ${Platform.OS}`,
     );
   }
 
@@ -55,7 +54,7 @@ function getNativeModule(): NativeMusicKit {
     throw new Error(
       'Native MusicKit module is not available. ' +
         'This usually means you are running in Expo Go. ' +
-        'Use a development build (EAS Build) to access native modules.'
+        'Use a development build (EAS Build) to access native modules.',
     );
   }
   return mod as NativeMusicKit;
@@ -88,7 +87,10 @@ export class AppleMusicProvider implements MusicProviderService {
   }
 
   async loadLibrary(): Promise<Track[]> {
-    const raw = await collectPages((offset, limit) => this.native.loadLibraryPage(offset, limit), LIBRARY_PAGE_SIZE);
+    const raw = await collectPages(
+      (offset, limit) => this.native.loadLibraryPage(offset, limit),
+      LIBRARY_PAGE_SIZE,
+    );
     return raw.map(toTrack);
   }
 
@@ -155,7 +157,11 @@ export class AppleMusicProvider implements MusicProviderService {
     // name takes nothing: try each in turn, and make one when none takes a
     // song.
     let moved = 0;
-    const found = await this.native.findPlaylistsByName(APPLE_REMOVED_PLAYLIST, RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE);
+    const found = await this.native.findPlaylistsByName(
+      APPLE_REMOVED_PLAYLIST,
+      RECENT_PLAYLIST_SECONDS,
+      PLAYLISTS_PAGE_SIZE,
+    );
     for (const id of found) {
       moved = countAdded(await this.native.addEachToPlaylist(id, songIDs));
       if (moved > 0) break;
@@ -166,7 +172,9 @@ export class AppleMusicProvider implements MusicProviderService {
       moved = countAdded(await this.native.addEachToPlaylist(playlistID, songIDs));
     }
     if (moved < songIDs.length) {
-      throw new Error(`${songIDs.length - moved} of ${songIDs.length} songs could not be moved to "${APPLE_REMOVED_PLAYLIST}"`);
+      throw new Error(
+        `${songIDs.length - moved} of ${songIDs.length} songs could not be moved to "${APPLE_REMOVED_PLAYLIST}"`,
+      );
     }
   }
 
@@ -184,7 +192,11 @@ export class AppleMusicProvider implements MusicProviderService {
     return this.writes.run(async () => {
       let out = 0;
       let failure: unknown = null;
-      for (const id of await this.native.findPlaylistsByName(APPLE_REMOVED_PLAYLIST, RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE)) {
+      for (const id of await this.native.findPlaylistsByName(
+        APPLE_REMOVED_PLAYLIST,
+        RECENT_PLAYLIST_SECONDS,
+        PLAYLISTS_PAGE_SIZE,
+      )) {
         try {
           out += await this.native.removeFromPlaylist(id, trackIDs);
         } catch (err) {
@@ -201,8 +213,13 @@ export class AppleMusicProvider implements MusicProviderService {
    * removed song is in a "Sift — Removed".
    */
   async removalLanded(_source: SiftSource, trackID: string): Promise<boolean> {
-    for (const id of await this.native.findPlaylistsByName(APPLE_REMOVED_PLAYLIST, RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE)) {
-      if ((await this.native.loadPlaylistItems(id)).some((item) => item.id === trackID)) return true;
+    for (const id of await this.native.findPlaylistsByName(
+      APPLE_REMOVED_PLAYLIST,
+      RECENT_PLAYLIST_SECONDS,
+      PLAYLISTS_PAGE_SIZE,
+    )) {
+      if ((await this.native.loadPlaylistItems(id)).some((item) => item.id === trackID))
+        return true;
     }
     return false;
   }
@@ -212,13 +229,20 @@ export class AppleMusicProvider implements MusicProviderService {
     // Still in a "Sift — Removed" (by id or by song, as playlists can file
     // a song under another id): not deleted.
     const listed = new TrackIndex();
-    for (const id of await this.native.findPlaylistsByName(APPLE_REMOVED_PLAYLIST, RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE)) {
+    for (const id of await this.native.findPlaylistsByName(
+      APPLE_REMOVED_PLAYLIST,
+      RECENT_PLAYLIST_SECONDS,
+      PLAYLISTS_PAGE_SIZE,
+    )) {
       for (const item of await this.native.loadPlaylistItems(id)) listed.add(toTrack(item));
     }
     const unlisted = tracks.filter((track) => !listed.has(track));
     // Gone from the library too: the lookup found no song, and didn't fail.
     const gone = new Set<string>();
-    for (const batch of batches(unlisted.map((track) => track.id), LOOKUP_BATCH_SIZE)) {
+    for (const batch of batches(
+      unlisted.map((track) => track.id),
+      LOOKUP_BATCH_SIZE,
+    )) {
       for (const result of await this.native.lookupLibrarySongs(batch)) {
         if (!result.failed && result.song == null) gone.add(result.id);
       }
@@ -250,12 +274,17 @@ export class AppleMusicProvider implements MusicProviderService {
     // A shortfall means some tracks couldn't be resolved or added; turn it
     // into a visible failure, with the counts of each, so the caller can
     // tell what's worth trying again.
-    const shortfall = AddShortfallError.of(await this.native.addEachToPlaylist(playlistID, trackIDs));
+    const shortfall = AddShortfallError.of(
+      await this.native.addEachToPlaylist(playlistID, trackIDs),
+    );
     if (shortfall) throw shortfall;
   }
 
   async loadPlaylists(): Promise<Playlist[]> {
-    const raw = await collectPages((offset, limit) => this.native.loadPlaylistsPage(offset, limit), PLAYLISTS_PAGE_SIZE);
+    const raw = await collectPages(
+      (offset, limit) => this.native.loadPlaylistsPage(offset, limit),
+      PLAYLISTS_PAGE_SIZE,
+    );
     return raw.map(toPlaylist);
   }
 
@@ -265,7 +294,10 @@ export class AppleMusicProvider implements MusicProviderService {
     // don't. Use the library song where there is one. A failed lookup just
     // keeps the entry.
     const songs = new Map<string, RawTrack>();
-    for (const batch of batches(items.map((item) => item.id), LOOKUP_BATCH_SIZE)) {
+    for (const batch of batches(
+      items.map((item) => item.id),
+      LOOKUP_BATCH_SIZE,
+    )) {
       for (const result of await this.native.lookupLibrarySongs(batch)) {
         if (result.song) songs.set(result.id, result.song);
       }
@@ -321,7 +353,10 @@ export class AppleMusicProvider implements MusicProviderService {
     let url = info.previewURL;
     if (!url && info.isrc) url = await this.native.catalogPreviewForISRC(info.isrc);
     if (!url) {
-      const hits = await this.native.searchCatalogSongs(`${info.title} ${info.artist}`, PREVIEW_SEARCH_LIMIT);
+      const hits = await this.native.searchCatalogSongs(
+        `${info.title} ${info.artist}`,
+        PREVIEW_SEARCH_LIMIT,
+      );
       const song = { id: trackID, title: info.title, artist: info.artist, duration: info.duration };
       url = bestPreviewCandidate(song, hits)?.previewURL ?? null;
     }
@@ -337,8 +372,11 @@ export class AppleMusicProvider implements MusicProviderService {
     const kinds = this.native.cachedKinds(trackIDs);
     const missing = uniqueInOrder(trackIDs.filter((_, i) => kinds[i] !== 'song'));
     for (const batch of batches(missing, LOOKUP_BATCH_SIZE)) {
-      const failed = (await this.native.lookupLibrarySongs(batch)).filter((result) => result.failed).length;
-      if (failed > 0) throw new Error(`Library lookup failed for ${failed} of ${batch.length} songs`);
+      const failed = (await this.native.lookupLibrarySongs(batch)).filter(
+        (result) => result.failed,
+      ).length;
+      if (failed > 0)
+        throw new Error(`Library lookup failed for ${failed} of ${batch.length} songs`);
     }
   }
 
@@ -351,7 +389,10 @@ export class AppleMusicProvider implements MusicProviderService {
    * requested one (see canonicalPairing). Without it, such an answer stays
    * unpaired, the safe default.
    */
-  private async resolveIntoCaches(trackIDs: string[], known?: ReadonlyMap<string, CandidateSong>): Promise<void> {
+  private async resolveIntoCaches(
+    trackIDs: string[],
+    known?: ReadonlyMap<string, CandidateSong>,
+  ): Promise<void> {
     const kinds = this.native.cachedKinds(trackIDs);
     const missing = uniqueInOrder(trackIDs.filter((_, i) => kinds[i] == null));
     const notInLibrary: string[] = [];

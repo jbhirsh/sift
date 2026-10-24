@@ -18,8 +18,14 @@ describe('createSerialQueue', () => {
     const queue = createSerialQueue(1000);
     const first = deferred();
     const log: string[] = [];
-    const a = queue.run(async () => { log.push('a starts'); await first.promise; log.push('a ends'); });
-    const b = queue.run(async () => { log.push('b starts'); });
+    const a = queue.run(async () => {
+      log.push('a starts');
+      await first.promise;
+      log.push('a ends');
+    });
+    const b = queue.run(async () => {
+      log.push('b starts');
+    });
     await flush();
     expect(log).toEqual(['a starts']);
     first.resolve();
@@ -27,21 +33,27 @@ describe('createSerialQueue', () => {
     expect(log).toEqual(['a starts', 'a ends', 'b starts']);
   });
 
-  test('hands each caller its own job\'s result', async () => {
+  test("hands each caller its own job's result", async () => {
     const queue = createSerialQueue(1000);
-    await expect(Promise.all([queue.run(async () => 1), queue.run(async () => 'two')])).resolves.toEqual([1, 'two']);
+    await expect(
+      Promise.all([queue.run(async () => 1), queue.run(async () => 'two')]),
+    ).resolves.toEqual([1, 'two']);
   });
 
   test('a job that throws before returning a promise rejects for its caller only', async () => {
     const queue = createSerialQueue(1000);
-    const failing = queue.run((): Promise<void> => { throw new Error('sync'); });
+    const failing = queue.run((): Promise<void> => {
+      throw new Error('sync');
+    });
     await expect(failing).rejects.toThrow('sync');
     await expect(queue.run(async () => 'next')).resolves.toBe('next');
   });
 
   test('a job that fails rejects for its caller only; the next still runs', async () => {
     const queue = createSerialQueue(1000);
-    const failing = queue.run(async () => { throw new Error('nope'); });
+    const failing = queue.run(async () => {
+      throw new Error('nope');
+    });
     const next = queue.run(async () => 'ran');
     await expect(failing).rejects.toThrow('nope');
     await expect(next).resolves.toBe('ran');
@@ -68,7 +80,10 @@ describe('createSerialQueue', () => {
       const queue = createSerialQueue(30000);
       const hung = queue.run(() => new Promise<void>(() => {}));
       const outcome = jest.fn();
-      hung.then(() => outcome('resolved'), (err: unknown) => outcome(err));
+      hung.then(
+        () => outcome('resolved'),
+        (err: unknown) => outcome(err),
+      );
       await jest.advanceTimersByTimeAsync(29999);
       expect(outcome).not.toHaveBeenCalled();
       await jest.advanceTimersByTimeAsync(1);
@@ -79,7 +94,7 @@ describe('createSerialQueue', () => {
       expect(err.message).toBe('No answer after 30 s. It may still finish; try again in a moment.');
     });
 
-    test('a job that settles late doesn\'t change the stall error its caller got', async () => {
+    test("a job that settles late doesn't change the stall error its caller got", async () => {
       const queue = createSerialQueue(1000);
       const late = deferred<string>();
       const result = queue.run(() => late.promise);
@@ -149,7 +164,11 @@ describe('createSerialQueue', () => {
     test('settled counts a failed job as finished, and resolves at once with nothing queued', async () => {
       const queue = createSerialQueue(1000);
       await expect(queue.settled()).resolves.toBeUndefined();
-      queue.run(async () => { throw new Error('nope'); }).catch(() => undefined);
+      queue
+        .run(async () => {
+          throw new Error('nope');
+        })
+        .catch(() => undefined);
       await expect(queue.settled()).resolves.toBeUndefined();
     });
 

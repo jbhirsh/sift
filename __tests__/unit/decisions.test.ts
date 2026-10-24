@@ -1,7 +1,15 @@
 import type { Track } from '../../src/types';
 import { decidedLatestFirst, decisionFor } from '../../src/utils/decisions';
 
-const t = (id: string): Track => ({ id, name: id, artist: 'A', album: 'B', duration: 1, playCount: 0, dateAdded: '' });
+const t = (id: string): Track => ({
+  id,
+  name: id,
+  artist: 'A',
+  album: 'B',
+  duration: 1,
+  playCount: 0,
+  dateAdded: '',
+});
 const [a, b, c, d] = [t('a'), t('b'), t('c'), t('d')];
 
 describe('decisions', () => {
@@ -20,7 +28,7 @@ describe('decisions', () => {
     expect(decidedLatestFirst([a, b], 9)).toEqual([b, a]);
   });
 
-  test('doesn\'t reorder the list it was given', () => {
+  test("doesn't reorder the list it was given", () => {
     const tracks = [a, b, c];
     decidedLatestFirst(tracks, 3);
     expect(tracks).toEqual([a, b, c]);

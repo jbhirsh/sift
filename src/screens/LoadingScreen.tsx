@@ -31,7 +31,8 @@ export default function LoadingScreen() {
   // off the one before.
   const { loadMessage } = state;
   useEffect(() => {
-    if (loadMessage) AccessibilityInfo.announceForAccessibilityWithOptions(loadMessage, { queue: true });
+    if (loadMessage)
+      AccessibilityInfo.announceForAccessibilityWithOptions(loadMessage, { queue: true });
   }, [loadMessage]);
   const percent = Math.round(Math.min(state.loadProgress, 1) * 100);
 
@@ -41,10 +42,7 @@ export default function LoadingScreen() {
 
       <View style={{ flex: 1 }} />
 
-      <Text
-        testID="loading-brand"
-        style={[styles.brandText, { color: colors.text }]}
-      >
+      <Text testID="loading-brand" style={[styles.brandText, { color: colors.text }]}>
         sift.
       </Text>
 

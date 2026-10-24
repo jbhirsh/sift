@@ -23,7 +23,11 @@ const mockSetItem = AsyncStorage.setItem as jest.Mock;
 
 beforeEach(() => jest.clearAllMocks());
 
-const DEFAULTS = { startAtChorus: false, sortOrder: 'least-played', filter: { maxPlays: null, addedYearsAgo: null } };
+const DEFAULTS = {
+  startAtChorus: false,
+  sortOrder: 'least-played',
+  filter: { maxPlays: null, addedYearsAgo: null },
+};
 
 describe('PreferencesStore', () => {
   it('defaults when nothing is saved', async () => {
@@ -34,7 +38,9 @@ describe('PreferencesStore', () => {
   });
 
   it('loads saved settings: Start at chorus, the sort and the Plays and Added choices (#175)', async () => {
-    mockGetItem.mockResolvedValue('{"startAtChorus":true,"sortOrder":"oldest","filter":{"maxPlays":5,"addedYearsAgo":3}}');
+    mockGetItem.mockResolvedValue(
+      '{"startAtChorus":true,"sortOrder":"oldest","filter":{"maxPlays":5,"addedYearsAgo":3}}',
+    );
     await expect(loadPreferences()).resolves.toEqual({
       startAtChorus: true,
       sortOrder: 'oldest',
@@ -49,7 +55,7 @@ describe('PreferencesStore', () => {
     }
   });
 
-  it('an older build\'s preferences (Start at chorus only) load with the other defaults', async () => {
+  it("an older build's preferences (Start at chorus only) load with the other defaults", async () => {
     mockGetItem.mockResolvedValue('{"startAtChorus":true}');
     await expect(loadPreferences()).resolves.toEqual({ ...DEFAULTS, startAtChorus: true });
   });
@@ -66,11 +72,18 @@ describe('PreferencesStore', () => {
   });
 
   it('a sort or a Plays or Added choice Setup no longer offers falls back to its default', async () => {
-    mockGetItem.mockResolvedValue('{"sortOrder":"by-mood","filter":{"maxPlays":7,"addedYearsAgo":2}}');
+    mockGetItem.mockResolvedValue(
+      '{"sortOrder":"by-mood","filter":{"maxPlays":7,"addedYearsAgo":2}}',
+    );
     await expect(loadPreferences()).resolves.toEqual(DEFAULTS);
     // Each choice on its own: one that is still offered stays.
-    mockGetItem.mockResolvedValue('{"sortOrder":"toString","filter":{"maxPlays":0,"addedYearsAgo":"5"}}');
-    await expect(loadPreferences()).resolves.toEqual({ ...DEFAULTS, filter: { maxPlays: 0, addedYearsAgo: null } });
+    mockGetItem.mockResolvedValue(
+      '{"sortOrder":"toString","filter":{"maxPlays":0,"addedYearsAgo":"5"}}',
+    );
+    await expect(loadPreferences()).resolves.toEqual({
+      ...DEFAULTS,
+      filter: { maxPlays: 0, addedYearsAgo: null },
+    });
   });
 
   it('defaults and reports when the read or parse fails', async () => {
@@ -79,11 +92,15 @@ describe('PreferencesStore', () => {
     mockGetItem.mockRejectedValue(new Error('io'));
     await expect(loadPreferences()).resolves.toEqual(DEFAULTS);
     expect(Sentry.captureException).toHaveBeenCalledTimes(2);
-    expect(Sentry.captureException).toHaveBeenLastCalledWith(expect.any(Error), { tags: { flow: 'preferences-load' } });
+    expect(Sentry.captureException).toHaveBeenLastCalledWith(expect.any(Error), {
+      tags: { flow: 'preferences-load' },
+    });
   });
 
   it('an update keeps the other saved preferences', async () => {
-    mockGetItem.mockResolvedValue('{"startAtChorus":true,"sortOrder":"oldest","filter":{"maxPlays":5,"addedYearsAgo":null}}');
+    mockGetItem.mockResolvedValue(
+      '{"startAtChorus":true,"sortOrder":"oldest","filter":{"maxPlays":5,"addedYearsAgo":null}}',
+    );
     mockSetItem.mockResolvedValue(undefined);
     await updatePreferences({ sortOrder: 'random' });
     expect(JSON.parse(mockSetItem.mock.calls[0][1] as string)).toEqual({
@@ -94,7 +111,7 @@ describe('PreferencesStore', () => {
     expect(mockSetItem.mock.calls[0][0]).toBe('sift_preferences');
   });
 
-  it('updates close together each build on the last one\'s write', async () => {
+  it("updates close together each build on the last one's write", async () => {
     let stored: string | null = null;
     mockGetItem.mockImplementation(async () => stored);
     mockSetItem.mockImplementation(async (_key: string, value: string) => {
@@ -117,15 +134,23 @@ describe('PreferencesStore', () => {
     mockGetItem.mockResolvedValue('{"filter":{"maxPlays":5,"addedYearsAgo":3}}');
     mockSetItem.mockResolvedValue(undefined);
     await updatePreferences({ filter: { maxPlays: 0 } });
-    expect(JSON.parse(mockSetItem.mock.calls[0][1] as string).filter).toEqual({ maxPlays: 0, addedYearsAgo: 3 });
+    expect(JSON.parse(mockSetItem.mock.calls[0][1] as string).filter).toEqual({
+      maxPlays: 0,
+      addedYearsAgo: 3,
+    });
   });
 
-  it('a stored value that won\'t parse is written over, so saving works again', async () => {
+  it("a stored value that won't parse is written over, so saving works again", async () => {
     mockGetItem.mockResolvedValue('{oops');
     mockSetItem.mockResolvedValue(undefined);
     await updatePreferences({ sortOrder: 'random' });
-    expect(JSON.parse(mockSetItem.mock.calls[0][1] as string)).toEqual({ ...DEFAULTS, sortOrder: 'random' });
-    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'preferences-save' } });
+    expect(JSON.parse(mockSetItem.mock.calls[0][1] as string)).toEqual({
+      ...DEFAULTS,
+      sortOrder: 'random',
+    });
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'preferences-save' },
+    });
   });
 
   it('a stored filter of null keeps the other preferences', async () => {
@@ -134,18 +159,22 @@ describe('PreferencesStore', () => {
     expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
-  it('a failed read writes nothing, so the other choices aren\'t lost', async () => {
+  it("a failed read writes nothing, so the other choices aren't lost", async () => {
     mockGetItem.mockRejectedValue(new Error('io'));
     await expect(updatePreferences({ sortOrder: 'random' })).resolves.toBeUndefined();
     expect(mockSetItem).not.toHaveBeenCalled();
-    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'preferences-save' } });
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'preferences-save' },
+    });
   });
 
   it('reports a failed save without throwing, and later updates still run', async () => {
     mockGetItem.mockResolvedValue(null);
     mockSetItem.mockRejectedValueOnce(new Error('disk full')).mockResolvedValue(undefined);
     await expect(updatePreferences({ startAtChorus: true })).resolves.toBeUndefined();
-    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'preferences-save' } });
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'preferences-save' },
+    });
     await updatePreferences({ sortOrder: 'oldest' });
     expect(mockSetItem).toHaveBeenCalledTimes(2);
   });
@@ -197,7 +226,11 @@ describe('first-card swipe hint flag', () => {
     await expect(loadSeenSwipeHint()).resolves.toBe(true);
     mockSetItem.mockRejectedValue(new Error('disk'));
     await expect(markSwipeHintSeen()).resolves.toBeUndefined();
-    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'preferences-save' } });
-    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'preferences-load' } });
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'preferences-save' },
+    });
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'preferences-load' },
+    });
   });
 });

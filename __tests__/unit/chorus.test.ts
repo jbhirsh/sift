@@ -64,7 +64,9 @@ describe('parseSyncedLyrics', () => {
   });
 
   it('marks the line after a blank, empty or ♪ line as a section start', () => {
-    const lines = parseSyncedLyrics('[00:01.00]A\n\n[00:02.00]B\n[00:03.00]\n[00:04.00]C\n[00:05.00]♪\n[00:06.00]D\n[00:07.00]E');
+    const lines = parseSyncedLyrics(
+      '[00:01.00]A\n\n[00:02.00]B\n[00:03.00]\n[00:04.00]C\n[00:05.00]♪\n[00:06.00]D\n[00:07.00]E',
+    );
     expect(lines.map((l) => [l.text, l.sectionStart === true])).toEqual([
       ['A', false],
       ['B', true],
@@ -83,7 +85,9 @@ describe('parseSyncedLyrics', () => {
 
 describe('normalizeLyric / normalizeTitle', () => {
   it('lowercases and drops bracketed asides, apostrophes and punctuation', () => {
-    expect(normalizeLyric("I'm Blinded (oh-oh) by the [chorus] LIGHTS!")).toBe('im blinded by the lights');
+    expect(normalizeLyric("I'm Blinded (oh-oh) by the [chorus] LIGHTS!")).toBe(
+      'im blinded by the lights',
+    );
     expect(normalizeLyric('Don’t—stop,  believin’')).toBe('dont stop believin');
     expect(normalizeLyric('(only an ad-lib)')).toBe('');
   });
@@ -154,7 +158,10 @@ describe('findChorusStart on real songs', () => {
   it('finds the songs it should', () => {
     const found = songs.filter((s) => s.expected !== null).map((s) => s.title);
     expect(found).toHaveLength(16);
-    expect(songs.find((s) => s.title === 'Mr. Brightside')?.expected).toEqual({ time: 58.44, method: 'title' });
+    expect(songs.find((s) => s.title === 'Mr. Brightside')?.expected).toEqual({
+      time: 58.44,
+      method: 'title',
+    });
   });
 });
 
@@ -162,9 +169,21 @@ describe('findChorusStart rules', () => {
   const duration = 200; // window 20 s – 120 s
 
   it('returns null for short tracks and empty lyrics', () => {
-    expect(findChorusStart(parseSyncedLyrics(lrc([[20, 'a'], [30, 'a']])), { title: 'x', duration: 59 })).toBeNull();
+    expect(
+      findChorusStart(
+        parseSyncedLyrics(
+          lrc([
+            [20, 'a'],
+            [30, 'a'],
+          ]),
+        ),
+        { title: 'x', duration: 59 },
+      ),
+    ).toBeNull();
     expect(findChorusStart([], { title: 'x', duration })).toBeNull();
-    expect(findChorusStart(parseSyncedLyrics('[00:30.00](ad-lib)'), { title: 'x', duration })).toBeNull();
+    expect(
+      findChorusStart(parseSyncedLyrics('[00:30.00](ad-lib)'), { title: 'x', duration }),
+    ).toBeNull();
   });
 
   it('title rule: earliest repeated title line inside the window', () => {
@@ -177,11 +196,20 @@ describe('findChorusStart rules', () => {
         [90, 'sing my song now'],
       ]),
     );
-    expect(findChorusStart(lines, { title: 'My Song', duration })).toEqual({ time: 50, method: 'title' });
+    expect(findChorusStart(lines, { title: 'My Song', duration })).toEqual({
+      time: 50,
+      method: 'title',
+    });
   });
 
   it('title rule: a title line sung once is not a chorus', () => {
-    const lines = parseSyncedLyrics(lrc([[50, 'my song'], [60, 'x'], [70, 'y']]));
+    const lines = parseSyncedLyrics(
+      lrc([
+        [50, 'my song'],
+        [60, 'x'],
+        [70, 'y'],
+      ]),
+    );
     expect(findChorusStart(lines, { title: 'My Song', duration })).toBeNull();
   });
 
@@ -196,14 +224,20 @@ describe('findChorusStart rules', () => {
         [85, 'chorus two my song'],
       ]),
     );
-    expect(findChorusStart(lines, { title: 'my song', duration })).toEqual({ time: 40, method: 'title' });
+    expect(findChorusStart(lines, { title: 'my song', duration })).toEqual({
+      time: 40,
+      method: 'title',
+    });
   });
 
   it('title rule: stops walking back at a section break', () => {
     const lines = parseSyncedLyrics(
       lrc([[30, 'pre'], '', [40, 'my song'], [70, 'pre'], [80, 'my song']]),
     );
-    expect(findChorusStart(lines, { title: 'my song', duration })).toEqual({ time: 40, method: 'title' });
+    expect(findChorusStart(lines, { title: 'my song', duration })).toEqual({
+      time: 40,
+      method: 'title',
+    });
   });
 
   it('title rule: stops at a line sung under half as often as the title line', () => {
@@ -223,9 +257,23 @@ describe('findChorusStart rules', () => {
   });
 
   it('title rule: walks back at most 30 s and never before the window', () => {
-    const far = parseSyncedLyrics(lrc([[25, 'a'], [56, 'my song'], [80, 'a'], [111, 'my song']]));
+    const far = parseSyncedLyrics(
+      lrc([
+        [25, 'a'],
+        [56, 'my song'],
+        [80, 'a'],
+        [111, 'my song'],
+      ]),
+    );
     expect(findChorusStart(far, { title: 'my song', duration })?.time).toBe(56);
-    const early = parseSyncedLyrics(lrc([[15, 'a'], [25, 'my song'], [80, 'a'], [90, 'my song']]));
+    const early = parseSyncedLyrics(
+      lrc([
+        [15, 'a'],
+        [25, 'my song'],
+        [80, 'a'],
+        [90, 'my song'],
+      ]),
+    );
     expect(findChorusStart(early, { title: 'my song', duration })?.time).toBe(25);
   });
 
@@ -245,7 +293,16 @@ describe('findChorusStart rules', () => {
 
   it('title rule: an ad-lib line carries its section break to the next line', () => {
     const lines = parseSyncedLyrics(
-      lrc([[30, 'pre'], '', [39, '(oh)'], [40, 'my song'], [70, 'pre'], '', [79, '(oh)'], [80, 'my song']]),
+      lrc([
+        [30, 'pre'],
+        '',
+        [39, '(oh)'],
+        [40, 'my song'],
+        [70, 'pre'],
+        '',
+        [79, '(oh)'],
+        [80, 'my song'],
+      ]),
     );
     expect(findChorusStart(lines, { title: 'my song', duration })?.time).toBe(40);
   });
@@ -271,28 +328,62 @@ describe('findChorusStart rules', () => {
       ]),
     );
     // c-d-e (3 lines × 3) beats a-b-c-d (4 lines × 2), though a-b comes first.
-    expect(findChorusStart(lines, { title: 'unsung', duration })).toEqual({ time: 50, method: 'block' });
+    expect(findChorusStart(lines, { title: 'unsung', duration })).toEqual({
+      time: 50,
+      method: 'block',
+    });
   });
 
   it('block rule: ignores runs that first start outside the window', () => {
     const lines = parseSyncedLyrics(
-      lrc([[130, 'a'], [132, 'b'], [150, 'a'], [152, 'b'], [170, 'a'], [172, 'b']]),
+      lrc([
+        [130, 'a'],
+        [132, 'b'],
+        [150, 'a'],
+        [152, 'b'],
+        [170, 'a'],
+        [172, 'b'],
+      ]),
     );
     expect(findChorusStart(lines, { title: 'unsung', duration })).toBeNull();
   });
 
   it('line rule: a single line sung three times, when nothing else repeats', () => {
-    const lines = parseSyncedLyrics(lrc([[30, 'x'], [40, 'hey'], [60, 'y'], [70, 'hey'], [90, 'z'], [100, 'hey']]));
-    expect(findChorusStart(lines, { title: 'unsung', duration })).toEqual({ time: 40, method: 'line' });
+    const lines = parseSyncedLyrics(
+      lrc([
+        [30, 'x'],
+        [40, 'hey'],
+        [60, 'y'],
+        [70, 'hey'],
+        [90, 'z'],
+        [100, 'hey'],
+      ]),
+    );
+    expect(findChorusStart(lines, { title: 'unsung', duration })).toEqual({
+      time: 40,
+      method: 'line',
+    });
   });
 
   it('line rule: twice is not enough', () => {
-    const lines = parseSyncedLyrics(lrc([[40, 'hey'], [60, 'y'], [70, 'hey']]));
+    const lines = parseSyncedLyrics(
+      lrc([
+        [40, 'hey'],
+        [60, 'y'],
+        [70, 'hey'],
+      ]),
+    );
     expect(findChorusStart(lines, { title: 'unsung', duration })).toBeNull();
   });
 
   it('ignores a title under three letters', () => {
-    const lines = parseSyncedLyrics(lrc([[40, 'go'], [50, 'x'], [60, 'go']]));
+    const lines = parseSyncedLyrics(
+      lrc([
+        [40, 'go'],
+        [50, 'x'],
+        [60, 'go'],
+      ]),
+    );
     expect(findChorusStart(lines, { title: 'Go', duration })).toBeNull();
   });
 });
@@ -320,7 +411,9 @@ describe('start positions', () => {
   });
 
   it('startFromLyrics leads in before the chorus line', () => {
-    expect(startFromLyrics({ time: 58.44, method: 'title' }, 222)).toBeCloseTo(58.44 - LEAD_IN_SECONDS);
+    expect(startFromLyrics({ time: 58.44, method: 'title' }, 222)).toBeCloseTo(
+      58.44 - LEAD_IN_SECONDS,
+    );
     expect(startFromLyrics({ time: 0.2, method: 'line' }, 222)).toBe(0);
   });
 

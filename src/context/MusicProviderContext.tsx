@@ -41,7 +41,9 @@ export function MusicProviderHost({
     return () => clearInterval(timer);
   }, [isPlaying, onPosition]);
 
-  return <MusicProviderContext.Provider value={serviceRef}>{children}</MusicProviderContext.Provider>;
+  return (
+    <MusicProviderContext.Provider value={serviceRef}>{children}</MusicProviderContext.Provider>
+  );
 }
 
 /** The shared provider, as a ref so callbacks always reach the current one. */

@@ -12,7 +12,10 @@ let store: typeof SessionStoreModule;
 // (and the same mock functions, so calls can be checked).
 const asyncStorageModule = jest.requireMock('@react-native-async-storage/async-storage');
 const AsyncStorage = asyncStorageModule.default as {
-  getItem: jest.Mock; setItem: jest.Mock; removeItem: jest.Mock; clear: jest.Mock;
+  getItem: jest.Mock;
+  setItem: jest.Mock;
+  removeItem: jest.Mock;
+  clear: jest.Mock;
 };
 const setItem = AsyncStorage.setItem;
 const relaunch = () => {
@@ -23,16 +26,27 @@ const relaunch = () => {
 };
 
 const track = (i: number): Track => ({
-  id: `t${i}`, name: `Track ${i}`, artist: `Artist ${i}`, album: `Album ${i}`, duration: 200 + i, playCount: i % 50,
-  dateAdded: '2020-01-01T00:00:00.000Z', artworkURL: `https://example.com/artwork/${i}.jpg`,
+  id: `t${i}`,
+  name: `Track ${i}`,
+  artist: `Artist ${i}`,
+  album: `Album ${i}`,
+  duration: 200 + i,
+  playCount: i % 50,
+  dateAdded: '2020-01-01T00:00:00.000Z',
+  artworkURL: `https://example.com/artwork/${i}.jpg`,
 });
 const sessionOf = (tracks: Track[], cursor: number): SiftSession => ({
-  tracks, cursor,
+  tracks,
+  cursor,
   kept: tracks.slice(0, cursor).filter((_, i) => i % 3 === 0),
   removed: tracks.slice(0, cursor).filter((_, i) => i % 3 === 1),
   skipped: tracks.slice(0, cursor).filter((_, i) => i % 3 === 2),
-  sortOrder: 'least-played', savedAt: '2026-10-10T00:00:00.000Z', provider: 'apple-music', source: { type: 'library' },
-  removalErrors: [], failedRemovalIds: [],
+  sortOrder: 'least-played',
+  savedAt: '2026-10-10T00:00:00.000Z',
+  provider: 'apple-music',
+  source: { type: 'library' },
+  removalErrors: [],
+  failedRemovalIds: [],
 });
 const keysWritten = () => setItem.mock.calls.map(([key]) => key as string);
 
@@ -101,7 +115,9 @@ describe('SessionStore, compact format (#150)', () => {
     // Re-sorting the rest writes a new list, in the other slot; the record
     // that would point at it never lands.
     const resorted = { ...before, tracks: [...tracks.slice(0, 2), ...tracks.slice(2).reverse()] };
-    setItem.mockImplementationOnce(async (key: string, value: string) => AsyncStorage.setItem(key, value));
+    setItem.mockImplementationOnce(async (key: string, value: string) =>
+      AsyncStorage.setItem(key, value),
+    );
     setItem.mockRejectedValueOnce(new Error('killed'));
     await store.saveSession(resorted);
     relaunch();
@@ -112,7 +128,10 @@ describe('SessionStore, compact format (#150)', () => {
     const tracks = Array.from({ length: 3 }, (_, i) => track(i));
     await store.saveSession(sessionOf(tracks, 1));
     const record = JSON.parse((await AsyncStorage.getItem('sift_session_v2')) ?? 'null');
-    await AsyncStorage.setItem('sift_session_v2', JSON.stringify({ ...record, keptIds: ['missing'] }));
+    await AsyncStorage.setItem(
+      'sift_session_v2',
+      JSON.stringify({ ...record, keptIds: ['missing'] }),
+    );
     await expect(store.loadSession()).resolves.toBeNull();
     await expect(AsyncStorage.getItem('sift_session_v2')).resolves.toBeNull();
     await expect(AsyncStorage.getItem('sift_session.invalid')).resolves.not.toBeNull();
@@ -133,7 +152,11 @@ describe('SessionStore, compact format (#150)', () => {
     const legacyBytes = JSON.stringify(session).length;
     await store.saveSession(session);
     setItem.mockClear();
-    await store.saveSession({ ...session, cursor: 2501, skipped: [...session.skipped, tracks[2500]] });
+    await store.saveSession({
+      ...session,
+      cursor: 2501,
+      skipped: [...session.skipped, tracks[2500]],
+    });
     const [[, written]] = setItem.mock.calls;
     expect(written.length / legacyBytes).toBeLessThan(0.05);
   });
@@ -146,9 +169,14 @@ describe('SessionStore, compact format (#150)', () => {
       await store.saveSession(sessionOf(list, 0));
       written.push(keysWritten()[0]);
     }
-    expect(written).toEqual(['sift_session_v2_tracks_a', 'sift_session_v2_tracks_b', 'sift_session_v2_tracks_a']);
+    expect(written).toEqual([
+      'sift_session_v2_tracks_a',
+      'sift_session_v2_tracks_b',
+      'sift_session_v2_tracks_a',
+    ]);
     const versionOf = async (slot: string) =>
-      JSON.parse((await AsyncStorage.getItem(`sift_session_v2_tracks_${slot}`)) ?? '{}').version as string;
+      JSON.parse((await AsyncStorage.getItem(`sift_session_v2_tracks_${slot}`)) ?? '{}')
+        .version as string;
     const [a, b] = [await versionOf('a'), await versionOf('b')];
     expect(a).toEqual(expect.any(String));
     expect(a).not.toBe('');
@@ -156,20 +184,38 @@ describe('SessionStore, compact format (#150)', () => {
   });
 
   test.each([
-    ['its track list is missing', async () => {
-      await AsyncStorage.removeItem('sift_session_v2_tracks_a');
-    }],
-    ['it names no slot', async () => {
-      const record = JSON.parse((await AsyncStorage.getItem('sift_session_v2')) ?? 'null');
-      await AsyncStorage.setItem('sift_session_v2', JSON.stringify({ ...record, tracksSlot: 'c' }));
-    }],
-    ['it has the wrong shape', async () => {
-      const record = JSON.parse((await AsyncStorage.getItem('sift_session_v2')) ?? 'null');
-      await AsyncStorage.setItem('sift_session_v2', JSON.stringify({ ...record, v: 1 }));
-    }],
-    ['its list is malformed', async () => {
-      await AsyncStorage.setItem('sift_session_v2_tracks_a', JSON.stringify({ version: 'x', tracks: [{ id: 1 }] }));
-    }],
+    [
+      'its track list is missing',
+      async () => {
+        await AsyncStorage.removeItem('sift_session_v2_tracks_a');
+      },
+    ],
+    [
+      'it names no slot',
+      async () => {
+        const record = JSON.parse((await AsyncStorage.getItem('sift_session_v2')) ?? 'null');
+        await AsyncStorage.setItem(
+          'sift_session_v2',
+          JSON.stringify({ ...record, tracksSlot: 'c' }),
+        );
+      },
+    ],
+    [
+      'it has the wrong shape',
+      async () => {
+        const record = JSON.parse((await AsyncStorage.getItem('sift_session_v2')) ?? 'null');
+        await AsyncStorage.setItem('sift_session_v2', JSON.stringify({ ...record, v: 1 }));
+      },
+    ],
+    [
+      'its list is malformed',
+      async () => {
+        await AsyncStorage.setItem(
+          'sift_session_v2_tracks_a',
+          JSON.stringify({ version: 'x', tracks: [{ id: 1 }] }),
+        );
+      },
+    ],
   ])('a record is set aside, reported, when %s', async (_case, corrupt) => {
     const Sentry = jest.requireMock('@sentry/react-native');
     const tracks = Array.from({ length: 3 }, (_, i) => track(i));
@@ -177,7 +223,9 @@ describe('SessionStore, compact format (#150)', () => {
     await corrupt();
     relaunch();
     await expect(store.loadSession()).resolves.toBeNull();
-    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'session-load' } });
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'session-load' },
+    });
     const setAside = JSON.parse((await AsyncStorage.getItem('sift_session.invalid')) ?? 'null');
     // Both raw values, kept for recovery (the list is null when it was missing).
     expect(Object.keys(setAside).sort()).toEqual(['state', 'tracks']);
@@ -199,7 +247,9 @@ describe('SessionStore, compact format (#150)', () => {
     await store.saveSession(sessionOf(tracks, 1));
     AsyncStorage.getItem.mockRejectedValueOnce(new Error('disk'));
     await expect(store.loadSession()).resolves.toBeNull();
-    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'session-load' } });
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'session-load' },
+    });
     await expect(AsyncStorage.getItem('sift_session_v2')).resolves.not.toBeNull();
   });
 

@@ -36,43 +36,69 @@ interface DecisionsSheetProps {
  * Every decision of this sift, the latest first, each one changeable:
  * beyond the last decision, which Undo already takes back.
  */
-export default function DecisionsSheet({ tracks, decisionFor, onRevise, onClose, disabled = false }: DecisionsSheetProps) {
+export default function DecisionsSheet({
+  tracks,
+  decisionFor,
+  onRevise,
+  onClose,
+  disabled = false,
+}: DecisionsSheetProps) {
   useTraceScreen('decisions');
   const { colors } = useTheme();
   // Rows whose change is on its way, and ones whose change didn't go through.
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
 
-  const change = useCallback(async (track: Track, decision: Decision) => {
-    setBusyIds((prev) => new Set(prev).add(track.id));
-    setFailedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(track.id);
-      return next;
-    });
-    const changed = await onRevise(track, decision);
-    setBusyIds((prev) => {
-      const next = new Set(prev);
-      next.delete(track.id);
-      return next;
-    });
-    if (!changed) setFailedIds((prev) => new Set(prev).add(track.id));
-  }, [onRevise]);
+  const change = useCallback(
+    async (track: Track, decision: Decision) => {
+      setBusyIds((prev) => new Set(prev).add(track.id));
+      setFailedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(track.id);
+        return next;
+      });
+      const changed = await onRevise(track, decision);
+      setBusyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(track.id);
+        return next;
+      });
+      if (!changed) setFailedIds((prev) => new Set(prev).add(track.id));
+    },
+    [onRevise],
+  );
 
   const decisionColor = (decision: Decision) =>
-    decision === 'keep' ? colors.keepText : decision === 'remove' ? colors.removeText : colors.skipText;
+    decision === 'keep'
+      ? colors.keepText
+      : decision === 'remove'
+        ? colors.removeText
+        : colors.skipText;
 
   const renderItem = ({ item }: { item: Track }) => {
     const current = decisionFor(item.id);
     const busy = busyIds.has(item.id) || disabled;
     return (
-      <View style={[styles.row, { borderBottomColor: colors.quaternary }]} testID={`decision-row-${item.id}`}>
+      <View
+        style={[styles.row, { borderBottomColor: colors.quaternary }]}
+        testID={`decision-row-${item.id}`}
+      >
         <View style={styles.rowHeader}>
           <View style={styles.trackText}>
-            <Text style={[styles.trackName, { color: colors.text }]} numberOfLines={1}>{item.name}</Text>
-            <Text style={[styles.trackArtist, { color: colors.textSecondary }]} numberOfLines={1}>{item.artist}</Text>
+            <Text style={[styles.trackName, { color: colors.text }]} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <Text style={[styles.trackArtist, { color: colors.textSecondary }]} numberOfLines={1}>
+              {item.artist}
+            </Text>
           </View>
-          {busyIds.has(item.id) && <ActivityIndicator size="small" color={colors.textSecondary} testID={`decision-busy-${item.id}`} />}
+          {busyIds.has(item.id) && (
+            <ActivityIndicator
+              size="small"
+              color={colors.textSecondary}
+              testID={`decision-busy-${item.id}`}
+            />
+          )}
         </View>
         <View style={styles.choices}>
           {CHOICES.map(({ decision, label }) => {
@@ -87,7 +113,9 @@ export default function DecisionsSheet({ tracks, decisionFor, onRevise, onClose,
                   selected && { borderColor: decisionColor(decision) },
                 ]}
                 disabled={busy || selected}
-                onPress={() => { void change(item, decision); }}
+                onPress={() => {
+                  void change(item, decision);
+                }}
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 accessibilityLabel={`${label} ${item.name}`}
@@ -107,7 +135,10 @@ export default function DecisionsSheet({ tracks, decisionFor, onRevise, onClose,
           })}
         </View>
         {failedIds.has(item.id) && (
-          <Text style={[styles.failed, { color: colors.removeText }]} testID={`decision-failed-${item.id}`}>
+          <Text
+            style={[styles.failed, { color: colors.removeText }]}
+            testID={`decision-failed-${item.id}`}
+          >
             Couldn{'’'}t change it. Check your connection and try again.
           </Text>
         )}
@@ -121,8 +152,16 @@ export default function DecisionsSheet({ tracks, decisionFor, onRevise, onClose,
         <View style={styles.sheetContainer}>
           <GlassCard intensity="thick" radius={RADIUS.lg} style={styles.sheet}>
             <View style={styles.header}>
-              <Text style={[styles.title, { color: colors.text }]} accessibilityRole="header">Your decisions</Text>
-              <TouchableOpacity onPress={onClose} activeOpacity={0.7} testID="decisions-done" accessibilityRole="button" style={styles.doneButton}>
+              <Text style={[styles.title, { color: colors.text }]} accessibilityRole="header">
+                Your decisions
+              </Text>
+              <TouchableOpacity
+                onPress={onClose}
+                activeOpacity={0.7}
+                testID="decisions-done"
+                accessibilityRole="button"
+                style={styles.doneButton}
+              >
                 <Text style={[styles.doneText, { color: colors.accent }]}>Done</Text>
               </TouchableOpacity>
             </View>

@@ -52,7 +52,10 @@ export function touchMove(marks: TouchMarks, x: number, y: number, now: number):
   if (Math.hypot(x - press.fromX, y - press.fromY) < TRAIL_SPACING) {
     return { ...marks, press: { ...press, x, y } };
   }
-  return { press: { ...press, x, y, fromX: x, fromY: y }, trail: [...marks.trail, { x, y, at: now }] };
+  return {
+    press: { ...press, x, y, fromX: x, fromY: y },
+    trail: [...marks.trail, { x, y, at: now }],
+  };
 }
 
 export function touchUp(marks: TouchMarks, x: number, y: number, now: number): TouchMarks {

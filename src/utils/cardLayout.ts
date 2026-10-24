@@ -54,10 +54,16 @@ export const FLING_MIN_DISTANCE = 30;
  */
 export function swipeDecision(translationX: number, velocityX: number): 'keep' | 'remove' | null {
   'worklet';
-  if (translationX > DRAG_THRESHOLD || (translationX > FLING_MIN_DISTANCE && velocityX > FLING_VELOCITY)) {
+  if (
+    translationX > DRAG_THRESHOLD ||
+    (translationX > FLING_MIN_DISTANCE && velocityX > FLING_VELOCITY)
+  ) {
     return 'keep';
   }
-  if (translationX < -DRAG_THRESHOLD || (translationX < -FLING_MIN_DISTANCE && velocityX < -FLING_VELOCITY)) {
+  if (
+    translationX < -DRAG_THRESHOLD ||
+    (translationX < -FLING_MIN_DISTANCE && velocityX < -FLING_VELOCITY)
+  ) {
     return 'remove';
   }
   return null;

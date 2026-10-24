@@ -3,9 +3,17 @@ import { render, act } from '@testing-library/react-native';
 import { AppState } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
-import { MAX_REMOVAL_RETRIES, resetRemovalRetries, useMusicProvider } from '../../src/hooks/useMusicProvider';
+import {
+  MAX_REMOVAL_RETRIES,
+  resetRemovalRetries,
+  useMusicProvider,
+} from '../../src/hooks/useMusicProvider';
 import { useRemovalRetry } from '../../src/hooks/useRemovalRetry';
-import { forgetRemovals, logRemoval, removeFromHistory } from '../../src/services/RemovalHistoryStore';
+import {
+  forgetRemovals,
+  logRemoval,
+  removeFromHistory,
+} from '../../src/services/RemovalHistoryStore';
 import type { Track } from '../../src/types';
 
 // Retrying failed removals (#151).
@@ -46,7 +54,9 @@ const mockProvider = {
   removeFromPlaylist: jest.fn().mockResolvedValue(undefined),
   restoreRemoved: jest.fn().mockResolvedValue(1),
   removalLanded: jest.fn().mockResolvedValue(false) as jest.Mock | undefined,
-  loadPlaylists: jest.fn().mockResolvedValue([{ id: 'removed-pl', name: 'Sift — Removed', trackCount: 0 }]),
+  loadPlaylists: jest
+    .fn()
+    .mockResolvedValue([{ id: 'removed-pl', name: 'Sift — Removed', trackCount: 0 }]),
 };
 
 jest.mock('../../src/services', () => ({
@@ -55,8 +65,13 @@ jest.mock('../../src/services', () => ({
 }));
 
 const trackA: Track = {
-  id: 'a', name: 'Track A', artist: 'Artist', album: 'Album',
-  duration: 200, playCount: 1, dateAdded: '2020-01-01T00:00:00.000Z',
+  id: 'a',
+  name: 'Track A',
+  artist: 'Artist',
+  album: 'Album',
+  duration: 200,
+  playCount: 1,
+  dateAdded: '2020-01-01T00:00:00.000Z',
 };
 const trackB: Track = { ...trackA, id: 'b', name: 'Track B' };
 const trackC: Track = { ...trackA, id: 'c', name: 'Track C' };
@@ -98,8 +113,12 @@ beforeEach(() => {
 });
 
 describe('retryFailedRemovals', () => {
-  test('retries a failed library removal; on success it\'s no longer a failure and is recorded again', async () => {
-    await render(<SiftProvider initialTracks={[trackA, trackB]}><Harness /></SiftProvider>);
+  test("retries a failed library removal; on success it's no longer a failure and is recorded again", async () => {
+    await render(
+      <SiftProvider initialTracks={[trackA, trackB]}>
+        <Harness />
+      </SiftProvider>,
+    );
     await failFirstRemoval();
     (logRemoval as jest.Mock).mockClear();
     await act(async () => {
@@ -109,11 +128,17 @@ describe('retryFailedRemovals', () => {
     expect(mockProvider.removeFromLibrary).toHaveBeenLastCalledWith(['a']);
     expect(sift.state.failedRemovalIds).toEqual([]);
     expect(sift.state.removalErrors).toEqual([]);
-    expect(logRemoval).toHaveBeenCalledWith(expect.objectContaining({ track: trackA, source: { type: 'library' } }));
+    expect(logRemoval).toHaveBeenCalledWith(
+      expect.objectContaining({ track: trackA, source: { type: 'library' } }),
+    );
   });
 
   test('a removal that already landed is cleared without removing it again', async () => {
-    await render(<SiftProvider initialTracks={[trackA, trackB]}><Harness /></SiftProvider>);
+    await render(
+      <SiftProvider initialTracks={[trackA, trackB]}>
+        <Harness />
+      </SiftProvider>,
+    );
     await failFirstRemoval();
     mockProvider.removeFromLibrary.mockClear();
     mockProvider.removalLanded?.mockResolvedValueOnce(true);
@@ -126,7 +151,11 @@ describe('retryFailedRemovals', () => {
 
   test('without a landed check, the retry removes again', async () => {
     mockProvider.removalLanded = undefined;
-    await render(<SiftProvider initialTracks={[trackA, trackB]}><Harness /></SiftProvider>);
+    await render(
+      <SiftProvider initialTracks={[trackA, trackB]}>
+        <Harness />
+      </SiftProvider>,
+    );
     await failFirstRemoval();
     await act(async () => {
       await api.retryFailedRemovals();
@@ -136,7 +165,11 @@ describe('retryFailedRemovals', () => {
   });
 
   test(`a removal that keeps failing stays failed, and stops after ${MAX_REMOVAL_RETRIES} retries`, async () => {
-    await render(<SiftProvider initialTracks={[trackA, trackB]}><Harness /></SiftProvider>);
+    await render(
+      <SiftProvider initialTracks={[trackA, trackB]}>
+        <Harness />
+      </SiftProvider>,
+    );
     await failFirstRemoval();
     mockProvider.removeFromLibrary.mockReset().mockRejectedValue(new Error('still offline'));
     for (let i = 0; i < MAX_REMOVAL_RETRIES + 1; i++) {
@@ -148,14 +181,20 @@ describe('retryFailedRemovals', () => {
     expect(sift.state.failedRemovalIds).toEqual(['a']);
     // A retry failing again isn't a second error for the same song.
     expect(sift.state.removalErrors).toEqual(['Track A']);
-    expect(Sentry.addBreadcrumb).toHaveBeenLastCalledWith(expect.objectContaining({
-      message: `retryFailedRemovals: a still failing (attempt ${MAX_REMOVAL_RETRIES} of ${MAX_REMOVAL_RETRIES}): still offline`,
-    }));
+    expect(Sentry.addBreadcrumb).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        message: `retryFailedRemovals: a still failing (attempt ${MAX_REMOVAL_RETRIES} of ${MAX_REMOVAL_RETRIES}): still offline`,
+      }),
+    );
     mockProvider.removeFromLibrary.mockReset().mockResolvedValue(undefined);
   });
 
   test('a removal that succeeds retries the ones that failed', async () => {
-    await render(<SiftProvider initialTracks={[trackA, trackB, trackC]}><Harness /></SiftProvider>);
+    await render(
+      <SiftProvider initialTracks={[trackA, trackB, trackC]}>
+        <Harness />
+      </SiftProvider>,
+    );
     await failFirstRemoval();
     await act(async () => {
       sift.decide('remove');
@@ -168,7 +207,11 @@ describe('retryFailedRemovals', () => {
   });
 
   test('overlapping retries run once', async () => {
-    await render(<SiftProvider initialTracks={[trackA, trackB]}><Harness /></SiftProvider>);
+    await render(
+      <SiftProvider initialTracks={[trackA, trackB]}>
+        <Harness />
+      </SiftProvider>,
+    );
     await failFirstRemoval();
     mockProvider.removeFromLibrary.mockClear();
     await act(async () => {
@@ -178,8 +221,15 @@ describe('retryFailedRemovals', () => {
   });
 
   test('a playlist removal retries into "Sift — Removed", never the playlist, and is recorded again', async () => {
-    await render(<SiftProvider initialTracks={[trackA, trackB]}><Harness /></SiftProvider>);
-    const source = { type: 'playlist' as const, playlist: { id: 'p1', name: 'Mix', trackCount: 2 } };
+    await render(
+      <SiftProvider initialTracks={[trackA, trackB]}>
+        <Harness />
+      </SiftProvider>,
+    );
+    const source = {
+      type: 'playlist' as const,
+      playlist: { id: 'p1', name: 'Mix', trackCount: 2 },
+    };
     await act(async () => {
       sift.dispatch({ type: 'SET_SOURCE', source });
     });
@@ -199,15 +249,26 @@ describe('retryFailedRemovals', () => {
     expect(mockProvider.removalLanded).toHaveBeenCalledWith(source, 'a');
     expect(mockProvider.removeFromLibrary).toHaveBeenLastCalledWith(['a']);
     expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
-    expect(logRemoval).toHaveBeenCalledWith(expect.objectContaining({ track: trackA, source, collected: true }));
+    expect(logRemoval).toHaveBeenCalledWith(
+      expect.objectContaining({ track: trackA, source, collected: true }),
+    );
     expect(sift.state.failedRemovalIds).toEqual([]);
   });
 
   test('a Restore during a retry waits for it, so the song ends up restored (#151)', async () => {
-    await render(<SiftProvider initialTracks={[trackA, trackB]}><Harness /></SiftProvider>);
+    await render(
+      <SiftProvider initialTracks={[trackA, trackB]}>
+        <Harness />
+      </SiftProvider>,
+    );
     await failFirstRemoval();
     let landedCheck!: (landed: boolean) => void;
-    mockProvider.removalLanded?.mockImplementationOnce(() => new Promise((resolve) => { landedCheck = resolve; }));
+    mockProvider.removalLanded?.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          landedCheck = resolve;
+        }),
+    );
     (logRemoval as jest.Mock).mockClear();
     let retry!: Promise<void>;
     let restore!: Promise<boolean>;
@@ -225,16 +286,26 @@ describe('retryFailedRemovals', () => {
     const removeOrder = mockProvider.removeFromLibrary.mock.invocationCallOrder.at(-1) ?? 0;
     expect(mockProvider.restoreRemoved).toHaveBeenCalledWith(['a']);
     expect(mockProvider.restoreRemoved.mock.invocationCallOrder[0]).toBeGreaterThan(removeOrder);
-    expect((forgetRemovals as jest.Mock).mock.invocationCallOrder.at(-1))
-      .toBeGreaterThan((logRemoval as jest.Mock).mock.invocationCallOrder.at(-1) ?? Infinity);
+    expect((forgetRemovals as jest.Mock).mock.invocationCallOrder.at(-1)).toBeGreaterThan(
+      (logRemoval as jest.Mock).mock.invocationCallOrder.at(-1) ?? Infinity,
+    );
     expect(sift.state.removed).toEqual([]);
   });
 
   test('a retry that starts during a Restore leaves that song alone (#151)', async () => {
-    await render(<SiftProvider initialTracks={[trackA, trackB]}><Harness /></SiftProvider>);
+    await render(
+      <SiftProvider initialTracks={[trackA, trackB]}>
+        <Harness />
+      </SiftProvider>,
+    );
     await failFirstRemoval();
     let restored!: (count: number) => void;
-    mockProvider.restoreRemoved.mockImplementationOnce(() => new Promise((resolve) => { restored = resolve; }));
+    mockProvider.restoreRemoved.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          restored = resolve;
+        }),
+    );
     mockProvider.removeFromLibrary.mockClear();
     let restore!: Promise<boolean>;
     await act(async () => {
@@ -253,7 +324,11 @@ describe('retryFailedRemovals', () => {
   });
 
   test('nothing failed, nothing retried', async () => {
-    await render(<SiftProvider initialTracks={[trackA]}><Harness /></SiftProvider>);
+    await render(
+      <SiftProvider initialTracks={[trackA]}>
+        <Harness />
+      </SiftProvider>,
+    );
     await act(async () => {
       await api.retryFailedRemovals();
     });
@@ -271,12 +346,20 @@ describe('useRemovalRetry', () => {
       removers.push(remove);
       return { remove } as unknown as ReturnType<typeof AppState.addEventListener>;
     });
-    const { rerender, unmount } = await render(<SiftProvider initialTracks={[trackA, trackB]}><Harness /></SiftProvider>);
+    const { rerender, unmount } = await render(
+      <SiftProvider initialTracks={[trackA, trackB]}>
+        <Harness />
+      </SiftProvider>,
+    );
     await failFirstRemoval();
     mockProvider.removeFromLibrary.mockReset().mockRejectedValue(new Error('still offline'));
 
     const before = removers.length;
-    await rerender(<SiftProvider initialTracks={[trackA, trackB]}><Harness retryHook /></SiftProvider>);
+    await rerender(
+      <SiftProvider initialTracks={[trackA, trackB]}>
+        <Harness retryHook />
+      </SiftProvider>,
+    );
     const ownRemovers = removers.slice(before);
     expect(ownRemovers.length).toBeGreaterThan(0);
     await act(async () => {});
@@ -304,7 +387,11 @@ describe('useRemovalRetry', () => {
       listeners.push(listener as (state: string) => void);
       return { remove: jest.fn() } as unknown as ReturnType<typeof AppState.addEventListener>;
     });
-    await render(<SiftProvider initialTracks={[trackA]}><Harness retryHook /></SiftProvider>);
+    await render(
+      <SiftProvider initialTracks={[trackA]}>
+        <Harness retryHook />
+      </SiftProvider>,
+    );
     await act(async () => {
       listeners.forEach((listener) => listener('active'));
     });

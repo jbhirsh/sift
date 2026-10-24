@@ -11,9 +11,11 @@ function quietly(feedback: Promise<void>): void {
 
 /** A decision taken: a firm tap for Keep and Remove, a light tick for Skip. */
 export function decisionHaptic(decision: Decision): void {
-  quietly(decision === 'skip'
-    ? Haptics.selectionAsync()
-    : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
+  quietly(
+    decision === 'skip'
+      ? Haptics.selectionAsync()
+      : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium),
+  );
 }
 
 /** A dragged card crossing the point where letting go decides, either way. */

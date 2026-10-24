@@ -1,9 +1,21 @@
 import * as Sentry from '@sentry/react-native';
-import { createTracer, currentScreen, enterScreen, trace, traceTouch, tracing } from '../../src/services/trace';
+import {
+  createTracer,
+  currentScreen,
+  enterScreen,
+  trace,
+  traceTouch,
+  tracing,
+} from '../../src/services/trace';
 
 const clock = (start: number) => {
   let t = start;
-  return { now: () => t, advance: (ms: number) => { t += ms; } };
+  return {
+    now: () => t,
+    advance: (ms: number) => {
+      t += ms;
+    },
+  };
 };
 
 describe('createTracer, log mode (the E2E build)', () => {
@@ -87,8 +99,8 @@ describe('screens', () => {
   });
 });
 
-describe('the app\'s tracer', () => {
-  test('in tests (a dev build) it doesn\'t trace: breadcrumbs only, through Sentry', () => {
+describe("the app's tracer", () => {
+  test("in tests (a dev build) it doesn't trace: breadcrumbs only, through Sentry", () => {
     const info = jest.spyOn(console, 'info').mockImplementation(() => {});
     (Sentry.addBreadcrumb as jest.Mock).mockClear();
     expect(tracing).toBe(false);
@@ -98,7 +110,10 @@ describe('the app\'s tracer', () => {
     expect(info).not.toHaveBeenCalled();
     expect(Sentry.addBreadcrumb).toHaveBeenCalledTimes(1);
     expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
-      category: 'ui.trace', message: 'guard-busy', data: { input: 'keep', held: 40 }, level: 'info',
+      category: 'ui.trace',
+      message: 'guard-busy',
+      data: { input: 'keep', held: 40 },
+      level: 'info',
     });
     const leave = enterScreen('done');
     expect(currentScreen()).toBe('done');

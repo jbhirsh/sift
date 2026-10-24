@@ -79,9 +79,18 @@ jest.mock('../../src/hooks/useResolvedArtwork', () => ({
 }));
 
 // Must import after mocks
-import { renderWithProviders, mockTrackA, mockTrackB, mockTrackC } from '../helpers/renderWithProviders';
+import {
+  renderWithProviders,
+  mockTrackA,
+  mockTrackB,
+  mockTrackC,
+} from '../helpers/renderWithProviders';
 import { a11yViolations } from '../helpers/a11yScan';
-import { FINISH_IN_MUSIC_NOTE, FINISH_IN_MUSIC_STEPS, FINISH_IN_MUSIC_WAYS } from '../../src/utils/sessionCopy';
+import {
+  FINISH_IN_MUSIC_NOTE,
+  FINISH_IN_MUSIC_STEPS,
+  FINISH_IN_MUSIC_WAYS,
+} from '../../src/utils/sessionCopy';
 import { clearHistoryForSource } from '../../src/services/RemovalHistoryStore';
 import { clearSession } from '../../src/services/SessionStore';
 import { useSift } from '../../src/context/SiftContext';
@@ -102,7 +111,9 @@ describe('SetupScreen', () => {
     (loadSession as jest.Mock).mockReset();
     (loadSession as jest.Mock).mockResolvedValue(null);
     // Setup's pickers save their choices (#175): each test starts from none.
-    await require('@react-native-async-storage/async-storage').default.removeItem('sift_preferences');
+    await require('@react-native-async-storage/async-storage').default.removeItem(
+      'sift_preferences',
+    );
   });
 
   test('renders brand text', async () => {
@@ -134,12 +145,23 @@ describe('SetupScreen', () => {
   });
 
   test('pressing sort button opens action sheet', async () => {
-    const spy = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation(() => {});
+    const spy = jest
+      .spyOn(ActionSheetIOS, 'showActionSheetWithOptions')
+      .mockImplementation(() => {});
     const { getByText } = await renderWithProviders(<SetupScreen />);
     await fireEvent.press(getByText('Least Played'));
     expect(spy).toHaveBeenCalledWith(
       expect.objectContaining({
-        options: ['Least Played', 'Most Played', 'Oldest Added', 'Newest Added', 'Artist', 'Album', 'Random', 'Cancel'],
+        options: [
+          'Least Played',
+          'Most Played',
+          'Oldest Added',
+          'Newest Added',
+          'Artist',
+          'Album',
+          'Random',
+          'Cancel',
+        ],
         cancelButtonIndex: 7,
       }),
       expect.any(Function),
@@ -148,7 +170,11 @@ describe('SetupScreen', () => {
   });
 
   test('selecting a sort option from action sheet dispatches sort order', async () => {
-    const spy = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation((_opts, cb) => { cb(1); });
+    const spy = jest
+      .spyOn(ActionSheetIOS, 'showActionSheetWithOptions')
+      .mockImplementation((_opts, cb) => {
+        cb(1);
+      });
     const { getByText } = await renderWithProviders(<SetupScreen />);
     // Mock calls callback with index 1 ("Most Played") immediately
     await fireEvent.press(getByText('Least Played'));
@@ -159,7 +185,11 @@ describe('SetupScreen', () => {
   test('a sort or a Plays/Added pick is saved for the next launch (#175)', async () => {
     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
     let pick = 1;
-    const spy = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation((_opts, cb) => { cb(pick); });
+    const spy = jest
+      .spyOn(ActionSheetIOS, 'showActionSheetWithOptions')
+      .mockImplementation((_opts, cb) => {
+        cb(pick);
+      });
     const { getByText, getByTestId } = await renderWithProviders(<SetupScreen />);
     await fireEvent.press(getByText('Least Played'));
     pick = 2;
@@ -178,15 +208,27 @@ describe('SetupScreen', () => {
       return <Text testID="probe-filter">{JSON.stringify(state.filter)}</Text>;
     }
     let pick = 0;
-    const spy = jest.spyOn(ActionSheetIOS, 'showActionSheetWithOptions').mockImplementation((_opts, cb) => { cb(pick); });
-    const { getByTestId } = await renderWithProviders(<><SetupScreen /><FilterProbe /></>);
+    const spy = jest
+      .spyOn(ActionSheetIOS, 'showActionSheetWithOptions')
+      .mockImplementation((_opts, cb) => {
+        cb(pick);
+      });
+    const { getByTestId } = await renderWithProviders(
+      <>
+        <SetupScreen />
+        <FilterProbe />
+      </>,
+    );
     expect(getByTestId('filter-plays')).toHaveTextContent('Any');
     expect(getByTestId('filter-added')).toHaveTextContent('Any time');
 
     pick = 1;
     await fireEvent.press(getByTestId('filter-plays'));
     expect(spy).toHaveBeenLastCalledWith(
-      { options: ['Any', 'Never played', '5 or fewer', '20 or fewer', 'Cancel'], cancelButtonIndex: 4 },
+      {
+        options: ['Any', 'Never played', '5 or fewer', '20 or fewer', 'Cancel'],
+        cancelButtonIndex: 4,
+      },
       expect.any(Function),
     );
     expect(getByTestId('filter-plays')).toHaveTextContent('Never played');
@@ -194,15 +236,24 @@ describe('SetupScreen', () => {
     pick = 2;
     await fireEvent.press(getByTestId('filter-added'));
     expect(spy).toHaveBeenLastCalledWith(
-      { options: ['Any time', 'Over a year ago', 'Over 3 years ago', 'Over 5 years ago', 'Cancel'], cancelButtonIndex: 4 },
+      {
+        options: ['Any time', 'Over a year ago', 'Over 3 years ago', 'Over 5 years ago', 'Cancel'],
+        cancelButtonIndex: 4,
+      },
       expect.any(Function),
     );
     expect(getByTestId('filter-added')).toHaveTextContent('Over 3 years ago');
-    expect(JSON.parse(getByTestId('probe-filter').props.children)).toEqual({ maxPlays: 0, addedYearsAgo: 3 });
+    expect(JSON.parse(getByTestId('probe-filter').props.children)).toEqual({
+      maxPlays: 0,
+      addedYearsAgo: 3,
+    });
 
     pick = 4; // Cancel
     await fireEvent.press(getByTestId('filter-plays'));
-    expect(JSON.parse(getByTestId('probe-filter').props.children)).toEqual({ maxPlays: 0, addedYearsAgo: 3 });
+    expect(JSON.parse(getByTestId('probe-filter').props.children)).toEqual({
+      maxPlays: 0,
+      addedYearsAgo: 3,
+    });
     expect(getByTestId('filter-plays').props.accessibilityRole).toBe('button');
     spy.mockRestore();
   });
@@ -248,9 +299,7 @@ describe('SetupScreen', () => {
   });
 
   test('cancelling playlist picker keeps library source', async () => {
-    mockProvider.loadPlaylists.mockResolvedValue([
-      { id: 'p1', name: 'Test', trackCount: 3 },
-    ]);
+    mockProvider.loadPlaylists.mockResolvedValue([{ id: 'p1', name: 'Test', trackCount: 3 }]);
     const { getByTestId, queryByTestId } = await renderWithProviders(<SetupScreen />);
     await act(async () => {
       await fireEvent.press(getByTestId('source-playlist'));
@@ -333,7 +382,9 @@ describe('SetupScreen', () => {
 
     expect(alertSpy).toHaveBeenCalledWith(
       'Discard your current sift?',
-      expect.stringContaining('2 decisions so far (1 kept, 1 removed, 0 skipped) in your sift of "Mix"'),
+      expect.stringContaining(
+        '2 decisions so far (1 kept, 1 removed, 0 skipped) in your sift of "Mix"',
+      ),
       expect.arrayContaining([
         expect.objectContaining({ text: 'Cancel', style: 'cancel' }),
         expect.objectContaining({ text: 'Discard', style: 'destructive' }),
@@ -374,7 +425,9 @@ describe('SetupScreen', () => {
     expect(alertSpy).toHaveBeenCalledWith(
       'Start Over?',
       expect.stringContaining('1 decision so far'),
-      expect.arrayContaining([expect.objectContaining({ text: 'Discard and Start Over', style: 'destructive' })]),
+      expect.arrayContaining([
+        expect.objectContaining({ text: 'Discard and Start Over', style: 'destructive' }),
+      ]),
     );
     expect(clearSession).not.toHaveBeenCalled();
     alertSpy.mockRestore();
@@ -407,7 +460,9 @@ describe('SetupScreen', () => {
     await act(async () => {
       buttons.find((b) => b.text === 'Discard and Start Over')?.onPress?.();
     });
-    expect(logRemoval).toHaveBeenCalledWith(expect.objectContaining({ track: mockTrackB, source: { type: 'library' } }));
+    expect(logRemoval).toHaveBeenCalledWith(
+      expect.objectContaining({ track: mockTrackB, source: { type: 'library' } }),
+    );
     expect(clearSession).toHaveBeenCalled();
     alertSpy.mockRestore();
   });
@@ -469,9 +524,17 @@ describe('SetupScreen', () => {
     const { loadSession } = require('../../src/services/SessionStore');
     let resolveSession: ((session: unknown) => void) | undefined;
     (loadSession as jest.Mock).mockImplementationOnce(
-      () => new Promise((res) => { resolveSession = res; }),
+      () =>
+        new Promise((res) => {
+          resolveSession = res;
+        }),
     );
-    const { getByTestId } = await renderWithProviders(<><SetupScreen /><PhaseProbe /></>);
+    const { getByTestId } = await renderWithProviders(
+      <>
+        <SetupScreen />
+        <PhaseProbe />
+      </>,
+    );
     // The source is picked while the saved sift loads, so no sheet pops up
     // and the inline Resume block offers it instead.
     await act(async () => {
@@ -496,11 +559,14 @@ describe('SetupScreen', () => {
     expect(getByTestId('probe-phase').props.children).toBe('done:1');
   });
 
-  test('the inline Resume block shows the saved sift\'s counts (#142)', async () => {
+  test("the inline Resume block shows the saved sift's counts (#142)", async () => {
     const { loadSession } = require('../../src/services/SessionStore');
     let resolveSession: ((session: unknown) => void) | undefined;
     (loadSession as jest.Mock).mockImplementationOnce(
-      () => new Promise((res) => { resolveSession = res; }),
+      () =>
+        new Promise((res) => {
+          resolveSession = res;
+        }),
     );
     const { getByTestId } = await renderWithProviders(<SetupScreen />);
     await act(async () => {
@@ -560,7 +626,12 @@ describe('SetupScreen', () => {
       removalErrors: ['Could not remove Track B'],
     });
 
-    const { getByTestId } = await renderWithProviders(<><SetupScreen /><ErrorsProbe /></>);
+    const { getByTestId } = await renderWithProviders(
+      <>
+        <SetupScreen />
+        <ErrorsProbe />
+      </>,
+    );
     await act(async () => {});
     await act(async () => {
       await fireEvent.press(getByTestId('resume-modal-resume'));
@@ -589,12 +660,21 @@ describe('SetupScreen', () => {
       provider: 'apple-music',
       source: { type: 'library' },
     });
-    const { getByTestId } = await renderWithProviders(<><SetupScreen /><PhaseProbe /></>);
+    const { getByTestId } = await renderWithProviders(
+      <>
+        <SetupScreen />
+        <PhaseProbe />
+      </>,
+    );
     await act(async () => {});
     await act(async () => {
       await fireEvent.press(getByTestId('resume-modal-resume'));
     });
-    expect(alertSpy).toHaveBeenCalledWith('Music Access Required', expect.any(String), expect.any(Array));
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Music Access Required',
+      expect.any(String),
+      expect.any(Array),
+    );
     expect(getByTestId('probe-phase').props.children).toBe('setup');
     alertSpy.mockRestore();
   });
@@ -624,7 +704,9 @@ describe('SetupScreen', () => {
     await act(async () => {
       await fireEvent.press(getByText('Start Sifting'));
     });
-    expect(logRemoval).toHaveBeenCalledWith(expect.objectContaining({ track: mockTrackB, source: mix }));
+    expect(logRemoval).toHaveBeenCalledWith(
+      expect.objectContaining({ track: mockTrackB, source: mix }),
+    );
     // Collected in "Sift — Removed", like any Remove; the playlist isn't edited.
     expect(mockProvider.removeFromLibrary).toHaveBeenCalledWith([mockTrackB.id]);
     expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
@@ -659,7 +741,12 @@ describe('SetupScreen', () => {
       ...extra,
     });
 
-    const { getByTestId } = await renderWithProviders(<><SetupScreen /><FailedIdsProbe /></>);
+    const { getByTestId } = await renderWithProviders(
+      <>
+        <SetupScreen />
+        <FailedIdsProbe />
+      </>,
+    );
     await act(async () => {});
     await act(async () => {
       await fireEvent.press(getByTestId('resume-modal-resume'));
@@ -668,7 +755,11 @@ describe('SetupScreen', () => {
   });
 
   test.each([
-    ['a playlist sift reloads its playlist (#54)', { type: 'playlist', playlist: { id: 'pl-9', name: 'Mix', trackCount: 3 } }, 'pl-9'],
+    [
+      'a playlist sift reloads its playlist (#54)',
+      { type: 'playlist', playlist: { id: 'pl-9', name: 'Mix', trackCount: 3 } },
+      'pl-9',
+    ],
     ['a library sift has no playlist to reload', { type: 'library' }, undefined],
   ])('Resume warms the cache: %s', async (_label, source, expectedPlaylist) => {
     const warm = jest.fn().mockResolvedValue(3);
@@ -703,11 +794,19 @@ describe('SetupScreen', () => {
   test('Resume marks the cache warming until each warm-up is done, so the card can retry', async () => {
     function CacheProbe() {
       const { state } = useSift();
-      return <Text testID="probe-cache">{`${state.songCacheWarming}:${state.songCacheGeneration}`}</Text>;
+      return (
+        <Text testID="probe-cache">{`${state.songCacheWarming}:${state.songCacheGeneration}`}</Text>
+      );
     }
     let finishFirst!: () => void;
-    const warm = jest.fn()
-      .mockImplementationOnce(() => new Promise<number>((resolve) => { finishFirst = () => resolve(2); }))
+    const warm = jest
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<number>((resolve) => {
+            finishFirst = () => resolve(2);
+          }),
+      )
       .mockResolvedValue(1);
     (mockProvider as { warmSongCache?: jest.Mock }).warmSongCache = warm;
     try {
@@ -723,7 +822,12 @@ describe('SetupScreen', () => {
         provider: 'apple-music',
         source: { type: 'library' },
       });
-      const { getByTestId } = await renderWithProviders(<><SetupScreen /><CacheProbe /></>);
+      const { getByTestId } = await renderWithProviders(
+        <>
+          <SetupScreen />
+          <CacheProbe />
+        </>,
+      );
       await act(async () => {});
       await act(async () => {
         await fireEvent.press(getByTestId('resume-modal-resume'));
@@ -825,10 +929,12 @@ describe('SetupScreen', () => {
     mockProvider.loadPlaylists.mockClear();
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const { InteractionManager } = require('react-native');
-    const later = jest.spyOn(InteractionManager, 'runAfterInteractions').mockImplementation((cb: unknown) => {
-      (cb as () => void)();
-      return { then: () => undefined, done: () => undefined, cancel: () => undefined };
-    });
+    const later = jest
+      .spyOn(InteractionManager, 'runAfterInteractions')
+      .mockImplementation((cb: unknown) => {
+        (cb as () => void)();
+        return { then: () => undefined, done: () => undefined, cancel: () => undefined };
+      });
     const { loadSession } = require('../../src/services/SessionStore');
     (loadSession as jest.Mock).mockResolvedValue(mixSession);
     const { getByTestId } = await renderWithProviders(<SetupScreen />);
@@ -840,7 +946,9 @@ describe('SetupScreen', () => {
       'Start Over?',
       // Apple Music collects removals, so nothing about the history.
       'You have 1 decision so far (1 kept, 0 removed, 0 skipped) in your sift of "Mix". You won’t be able to resume it.',
-      expect.arrayContaining([expect.objectContaining({ text: 'Discard and Start Over', style: 'destructive' })]),
+      expect.arrayContaining([
+        expect.objectContaining({ text: 'Discard and Start Over', style: 'destructive' }),
+      ]),
     );
     // Nothing goes before the user confirms.
     expect(clearHistoryForSource).not.toHaveBeenCalled();
@@ -857,15 +965,17 @@ describe('SetupScreen', () => {
     later.mockRestore();
   });
 
-  test('a playlist Start Over that can\'t clear the removal history keeps the sift and says so', async () => {
+  test("a playlist Start Over that can't clear the removal history keeps the sift and says so", async () => {
     (clearSession as jest.Mock).mockClear();
     (clearHistoryForSource as jest.Mock).mockResolvedValueOnce(false);
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const { InteractionManager } = require('react-native');
-    const later = jest.spyOn(InteractionManager, 'runAfterInteractions').mockImplementation((cb: unknown) => {
-      (cb as () => void)();
-      return { then: () => undefined, done: () => undefined, cancel: () => undefined };
-    });
+    const later = jest
+      .spyOn(InteractionManager, 'runAfterInteractions')
+      .mockImplementation((cb: unknown) => {
+        (cb as () => void)();
+        return { then: () => undefined, done: () => undefined, cancel: () => undefined };
+      });
     const { loadSession } = require('../../src/services/SessionStore');
     (loadSession as jest.Mock).mockResolvedValue(mixSession);
     const { getByTestId } = await renderWithProviders(<SetupScreen />);
@@ -877,7 +987,9 @@ describe('SetupScreen', () => {
     await act(async () => {
       buttons.find((b) => b.style === 'destructive')?.onPress?.();
     });
-    expect(getByTestId('setup-error').props.children).toBe('Could not clear the removal history. Try again.');
+    expect(getByTestId('setup-error').props.children).toBe(
+      'Could not clear the removal history. Try again.',
+    );
     expect(clearSession).not.toHaveBeenCalled();
     alertSpy.mockRestore();
     later.mockRestore();
@@ -888,10 +1000,12 @@ describe('SetupScreen', () => {
     (clearSession as jest.Mock).mockClear();
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const { InteractionManager } = require('react-native');
-    const later = jest.spyOn(InteractionManager, 'runAfterInteractions').mockImplementation((cb: unknown) => {
-      (cb as () => void)();
-      return { then: () => undefined, done: () => undefined, cancel: () => undefined };
-    });
+    const later = jest
+      .spyOn(InteractionManager, 'runAfterInteractions')
+      .mockImplementation((cb: unknown) => {
+        (cb as () => void)();
+        return { then: () => undefined, done: () => undefined, cancel: () => undefined };
+      });
     const { loadSession } = require('../../src/services/SessionStore');
     (loadSession as jest.Mock).mockResolvedValue({ ...mixSession, cursor: 0, kept: [] });
     const { getByTestId } = await renderWithProviders(<SetupScreen />);
@@ -902,7 +1016,9 @@ describe('SetupScreen', () => {
     expect(alertSpy).toHaveBeenCalledWith(
       'Start Over?',
       'This starts "Mix" over. Songs you removed stay in "Sift \u2014 Removed".',
-      expect.arrayContaining([expect.objectContaining({ text: 'Start Over', style: 'destructive' })]),
+      expect.arrayContaining([
+        expect.objectContaining({ text: 'Start Over', style: 'destructive' }),
+      ]),
     );
     expect(clearHistoryForSource).not.toHaveBeenCalled();
     const buttons = (alertSpy.mock.calls[0][2] ?? []) as { style?: string; onPress?: () => void }[];
@@ -923,7 +1039,9 @@ describe('SetupScreen', () => {
     // resume sheet, and Resume restored it over the newer sift.
     function Probe() {
       const { state } = useSift();
-      return <Text testID="probe-cursor">{`${state.phase}:${state.cursor}:${state.skipped.length}`}</Text>;
+      return (
+        <Text testID="probe-cursor">{`${state.phase}:${state.cursor}:${state.skipped.length}`}</Text>
+      );
     }
     const BackedOut = () => {
       const { dispatch, decide } = useSift();
@@ -951,8 +1069,15 @@ describe('SetupScreen', () => {
       provider: 'apple-music',
       source: { type: 'library' },
     });
-    mockProvider.loadPlaylists.mockResolvedValue([{ id: 'p1', name: 'My Playlist', trackCount: 8 }]);
-    const { getByTestId, getByText, queryByTestId } = await renderWithProviders(<><BackedOut /><Probe /></>);
+    mockProvider.loadPlaylists.mockResolvedValue([
+      { id: 'p1', name: 'My Playlist', trackCount: 8 },
+    ]);
+    const { getByTestId, getByText, queryByTestId } = await renderWithProviders(
+      <>
+        <BackedOut />
+        <Probe />
+      </>,
+    );
     await act(async () => {});
     expect(queryByTestId('resume-session-modal')).toBeNull();
     // Away to a playlist and back to the library.
@@ -972,11 +1097,14 @@ describe('SetupScreen', () => {
     expect(getByTestId('probe-cursor').props.children).toBe('sifting:2:2');
   });
 
-  test('without the sift in memory, picking the saved sift\'s source still offers it', async () => {
+  test("without the sift in memory, picking the saved sift's source still offers it", async () => {
     const { loadSession } = require('../../src/services/SessionStore');
     let resolveSession: ((session: unknown) => void) | undefined;
     (loadSession as jest.Mock).mockImplementationOnce(
-      () => new Promise((res) => { resolveSession = res; }),
+      () =>
+        new Promise((res) => {
+          resolveSession = res;
+        }),
     );
     mockProvider.loadPlaylists.mockResolvedValue([{ id: 'p1', name: 'Mix', trackCount: 3 }]);
     const { getByTestId, queryByTestId } = await renderWithProviders(<SetupScreen />);
@@ -996,7 +1124,6 @@ describe('SetupScreen', () => {
     });
     expect(queryByTestId('resume-session-modal')).toBeTruthy();
   });
-
 
   test('backing out of an active sift does not pop the resume modal over the inline Resume button', async () => {
     // Back-out leaves the same session both in memory (tracks/cursor/
@@ -1038,7 +1165,10 @@ describe('SetupScreen', () => {
     const { loadSession } = require('../../src/services/SessionStore');
     let resolveSession: ((session: unknown) => void) | undefined;
     (loadSession as jest.Mock).mockImplementationOnce(
-      () => new Promise((res) => { resolveSession = res; }),
+      () =>
+        new Promise((res) => {
+          resolveSession = res;
+        }),
     );
     const ProviderProbe = () => {
       const { state } = useSift();
@@ -1051,7 +1181,10 @@ describe('SetupScreen', () => {
     };
 
     const { getByTestId, queryByTestId } = await renderWithProviders(
-      <><SetupScreen /><ProviderProbe /></>,
+      <>
+        <SetupScreen />
+        <ProviderProbe />
+      </>,
     );
     // The user picks the library source while loadSession is still pending…
     await act(async () => {
@@ -1141,7 +1274,9 @@ describe('SetupScreen: songs deleted in Music (#183)', () => {
     const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
     mockDeletedInMusicCount.mockResolvedValueOnce(3);
     const { findByTestId, toJSON } = await renderWithProviders(<SetupScreen />);
-    expect(await findByTestId('deleted-in-music-note')).toHaveTextContent('You deleted 3 songs from your library in Music.');
+    expect(await findByTestId('deleted-in-music-note')).toHaveTextContent(
+      'You deleted 3 songs from your library in Music.',
+    );
     expect(mockDeletedInMusicCount).toHaveBeenCalledWith(mockProvider, 'apple-music');
     expect(announce).toHaveBeenCalledWith('You deleted 3 songs from your library in Music.');
     // Shown, so it's said no more.
@@ -1160,9 +1295,14 @@ describe('SetupScreen: songs deleted in Music (#183)', () => {
     announce.mockRestore();
   });
 
-  test('a Setup gone before the count arrives doesn\'t mark it shown, so the next Setup says it', async () => {
+  test("a Setup gone before the count arrives doesn't mark it shown, so the next Setup says it", async () => {
     let answer: (count: number) => void = () => {};
-    mockDeletedInMusicCount.mockImplementationOnce(() => new Promise<number>((resolve) => { answer = resolve; }));
+    mockDeletedInMusicCount.mockImplementationOnce(
+      () =>
+        new Promise<number>((resolve) => {
+          answer = resolve;
+        }),
+    );
     const { unmount } = await renderWithProviders(<SetupScreen />);
     await unmount();
     await act(async () => answer(2));
@@ -1188,14 +1328,26 @@ describe('SetupScreen: songs sifted before (#143)', () => {
   });
 
   test('says how many kept songs a library sift leaves out, and the switch brings them back', async () => {
-    await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({ 'apple-music:library': ['a', 'b', 'c'] }));
-    const { getByTestId } = await renderWithProviders(<><SetupScreen /><SkipProbe /></>);
+    await AsyncStorage.setItem(
+      'sift_reviewed_ledger',
+      JSON.stringify({ 'apple-music:library': ['a', 'b', 'c'] }),
+    );
+    const { getByTestId } = await renderWithProviders(
+      <>
+        <SetupScreen />
+        <SkipProbe />
+      </>,
+    );
     await act(async () => {});
-    expect(getByTestId('reviewed-note').props.children).toBe('3 songs you’ve already kept are left out of new sifts.');
+    expect(getByTestId('reviewed-note').props.children).toBe(
+      '3 songs you’ve already kept are left out of new sifts.',
+    );
     await act(async () => {
       await fireEvent.press(getByTestId('include-sifted-switch'));
     });
-    expect(getByTestId('reviewed-note').props.children).toBe('Songs you’ve already kept are included in new sifts. Songs you removed stay out.');
+    expect(getByTestId('reviewed-note').props.children).toBe(
+      'Songs you’ve already kept are included in new sifts. Songs you removed stay out.',
+    );
     await act(async () => {
       await fireEvent.press(getByTestId('setup-start-sifting'));
     });
@@ -1209,7 +1361,13 @@ describe('SetupScreen: songs sifted before (#143)', () => {
       { id: 's1', name: 'My Playlist - Sifted', trackCount: 2 },
     ]);
     mockProvider.loadPlaylistTracks.mockImplementation(async (id: string) =>
-      (id === 's1' ? [{ ...mockTrackA, id: 'i.1' }, { ...mockTrackB, id: 'i.2' }] : [mockTrackA, mockTrackB, mockTrackC]));
+      id === 's1'
+        ? [
+            { ...mockTrackA, id: 'i.1' },
+            { ...mockTrackB, id: 'i.2' },
+          ]
+        : [mockTrackA, mockTrackB, mockTrackC],
+    );
     try {
       const { getByTestId, queryByTestId } = await renderWithProviders(<SetupScreen />);
       await act(async () => {});
@@ -1221,7 +1379,9 @@ describe('SetupScreen: songs sifted before (#143)', () => {
         await fireEvent.press(getByTestId('playlist-row-p1'));
       });
       await act(async () => {});
-      expect(getByTestId('reviewed-note').props.children).toBe('2 songs you’ve already kept are left out of new sifts.');
+      expect(getByTestId('reviewed-note').props.children).toBe(
+        '2 songs you’ve already kept are left out of new sifts.',
+      );
       expect(getByTestId('include-sifted-switch')).toBeTruthy();
     } finally {
       mockProvider.loadPlaylists.mockResolvedValue([]);
@@ -1230,17 +1390,27 @@ describe('SetupScreen: songs sifted before (#143)', () => {
   });
 
   test('a playlist shows its own kept songs, and the switch brings them back for it', async () => {
-    await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({
-      'apple-music:library': ['x'],
-      'apple-music:playlist:p1': ['a', 'b'],
-    }));
+    await AsyncStorage.setItem(
+      'sift_reviewed_ledger',
+      JSON.stringify({
+        'apple-music:library': ['x'],
+        'apple-music:playlist:p1': ['a', 'b'],
+      }),
+    );
     mockProvider.loadPlaylists.mockResolvedValue([
       { id: 'p1', name: 'My Playlist', trackCount: 8 },
       { id: 'p2', name: 'Other', trackCount: 3 },
     ]);
-    const { getByTestId, queryByTestId } = await renderWithProviders(<><SetupScreen /><SkipProbe /></>);
+    const { getByTestId, queryByTestId } = await renderWithProviders(
+      <>
+        <SetupScreen />
+        <SkipProbe />
+      </>,
+    );
     await act(async () => {});
-    expect(getByTestId('reviewed-note').props.children).toBe('1 song you’ve already kept is left out of new sifts.');
+    expect(getByTestId('reviewed-note').props.children).toBe(
+      '1 song you’ve already kept is left out of new sifts.',
+    );
     await act(async () => {
       await fireEvent.press(getByTestId('source-playlist'));
     });
@@ -1255,7 +1425,9 @@ describe('SetupScreen: songs sifted before (#143)', () => {
     await act(async () => {
       await fireEvent.press(getByTestId('playlist-row-p1'));
     });
-    expect(getByTestId('reviewed-note').props.children).toBe('2 songs you’ve already kept are left out of new sifts.');
+    expect(getByTestId('reviewed-note').props.children).toBe(
+      '2 songs you’ve already kept are left out of new sifts.',
+    );
     await act(async () => {
       await fireEvent.press(getByTestId('include-sifted-switch'));
     });
@@ -1266,9 +1438,17 @@ describe('SetupScreen: songs sifted before (#143)', () => {
   });
 
   test('the switch only counts for a source it shows for', async () => {
-    await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({ 'apple-music:library': ['x'] }));
+    await AsyncStorage.setItem(
+      'sift_reviewed_ledger',
+      JSON.stringify({ 'apple-music:library': ['x'] }),
+    );
     mockProvider.loadPlaylists.mockResolvedValue([{ id: 'p2', name: 'Other', trackCount: 3 }]);
-    const { getByTestId } = await renderWithProviders(<><SetupScreen /><SkipProbe /></>);
+    const { getByTestId } = await renderWithProviders(
+      <>
+        <SetupScreen />
+        <SkipProbe />
+      </>,
+    );
     await act(async () => {});
     await act(async () => {
       await fireEvent.press(getByTestId('include-sifted-switch'));
@@ -1286,12 +1466,21 @@ describe('SetupScreen: songs sifted before (#143)', () => {
     expect(getByTestId('probe-skip').props.children).toBe('loading:false');
   });
 
-
   test('left off, a new library sift filters them out', async () => {
-    await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({ 'apple-music:library': ['a'] }));
-    const { getByTestId } = await renderWithProviders(<><SetupScreen /><SkipProbe /></>);
+    await AsyncStorage.setItem(
+      'sift_reviewed_ledger',
+      JSON.stringify({ 'apple-music:library': ['a'] }),
+    );
+    const { getByTestId } = await renderWithProviders(
+      <>
+        <SetupScreen />
+        <SkipProbe />
+      </>,
+    );
     await act(async () => {});
-    expect(getByTestId('reviewed-note').props.children).toBe('1 song you’ve already kept is left out of new sifts.');
+    expect(getByTestId('reviewed-note').props.children).toBe(
+      '1 song you’ve already kept is left out of new sifts.',
+    );
     await act(async () => {
       await fireEvent.press(getByTestId('setup-start-sifting'));
     });
@@ -1314,7 +1503,10 @@ describe('SetupScreen: Start Over and songs sifted before (#143)', () => {
       if (ran.current) return;
       ran.current = true;
       if (playlist) {
-        dispatch({ type: 'SET_SOURCE', source: { type: 'playlist', playlist: { id: 'p1', name: 'Mix', trackCount: 3 } } });
+        dispatch({
+          type: 'SET_SOURCE',
+          source: { type: 'playlist', playlist: { id: 'p1', name: 'Mix', trackCount: 3 } },
+        });
       }
       dispatch({ type: 'LOAD_TRACKS', tracks: [mockTrackA, mockTrackB, mockTrackC] });
       decide('keep');
@@ -1331,35 +1523,44 @@ describe('SetupScreen: Start Over and songs sifted before (#143)', () => {
   test.each([
     [false, 'loading:false'],
     [true, 'loading:true'],
-  ])('a playlist Start Over follows the switch too, not "- Sifted" (on: %s)', async (on, expected) => {
-    jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
-      buttons?.find((b) => b.style === 'destructive')?.onPress?.();
-    });
-    const { InteractionManager } = require('react-native');
-    jest.spyOn(InteractionManager, 'runAfterInteractions').mockImplementation((cb: unknown) => {
-      (cb as () => void)();
-      return { then: () => undefined, done: () => undefined, cancel: () => undefined };
-    });
-    mockProvider.loadPlaylists.mockClear();
-    await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({ 'apple-music:playlist:p1': ['x'] }));
-    // Its "- Sifted" was looked for once already (services/SiftedImport).
-    await AsyncStorage.setItem('sift_sifted_imported', JSON.stringify(['apple-music:playlist:p1']));
-    const { getByTestId } = await renderWithProviders(<BackedOut playlist />);
-    await act(async () => {});
-    if (on) {
-      await act(async () => {
-        await fireEvent.press(getByTestId('include-sifted-switch'));
+  ])(
+    'a playlist Start Over follows the switch too, not "- Sifted" (on: %s)',
+    async (on, expected) => {
+      jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
+        buttons?.find((b) => b.style === 'destructive')?.onPress?.();
       });
-    }
-    await act(async () => {
-      await fireEvent.press(getByTestId('setup-start-over'));
-    });
-    await act(async () => {});
-    expect(getByTestId('probe-skip').props.children).toBe(expected);
-    expect(clearHistoryForSource).toHaveBeenCalledWith('p1');
-    expect(mockProvider.loadPlaylists).not.toHaveBeenCalled();
-    jest.restoreAllMocks();
-  });
+      const { InteractionManager } = require('react-native');
+      jest.spyOn(InteractionManager, 'runAfterInteractions').mockImplementation((cb: unknown) => {
+        (cb as () => void)();
+        return { then: () => undefined, done: () => undefined, cancel: () => undefined };
+      });
+      mockProvider.loadPlaylists.mockClear();
+      await AsyncStorage.setItem(
+        'sift_reviewed_ledger',
+        JSON.stringify({ 'apple-music:playlist:p1': ['x'] }),
+      );
+      // Its "- Sifted" was looked for once already (services/SiftedImport).
+      await AsyncStorage.setItem(
+        'sift_sifted_imported',
+        JSON.stringify(['apple-music:playlist:p1']),
+      );
+      const { getByTestId } = await renderWithProviders(<BackedOut playlist />);
+      await act(async () => {});
+      if (on) {
+        await act(async () => {
+          await fireEvent.press(getByTestId('include-sifted-switch'));
+        });
+      }
+      await act(async () => {
+        await fireEvent.press(getByTestId('setup-start-over'));
+      });
+      await act(async () => {});
+      expect(getByTestId('probe-skip').props.children).toBe(expected);
+      expect(clearHistoryForSource).toHaveBeenCalledWith('p1');
+      expect(mockProvider.loadPlaylists).not.toHaveBeenCalled();
+      jest.restoreAllMocks();
+    },
+  );
 
   test.each([
     [false, 'loading:false'],
@@ -1373,7 +1574,10 @@ describe('SetupScreen: Start Over and songs sifted before (#143)', () => {
       (cb as () => void)();
       return { then: () => undefined, done: () => undefined, cancel: () => undefined };
     });
-    await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({ 'apple-music:library': ['x'] }));
+    await AsyncStorage.setItem(
+      'sift_reviewed_ledger',
+      JSON.stringify({ 'apple-music:library': ['x'] }),
+    );
     const { getByTestId } = await renderWithProviders(<BackedOut />);
     await act(async () => {});
     // Shown beside the resume block too: it decides what Start Over loads.
@@ -1409,12 +1613,21 @@ describe('LoadingScreen', () => {
   });
 
   test('Cancel goes back to Setup, and the load finishing later changes nothing (#177)', async () => {
-    let resolveLibrary!: (tracks: typeof mockTrackA[]) => void;
-    mockProvider.loadLibrary.mockImplementationOnce(() => new Promise((res) => { resolveLibrary = res; }));
+    let resolveLibrary!: (tracks: (typeof mockTrackA)[]) => void;
+    mockProvider.loadLibrary.mockImplementationOnce(
+      () =>
+        new Promise((res) => {
+          resolveLibrary = res;
+        }),
+    );
     let api!: ReturnType<typeof useSift>;
     const Probe = () => {
       api = useSift();
-      return api.state.phase === 'loading' ? <LoadingScreen /> : <Text testID="probe-phase">{api.state.phase}</Text>;
+      return api.state.phase === 'loading' ? (
+        <LoadingScreen />
+      ) : (
+        <Text testID="probe-phase">{api.state.phase}</Text>
+      );
     };
     const Start = () => {
       const { dispatch } = useSift();
@@ -1439,7 +1652,9 @@ describe('LoadingScreen', () => {
   });
 
   test('the bar is a progress bar VoiceOver reads, and each step is announced (#174)', async () => {
-    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions').mockImplementation(() => {});
+    const announce = jest
+      .spyOn(AccessibilityInfo, 'announceForAccessibilityWithOptions')
+      .mockImplementation(() => {});
     let api!: ReturnType<typeof useSift>;
     const Probe = () => {
       api = useSift();
@@ -1458,7 +1673,11 @@ describe('LoadingScreen', () => {
     await act(async () => {
       api.dispatch({ type: 'SET_LOAD_PROGRESS', progress: 1.4 });
     });
-    expect(getByTestId('loading-progress').props.accessibilityValue).toEqual({ min: 0, max: 100, now: 100 });
+    expect(getByTestId('loading-progress').props.accessibilityValue).toEqual({
+      min: 0,
+      max: 100,
+      now: 100,
+    });
     // A step with no words says nothing.
     announce.mockClear();
     await act(async () => {
@@ -1468,7 +1687,6 @@ describe('LoadingScreen', () => {
     announce.mockRestore();
   });
 });
-
 
 describe('DoneScreen', () => {
   const tracks = [mockTrackA, mockTrackB, mockTrackC];
@@ -1526,7 +1744,9 @@ describe('DoneScreen', () => {
     });
     expect(alertSpy).toHaveBeenCalledWith(
       'Start Over?',
-      expect.stringContaining('You made 1 decision (1 kept, 0 removed, 0 skipped) in your sift of your library.'),
+      expect.stringContaining(
+        'You made 1 decision (1 kept, 0 removed, 0 skipped) in your sift of your library.',
+      ),
       expect.arrayContaining([
         expect.objectContaining({ text: 'Cancel', style: 'cancel' }),
         expect.objectContaining({ text: 'Discard and Start Over', style: 'destructive' }),
@@ -1553,16 +1773,18 @@ describe('DoneScreen', () => {
   test('Start Over on a playlist source with decisions asks first; collected removals stay, so nothing about history', async () => {
     (clearHistoryForSource as jest.Mock).mockClear();
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const { getByText } = await renderWithProviders(<PlaylistDecided decisions={['keep']} />, { initialTracks: tracks });
+    const { getByText } = await renderWithProviders(<PlaylistDecided decisions={['keep']} />, {
+      initialTracks: tracks,
+    });
     await act(async () => {});
     await act(async () => {
       await fireEvent.press(getByText('Start Over'));
     });
     expect(alertSpy).toHaveBeenCalledWith(
       'Start Over?',
-      'You made 1 decision (1 kept, 0 removed, 0 skipped) in your sift of "Mix". '
-        + 'Starting over clears this summary and its Restore buttons. '
-        + 'You won’t be able to resume it.',
+      'You made 1 decision (1 kept, 0 removed, 0 skipped) in your sift of "Mix". ' +
+        'Starting over clears this summary and its Restore buttons. ' +
+        'You won’t be able to resume it.',
       [
         { text: 'Cancel', style: 'cancel' },
         expect.objectContaining({ text: 'Discard and Start Over', style: 'destructive' }),
@@ -1578,7 +1800,9 @@ describe('DoneScreen', () => {
     mockProvider.removeFromPlaylist.mockClear();
     mockProvider.loadPlaylists.mockClear();
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const { getByText } = await renderWithProviders(<PlaylistDecided decisions={['keep']} />, { initialTracks: tracks });
+    const { getByText } = await renderWithProviders(<PlaylistDecided decisions={['keep']} />, {
+      initialTracks: tracks,
+    });
     await act(async () => {});
     await act(async () => {
       await fireEvent.press(getByText('Start Over'));
@@ -1599,7 +1823,9 @@ describe('DoneScreen', () => {
     (clearHistoryForSource as jest.Mock).mockClear();
     (clearSession as jest.Mock).mockClear();
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const { getByText } = await renderWithProviders(<PlaylistDecided decisions={[]} />, { initialTracks: tracks });
+    const { getByText } = await renderWithProviders(<PlaylistDecided decisions={[]} />, {
+      initialTracks: tracks,
+    });
     await act(async () => {});
     await act(async () => {
       await fireEvent.press(getByText('Start Over'));
@@ -1622,11 +1848,14 @@ describe('DoneScreen', () => {
     alertSpy.mockRestore();
   });
 
-  test('Start Over does not reset when the removal history can\'t be cleared, and can be tried again', async () => {
+  test("Start Over does not reset when the removal history can't be cleared, and can be tried again", async () => {
     (clearSession as jest.Mock).mockClear();
     (clearHistoryForSource as jest.Mock).mockClear().mockResolvedValueOnce(false);
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const { getByText, getByTestId } = await renderWithProviders(<PlaylistDecided decisions={['skip']} />, { initialTracks: tracks });
+    const { getByText, getByTestId } = await renderWithProviders(
+      <PlaylistDecided decisions={['skip']} />,
+      { initialTracks: tracks },
+    );
     await act(async () => {});
     await act(async () => {
       await fireEvent.press(getByText('Start Over'));
@@ -1635,12 +1864,13 @@ describe('DoneScreen', () => {
     await act(async () => {
       buttons.find((b) => b.style === 'destructive')?.onPress?.();
     });
-    expect(getByTestId('start-over-error').props.children).toBe('Could not clear the removal history. Try again.');
+    expect(getByTestId('start-over-error').props.children).toBe(
+      'Could not clear the removal history. Try again.',
+    );
     expect(clearSession).not.toHaveBeenCalled();
     expect(getByTestId('done-start-over').props.accessibilityState?.disabled).toBe(false);
     alertSpy.mockRestore();
   });
-
 
   // Removes a song, then shows Done (#173).
   const RemoveThenDone = () => {
@@ -1656,7 +1886,10 @@ describe('DoneScreen', () => {
   };
 
   test('a Remove that reached "Sift \u2014 Removed" gets the Finish in Music card, first thing (#173)', async () => {
-    const { getByText, getByTestId, getByLabelText } = await renderWithProviders(<RemoveThenDone />, { initialTracks: tracks });
+    const { getByText, getByTestId, getByLabelText } = await renderWithProviders(
+      <RemoveThenDone />,
+      { initialTracks: tracks },
+    );
     expect(getByText('Tracks Removed')).toBeTruthy();
     const title = getByTestId('finish-in-music');
     expect(title.props.children).toBe('Finish in Music');
@@ -1677,13 +1910,19 @@ describe('DoneScreen', () => {
         if (ran.current) return;
         ran.current = true;
         decide('remove');
-        dispatch({ type: 'ADD_REMOVAL_ERROR', error: mockTrackA.name, failedRemovalId: mockTrackA.id });
+        dispatch({
+          type: 'ADD_REMOVAL_ERROR',
+          error: mockTrackA.name,
+          failedRemovalId: mockTrackA.id,
+        });
         dispatch({ type: 'FINISH' });
       }, [decide, dispatch]);
       if (state.removed.length === 0) return null;
       return <DoneScreen />;
     };
-    const { getByTestId, queryByTestId } = await renderWithProviders(<AllFailed />, { initialTracks: tracks });
+    const { getByTestId, queryByTestId } = await renderWithProviders(<AllFailed />, {
+      initialTracks: tracks,
+    });
     await act(async () => {});
     expect(getByTestId('removal-errors')).toBeTruthy();
     expect(queryByTestId('finish-in-music')).toBeNull();
@@ -1692,11 +1931,13 @@ describe('DoneScreen', () => {
     mockProvider.removeFromLibrary.mockReset().mockResolvedValue(undefined);
   });
 
-  test('Open Music opens the Music app, and says so when it can\'t (#173)', async () => {
+  test("Open Music opens the Music app, and says so when it can't (#173)", async () => {
     const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(true);
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     try {
-      const { getByTestId } = await renderWithProviders(<RemoveThenDone />, { initialTracks: tracks });
+      const { getByTestId } = await renderWithProviders(<RemoveThenDone />, {
+        initialTracks: tracks,
+      });
       await fireEvent.press(getByTestId('open-music'));
       expect(openURL).toHaveBeenCalledWith('music://');
       expect(alert).not.toHaveBeenCalled();
@@ -1704,7 +1945,10 @@ describe('DoneScreen', () => {
       openURL.mockRejectedValueOnce(new Error('no Music app'));
       await fireEvent.press(getByTestId('open-music'));
       await act(async () => {});
-      expect(alert).toHaveBeenCalledWith('Couldn\u2019t open Music', 'Open the Music app yourself to finish.');
+      expect(alert).toHaveBeenCalledWith(
+        'Couldn\u2019t open Music',
+        'Open the Music app yourself to finish.',
+      );
     } finally {
       openURL.mockRestore();
       alert.mockRestore();
@@ -1714,10 +1958,14 @@ describe('DoneScreen', () => {
   test('Share List shares the removed songs; a sheet that fails to open is no error (#173)', async () => {
     const share = jest.spyOn(Share, 'share').mockResolvedValueOnce({ action: 'sharedAction' });
     try {
-      const { getByTestId } = await renderWithProviders(<RemoveThenDone />, { initialTracks: tracks });
+      const { getByTestId } = await renderWithProviders(<RemoveThenDone />, {
+        initialTracks: tracks,
+      });
       await fireEvent.press(getByTestId('share-removed'));
       expect(share).toHaveBeenCalledTimes(1);
-      expect(share.mock.calls[0][0]).toEqual({ message: `${mockTrackA.name} \u2014 ${mockTrackA.artist}` });
+      expect(share.mock.calls[0][0]).toEqual({
+        message: `${mockTrackA.name} \u2014 ${mockTrackA.artist}`,
+      });
 
       // A sheet that fails to open throws nothing at the user.
       share.mockRejectedValueOnce(new Error('could not present'));
@@ -1737,7 +1985,10 @@ describe('DoneScreen', () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     let resolveRestore: (() => void) | undefined;
     mockProvider.restoreRemoved.mockImplementationOnce(
-      () => new Promise<number>((res) => { resolveRestore = () => res(1); }),
+      () =>
+        new Promise<number>((res) => {
+          resolveRestore = () => res(1);
+        }),
     );
     const WithRemoved = () => {
       const { decide, dispatch } = useSift();
@@ -1757,10 +2008,7 @@ describe('DoneScreen', () => {
       }, [decide, dispatch]);
       return <DoneScreen />;
     };
-    const { getByTestId } = await renderWithProviders(
-      <WithRemoved />,
-      { initialTracks: tracks },
-    );
+    const { getByTestId } = await renderWithProviders(<WithRemoved />, { initialTracks: tracks });
     await act(async () => {});
 
     await act(async () => {
@@ -1804,7 +2052,11 @@ describe('DoneScreen', () => {
       const { decide, dispatch, state } = useSift();
       React.useEffect(() => {
         decide('remove');
-        dispatch({ type: 'ADD_REMOVAL_ERROR', error: mockTrackA.name, failedRemovalId: mockTrackA.id });
+        dispatch({
+          type: 'ADD_REMOVAL_ERROR',
+          error: mockTrackA.name,
+          failedRemovalId: mockTrackA.id,
+        });
       }, [decide, dispatch]);
       if (state.removed.length === 0) return null;
       return <DoneScreen />;
@@ -1822,12 +2074,13 @@ describe('DoneScreen', () => {
     expect(queryByText('These tracks have been added to "Sift — Removed" in Music.')).toBeNull();
     // The effect above re-fires: three tracks get removed and the error for
     // Track A is recorded more than once. Only Track A's removal failed.
-    expect(getByText('2 of 3 have been added to "Sift — Removed" in Music; 1 could not be.')).toBeTruthy();
+    expect(
+      getByText('2 of 3 have been added to "Sift — Removed" in Music; 1 could not be.'),
+    ).toBeTruthy();
     // Some landed, so Done says how to finish in Music.
     expect(getByTestId('finish-in-music')).toBeTruthy();
     mockProvider.removeFromLibrary.mockReset().mockResolvedValue(undefined);
   });
-
 });
 
 describe('DoneScreen: Finish, Continue, Review skipped (#142)', () => {
@@ -1862,7 +2115,9 @@ describe('DoneScreen: Finish, Continue, Review skipped (#142)', () => {
     );
     await act(async () => {});
     expect(getByTestId('done-title').props.children).toBe('Finished for now.');
-    expect(getByTestId('done-subtitle').props.children).toBe('You reviewed 1 of the 3 songs in this sift of your library. 2 not reviewed.');
+    expect(getByTestId('done-subtitle').props.children).toBe(
+      'You reviewed 1 of the 3 songs in this sift of your library. 2 not reviewed.',
+    );
     // Cards remain: Continue comes first, and Review skipped waits.
     expect(getByTestId('done-continue')).toBeTruthy();
     expect(queryByTestId('done-review-skipped')).toBeNull();
@@ -1874,7 +2129,7 @@ describe('DoneScreen: Finish, Continue, Review skipped (#142)', () => {
     expect(getByTestId('probe-phase').props.children).toBe('sifting');
   });
 
-  test('Change a decision opens the list of this sift\'s decisions, changeable', async () => {
+  test("Change a decision opens the list of this sift's decisions, changeable", async () => {
     const { getByTestId, getAllByTestId, queryByTestId } = await renderWithProviders(
       <DoneAfter decisions={['skip', 'skip']} />,
       { initialTracks: tracks },
@@ -1884,7 +2139,10 @@ describe('DoneScreen: Finish, Continue, Review skipped (#142)', () => {
     expect(link.props.accessibilityRole).toBe('button');
     await fireEvent.press(link);
     // The latest first.
-    expect(getAllByTestId(/^decision-row-/).map((row) => row.props.testID)).toEqual(['decision-row-2', 'decision-row-1']);
+    expect(getAllByTestId(/^decision-row-/).map((row) => row.props.testID)).toEqual([
+      'decision-row-2',
+      'decision-row-1',
+    ]);
     await act(async () => {
       await fireEvent.press(getByTestId('decision-keep-1'));
     });
@@ -1893,9 +2151,10 @@ describe('DoneScreen: Finish, Continue, Review skipped (#142)', () => {
     expect(queryByTestId('decisions-sheet')).toBeNull();
   });
 
-
   test('no decisions, no link', async () => {
-    const { queryByTestId } = await renderWithProviders(<DoneAfter decisions={[]} />, { initialTracks: tracks });
+    const { queryByTestId } = await renderWithProviders(<DoneAfter decisions={[]} />, {
+      initialTracks: tracks,
+    });
     await act(async () => {});
     expect(queryByTestId('done-change-decisions')).toBeNull();
   });
@@ -1907,7 +2166,9 @@ describe('DoneScreen: Finish, Continue, Review skipped (#142)', () => {
     );
     await act(async () => {});
     expect(getByTestId('done-title').props.children).toBe('All done.');
-    expect(getByTestId('done-subtitle').props.children).toBe('You reviewed every song in this sift of your library.');
+    expect(getByTestId('done-subtitle').props.children).toBe(
+      'You reviewed every song in this sift of your library.',
+    );
     expect(queryByTestId('done-continue')).toBeNull();
   });
 
@@ -1935,7 +2196,11 @@ describe('DoneScreen: Finish, Continue, Review skipped (#142)', () => {
     await act(async () => {
       await fireEvent.press(getByTestId('done-review-skipped'));
     });
-    expect(alertSpy).toHaveBeenCalledWith('Review skipped songs?', expect.stringContaining('Restore buttons'), expect.anything());
+    expect(alertSpy).toHaveBeenCalledWith(
+      'Review skipped songs?',
+      expect.stringContaining('Restore buttons'),
+      expect.anything(),
+    );
     // Not started until confirmed.
     expect(getByTestId('probe-phase').props.children).toBe('done');
     alertSpy.mockRestore();
@@ -1975,14 +2240,22 @@ describe('DoneScreen: Finish, Continue, Review skipped (#142)', () => {
     // pressed meanwhile must not record it as kept over that change.
     await emptyLedger();
     let finish: ((out: number) => void) | undefined;
-    mockProvider.restoreRemoved.mockImplementationOnce(() => new Promise<number>((resolve) => { finish = resolve; }));
+    mockProvider.restoreRemoved.mockImplementationOnce(
+      () =>
+        new Promise<number>((resolve) => {
+          finish = resolve;
+        }),
+    );
     let restore: ((track: typeof mockTrackA) => Promise<boolean>) | undefined;
     function Grab() {
       restore = useMusicProvider().restoreTrack;
       return null;
     }
     const { getByTestId } = await renderWithProviders(
-      <><DoneAfter decisions={['remove', 'skip', 'skip']} /><Grab /></>,
+      <>
+        <DoneAfter decisions={['remove', 'skip', 'skip']} />
+        <Grab />
+      </>,
       { initialTracks: tracks },
     );
     await act(async () => {});
@@ -2018,12 +2291,13 @@ describe('DoneScreen: Finish, Continue, Review skipped (#142)', () => {
   });
 
   test('with nothing removed, Done points at the next thing to do', async () => {
-    const { getByTestId } = await renderWithProviders(
-      <DoneAfter decisions={['keep']} />,
-      { initialTracks: tracks },
-    );
+    const { getByTestId } = await renderWithProviders(<DoneAfter decisions={['keep']} />, {
+      initialTracks: tracks,
+    });
     await act(async () => {});
-    expect(getByTestId('nothing-removed').props.children).toBe('Nothing removed yet. Continue sifting to keep going.');
+    expect(getByTestId('nothing-removed').props.children).toBe(
+      'Nothing removed yet. Continue sifting to keep going.',
+    );
   });
 });
 
@@ -2035,7 +2309,9 @@ describe('DoneScreen: Save kept songs as a playlist', () => {
 
   /** "Mix" (p1) holds the sift's songs; "- Sifted" playlists hold their own. */
   const holding = (sifted: Record<string, typeof tracks> = {}) => {
-    mockProvider.loadPlaylistTracks.mockReset().mockImplementation(async (id: string) => (id === 'p1' ? tracks : sifted[id] ?? []));
+    mockProvider.loadPlaylistTracks
+      .mockReset()
+      .mockImplementation(async (id: string) => (id === 'p1' ? tracks : (sifted[id] ?? [])));
   };
 
   beforeEach(async () => {
@@ -2054,7 +2330,13 @@ describe('DoneScreen: Save kept songs as a playlist', () => {
   });
 
   /** A loaded sift of "Mix" with these decisions, ended at Done. */
-  function MixDone({ decisions, source = mix }: { decisions: ('keep' | 'remove' | 'skip')[]; source?: typeof mix | { type: 'library' } }) {
+  function MixDone({
+    decisions,
+    source = mix,
+  }: {
+    decisions: ('keep' | 'remove' | 'skip')[];
+    source?: typeof mix | { type: 'library' };
+  }) {
     const { decide, dispatch, state } = useSift();
     const ran = React.useRef(false);
     React.useEffect(() => {
@@ -2073,7 +2355,10 @@ describe('DoneScreen: Save kept songs as a playlist', () => {
     );
   }
 
-  const renderMix = async (decisions: ('keep' | 'remove' | 'skip')[], source?: typeof mix | { type: 'library' }) => {
+  const renderMix = async (
+    decisions: ('keep' | 'remove' | 'skip')[],
+    source?: typeof mix | { type: 'library' },
+  ) => {
     const view = await renderWithProviders(<MixDone decisions={decisions} source={source} />);
     await act(async () => {});
     return view;
@@ -2082,11 +2367,13 @@ describe('DoneScreen: Save kept songs as a playlist', () => {
   /** A write the test lets finish. */
   function gate() {
     let resolve!: () => void;
-    const promise = new Promise<undefined>((res) => { resolve = () => res(undefined); });
+    const promise = new Promise<undefined>((res) => {
+      resolve = () => res(undefined);
+    });
     return { promise, resolve };
   }
 
-  test('a playlist sift with a keep offers the button; nothing is written until it\'s pressed', async () => {
+  test("a playlist sift with a keep offers the button; nothing is written until it's pressed", async () => {
     const { getByTestId, getByText } = await renderMix(['keep']);
     const button = getByTestId('save-kept-playlist');
     expect(button.props.accessibilityRole).toBe('button');
@@ -2107,14 +2394,20 @@ describe('DoneScreen: Save kept songs as a playlist', () => {
   });
 
   test('keeps from an earlier sift of the playlist are enough', async () => {
-    await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({ 'apple-music:playlist:p1': ['old'] }));
+    await AsyncStorage.setItem(
+      'sift_reviewed_ledger',
+      JSON.stringify({ 'apple-music:playlist:p1': ['old'] }),
+    );
     const { getByTestId } = await renderMix(['skip']);
     expect(getByTestId('save-kept-playlist')).toBeTruthy();
   });
 
   test('pressed: Saving… while it runs, then what it saved, and the button steps aside', async () => {
     // A keep from an earlier sift whose song has since left "Mix".
-    await AsyncStorage.setItem('sift_reviewed_ledger', JSON.stringify({ 'apple-music:playlist:p1': ['old'] }));
+    await AsyncStorage.setItem(
+      'sift_reviewed_ledger',
+      JSON.stringify({ 'apple-music:playlist:p1': ['old'] }),
+    );
     const add = gate();
     mockProvider.addToPlaylist.mockImplementationOnce(() => add.promise);
     const { getByTestId, getByText, queryByTestId } = await renderMix(['keep']);
@@ -2140,13 +2433,17 @@ describe('DoneScreen: Save kept songs as a playlist', () => {
   });
 
   test('all already there: says so', async () => {
-    mockProvider.loadPlaylists.mockResolvedValue([{ id: 's1', name: 'Mix - Sifted', trackCount: 1 }]);
+    mockProvider.loadPlaylists.mockResolvedValue([
+      { id: 's1', name: 'Mix - Sifted', trackCount: 1 },
+    ]);
     holding({ s1: [mockTrackA] });
     const { getByTestId } = await renderMix(['keep']);
     await act(async () => {
       await fireEvent.press(getByTestId('save-kept-playlist'));
     });
-    expect(getByTestId('save-kept-status').props.children).toBe('All kept songs are already in "Mix - Sifted".');
+    expect(getByTestId('save-kept-status').props.children).toBe(
+      'All kept songs are already in "Mix - Sifted".',
+    );
     expect(mockProvider.addToPlaylist).not.toHaveBeenCalled();
     expect(mockProvider.createPlaylist).not.toHaveBeenCalled();
   });
@@ -2157,7 +2454,9 @@ describe('DoneScreen: Save kept songs as a playlist', () => {
     await act(async () => {
       await fireEvent.press(getByTestId('save-kept-playlist'));
     });
-    expect(getByTestId('save-kept-status').props.children).toBe('Couldn’t save to "Mix - Sifted": Simulated add failure');
+    expect(getByTestId('save-kept-status').props.children).toBe(
+      'Couldn’t save to "Mix - Sifted": Simulated add failure',
+    );
     expect(getByText('Retry')).toBeTruthy();
     expect(getByTestId('save-kept-playlist').props.accessibilityState?.disabled).toBe(false);
     await act(async () => {
@@ -2172,7 +2471,9 @@ describe('DoneScreen: Save kept songs as a playlist', () => {
 
   test('songs Music refused show as a failure with Retry, not as "couldn\'t be added"', async () => {
     const { AddShortfallError } = require('../../src/utils/musicKit');
-    mockProvider.addToPlaylist.mockRejectedValueOnce(new AddShortfallError({ added: 0, unresolved: 0, failed: 1 }));
+    mockProvider.addToPlaylist.mockRejectedValueOnce(
+      new AddShortfallError({ added: 0, unresolved: 0, failed: 1 }),
+    );
     const { getByTestId, getByText } = await renderMix(['keep']);
     await act(async () => {
       await fireEvent.press(getByTestId('save-kept-playlist'));
@@ -2189,7 +2490,9 @@ describe('DoneScreen: Save kept songs as a playlist', () => {
 
   test('songs with nothing to add are counted, and the save still counts as done', async () => {
     const { AddShortfallError } = require('../../src/utils/musicKit');
-    mockProvider.addToPlaylist.mockRejectedValueOnce(new AddShortfallError({ added: 0, unresolved: 1, failed: 0 }));
+    mockProvider.addToPlaylist.mockRejectedValueOnce(
+      new AddShortfallError({ added: 0, unresolved: 1, failed: 0 }),
+    );
     const { getByTestId, queryByTestId } = await renderMix(['keep']);
     await act(async () => {
       await fireEvent.press(getByTestId('save-kept-playlist'));
@@ -2200,13 +2503,15 @@ describe('DoneScreen: Save kept songs as a playlist', () => {
     expect(queryByTestId('save-kept-playlist')).toBeNull();
   });
 
-  test('a failure that isn\'t an Error still reads', async () => {
+  test("a failure that isn't an Error still reads", async () => {
     mockProvider.createPlaylist.mockRejectedValueOnce('nope');
     const { getByTestId } = await renderMix(['keep']);
     await act(async () => {
       await fireEvent.press(getByTestId('save-kept-playlist'));
     });
-    expect(getByTestId('save-kept-status').props.children).toBe('Couldn’t save to "Mix - Sifted": Something went wrong.');
+    expect(getByTestId('save-kept-status').props.children).toBe(
+      'Couldn’t save to "Mix - Sifted": Something went wrong.',
+    );
   });
 
   test('after a save, a decision changed to Keep brings the button back', async () => {
@@ -2224,15 +2529,19 @@ describe('DoneScreen: Save kept songs as a playlist', () => {
     expect(getByTestId('save-kept-playlist')).toBeTruthy();
   });
 
-  test('decisions can\'t change, nor the sift go on, while a save runs; they can again after', async () => {
+  test("decisions can't change, nor the sift go on, while a save runs; they can again after", async () => {
     const add = gate();
     mockProvider.addToPlaylist.mockImplementationOnce(() => add.promise);
     const { getByTestId } = await renderMix(['keep']);
     await act(async () => {
       await fireEvent.press(getByTestId('save-kept-playlist'));
     });
-    expect(getByTestId('done-change-decisions').props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
-    expect(getByTestId('done-continue').props.accessibilityState).toEqual(expect.objectContaining({ disabled: true }));
+    expect(getByTestId('done-change-decisions').props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: true }),
+    );
+    expect(getByTestId('done-continue').props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: true }),
+    );
     await act(async () => {
       await fireEvent.press(getByTestId('done-continue'));
     });
@@ -2240,8 +2549,12 @@ describe('DoneScreen: Save kept songs as a playlist', () => {
     await act(async () => {
       add.resolve();
     });
-    expect(getByTestId('done-change-decisions').props.accessibilityState).toEqual(expect.objectContaining({ disabled: false }));
-    expect(getByTestId('done-continue').props.accessibilityState).toEqual(expect.objectContaining({ disabled: false }));
+    expect(getByTestId('done-change-decisions').props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: false }),
+    );
+    expect(getByTestId('done-continue').props.accessibilityState).toEqual(
+      expect.objectContaining({ disabled: false }),
+    );
   });
 
   test('leaving Done mid-save is fine: the save finishes on its own', async () => {
@@ -2258,7 +2571,6 @@ describe('DoneScreen: Save kept songs as a playlist', () => {
     expect(mockProvider.addToPlaylist).toHaveBeenCalledTimes(1);
   });
 });
-
 
 describe('PlaylistPicker', () => {
   const mockPlaylists = [
@@ -2282,7 +2594,12 @@ describe('PlaylistPicker', () => {
 
   test('renders playlist rows', async () => {
     const { getByTestId, getByText } = await renderWithProviders(
-      <PlaylistPicker playlists={mockPlaylists} loading={false} onSelect={jest.fn()} onCancel={jest.fn()} />,
+      <PlaylistPicker
+        playlists={mockPlaylists}
+        loading={false}
+        onSelect={jest.fn()}
+        onCancel={jest.fn()}
+      />,
     );
     expect(getByTestId('playlist-picker-list')).toBeTruthy();
     expect(getByText('Chill Vibes')).toBeTruthy();
@@ -2294,7 +2611,12 @@ describe('PlaylistPicker', () => {
   test('tapping a row calls onSelect with the playlist', async () => {
     const onSelect = jest.fn();
     const { getByTestId } = await renderWithProviders(
-      <PlaylistPicker playlists={mockPlaylists} loading={false} onSelect={onSelect} onCancel={jest.fn()} />,
+      <PlaylistPicker
+        playlists={mockPlaylists}
+        loading={false}
+        onSelect={onSelect}
+        onCancel={jest.fn()}
+      />,
     );
     await fireEvent.press(getByTestId('playlist-row-p1'));
     expect(onSelect).toHaveBeenCalledWith(mockPlaylists[0]);
@@ -2303,7 +2625,12 @@ describe('PlaylistPicker', () => {
   test('tapping cancel calls onCancel', async () => {
     const onCancel = jest.fn();
     const { getByTestId } = await renderWithProviders(
-      <PlaylistPicker playlists={mockPlaylists} loading={false} onSelect={jest.fn()} onCancel={onCancel} />,
+      <PlaylistPicker
+        playlists={mockPlaylists}
+        loading={false}
+        onSelect={jest.fn()}
+        onCancel={onCancel}
+      />,
     );
     await fireEvent.press(getByTestId('playlist-picker-cancel'));
     expect(onCancel).toHaveBeenCalled();
@@ -2312,7 +2639,12 @@ describe('PlaylistPicker', () => {
   test('renders singular "track" for count of 1', async () => {
     const single = [{ id: 'p1', name: 'Solo', trackCount: 1 }];
     const { getByText } = await renderWithProviders(
-      <PlaylistPicker playlists={single} loading={false} onSelect={jest.fn()} onCancel={jest.fn()} />,
+      <PlaylistPicker
+        playlists={single}
+        loading={false}
+        onSelect={jest.fn()}
+        onCancel={jest.fn()}
+      />,
     );
     expect(getByText('1 track')).toBeTruthy();
   });
@@ -2422,12 +2754,13 @@ describe('SettingsScreen', () => {
 
     await fireEvent.press(toggle);
     expect(getByTestId('start-at-chorus-value').props.children).toBe('true');
-    expect(getByTestId('start-at-chorus-switch').props.accessibilityState).toEqual({ checked: true });
+    expect(getByTestId('start-at-chorus-switch').props.accessibilityState).toEqual({
+      checked: true,
+    });
 
     await fireEvent.press(getByTestId('start-at-chorus-switch'));
     expect(getByTestId('start-at-chorus-value').props.children).toBe('false');
   });
-
 });
 
 describe('VoiceOver scan (#146)', () => {
@@ -2463,7 +2796,10 @@ describe('VoiceOver scan (#146)', () => {
     const Picked = () => {
       const { dispatch } = useSift();
       React.useEffect(() => {
-        dispatch({ type: 'SET_SOURCE', source: { type: 'playlist', playlist: { id: 'p1', name: 'Road Trip', trackCount: 3 } } });
+        dispatch({
+          type: 'SET_SOURCE',
+          source: { type: 'playlist', playlist: { id: 'p1', name: 'Road Trip', trackCount: 3 } },
+        });
       }, [dispatch]);
       return <SetupScreen />;
     };
@@ -2491,7 +2827,9 @@ describe('VoiceOver scan (#146)', () => {
       }, [decide, dispatch]);
       return <DoneScreen />;
     };
-    const { toJSON, getByTestId } = await renderWithProviders(<WithRemoved />, { initialTracks: [mockTrackA, mockTrackB, mockTrackC] });
+    const { toJSON, getByTestId } = await renderWithProviders(<WithRemoved />, {
+      initialTracks: [mockTrackA, mockTrackB, mockTrackC],
+    });
     await act(async () => {});
     // The Finish in Music card is in what's scanned (#173).
     expect(getByTestId('finish-in-music')).toBeTruthy();
@@ -2506,14 +2844,19 @@ describe('VoiceOver scan (#146)', () => {
       React.useEffect(() => {
         if (ran.current) return;
         ran.current = true;
-        dispatch({ type: 'SET_SOURCE', source: { type: 'playlist', playlist: { id: 'p1', name: 'Mix', trackCount: 3 } } });
+        dispatch({
+          type: 'SET_SOURCE',
+          source: { type: 'playlist', playlist: { id: 'p1', name: 'Mix', trackCount: 3 } },
+        });
         decide('keep');
         dispatch({ type: 'FINISH' });
       }, [decide, dispatch]);
       return state.phase === 'done' ? <DoneScreen /> : null;
     }
     mockProvider.loadPlaylists.mockResolvedValue([]);
-    const { getByTestId, toJSON } = await renderWithProviders(<Kept />, { initialTracks: [mockTrackA, mockTrackB, mockTrackC] });
+    const { getByTestId, toJSON } = await renderWithProviders(<Kept />, {
+      initialTracks: [mockTrackA, mockTrackB, mockTrackC],
+    });
     await act(async () => {});
     expect(a11yViolations(toJSON())).toEqual([]);
     await act(async () => {
@@ -2527,8 +2870,12 @@ describe('VoiceOver scan (#146)', () => {
   test('the source segments say which is selected', async () => {
     const { getByTestId } = await renderWithProviders(<SetupScreen />);
     await act(async () => {});
-    expect(getByTestId('source-library').props.accessibilityState).toMatchObject({ selected: true });
-    expect(getByTestId('source-playlist').props.accessibilityState).toMatchObject({ selected: false });
+    expect(getByTestId('source-library').props.accessibilityState).toMatchObject({
+      selected: true,
+    });
+    expect(getByTestId('source-playlist').props.accessibilityState).toMatchObject({
+      selected: false,
+    });
   });
 
   test('Settings', async () => {
@@ -2539,7 +2886,12 @@ describe('VoiceOver scan (#146)', () => {
 
   test('the playlist picker', async () => {
     const { toJSON } = await renderWithProviders(
-      <PlaylistPicker playlists={[{ id: 'p1', name: 'Chill Vibes', trackCount: 12 }]} loading={false} onSelect={jest.fn()} onCancel={jest.fn()} />,
+      <PlaylistPicker
+        playlists={[{ id: 'p1', name: 'Chill Vibes', trackCount: 12 }]}
+        loading={false}
+        onSelect={jest.fn()}
+        onCancel={jest.fn()}
+      />,
     );
     expect(a11yViolations(toJSON())).toEqual([]);
   });

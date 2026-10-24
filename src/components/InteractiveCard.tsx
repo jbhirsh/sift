@@ -1,9 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -109,11 +105,7 @@ export default function InteractiveCard({
     const rotation = offsetX / 20;
 
     return {
-      transform: [
-        { translateX: offsetX },
-        { translateY: offsetY },
-        { rotate: `${rotation}deg` },
-      ],
+      transform: [{ translateX: offsetX }, { translateY: offsetY }, { rotate: `${rotation}deg` }],
     };
   });
 
@@ -162,7 +154,12 @@ export default function InteractiveCard({
                 end={{ x: 1, y: 1 }}
                 style={styles.placeholderArtwork}
               >
-                <SymbolView name="music.note" size={48} tintColor={colors.textTertiary} accessibilityElementsHidden />
+                <SymbolView
+                  name="music.note"
+                  size={48}
+                  tintColor={colors.textTertiary}
+                  accessibilityElementsHidden
+                />
               </LinearGradient>
             )}
 
@@ -176,11 +173,7 @@ export default function InteractiveCard({
 
             {/* Glass info overlay at bottom */}
             <View style={styles.glassInfoContainer}>
-              <BlurView
-                intensity={60}
-                tint="dark"
-                style={StyleSheet.absoluteFill}
-              />
+              <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
               <View style={styles.trackInfoContent}>
                 <View style={styles.trackTextGroup}>
                   {/* Keep, Remove and Skip as VoiceOver actions on the song's
@@ -198,31 +191,28 @@ export default function InteractiveCard({
                     accessibilityActions={CARD_ACTIONS}
                     onAccessibilityAction={(event) => {
                       const decision = event.nativeEvent.actionName;
-                      if (decision === 'keep' || decision === 'remove' || decision === 'skip') handleDecide(decision);
+                      if (decision === 'keep' || decision === 'remove' || decision === 'skip')
+                        handleDecide(decision);
                     }}
                   >
                     <Text style={styles.trackName} numberOfLines={2}>
                       {track.name}
                     </Text>
                   </View>
-                  <Text
-                    style={styles.artistName}
-                    numberOfLines={1}
-                    testID="card-artist-name"
-                  >
+                  <Text style={styles.artistName} numberOfLines={1} testID="card-artist-name">
                     {track.artist}
                   </Text>
                 </View>
                 <View style={styles.metaRow}>
-                  <Text
-                    style={styles.albumName}
-                    numberOfLines={1}
-                    testID="card-album-name"
-                  >
+                  <Text style={styles.albumName} numberOfLines={1} testID="card-album-name">
                     {track.album}
                   </Text>
                   {meta.text !== '' && (
-                    <Text style={styles.playCount} accessibilityLabel={meta.label} testID="card-play-count">
+                    <Text
+                      style={styles.playCount}
+                      accessibilityLabel={meta.label}
+                      testID="card-play-count"
+                    >
                       {meta.text}
                     </Text>
                   )}

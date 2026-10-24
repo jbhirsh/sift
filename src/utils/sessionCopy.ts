@@ -61,8 +61,7 @@ export const SWIPE_HINT = 'Swipe right to keep, left to remove.';
  * The one-time note on the first Apple Music remove: Apple doesn't let apps
  * delete library songs or edit your playlists, so Remove only collects them.
  */
-export const FIRST_REMOVE_NOTE =
-  `Removed songs stay where they are for now: they're collected in "${APPLE_REMOVED_PLAYLIST}" so you can delete them from your library in Music.`;
+export const FIRST_REMOVE_NOTE = `Removed songs stay where they are for now: they're collected in "${APPLE_REMOVED_PLAYLIST}" so you can delete them from your library in Music.`;
 
 /**
  * Done's "Finish in Music" card (#173): Sift can only collect removed songs,
@@ -152,9 +151,11 @@ export function discardConfirmation(
   const name = source.type === 'playlist' ? `"${source.playlist.name}"` : 'your library';
   const n = (x: number) => x.toLocaleString('en-US');
   const breakdown = `(${n(counts.kept)} kept, ${n(counts.removed)} removed, ${n(counts.skipped)} skipped)`;
-  const lines = [kind === 'done'
-    ? `You made ${plural(counts.total, 'decision')} ${breakdown} in your sift of ${name}.`
-    : `You have ${plural(counts.total, 'decision')} so far ${breakdown} in your sift of ${name}.`];
+  const lines = [
+    kind === 'done'
+      ? `You made ${plural(counts.total, 'decision')} ${breakdown} in your sift of ${name}.`
+      : `You have ${plural(counts.total, 'decision')} so far ${breakdown} in your sift of ${name}.`,
+  ];
   const collecting = collectsRemovals(provider);
   // A playlist whose removals aren't collected keeps them in its own
   // history, which starting over clears. Collected ones stay in "Sift —
@@ -168,13 +169,15 @@ export function discardConfirmation(
   } else if (counts.removed > 0 && !(kind === 'start-over' && clearsHistory)) {
     lines.push('Songs you removed stay removed.');
   }
-  lines.push({
-    'start-over': 'You won\u2019t be able to resume it.',
-    'new-sift': 'Starting a new sift replaces it, and you won\u2019t be able to resume it.',
-    done: clearsHistory
-      ? 'Starting over clears this summary, its Restore buttons and this playlist\u2019s removal history.'
-      : 'Starting over clears this summary and its Restore buttons.',
-  }[kind]);
+  lines.push(
+    {
+      'start-over': 'You won\u2019t be able to resume it.',
+      'new-sift': 'Starting a new sift replaces it, and you won\u2019t be able to resume it.',
+      done: clearsHistory
+        ? 'Starting over clears this summary, its Restore buttons and this playlist\u2019s removal history.'
+        : 'Starting over clears this summary and its Restore buttons.',
+    }[kind],
+  );
   // Done after Finish (#142): cards remain, and they go too.
   if (kind === 'done' && unfinished) lines.push('You won\u2019t be able to resume it.');
   return {
@@ -192,7 +195,10 @@ export function discardConfirmation(
  * keeps a failed removal's entry after a successful restore takes the track
  * off the removed list.
  */
-export function failedRemovalCount(removed: readonly Track[], failedRemovalIds: readonly string[]): number {
+export function failedRemovalCount(
+  removed: readonly Track[],
+  failedRemovalIds: readonly string[],
+): number {
   const ids = new Set(failedRemovalIds);
   return removed.filter((t) => ids.has(t.id)).length;
 }
@@ -202,7 +208,10 @@ export function failedRemovalCount(removed: readonly Track[], failedRemovalIds: 
  * removed tracks whose name is a removal error. A name shared by another
  * removed track over-counts, the best a names-only session allows.
  */
-export function legacyFailedRemovalIds(removed: readonly Track[], removalErrors: readonly string[]): string[] {
+export function legacyFailedRemovalIds(
+  removed: readonly Track[],
+  removalErrors: readonly string[],
+): string[] {
   const names = new Set(removalErrors);
   return removed.filter((t) => names.has(t.name)).map((t) => t.id);
 }
@@ -238,7 +247,11 @@ function sourceName(source: SiftSource): string {
  * Done's title and subtitle. A sift ended early with Finish says how far it
  * got; a complete one names what was sifted, library or playlist.
  */
-export function doneHeadline(source: SiftSource, reviewed: number, total: number): { title: string; subtitle: string } {
+export function doneHeadline(
+  source: SiftSource,
+  reviewed: number,
+  total: number,
+): { title: string; subtitle: string } {
   const n = (x: number) => x.toLocaleString('en-US');
   if (reviewed < total) {
     return {
@@ -258,7 +271,14 @@ export function doneHeadline(source: SiftSource, reviewed: number, total: number
 export const SAVE_KEPT_TITLE = 'Save kept songs as a playlist';
 
 /** Done's line once "Save kept songs as a playlist" worked. */
-export function keptSaveMessage({ playlistName, sourceName, kept, added, notAdded, leftOut }: {
+export function keptSaveMessage({
+  playlistName,
+  sourceName,
+  kept,
+  added,
+  notAdded,
+  leftOut,
+}: {
   playlistName: string;
   sourceName: string;
   kept: number;
@@ -266,16 +286,22 @@ export function keptSaveMessage({ playlistName, sourceName, kept, added, notAdde
   notAdded: number;
   leftOut: number;
 }): string {
-  const lines = [kept === 0
-    ? leftOut > 0 ? `None of your kept songs are in "${sourceName}" any more.` : 'No kept songs to save yet.'
-    : added > 0
-      ? `Saved ${plural(added, 'song')} to "${playlistName}".`
-      : notAdded > 0
-        ? `Nothing new could be saved to "${playlistName}".`
-        : `All kept songs are already in "${playlistName}".`];
+  const lines = [
+    kept === 0
+      ? leftOut > 0
+        ? `None of your kept songs are in "${sourceName}" any more.`
+        : 'No kept songs to save yet.'
+      : added > 0
+        ? `Saved ${plural(added, 'song')} to "${playlistName}".`
+        : notAdded > 0
+          ? `Nothing new could be saved to "${playlistName}".`
+          : `All kept songs are already in "${playlistName}".`,
+  ];
   if (notAdded > 0) lines.push(`${plural(notAdded, 'song')} couldn\u2019t be added.`);
   if (kept > 0 && leftOut > 0) {
-    lines.push(`${plural(leftOut, 'kept song')} no longer in "${sourceName}" ${leftOut === 1 ? 'was' : 'were'} left out.`);
+    lines.push(
+      `${plural(leftOut, 'kept song')} no longer in "${sourceName}" ${leftOut === 1 ? 'was' : 'were'} left out.`,
+    );
   }
   return lines.join(' ');
 }
@@ -284,7 +310,15 @@ export function keptSaveMessage({ playlistName, sourceName, kept, added, notAdde
  * Why a save failed when Music refused some songs (worth another try),
  * after it added others; Done shows it with Retry.
  */
-export function keptSaveRetryable({ added, refused, notAdded }: { added: number; refused: number; notAdded: number }): string {
+export function keptSaveRetryable({
+  added,
+  refused,
+  notAdded,
+}: {
+  added: number;
+  refused: number;
+  notAdded: number;
+}): string {
   const lines = [
     `${plural(added, 'song')} added; ${plural(refused, 'song')} failed and can be tried again.`,
   ];
@@ -300,7 +334,8 @@ export function keptSaveFailure(playlistName: string, message: string): string {
 /** Done with nothing removed: point at the next thing to do. */
 export function nothingRemovedNote(remaining: number, skipped: number): string {
   if (remaining > 0) return 'Nothing removed yet. Continue sifting to keep going.';
-  if (skipped > 0) return 'Nothing removed this time. Review the songs you skipped, or start a new sift.';
+  if (skipped > 0)
+    return 'Nothing removed this time. Review the songs you skipped, or start a new sift.';
   return 'Nothing removed this time. Start a new sift any time.';
 }
 

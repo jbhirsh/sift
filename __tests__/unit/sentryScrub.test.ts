@@ -1,8 +1,16 @@
-import { REDACTED, scrubBreadcrumb, scrubEvent, scrubText, stripUrlQuery } from '../../src/utils/sentryScrub';
+import {
+  REDACTED,
+  scrubBreadcrumb,
+  scrubEvent,
+  scrubText,
+  stripUrlQuery,
+} from '../../src/utils/sentryScrub';
 
-const LRCLIB = 'https://lrclib.net/api/get?track_name=Peaches&artist_name=Justin%20Bieber&duration=198';
+const LRCLIB =
+  'https://lrclib.net/api/get?track_name=Peaches&artist_name=Justin%20Bieber&duration=198';
 // encodeURIComponent leaves apostrophes as they are.
-const LRCLIB_APOSTROPHE = "https://lrclib.net/api/get?track_name=Don't%20Stop%20Me%20Now&artist_name=Queen&duration=210";
+const LRCLIB_APOSTROPHE =
+  "https://lrclib.net/api/get?track_name=Don't%20Stop%20Me%20Now&artist_name=Queen&duration=210";
 
 describe('scrubText', () => {
   test('redacts double-quoted names, straight and curly', () => {
@@ -12,7 +20,9 @@ describe('scrubText', () => {
 
   test('drops URL queries and fragments, keeping the host and path', () => {
     expect(scrubText(`GET ${LRCLIB}`)).toBe('GET https://lrclib.net/api/get');
-    expect(scrubText('see https://example.com/a#b and more')).toBe('see https://example.com/a and more');
+    expect(scrubText('see https://example.com/a#b and more')).toBe(
+      'see https://example.com/a and more',
+    );
   });
 
   test("a name with an apostrophe doesn't end the query early", () => {
@@ -93,7 +103,9 @@ describe('scrubEvent', () => {
   test('scrubs exception values, the message, breadcrumbs and the request', () => {
     const event = scrubEvent({
       message: 'Restore failed for "Peaches"',
-      exception: { values: [{ type: 'Error', value: 'No song "Peaches" in "Road Trip"' }, { type: 'Error' }] },
+      exception: {
+        values: [{ type: 'Error', value: 'No song "Peaches" in "Road Trip"' }, { type: 'Error' }],
+      },
       breadcrumbs: [{ message: 'Decision: keep on "Peaches"' }],
       request: { url: LRCLIB, query_string: 'track_name=Peaches', method: 'GET' },
     });
@@ -114,7 +126,11 @@ describe('scrubEvent', () => {
       'http.fragment': '',
       'http.status_code': 200,
     };
-    const scrubbedData = { url: 'https://lrclib.net/api/get', 'http.url': 'https://lrclib.net/api/get', 'http.status_code': 200 };
+    const scrubbedData = {
+      url: 'https://lrclib.net/api/get',
+      'http.url': 'https://lrclib.net/api/get',
+      'http.status_code': 200,
+    };
     const event = scrubEvent({
       transaction: 'SiftScreen',
       spans: [

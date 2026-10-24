@@ -26,7 +26,15 @@ interface SwitchRowProps {
  * flow 15 lost one that way on #197's run. The row's press, through React
  * Native's touch handling, sees both and goes.
  */
-export default function SwitchRow({ label, hint, value, onValueChange, testID, style, children }: SwitchRowProps) {
+export default function SwitchRow({
+  label,
+  hint,
+  value,
+  onValueChange,
+  testID,
+  style,
+  children,
+}: SwitchRowProps) {
   const { colors } = useTheme();
   return (
     <Pressable
@@ -40,7 +48,11 @@ export default function SwitchRow({ label, hint, value, onValueChange, testID, s
       style={style}
     >
       {children}
-      <View pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <View
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
         <Switch value={value} trackColor={{ true: colors.accent, false: colors.quaternary }} />
       </View>
     </Pressable>

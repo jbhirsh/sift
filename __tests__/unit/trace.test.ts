@@ -24,8 +24,9 @@ describe('traceMode', () => {
 
 describe('formatTraceLine', () => {
   test('tag, sequence, whole milliseconds since launch, event, then key=value pairs', () => {
-    expect(formatTraceLine(12, 3456.4, 'guard-busy', { input: 'skip', held: 40, ok: false }))
-      .toBe('[sift-trace] #12 +3456ms guard-busy input=skip held=40 ok=false');
+    expect(formatTraceLine(12, 3456.4, 'guard-busy', { input: 'skip', held: 40, ok: false })).toBe(
+      '[sift-trace] #12 +3456ms guard-busy input=skip held=40 ok=false',
+    );
     expect(formatTraceLine(1, 0.6, 'tick')).toBe('[sift-trace] #1 +1ms tick');
   });
 
@@ -37,17 +38,28 @@ describe('formatTraceLine', () => {
 
 describe('describeAction', () => {
   test('names the type, and a decision or phase when the action has one', () => {
-    expect(describeAction({ type: 'DECIDE', decision: 'skip' })).toEqual({ type: 'DECIDE', decision: 'skip' });
-    expect(describeAction({ type: 'SET_PHASE', phase: 'done' })).toEqual({ type: 'SET_PHASE', phase: 'done' });
+    expect(describeAction({ type: 'DECIDE', decision: 'skip' })).toEqual({
+      type: 'DECIDE',
+      decision: 'skip',
+    });
+    expect(describeAction({ type: 'SET_PHASE', phase: 'done' })).toEqual({
+      type: 'SET_PHASE',
+      phase: 'done',
+    });
     expect(describeAction({ type: 'UNDO_LAST' })).toEqual({ type: 'UNDO_LAST' });
   });
 
   test('nothing else from the action: never a track', () => {
-    const action = { type: 'LOAD_TRACKS', tracks: [{ id: 'a', name: 'Secret Song' }], decision: 3, phase: null };
+    const action = {
+      type: 'LOAD_TRACKS',
+      tracks: [{ id: 'a', name: 'Secret Song' }],
+      decision: 3,
+      phase: null,
+    };
     expect(describeAction(action)).toEqual({ type: 'LOAD_TRACKS' });
   });
 
-  test('leaves out the poller\'s position ticks', () => {
+  test("leaves out the poller's position ticks", () => {
     expect(describeAction({ type: 'SET_PLAYBACK_POSITION' })).toBeNull();
     expect(describeAction({ type: 'SET_IS_PLAYING' })).toEqual({ type: 'SET_IS_PLAYING' });
   });

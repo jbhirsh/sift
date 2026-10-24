@@ -46,24 +46,27 @@ export function useSendPending(): (pending: PendingDecision | null) => void {
     latest.current = { tracks: state.tracks, keepTrack, removeTrack };
   });
 
-  return useCallback((pending: PendingDecision | null) => {
-    if (!pending) return;
-    const key = sentKey(pending);
-    const alreadySent = sent.has(key);
-    sent.add(key);
-    // On disk before it goes out, so a crash mid-call still knows of it.
-    if (!alreadySent) flushPendingSave();
-    // Cleared in state whether or not this call sends it: a session
-    // reloaded from before the clear brings it back, and it must not
-    // linger there to be undone after the service acted on it.
-    dispatch({ type: 'PENDING_SENT', trackId: pending.trackId, at: pending.at });
-    if (alreadySent) return;
-    const { tracks, keepTrack: keep, removeTrack: remove } = latest.current;
-    const track = tracks.find((t) => t.id === pending.trackId);
-    if (!track) return;
-    if (pending.decision === 'remove') void remove(track);
-    if (pending.decision === 'keep') void keep(track);
-  }, [dispatch, flushPendingSave]);
+  return useCallback(
+    (pending: PendingDecision | null) => {
+      if (!pending) return;
+      const key = sentKey(pending);
+      const alreadySent = sent.has(key);
+      sent.add(key);
+      // On disk before it goes out, so a crash mid-call still knows of it.
+      if (!alreadySent) flushPendingSave();
+      // Cleared in state whether or not this call sends it: a session
+      // reloaded from before the clear brings it back, and it must not
+      // linger there to be undone after the service acted on it.
+      dispatch({ type: 'PENDING_SENT', trackId: pending.trackId, at: pending.at });
+      if (alreadySent) return;
+      const { tracks, keepTrack: keep, removeTrack: remove } = latest.current;
+      const track = tracks.find((t) => t.id === pending.trackId);
+      if (!track) return;
+      if (pending.decision === 'remove') void remove(track);
+      if (pending.decision === 'keep') void keep(track);
+    },
+    [dispatch, flushPendingSave],
+  );
 }
 
 /**
@@ -75,18 +78,22 @@ export function useSendPending(): (pending: PendingDecision | null) => void {
  */
 export function useSendSavedPending(): (session: SiftSession | null) => void {
   const { removeTrack } = useMusicProvider();
-  return useCallback((session: SiftSession | null) => {
-    const pending = session?.pending;
-    if (!session || !pending || !session.source || !session.provider) return;
-    const key = sentKey(pending);
-    if (sent.has(key)) return;
-    sent.add(key);
-    const track = session.tracks.find((t) => t.id === pending.trackId);
-    if (!track) return;
-    const from = { source: session.source, provider: session.provider };
-    if (pending.decision === 'remove') void removeTrack(track, from);
-    if (pending.decision === 'keep') void markReviewed(ledgerKey(from.provider, from.source), track.id);
-  }, [removeTrack]);
+  return useCallback(
+    (session: SiftSession | null) => {
+      const pending = session?.pending;
+      if (!session || !pending || !session.source || !session.provider) return;
+      const key = sentKey(pending);
+      if (sent.has(key)) return;
+      sent.add(key);
+      const track = session.tracks.find((t) => t.id === pending.trackId);
+      if (!track) return;
+      const from = { source: session.source, provider: session.provider };
+      if (pending.decision === 'remove') void removeTrack(track, from);
+      if (pending.decision === 'keep')
+        void markReviewed(ledgerKey(from.provider, from.source), track.id);
+    },
+    [removeTrack],
+  );
 }
 
 /**
@@ -94,7 +101,9 @@ export function useSendSavedPending(): (session: SiftSession | null) => void {
  * straight away when the screen goes away or the app leaves the foreground.
  * For the Sift screen.
  */
-export function useHoldPendingDecision(sendPending: (pending: PendingDecision | null) => void): void {
+export function useHoldPendingDecision(
+  sendPending: (pending: PendingDecision | null) => void,
+): void {
   const { state } = useSift();
   const pendingRef = useRef(state.pending);
   useEffect(() => {

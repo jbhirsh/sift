@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Modal,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { CONTENT_COLUMN, SPACING, RADIUS } from '../theme';
 import GlassCard from './GlassCard';
@@ -32,9 +26,7 @@ export default function ResumeSessionModal({
   const { colors } = useTheme();
 
   const sourceLabel =
-    session.source?.type === 'playlist'
-      ? session.source.playlist.name
-      : 'Library';
+    session.source?.type === 'playlist' ? session.source.playlist.name : 'Library';
 
   // Clamped like the reducer's `remaining` (SiftContext): a corrupted or
   // legacy session could carry cursor > tracks.length. (Setup offers only
@@ -42,11 +34,7 @@ export default function ResumeSessionModal({
   const remaining = Math.max(0, session.tracks.length - session.cursor);
 
   return (
-    <Modal
-      visible
-      transparent
-      animationType="slide"
-    >
+    <Modal visible transparent animationType="slide">
       {/* testID lives on the inner View, not the Modal: RN never exposes a
           Modal's own testID to the iOS accessibility hierarchy, so Maestro
           (XCUITest) cannot see it there — unit tests find either. */}
@@ -54,18 +42,14 @@ export default function ResumeSessionModal({
         <View style={styles.sheetContainer}>
           <GlassCard intensity="thick" radius={RADIUS.lg} style={styles.sheet}>
             <View style={styles.header}>
-              <Text style={[styles.title, { color: colors.text }]}>
-                Resume Sifting?
-              </Text>
+              <Text style={[styles.title, { color: colors.text }]}>Resume Sifting?</Text>
               <TouchableOpacity
                 onPress={onCancel}
                 activeOpacity={0.7}
                 accessibilityRole="button"
                 testID="resume-modal-cancel"
               >
-                <Text style={[styles.cancelText, { color: colors.accent }]}>
-                  Cancel
-                </Text>
+                <Text style={[styles.cancelText, { color: colors.accent }]}>Cancel</Text>
               </TouchableOpacity>
             </View>
 
@@ -81,12 +65,7 @@ export default function ResumeSessionModal({
             />
 
             <View style={styles.buttonSection}>
-              <Button
-                title="Resume"
-                size="large"
-                onPress={onResume}
-                testID="resume-modal-resume"
-              />
+              <Button title="Resume" size="large" onPress={onResume} testID="resume-modal-resume" />
               {/* Destructive, and kept well clear of Resume: a thumb aimed at
                   Resume must not land here (#137). It asks before
                   discarding anything. */}

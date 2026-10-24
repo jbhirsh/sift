@@ -23,7 +23,12 @@ jest.mock('expo-image', () => ({ Image: 'Image' }));
 jest.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: { View: 'View', createAnimatedComponent: (comp: unknown) => comp },
-  useSharedValue: (val: number) => ({ value: val, set(v: number) { this.value = v; } }),
+  useSharedValue: (val: number) => ({
+    value: val,
+    set(v: number) {
+      this.value = v;
+    },
+  }),
   useAnimatedStyle: (fn: () => unknown) => fn(),
   withTiming: (val: number, _config: unknown, callback?: (finished: boolean) => void) => {
     if (callback) callback(true);
@@ -41,7 +46,9 @@ jest.mock('react-native-gesture-handler', () => ({
   GestureDetector: ({ children }: { children: React.ReactNode }) => children,
   Gesture: {
     Pan: () => ({
-      minDistance: () => ({ enabled: () => ({ onUpdate: () => ({ onEnd: () => ({ onFinalize: () => ({}) }) }) }) }),
+      minDistance: () => ({
+        enabled: () => ({ onUpdate: () => ({ onEnd: () => ({ onFinalize: () => ({}) }) }) }),
+      }),
       onUpdate: () => ({ onFinalize: () => ({}) }),
     }),
     Tap: () => ({ onEnd: () => ({}) }),
@@ -67,7 +74,13 @@ jest.mock('../../src/services/SessionStore', () => ({
 }));
 
 const track = (id: string, name: string): Track => ({
-  id, name, artist: 'Artist', album: 'Album', duration: 200, playCount: 1, dateAdded: '2020-01-01T00:00:00.000Z',
+  id,
+  name,
+  artist: 'Artist',
+  album: 'Album',
+  duration: 200,
+  playCount: 1,
+  dateAdded: '2020-01-01T00:00:00.000Z',
 });
 
 function ChorusOn() {
@@ -95,8 +108,17 @@ describe('playback position with one shared provider', () => {
 
   test('the clock follows the playing song, at its chorus after a skip', async () => {
     const { getByTestId, getByLabelText } = await renderWithProviders(
-      <><SiftScreen /><ChorusOn /></>,
-      { initialTracks: [track('a', 'Peaches'), track('b', 'drivers license'), track('c', 'Montero')] },
+      <>
+        <SiftScreen />
+        <ChorusOn />
+      </>,
+      {
+        initialTracks: [
+          track('a', 'Peaches'),
+          track('b', 'drivers license'),
+          track('c', 'Montero'),
+        ],
+      },
     );
     const elapsed = () => toSeconds(String(getByTestId('elapsed-time').props.children));
     const advance = async (ms: number) => {
@@ -118,10 +140,9 @@ describe('playback position with one shared provider', () => {
   test('one provider for every screen, and a skip ahead holds while playing (#144)', async () => {
     const { createMusicProvider } = jest.requireMock('../../src/services');
     (createMusicProvider as jest.Mock).mockClear();
-    const { getByTestId, getByLabelText } = await renderWithProviders(
-      <SiftScreen />,
-      { initialTracks: [track('a', 'Peaches'), track('b', 'drivers license')] },
-    );
+    const { getByTestId, getByLabelText } = await renderWithProviders(<SiftScreen />, {
+      initialTracks: [track('a', 'Peaches'), track('b', 'drivers license')],
+    });
     const elapsed = () => toSeconds(String(getByTestId('elapsed-time').props.children));
     const advance = async (ms: number) => {
       await act(async () => {

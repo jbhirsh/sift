@@ -28,8 +28,17 @@ export function traceMode(useMockProvider: string | undefined, isDev: boolean): 
 export const BREADCRUMB_EVENTS: ReadonlySet<string> = new Set(['guard-busy']);
 
 /** `[sift-trace] #12 +3456ms guard-busy input=skip held=40` */
-export function formatTraceLine(seq: number, elapsedMs: number, event: string, data?: TraceData): string {
-  const pairs = data ? Object.entries(data).map(([key, value]) => ` ${key}=${value}`).join('') : '';
+export function formatTraceLine(
+  seq: number,
+  elapsedMs: number,
+  event: string,
+  data?: TraceData,
+): string {
+  const pairs = data
+    ? Object.entries(data)
+        .map(([key, value]) => ` ${key}=${value}`)
+        .join('')
+    : '';
   return `${TRACE_TAG} #${seq} +${Math.round(elapsedMs)}ms ${event}${pairs}`;
 }
 
@@ -38,7 +47,11 @@ export function formatTraceLine(seq: number, elapsedMs: number, event: string, d
  * playback poller's position ticks, twice a second, would bury the rest.
  * Only the type and plain fields: a track never goes in a line.
  */
-export function describeAction(action: { type: string; decision?: unknown; phase?: unknown }): TraceData | null {
+export function describeAction(action: {
+  type: string;
+  decision?: unknown;
+  phase?: unknown;
+}): TraceData | null {
   if (action.type === 'SET_PLAYBACK_POSITION') return null;
   const data: Record<string, string> = { type: action.type };
   if (typeof action.decision === 'string') data.decision = action.decision;

@@ -76,7 +76,8 @@ export default function DoneScreen() {
   const revise = useReviseDecision(sendPending);
   const [showDecisions, setShowDecisions] = useState(false);
   const decisionOf = useCallback(
-    (trackId: string) => decisionFor(trackId, { kept: state.kept, removed: state.removed, skipped: state.skipped }),
+    (trackId: string) =>
+      decisionFor(trackId, { kept: state.kept, removed: state.removed, skipped: state.skipped }),
     [state.kept, state.removed, state.skipped],
   );
   useEffect(() => {
@@ -98,7 +99,8 @@ export default function DoneScreen() {
   // into "<name> - Sifted". Shown once there is something to save: a keep
   // in this sift, or one the ledger remembers from before.
   const keptSource = state.activeSource ?? state.source;
-  const keptLedgerKey = keptSource.type === 'playlist' ? ledgerKey(state.provider, keptSource) : null;
+  const keptLedgerKey =
+    keptSource.type === 'playlist' ? ledgerKey(state.provider, keptSource) : null;
   const [rememberedKeeps, setRememberedKeeps] = useState(0);
   useEffect(() => {
     if (keptLedgerKey == null) return;
@@ -126,13 +128,17 @@ export default function DoneScreen() {
       setKeptSave({ status: 'saved', message: keptSaveMessage(result), kept });
     } catch (err) {
       const reason = err instanceof Error ? err.message : 'Something went wrong.';
-      setKeptSave({ status: 'failed', message: keptSaveFailure(siftedPlaylistName(keptSource.playlist.name), reason) });
+      setKeptSave({
+        status: 'failed',
+        message: keptSaveFailure(siftedPlaylistName(keptSource.playlist.name), reason),
+      });
     } finally {
       savingRef.current = false;
     }
   }, [keptSource, state.kept, saveKeptPlaylist]);
-  const canSaveKept = keptSource.type === 'playlist'
-    && (state.kept.length > 0 || rememberedKeeps > 0 || keptSave.status !== 'idle');
+  const canSaveKept =
+    keptSource.type === 'playlist' &&
+    (state.kept.length > 0 || rememberedKeeps > 0 || keptSave.status !== 'idle');
   // After a save, the button comes back once this sift's keeps change.
   const showSaveButton = keptSave.status !== 'saved' || keptSave.kept !== state.kept;
   // Changing a decision while the save reads the ledger could leave a song
@@ -145,7 +151,10 @@ export default function DoneScreen() {
   const shareButtonRef = useRef<View>(null);
   const shareRemovedList = useCallback(() => {
     const anchor = shareButtonRef.current ? findNodeHandle(shareButtonRef.current) : null;
-    Share.share({ message: removedListText(state.removed) }, anchor != null ? { anchor } : undefined).catch(() => {});
+    Share.share(
+      { message: removedListText(state.removed) },
+      anchor != null ? { anchor } : undefined,
+    ).catch(() => {});
   }, [state.removed]);
 
   const openMusic = useCallback(() => {
@@ -175,23 +184,12 @@ export default function DoneScreen() {
 
   const renderTrackRow = useCallback(
     ({ item: track, index }: { item: Track; index: number }) => (
-      <View
-        style={[
-          styles.trackRow,
-          index % 2 !== 0 && { backgroundColor: colors.quaternary },
-        ]}
-      >
+      <View style={[styles.trackRow, index % 2 !== 0 && { backgroundColor: colors.quaternary }]}>
         <View style={{ flex: 1 }}>
-          <Text
-            style={[styles.trackName, { color: colors.text }]}
-            numberOfLines={1}
-          >
+          <Text style={[styles.trackName, { color: colors.text }]} numberOfLines={1}>
             {track.name}
           </Text>
-          <Text
-            style={[styles.trackArtist, { color: colors.textSecondary }]}
-            numberOfLines={1}
-          >
+          <Text style={[styles.trackArtist, { color: colors.textSecondary }]} numberOfLines={1}>
             {track.artist}
           </Text>
         </View>
@@ -211,7 +209,14 @@ export default function DoneScreen() {
         </TouchableOpacity>
       </View>
     ),
-    [colors.quaternary, colors.text, colors.textSecondary, colors.accent, handleRestore, restoringIds],
+    [
+      colors.quaternary,
+      colors.text,
+      colors.textSecondary,
+      colors.accent,
+      handleRestore,
+      restoringIds,
+    ],
   );
 
   const keyExtractor = useCallback((track: Track) => track.id, []);
@@ -230,7 +235,9 @@ export default function DoneScreen() {
       accessibilityHint="Shares the list of removed songs"
       activeOpacity={0.8}
     >
-      <Text style={[styles.smallSecondaryButtonText, { color: colors.accent }]}>{SHARE_LIST_TITLE}</Text>
+      <Text style={[styles.smallSecondaryButtonText, { color: colors.accent }]}>
+        {SHARE_LIST_TITLE}
+      </Text>
     </TouchableOpacity>
   );
   // Cards not yet decided: a sift ended early with Finish (#142).
@@ -281,10 +288,7 @@ export default function DoneScreen() {
     <>
       {/* Title section */}
       <View style={styles.titleSection}>
-        <Text
-          testID="done-title"
-          style={[styles.titleText, { color: colors.text }]}
-        >
+        <Text testID="done-title" style={[styles.titleText, { color: colors.text }]}>
           {headline.title}
         </Text>
         <Text testID="done-subtitle" style={[styles.subtitleText, { color: colors.textSecondary }]}>
@@ -325,7 +329,10 @@ export default function DoneScreen() {
       </View>
 
       {state.removed.length === 0 && (
-        <Text testID="nothing-removed" style={[styles.nothingRemoved, { color: colors.textSecondary }]}>
+        <Text
+          testID="nothing-removed"
+          style={[styles.nothingRemoved, { color: colors.textSecondary }]}
+        >
           {nothingRemovedNote(remaining, state.skipped.length)}
         </Text>
       )}
@@ -335,14 +342,17 @@ export default function DoneScreen() {
         <View style={styles.removedSection}>
           <View style={styles.removedHeader}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.removedTitle, { color: colors.text }]}>
-                Tracks Removed
-              </Text>
+              <Text style={[styles.removedTitle, { color: colors.text }]}>Tracks Removed</Text>
               <Text style={[styles.removedSubtitle, { color: colors.textSecondary }]}>
                 {/* Real counts when some failed: "Most of these" was shown
                     even when every removal failed (#141). The warning block
                     below names the tracks that are still in place. */}
-                {removedListSubtitle(state.provider, state.source, state.removed.length, failedRemovals)}
+                {removedListSubtitle(
+                  state.provider,
+                  state.source,
+                  state.removed.length,
+                  failedRemovals,
+                )}
               </Text>
             </View>
           </View>
@@ -363,18 +373,24 @@ export default function DoneScreen() {
                   </Text>
                   {/* Each step one Text, so VoiceOver reads it in one stop. */}
                   {FINISH_IN_MUSIC_STEPS.map((step) => (
-                    <Text key={step} style={[styles.finishStepText, { color: colors.text }]}>{step}</Text>
+                    <Text key={step} style={[styles.finishStepText, { color: colors.text }]}>
+                      {step}
+                    </Text>
                   ))}
                   {/* Step 2's ways: one or the other, not both in turn. The
                       bullet hangs, so a wrapped line starts under the text;
                       VoiceOver reads each as one stop, without the bullet. */}
                   {FINISH_IN_MUSIC_WAYS.map((way) => (
                     <View key={way} style={styles.finishWay} accessible accessibilityLabel={way}>
-                      <Text style={[styles.finishStepText, { color: colors.text }]}>{'\u2022'}</Text>
+                      <Text style={[styles.finishStepText, { color: colors.text }]}>
+                        {'\u2022'}
+                      </Text>
                       <Text style={[styles.finishWayText, { color: colors.text }]}>{way}</Text>
                     </View>
                   ))}
-                  <Text style={[styles.finishNote, { color: colors.textSecondary }]}>{FINISH_IN_MUSIC_NOTE}</Text>
+                  <Text style={[styles.finishNote, { color: colors.textSecondary }]}>
+                    {FINISH_IN_MUSIC_NOTE}
+                  </Text>
                   <View style={styles.removedActions}>
                     <TouchableOpacity
                       testID="open-music"
@@ -384,7 +400,9 @@ export default function DoneScreen() {
                       accessibilityHint="Opens the Music app"
                       activeOpacity={0.8}
                     >
-                      <Text style={[styles.smallSecondaryButtonText, { color: colors.accent }]}>{OPEN_MUSIC_TITLE}</Text>
+                      <Text style={[styles.smallSecondaryButtonText, { color: colors.accent }]}>
+                        {OPEN_MUSIC_TITLE}
+                      </Text>
                     </TouchableOpacity>
                     {shareButton}
                   </View>
@@ -425,7 +443,11 @@ export default function DoneScreen() {
           {(keptSave.status === 'saved' || keptSave.status === 'failed') && (
             <View style={styles.saveKeptStatus}>
               <SymbolView
-                name={keptSave.status === 'saved' ? 'checkmark.circle.fill' : 'exclamationmark.triangle.fill'}
+                name={
+                  keptSave.status === 'saved'
+                    ? 'checkmark.circle.fill'
+                    : 'exclamationmark.triangle.fill'
+                }
                 size={18}
                 tintColor={keptSave.status === 'saved' ? COLORS.keep : COLORS.skip}
                 accessibilityElementsHidden
@@ -443,19 +465,26 @@ export default function DoneScreen() {
           )}
           {showSaveButton && (
             <Button
-              title={saving ? 'Saving\u2026' : keptSave.status === 'failed' ? 'Retry' : SAVE_KEPT_TITLE}
+              title={
+                saving ? 'Saving\u2026' : keptSave.status === 'failed' ? 'Retry' : SAVE_KEPT_TITLE
+              }
               testID="save-kept-playlist"
               size="large"
               variant="secondary"
               disabled={saving || isStartingOver}
-              onPress={() => { void saveKept(); }}
+              onPress={() => {
+                void saveKept();
+              }}
             />
           )}
         </View>
       )}
 
       {startOverError && (
-        <Text testID="start-over-error" style={[styles.playlistError, { color: colors.removeText }]}>
+        <Text
+          testID="start-over-error"
+          style={[styles.playlistError, { color: colors.removeText }]}
+        >
           {startOverError}
         </Text>
       )}
@@ -469,7 +498,9 @@ export default function DoneScreen() {
           accessibilityRole="button"
           accessibilityHint="Lists this sift's decisions, to change any of them"
         >
-          <Text style={[styles.changeDecisionsText, { color: colors.accent }]}>Change a decision</Text>
+          <Text style={[styles.changeDecisionsText, { color: colors.accent }]}>
+            Change a decision
+          </Text>
         </TouchableOpacity>
       )}
 
@@ -513,16 +544,34 @@ export default function DoneScreen() {
               void startOver();
               return;
             }
-            Alert.alert('Start Over?', playlistStartOverMessage(state.provider, state.source.playlist.name), [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Start Over', style: 'destructive', onPress: () => { void startOver(); } },
-            ]);
+            Alert.alert(
+              'Start Over?',
+              playlistStartOverMessage(state.provider, state.source.playlist.name),
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Start Over',
+                  style: 'destructive',
+                  onPress: () => {
+                    void startOver();
+                  },
+                },
+              ],
+            );
             return;
           }
-          const copy = discardConfirmation(state.provider, state.source, counts, 'done', { unfinished: remaining > 0 });
+          const copy = discardConfirmation(state.provider, state.source, counts, 'done', {
+            unfinished: remaining > 0,
+          });
           Alert.alert(copy.title, copy.message, [
             { text: 'Cancel', style: 'cancel' },
-            { text: copy.confirm, style: 'destructive', onPress: () => { void startOver(); } },
+            {
+              text: copy.confirm,
+              style: 'destructive',
+              onPress: () => {
+                void startOver();
+              },
+            },
           ]);
         }}
       />
@@ -539,7 +588,10 @@ export default function DoneScreen() {
         style={styles.container}
         // Clear the floating settings gear (App.tsx), which sits in the same
         // column as the rows' restore buttons.
-        contentContainerStyle={[styles.contentContainer, { paddingTop: insets.top + SETTINGS_BUTTON.top + SETTINGS_BUTTON.size }]}
+        contentContainerStyle={[
+          styles.contentContainer,
+          { paddingTop: insets.top + SETTINGS_BUTTON.top + SETTINGS_BUTTON.size },
+        ]}
         ListHeaderComponent={listHeader}
         ListFooterComponent={listFooter}
       />
@@ -573,11 +625,13 @@ function SummaryItem({
 }) {
   return (
     <View style={summaryStyles.item}>
-      <SymbolView name={symbolName as SFSymbol} size={32} tintColor={color} accessibilityElementsHidden />
-      <Text
-        testID={`summary-count-${label}`}
-        style={[summaryStyles.count, { color: textColor }]}
-      >
+      <SymbolView
+        name={symbolName as SFSymbol}
+        size={32}
+        tintColor={color}
+        accessibilityElementsHidden
+      />
+      <Text testID={`summary-count-${label}`} style={[summaryStyles.count, { color: textColor }]}>
         {count}
       </Text>
       <Text

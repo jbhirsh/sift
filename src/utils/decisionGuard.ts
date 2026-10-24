@@ -14,9 +14,7 @@
  * late after a stall.
  */
 export type PressVerdict =
-  | { verdict: 'go' }
-  | { verdict: 'wait' }
-  | { verdict: 'busy'; sinceMs: number };
+  { verdict: 'go' } | { verdict: 'wait' } | { verdict: 'busy'; sinceMs: number };
 
 export interface DecisionGuard {
   /**
@@ -41,7 +39,8 @@ export function createDecisionGuard(): DecisionGuard {
   let unshown = 0;
   return {
     press(atMs, holdMs, canWait) {
-      if (atMs < until || (unshown > 0 && !canWait)) return { verdict: 'busy', sinceMs: atMs - lastPress };
+      if (atMs < until || (unshown > 0 && !canWait))
+        return { verdict: 'busy', sinceMs: atMs - lastPress };
       lastPress = atMs;
       until = atMs + holdMs;
       unshown += 1;

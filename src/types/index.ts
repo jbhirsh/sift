@@ -30,7 +30,8 @@ export interface PendingDecision {
 
 export type AppPhase = 'setup' | 'loading' | 'sifting' | 'done';
 
-export type SortOrder = 'least-played' | 'most-played' | 'oldest' | 'newest' | 'artist' | 'album' | 'random';
+export type SortOrder =
+  'least-played' | 'most-played' | 'oldest' | 'newest' | 'artist' | 'album' | 'random';
 
 /**
  * Apple Music only. Spotify was removed (#140): its token lacked the scope
@@ -49,9 +50,7 @@ export interface Playlist {
   artworkURL?: string;
 }
 
-export type SiftSource =
-  | { type: 'library' }
-  | { type: 'playlist'; playlist: Playlist };
+export type SiftSource = { type: 'library' } | { type: 'playlist'; playlist: Playlist };
 
 export interface SiftSession {
   tracks: Track[];
@@ -128,7 +127,9 @@ export interface Preferences {
 }
 
 /** Some preferences to save; the filter's two choices save separately. */
-export type PreferenceChanges = Partial<Omit<Preferences, 'filter'>> & { filter?: Partial<TrackFilter> };
+export type PreferenceChanges = Partial<Omit<Preferences, 'filter'>> & {
+  filter?: Partial<TrackFilter>;
+};
 
 /** Each preference the user can change on its own. */
 export type PreferenceField = 'startAtChorus' | 'sortOrder' | keyof TrackFilter;

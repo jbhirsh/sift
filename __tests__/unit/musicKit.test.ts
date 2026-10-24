@@ -35,8 +35,16 @@ const raw = (over: Partial<RawTrack> = {}): RawTrack => ({
   ...over,
 });
 
-const song = (id: string, title: string, artist: string, duration: number | null): CandidateSong => ({
-  id, title, artist, duration,
+const song = (
+  id: string,
+  title: string,
+  artist: string,
+  duration: number | null,
+): CandidateSong => ({
+  id,
+  title,
+  artist,
+  duration,
 });
 
 describe('constants', () => {
@@ -80,10 +88,18 @@ describe('toTrack', () => {
   });
 
   test('missing values get the defaults the app expects', () => {
-    expect(toTrack(raw({
-      album: null, duration: null, playCount: null, dateAdded: null,
-      artworkURL: 'musicKit://artwork/x', kind: 'track',
-    }))).toEqual({
+    expect(
+      toTrack(
+        raw({
+          album: null,
+          duration: null,
+          playCount: null,
+          dateAdded: null,
+          artworkURL: 'musicKit://artwork/x',
+          kind: 'track',
+        }),
+      ),
+    ).toEqual({
       id: 'i1',
       name: 'Peaches',
       artist: 'Justin Bieber',
@@ -98,7 +114,10 @@ describe('toTrack', () => {
 
 describe('toTrack: album order (#176)', () => {
   test('track and disc numbers come over when the service sends them', () => {
-    expect(toTrack(raw({ trackNumber: 3, discNumber: 2 }))).toMatchObject({ trackNumber: 3, discNumber: 2 });
+    expect(toTrack(raw({ trackNumber: 3, discNumber: 2 }))).toMatchObject({
+      trackNumber: 3,
+      discNumber: 2,
+    });
   });
 
   test('missing or null numbers leave the fields out, as an older build sends', () => {
@@ -109,27 +128,38 @@ describe('toTrack: album order (#176)', () => {
   });
 
   test('track 0 or disc 0 is still a number', () => {
-    expect(toTrack(raw({ trackNumber: 0, discNumber: 0 }))).toMatchObject({ trackNumber: 0, discNumber: 0 });
+    expect(toTrack(raw({ trackNumber: 0, discNumber: 0 }))).toMatchObject({
+      trackNumber: 0,
+      discNumber: 0,
+    });
   });
 });
 
 describe('toPlaylist', () => {
   test('keeps web artwork, drops the rest', () => {
-    expect(toPlaylist({ id: 'p', name: 'Mix', trackCount: 3, artworkURL: 'https://a.example/p.jpg' }))
-      .toEqual({ id: 'p', name: 'Mix', trackCount: 3, artworkURL: 'https://a.example/p.jpg' });
-    expect(toPlaylist({ id: 'p', name: 'Mix', trackCount: 0, artworkURL: null }))
-      .toEqual({ id: 'p', name: 'Mix', trackCount: 0, artworkURL: undefined });
+    expect(
+      toPlaylist({ id: 'p', name: 'Mix', trackCount: 3, artworkURL: 'https://a.example/p.jpg' }),
+    ).toEqual({ id: 'p', name: 'Mix', trackCount: 3, artworkURL: 'https://a.example/p.jpg' });
+    expect(toPlaylist({ id: 'p', name: 'Mix', trackCount: 0, artworkURL: null })).toEqual({
+      id: 'p',
+      name: 'Mix',
+      trackCount: 0,
+      artworkURL: undefined,
+    });
   });
 });
 
 describe('batches', () => {
   test('slices in order, the last one partial', () => {
     expect(batches([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
-    expect(batches([1, 2, 3, 4], 2)).toEqual([[1, 2], [3, 4]]);
+    expect(batches([1, 2, 3, 4], 2)).toEqual([
+      [1, 2],
+      [3, 4],
+    ]);
     expect(batches([1], 100)).toEqual([[1]]);
   });
 
-  test('nothing to slice, or a size that can\'t slice, is no batches', () => {
+  test("nothing to slice, or a size that can't slice, is no batches", () => {
     expect(batches([], 100)).toEqual([]);
     expect(batches([1, 2], 0)).toEqual([]);
     expect(batches([1, 2], -1)).toEqual([]);
@@ -139,9 +169,15 @@ describe('batches', () => {
 describe('collectPages', () => {
   test('fetches pages at growing offsets until one comes back short', async () => {
     const data = Array.from({ length: 5 }, (_, i) => i);
-    const fetchPage = jest.fn(async (offset: number, limit: number) => data.slice(offset, offset + limit));
+    const fetchPage = jest.fn(async (offset: number, limit: number) =>
+      data.slice(offset, offset + limit),
+    );
     await expect(collectPages(fetchPage, 2)).resolves.toEqual([0, 1, 2, 3, 4]);
-    expect(fetchPage.mock.calls).toEqual([[0, 2], [2, 2], [4, 2]]);
+    expect(fetchPage.mock.calls).toEqual([
+      [0, 2],
+      [2, 2],
+      [4, 2],
+    ]);
   });
 
   test('an exact multiple ends on an empty page', async () => {
@@ -158,7 +194,10 @@ describe('collectPages', () => {
   });
 
   test('a failed page fails the whole load', async () => {
-    const fetchPage = jest.fn().mockResolvedValueOnce([1, 2]).mockRejectedValueOnce(new Error('offline'));
+    const fetchPage = jest
+      .fn()
+      .mockResolvedValueOnce([1, 2])
+      .mockRejectedValueOnce(new Error('offline'));
     await expect(collectPages(fetchPage, 2)).rejects.toThrow('offline');
   });
 });
@@ -203,7 +242,7 @@ describe('songMetadataMatches', () => {
     expect(songMetadataMatches(a, song('2', 'Peaches', 'Justin Bieber', 199.5))).toBe(false);
   });
 
-  test('a missing duration on either side doesn\'t block the match', () => {
+  test("a missing duration on either side doesn't block the match", () => {
     expect(songMetadataMatches(a, song('2', 'Peaches', 'Justin Bieber', null))).toBe(true);
     expect(songMetadataMatches(song('1', 'Peaches', 'Justin Bieber', null), a)).toBe(true);
   });
@@ -214,16 +253,23 @@ describe('canonicalPairing', () => {
   const answer = song('canon', 'Peaches', 'Justin Bieber', 198.4);
 
   test('pairs one unanswered id with one matching answer', () => {
-    expect(canonicalPairing(['req'], [answer], requested)).toEqual({ requestID: 'req', response: answer });
+    expect(canonicalPairing(['req'], [answer], requested)).toEqual({
+      requestID: 'req',
+      response: answer,
+    });
   });
 
   test('anything ambiguous or unconfirmed stays unpaired', () => {
     expect(canonicalPairing([], [answer], requested)).toBeNull();
     expect(canonicalPairing(['req', 'other'], [answer], requested)).toBeNull();
     expect(canonicalPairing(['req'], [], requested)).toBeNull();
-    expect(canonicalPairing(['req'], [answer, song('x', 'Peaches', 'Justin Bieber', 198)], requested)).toBeNull();
+    expect(
+      canonicalPairing(['req'], [answer, song('x', 'Peaches', 'Justin Bieber', 198)], requested),
+    ).toBeNull();
     expect(canonicalPairing(['req'], [answer], undefined)).toBeNull();
-    expect(canonicalPairing(['req'], [song('canon', 'Other', 'Justin Bieber', 198)], requested)).toBeNull();
+    expect(
+      canonicalPairing(['req'], [song('canon', 'Other', 'Justin Bieber', 198)], requested),
+    ).toBeNull();
   });
 });
 
@@ -241,7 +287,10 @@ describe('bestPreviewCandidate', () => {
   });
 
   test('a tie keeps the first hit', () => {
-    const hits = [song('first', 'Peaches', 'Justin Bieber', 199), song('second', 'Peaches', 'Justin Bieber', 197)];
+    const hits = [
+      song('first', 'Peaches', 'Justin Bieber', 199),
+      song('second', 'Peaches', 'Justin Bieber', 197),
+    ];
     expect(bestPreviewCandidate(target, hits)?.id).toBe('first');
   });
 
@@ -249,12 +298,17 @@ describe('bestPreviewCandidate', () => {
     const edge = [song('edge', 'Peaches', 'Justin Bieber', 201)];
     expect(bestPreviewCandidate(target, edge)?.id).toBe('edge');
     expect(bestPreviewCandidate(target, edge, 2.9)).toBeNull();
-    expect(bestPreviewCandidate(target, [song('live', 'Peaches', 'Justin Bieber', 210)])).toBeNull();
+    expect(
+      bestPreviewCandidate(target, [song('live', 'Peaches', 'Justin Bieber', 210)]),
+    ).toBeNull();
   });
 
   test('missing durations count as 0', () => {
     const unknown = song('lib', 'Peaches', 'Justin Bieber', null);
-    const hits = [song('full', 'Peaches', 'Justin Bieber', 198), song('none', 'Peaches', 'Justin Bieber', null)];
+    const hits = [
+      song('full', 'Peaches', 'Justin Bieber', 198),
+      song('none', 'Peaches', 'Justin Bieber', null),
+    ];
     expect(bestPreviewCandidate(unknown, hits)?.id).toBe('none');
     expect(bestPreviewCandidate(target, [hits[1]])).toBeNull();
   });
@@ -272,14 +326,23 @@ describe('toCandidate', () => {
 
 describe('loadFailureKind (#174)', () => {
   // As the bridge passes a native error on: Expo prefixes the description.
-  const native = (description: string) => new Error(`Calling the 'loadPlaylistItems' function has failed\n\u2192 Caused by: ${description}`);
+  const native = (description: string) =>
+    new Error(
+      `Calling the 'loadPlaylistItems' function has failed\n\u2192 Caused by: ${description}`,
+    );
 
   test('a playlist no longer in the library', () => {
     expect(loadFailureKind(native(NO_TRACKS_FOUND))).toBe('gone');
   });
 
   test('library access taken away', () => {
-    expect(loadFailureKind(native('Music library access not authorized. Allow access in Settings > Privacy & Security > Media & Apple Music.'))).toBe('denied');
+    expect(
+      loadFailureKind(
+        native(
+          'Music library access not authorized. Allow access in Settings > Privacy & Security > Media & Apple Music.',
+        ),
+      ),
+    ).toBe('denied');
   });
 
   test.each([

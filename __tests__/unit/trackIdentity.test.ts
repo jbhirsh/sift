@@ -1,4 +1,9 @@
-import { DURATION_TOLERANCE_SECONDS, sameSong, TrackIndex, uniqueTracks } from '../../src/utils/trackIdentity';
+import {
+  DURATION_TOLERANCE_SECONDS,
+  sameSong,
+  TrackIndex,
+  uniqueTracks,
+} from '../../src/utils/trackIdentity';
 import type { Track } from '../../src/types';
 
 function makeTrack(overrides: Partial<Track> = {}): Track {
@@ -40,7 +45,9 @@ describe('sameSong', () => {
   test('durations within a second match, inclusive, even across a rounding boundary (#55)', () => {
     expect(DURATION_TOLERANCE_SECONDS).toBe(1);
     // 238.4 and 238.6 round to different seconds but are the same song.
-    expect(sameSong(makeTrack({ id: 'a', duration: 238.4 }), makeTrack({ id: 'b', duration: 238.6 }))).toBe(true);
+    expect(
+      sameSong(makeTrack({ id: 'a', duration: 238.4 }), makeTrack({ id: 'b', duration: 238.6 })),
+    ).toBe(true);
     const base = makeTrack({ id: 'a', duration: 238.5 });
     expect(sameSong(base, makeTrack({ id: 'b', duration: 239.5 }))).toBe(true);
     expect(sameSong(base, makeTrack({ id: 'b', duration: 237.5 }))).toBe(true);
@@ -48,7 +55,7 @@ describe('sameSong', () => {
     expect(sameSong(base, makeTrack({ id: 'b', duration: 237.25 }))).toBe(false);
   });
 
-  test('an unknown duration (0) on either side doesn\'t block a match (#55)', () => {
+  test("an unknown duration (0) on either side doesn't block a match (#55)", () => {
     expect(sameSong(makeTrack({ id: 'a', duration: 0 }), makeTrack({ id: 'b' }))).toBe(true);
     expect(sameSong(makeTrack({ id: 'a' }), makeTrack({ id: 'b', duration: 0 }))).toBe(true);
   });
@@ -64,8 +71,18 @@ describe('sameSong', () => {
     // Same-titled interludes by the same artist within a second of each
     // other DO collide: the deliberate trade-off (see the doc comment) for
     // surviving Apple Music id reassignment.
-    const interludeAlbumOne = makeTrack({ id: 'a1', name: 'Interlude', album: 'One', duration: 30 });
-    const interludeAlbumTwo = makeTrack({ id: 'a2', name: 'Interlude', album: 'Two', duration: 30.8 });
+    const interludeAlbumOne = makeTrack({
+      id: 'a1',
+      name: 'Interlude',
+      album: 'One',
+      duration: 30,
+    });
+    const interludeAlbumTwo = makeTrack({
+      id: 'a2',
+      name: 'Interlude',
+      album: 'Two',
+      duration: 30.8,
+    });
     expect(sameSong(interludeAlbumOne, interludeAlbumTwo)).toBe(true);
   });
 });
@@ -78,7 +95,9 @@ describe('TrackIndex', () => {
     ]);
     expect(index.has(makeTrack({ id: 'a', name: 'Anything' }))).toBe(true);
     expect(index.has(makeTrack({ id: 'c', duration: 238.6 }))).toBe(true);
-    expect(index.has(makeTrack({ id: 'c', name: 'Bad Habit', artist: 'Steve Lacy', duration: 0 }))).toBe(true);
+    expect(
+      index.has(makeTrack({ id: 'c', name: 'Bad Habit', artist: 'Steve Lacy', duration: 0 })),
+    ).toBe(true);
     expect(index.has(makeTrack({ id: 'c', duration: 241 }))).toBe(false);
     expect(index.has(makeTrack({ id: 'c', name: 'Bad Habit', artist: 'Someone' }))).toBe(false);
   });

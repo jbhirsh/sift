@@ -10,14 +10,21 @@ import type { SiftState } from './SiftContext';
  */
 export function resumeState(
   saved: SiftSession,
-  { provider, connectionStatus, finish = false }: {
+  {
+    provider,
+    connectionStatus,
+    finish = false,
+  }: {
     /** The current provider, for sessions saved before they recorded one. */
     provider: MusicProvider;
     connectionStatus: ConnectionStatus;
     /** End the sift where it left off: resume straight to Done (#142). */
     finish?: boolean;
   },
-): Omit<SiftState, 'startAtChorus' | 'playbackFailedId' | 'songCacheWarming' | 'songCacheGeneration' | 'filter'> {
+): Omit<
+  SiftState,
+  'startAtChorus' | 'playbackFailedId' | 'songCacheWarming' | 'songCacheGeneration' | 'filter'
+> {
   const source = saved.source ?? { type: 'library' as const };
   return {
     tracks: saved.tracks,

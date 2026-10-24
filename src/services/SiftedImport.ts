@@ -24,7 +24,9 @@ let flagWrites: Promise<void> = Promise.resolve();
 
 async function storedKeys(): Promise<string[]> {
   const parsed: unknown = JSON.parse((await AsyncStorage.getItem(IMPORTED_KEY)) ?? '[]');
-  return Array.isArray(parsed) ? parsed.filter((key): key is string => typeof key === 'string') : [];
+  return Array.isArray(parsed)
+    ? parsed.filter((key): key is string => typeof key === 'string')
+    : [];
 }
 
 /** Runs a storage write after the ones before it. */
@@ -37,7 +39,8 @@ function inTurn(write: () => Promise<void>): Promise<void> {
 function rememberImported(key: string): Promise<void> {
   return inTurn(async () => {
     const keys = await storedKeys().catch((): string[] => []);
-    if (!keys.includes(key)) await AsyncStorage.setItem(IMPORTED_KEY, JSON.stringify([...keys, key]));
+    if (!keys.includes(key))
+      await AsyncStorage.setItem(IMPORTED_KEY, JSON.stringify([...keys, key]));
   });
 }
 
@@ -57,17 +60,25 @@ async function storedIdLists(): Promise<Record<string, string[]>> {
  * its next sift: the one-time look found "- Sifted" by name, and missed it
  * if either playlist was renamed. Never rejects.
  */
-export function rememberSiftedPlaylist(provider: MusicProvider, source: SiftSource, siftedId: string): Promise<void> {
+export function rememberSiftedPlaylist(
+  provider: MusicProvider,
+  source: SiftSource,
+  siftedId: string,
+): Promise<void> {
   if (source.type !== 'playlist') return Promise.resolve();
   const key = ledgerKey(provider, source);
   return inTurn(async () => {
     const lists = await storedIdLists().catch((): Record<string, string[]> => ({}));
     const ids = lists[key] ?? [];
     if (ids.includes(siftedId)) return;
-    await AsyncStorage.setItem(REMEMBERED_IDS_KEY, JSON.stringify({ ...lists, [key]: [...ids, siftedId] }));
+    await AsyncStorage.setItem(
+      REMEMBERED_IDS_KEY,
+      JSON.stringify({ ...lists, [key]: [...ids, siftedId] }),
+    );
     // Looked at before by name only: look again, with this one.
     const keys = await storedKeys().catch((): string[] => []);
-    if (keys.includes(key)) await AsyncStorage.setItem(IMPORTED_KEY, JSON.stringify(keys.filter((k) => k !== key)));
+    if (keys.includes(key))
+      await AsyncStorage.setItem(IMPORTED_KEY, JSON.stringify(keys.filter((k) => k !== key)));
   }).catch((err: unknown) => {
     Sentry.captureException(err, { tags: { flow: 'sifted-import' } });
   });
@@ -78,10 +89,14 @@ export function rememberSiftedPlaylist(provider: MusicProvider, source: SiftSour
  * and any an older build's session named that are still in the library (a
  * deleted one is no keeps, not a failed look to retry forever).
  */
-async function siftedPlaylistIds(service: MusicProviderService, key: string, name: string): Promise<string[]> {
+async function siftedPlaylistIds(
+  service: MusicProviderService,
+  key: string,
+  name: string,
+): Promise<string[]> {
   const byName = service.findPlaylists
     ? await service.findPlaylists(name)
-    : (await service.loadPlaylists?.() ?? []).filter((p) => p.name === name).map((p) => p.id);
+    : ((await service.loadPlaylists?.()) ?? []).filter((p) => p.name === name).map((p) => p.id);
   const remembered = (await storedIdLists().catch((): Record<string, string[]> => ({})))[key] ?? [];
   const extra = remembered.filter((id) => !byName.includes(id));
   if (extra.length === 0 || !service.loadPlaylists) return byName;
@@ -107,12 +122,13 @@ async function importNow(
     if (ids.length > 0) {
       const saved = new TrackIndex();
       for (const id of ids) {
-        for (const track of await service.loadPlaylistTracks?.(id) ?? []) saved.add(track);
+        for (const track of (await service.loadPlaylistTracks?.(id)) ?? []) saved.add(track);
       }
       // By song: Apple Music files a song under a new id in each playlist.
       // The ledger takes the id the playlist's own load gives it, shared
       // with a sift's load of it under way (#179).
-      const tracks = sourceTracks ?? await loadPlaylistTracksOnce(service, source.playlist.id) ?? [];
+      const tracks =
+        sourceTracks ?? (await loadPlaylistTracksOnce(service, source.playlist.id)) ?? [];
       // Not a keep the user took back this launch (a resumed old session's
       // keep changed while this ran): that change stands.
       const undone = takenBack(key);
@@ -122,7 +138,8 @@ async function importNow(
       // landed, or look again next time rather than lose them.
       const stored = await storedReviewedIds(key);
       const missing = kept.filter((id) => !stored.has(id) && !takenBack(key).has(id));
-      if (missing.length > 0) throw new Error(`${missing.length} of ${kept.length} kept songs weren't recorded`);
+      if (missing.length > 0)
+        throw new Error(`${missing.length} of ${kept.length} kept songs weren't recorded`);
     }
     await rememberImported(key);
   } catch (err) {

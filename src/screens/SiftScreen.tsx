@@ -12,12 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
 import type { SFSymbol } from 'sf-symbols-typescript';
-import {
-  useSharedValue,
-  withTiming,
-  Easing,
-  runOnJS,
-} from 'react-native-reanimated';
+import { useSharedValue, withTiming, Easing, runOnJS } from 'react-native-reanimated';
 import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
 import GlassBackground from '../components/GlassBackground';
@@ -26,8 +21,19 @@ import InteractiveCard from '../components/InteractiveCard';
 import PlayerControls from '../components/PlayerControls';
 import { COLORS, RADIUS, SETTINGS_BUTTON, SHADOWS, SPACING, UNDO_PILL } from '../theme';
 import { Decision, PendingDecision, PROVIDER_DISPLAY, Track } from '../types';
-import { loadSeenRemoveNote, loadSeenSwipeHint, markRemoveNoteSeen, markSwipeHintSeen } from '../services/PreferencesStore';
-import { decisionAnnouncement, failedRemovalCount, FIRST_REMOVE_NOTE, SWIPE_HINT, undoMessage } from '../utils/sessionCopy';
+import {
+  loadSeenRemoveNote,
+  loadSeenSwipeHint,
+  markRemoveNoteSeen,
+  markSwipeHintSeen,
+} from '../services/PreferencesStore';
+import {
+  decisionAnnouncement,
+  failedRemovalCount,
+  FIRST_REMOVE_NOTE,
+  SWIPE_HINT,
+  undoMessage,
+} from '../utils/sessionCopy';
 import { collectsRemovals } from '../utils/libraryRemovals';
 import { useHoldPendingDecision, useSendPending, wasSent } from '../hooks/usePendingDecision';
 import { useRemovalRetry } from '../hooks/useRemovalRetry';
@@ -91,13 +97,17 @@ export default function SiftScreen() {
   const revise = useReviseDecision(sendPending);
   const [showDecisions, setShowDecisions] = useState(false);
   const decisionOf = useCallback(
-    (trackId: string) => decisionFor(trackId, { kept: state.kept, removed: state.removed, skipped: state.skipped }),
+    (trackId: string) =>
+      decisionFor(trackId, { kept: state.kept, removed: state.removed, skipped: state.skipped }),
     [state.kept, state.removed, state.skipped],
   );
   // The last card's decision goes now: Done has no Undo to hold it for.
-  const sendIfLast = useCallback((held: PendingDecision | null) => {
-    if (held && state.tracks[state.tracks.length - 1]?.id === held.trackId) sendPending(held);
-  }, [sendPending, state.tracks]);
+  const sendIfLast = useCallback(
+    (held: PendingDecision | null) => {
+      if (held && state.tracks[state.tracks.length - 1]?.id === held.trackId) sendPending(held);
+    },
+    [sendPending, state.tracks],
+  );
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   // One decision at a time (utils/decisionGuard). Every way to decide, and
@@ -141,21 +151,25 @@ export default function SiftScreen() {
     };
   }, []);
 
-  const afterDecision = useCallback((decision: Decision, track: Track | undefined) => {
-    // Say what happened: a swipe or button gives a sighted user motion,
-    // VoiceOver nothing (#146).
-    if (track) AccessibilityInfo.announceForAccessibility(decisionAnnouncement(track.name, decision));
-    if (showSwipeHint) {
-      setShowSwipeHint(false);
-      markSwipeHintSeen();
-    }
-    setShowRemoveNote(false);
-    if (decision === 'remove' && removeNoteEligible && !seenRemoveNoteRef.current) {
-      seenRemoveNoteRef.current = true;
-      setShowRemoveNote(true);
-      markRemoveNoteSeen();
-    }
-  }, [removeNoteEligible, showSwipeHint]);
+  const afterDecision = useCallback(
+    (decision: Decision, track: Track | undefined) => {
+      // Say what happened: a swipe or button gives a sighted user motion,
+      // VoiceOver nothing (#146).
+      if (track)
+        AccessibilityInfo.announceForAccessibility(decisionAnnouncement(track.name, decision));
+      if (showSwipeHint) {
+        setShowSwipeHint(false);
+        markSwipeHintSeen();
+      }
+      setShowRemoveNote(false);
+      if (decision === 'remove' && removeNoteEligible && !seenRemoveNoteRef.current) {
+        seenRemoveNoteRef.current = true;
+        setShowRemoveNote(true);
+        markRemoveNoteSeen();
+      }
+    },
+    [removeNoteEligible, showSwipeHint],
+  );
 
   // Failed removals: changes that didn't reach the provider, shown during
   // the sift rather than only on Done, and counted the same way Done counts
@@ -171,20 +185,23 @@ export default function SiftScreen() {
   // phone; on iPad, clamped so square artwork isn't cropped to a strip.
   // Until the first layout the stack just fills the area, as on a phone.
   const { width: windowWidth } = useWindowDimensions();
-  const [cardStackSize, setCardStackSize] = useState<{ width: number; height: number } | null>(null);
+  const [cardStackSize, setCardStackSize] = useState<{ width: number; height: number } | null>(
+    null,
+  );
   const onCardAreaLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     const next = cardSize(width - CARD_AREA_GUTTER * 2, height);
-    setCardStackSize((prev) => (prev?.width === next.width && prev.height === next.height ? prev : next));
+    setCardStackSize((prev) =>
+      prev?.width === next.width && prev.height === next.height ? prev : next,
+    );
   };
 
-  const showUndo = state.pending != null
-    && state.tracks[state.cursor - 1]?.id === state.pending.trackId
-    && !wasSent(state.pending);
+  const showUndo =
+    state.pending != null &&
+    state.tracks[state.cursor - 1]?.id === state.pending.trackId &&
+    !wasSent(state.pending);
 
-  const progress = state.tracks.length > 0
-    ? state.cursor / state.tracks.length
-    : 0;
+  const progress = state.tracks.length > 0 ? state.cursor / state.tracks.length : 0;
 
   // Plain function, not useCallback: the React Compiler (enabled in app.json)
   // memoizes it, and hook-argument freezing is what made the shared-value
@@ -322,7 +339,9 @@ export default function SiftScreen() {
           >
             {/* Capped so the largest text sizes can't push it under the
                 centered title. */}
-            <Text style={[styles.finishText, { color: colors.text }]} maxFontSizeMultiplier={1.3}>Finish</Text>
+            <Text style={[styles.finishText, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
+              Finish
+            </Text>
           </TouchableOpacity>
         </GlassCard>
 
@@ -339,7 +358,11 @@ export default function SiftScreen() {
               accessibilityLabel="Your decisions"
               accessibilityHint="Lists this sift's decisions, to change any of them"
             >
-              <SymbolView name="clock.arrow.circlepath" size={18} tintColor={colors.textSecondary} />
+              <SymbolView
+                name="clock.arrow.circlepath"
+                size={18}
+                tintColor={colors.textSecondary}
+              />
             </TouchableOpacity>
           </GlassCard>
         )}
@@ -362,10 +385,34 @@ export default function SiftScreen() {
         <GlassCard intensity="thin" radius={RADIUS.lg}>
           <View style={styles.statsRow}>
             {/* "left" leads: it's the number that answers "how much more?" */}
-            <StatBadge label="left" value={remaining} color={colors.textTertiary} textColor={colors.textSecondary} testID="remaining-count" />
-            <StatBadge label="kept" value={state.kept.length} color={COLORS.keep} textColor={colors.textSecondary} testID="stat-kept" />
-            <StatBadge label="removed" value={state.removed.length} color={COLORS.remove} textColor={colors.textSecondary} testID="stat-removed" />
-            <StatBadge label="skipped" value={state.skipped.length} color={COLORS.skip} textColor={colors.textSecondary} testID="stat-skipped" />
+            <StatBadge
+              label="left"
+              value={remaining}
+              color={colors.textTertiary}
+              textColor={colors.textSecondary}
+              testID="remaining-count"
+            />
+            <StatBadge
+              label="kept"
+              value={state.kept.length}
+              color={COLORS.keep}
+              textColor={colors.textSecondary}
+              testID="stat-kept"
+            />
+            <StatBadge
+              label="removed"
+              value={state.removed.length}
+              color={COLORS.remove}
+              textColor={colors.textSecondary}
+              testID="stat-removed"
+            />
+            <StatBadge
+              label="skipped"
+              value={state.skipped.length}
+              color={COLORS.skip}
+              textColor={colors.textSecondary}
+              testID="stat-skipped"
+            />
           </View>
         </GlassCard>
       </View>
@@ -402,18 +449,22 @@ export default function SiftScreen() {
       <View style={styles.cardArea} onLayout={onCardAreaLayout} testID="card-area">
         <View style={cardStackSize ?? styles.cardStackFill} testID="card-stack">
           {nextNextTrack != null && (
-            <View style={[
-              styles.backCard,
-              styles.backCard2,
-              { backgroundColor: isDark ? colors.surface : colors.background },
-            ]} />
+            <View
+              style={[
+                styles.backCard,
+                styles.backCard2,
+                { backgroundColor: isDark ? colors.surface : colors.background },
+              ]}
+            />
           )}
           {nextTrack != null && (
-            <View style={[
-              styles.backCard,
-              styles.backCard1,
-              { backgroundColor: isDark ? colors.surface : colors.background },
-            ]} />
+            <View
+              style={[
+                styles.backCard,
+                styles.backCard1,
+                { backgroundColor: isDark ? colors.surface : colors.background },
+              ]}
+            />
           )}
           {currentTrack != null && (
             <InteractiveCard
@@ -436,21 +487,30 @@ export default function SiftScreen() {
                 testID="unsynced-chip"
                 accessibilityLabel={`${unsynced} ${unsynced === 1 ? 'change' : 'changes'} didn't reach ${PROVIDER_DISPLAY[state.provider]}`}
                 // Opaque surface behind it: it sits over artwork of any color.
-                style={[styles.unsyncedChip, { color: colors.skipText, backgroundColor: colors.surface }]}
+                style={[
+                  styles.unsyncedChip,
+                  { color: colors.skipText, backgroundColor: colors.surface },
+                ]}
               >
                 {`${unsynced} didn\u2019t sync`}
               </Text>
             )}
             {showSwipeHint && (
               // Opaque, like the sync chip: it sits over artwork of any color.
-              <Text testID="swipe-hint" style={[styles.swipeHint, { color: colors.text, backgroundColor: colors.surface }]}>
+              <Text
+                testID="swipe-hint"
+                style={[styles.swipeHint, { color: colors.text, backgroundColor: colors.surface }]}
+              >
                 {SWIPE_HINT}
               </Text>
             )}
             {showRemoveNote && (
               <View style={styles.removeNote}>
                 <GlassCard intensity="thin" radius={RADIUS.md}>
-                  <Text testID="first-remove-note" style={[styles.removeNoteText, { color: colors.textSecondary }]}>
+                  <Text
+                    testID="first-remove-note"
+                    style={[styles.removeNoteText, { color: colors.textSecondary }]}
+                  >
                     {FIRST_REMOVE_NOTE}
                   </Text>
                 </GlassCard>
@@ -473,7 +533,9 @@ export default function SiftScreen() {
           label="Remove"
           color={COLORS.remove}
           labelColor={colors.textSecondary}
-          onPress={(event) => { requestDecision('remove', false, pressTime(event)); }}
+          onPress={(event) => {
+            requestDecision('remove', false, pressTime(event));
+          }}
         />
         <ActionButton
           symbolName="arrow.right.circle"
@@ -481,7 +543,9 @@ export default function SiftScreen() {
           label="Skip"
           color={COLORS.skip}
           labelColor={colors.textSecondary}
-          onPress={(event) => { requestDecision('skip', false, pressTime(event)); }}
+          onPress={(event) => {
+            requestDecision('skip', false, pressTime(event));
+          }}
         />
         <ActionButton
           symbolName="checkmark.circle.fill"
@@ -489,7 +553,9 @@ export default function SiftScreen() {
           label="Keep"
           color={COLORS.keep}
           labelColor={colors.textSecondary}
-          onPress={(event) => { requestDecision('keep', false, pressTime(event)); }}
+          onPress={(event) => {
+            requestDecision('keep', false, pressTime(event));
+          }}
         />
         {/* Undo the latest decision while it hasn't been sent (#152): in
             thumb reach, over the buttons' label row, whose labels step aside
@@ -600,7 +666,9 @@ function ActionButton({
           <SymbolView name={symbolName as SFSymbol} size={28} tintColor={color} />
         </View>
       </GlassCard>
-      <Text style={[actionStyles.label, { color: labelColor, opacity: hideLabel ? 0 : 1 }]}>{label.toUpperCase()}</Text>
+      <Text style={[actionStyles.label, { color: labelColor, opacity: hideLabel ? 0 : 1 }]}>
+        {label.toUpperCase()}
+      </Text>
     </TouchableOpacity>
   );
 }

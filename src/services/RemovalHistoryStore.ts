@@ -101,10 +101,10 @@ async function loadForMutation(): Promise<MutationBase> {
   }
   const malformed = result.dropped - result.legacy;
   if (malformed > 0) {
-    Sentry.captureException(
-      new Error(`Dropped ${malformed} malformed removal-history record(s)`),
-      { tags: { flow: 'removal-history-backup' }, extra: { backup: backupName, legacy: result.legacy } },
-    );
+    Sentry.captureException(new Error(`Dropped ${malformed} malformed removal-history record(s)`), {
+      tags: { flow: 'removal-history-backup' },
+      extra: { backup: backupName, legacy: result.legacy },
+    });
   } else {
     Sentry.addBreadcrumb({
       category: 'removal-history',
@@ -160,7 +160,9 @@ export function clearHistoryForSource(playlistId: string): Promise<boolean> {
     try {
       const { records: history } = await loadForMutation();
       const filtered = history.filter(
-        (r) => r.collected === true || !(r.source.type === 'playlist' && r.source.playlist.id === playlistId),
+        (r) =>
+          r.collected === true ||
+          !(r.source.type === 'playlist' && r.source.playlist.id === playlistId),
       );
       await writeHistory(filtered);
       return true;

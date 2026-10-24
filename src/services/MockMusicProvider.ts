@@ -32,7 +32,9 @@ const MOCK_LIBRARY_TRACKS: Track[] = [
     duration: 200,
     playCount: 87,
     dateAdded: '2020-11-22T14:15:00.000Z',
-    artworkURL: cover('Music125/v4/6f/bc/e6/6fbce6c4-c38c-72d8-4fd0-66cfff32f679/20UMGIM12176.rgb.jpg'),
+    artworkURL: cover(
+      'Music125/v4/6f/bc/e6/6fbce6c4-c38c-72d8-4fd0-66cfff32f679/20UMGIM12176.rgb.jpg',
+    ),
   },
   {
     id: 'mock-3',
@@ -54,7 +56,9 @@ const MOCK_LIBRARY_TRACKS: Track[] = [
     duration: 242,
     playCount: 31,
     dateAdded: '2021-05-18T16:20:00.000Z',
-    artworkURL: cover('Music115/v4/02/ed/8c/02ed8cab-c089-2fdd-7ce6-ab334a9a4e19/21UMGIM26093.rgb.jpg'),
+    artworkURL: cover(
+      'Music115/v4/02/ed/8c/02ed8cab-c089-2fdd-7ce6-ab334a9a4e19/21UMGIM26093.rgb.jpg',
+    ),
   },
   {
     id: 'mock-5',
@@ -76,7 +80,9 @@ const MOCK_LIBRARY_TRACKS: Track[] = [
     duration: 178,
     playCount: 45,
     dateAdded: '2021-05-18T16:25:00.000Z',
-    artworkURL: cover('Music115/v4/02/ed/8c/02ed8cab-c089-2fdd-7ce6-ab334a9a4e19/21UMGIM26093.rgb.jpg'),
+    artworkURL: cover(
+      'Music115/v4/02/ed/8c/02ed8cab-c089-2fdd-7ce6-ab334a9a4e19/21UMGIM26093.rgb.jpg',
+    ),
   },
   {
     id: 'mock-7',
@@ -86,7 +92,9 @@ const MOCK_LIBRARY_TRACKS: Track[] = [
     duration: 198,
     playCount: 28,
     dateAdded: '2021-03-19T08:30:00.000Z',
-    artworkURL: cover('Music115/v4/e0/92/da/e092da2d-9f6d-11dc-7843-2021e95a2b61/21UMGIM17518.rgb.jpg'),
+    artworkURL: cover(
+      'Music115/v4/e0/92/da/e092da2d-9f6d-11dc-7843-2021e95a2b61/21UMGIM17518.rgb.jpg',
+    ),
   },
   {
     id: 'mock-8',
@@ -116,7 +124,9 @@ const MOCK_LIBRARY_TRACKS: Track[] = [
     duration: 238,
     playCount: 72,
     dateAdded: '2020-08-07T12:00:00.000Z',
-    artworkURL: cover('Music115/v4/da/8b/77/da8b7731-6f4f-eacf-5e74-8b23389eefa1/20UMGIM03371.rgb.jpg'),
+    artworkURL: cover(
+      'Music115/v4/da/8b/77/da8b7731-6f4f-eacf-5e74-8b23389eefa1/20UMGIM03371.rgb.jpg',
+    ),
   },
 ];
 
@@ -141,11 +151,31 @@ const MOCK_PLAYLIST_TRACK_INDICES: Record<string, number[]> = {
 export const SLOW_PLAYLIST_LOAD_MS = 15000;
 
 const MOCK_PLAYLISTS: Playlist[] = [
-  { id: 'playlist-1', name: 'Chill Vibes', trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-1'].length },
-  { id: 'playlist-2', name: 'Workout Mix', trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-2'].length },
-  { id: 'playlist-3', name: 'Road Trip', trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-3'].length },
-  { id: 'playlist-4', name: 'Road Trip - Sifted', trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-4'].length },
-  { id: 'playlist-5', name: 'Long Drive', trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-5'].length },
+  {
+    id: 'playlist-1',
+    name: 'Chill Vibes',
+    trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-1'].length,
+  },
+  {
+    id: 'playlist-2',
+    name: 'Workout Mix',
+    trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-2'].length,
+  },
+  {
+    id: 'playlist-3',
+    name: 'Road Trip',
+    trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-3'].length,
+  },
+  {
+    id: 'playlist-4',
+    name: 'Road Trip - Sifted',
+    trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-4'].length,
+  },
+  {
+    id: 'playlist-5',
+    name: 'Long Drive',
+    trackCount: MOCK_PLAYLIST_TRACK_INDICES['playlist-5'].length,
+  },
 ];
 
 // ── Failure injection (E2E / unit tests) ───────────────
@@ -305,7 +335,11 @@ export class MockMusicProvider implements MusicProviderService {
     await delay(200);
     const requested = requestedFailures(process.env.EXPO_PUBLIC_MOCK_FAIL_REMOVES);
     for (const id of trackIDs) {
-      if (!failingRemoveIds.has(id) && !landedRemoveIds.has(id) && failingRemoveIds.size < requested) {
+      if (
+        !failingRemoveIds.has(id) &&
+        !landedRemoveIds.has(id) &&
+        failingRemoveIds.size < requested
+      ) {
         failingRemoveIds.add(id);
       }
     }
@@ -345,8 +379,10 @@ export class MockMusicProvider implements MusicProviderService {
 
   async addToPlaylist(playlistID: string, _trackIDs: string[]): Promise<void> {
     await delay(200);
-    if (!createdPlaylists.has(playlistID)
-      && injectedAddFailures < requestedFailures(process.env.EXPO_PUBLIC_MOCK_FAIL_ADDS)) {
+    if (
+      !createdPlaylists.has(playlistID) &&
+      injectedAddFailures < requestedFailures(process.env.EXPO_PUBLIC_MOCK_FAIL_ADDS)
+    ) {
       injectedAddFailures += 1;
       throw new Error('Simulated add failure (EXPO_PUBLIC_MOCK_FAIL_ADDS)');
     }

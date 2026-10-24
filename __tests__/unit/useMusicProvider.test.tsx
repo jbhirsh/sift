@@ -3,11 +3,21 @@ import { Text, TouchableOpacity } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import * as Sentry from '@sentry/react-native';
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
-import { KEPT_SAVE_BATCH, KEPT_SAVE_SETTLE_MS, resetKeptSaves, STILL_FINISHING, useMusicProvider } from '../../src/hooks/useMusicProvider';
+import {
+  KEPT_SAVE_BATCH,
+  KEPT_SAVE_SETTLE_MS,
+  resetKeptSaves,
+  STILL_FINISHING,
+  useMusicProvider,
+} from '../../src/hooks/useMusicProvider';
 import { AddShortfallError } from '../../src/utils/musicKit';
 import { QueueStallError } from '../../src/utils/serialQueue';
 import { forgetRemovals } from '../../src/services/RemovalHistoryStore';
-import { loadReviewedIds, markReviewed, unmarkReviewed } from '../../src/services/ReviewedLedgerStore';
+import {
+  loadReviewedIds,
+  markReviewed,
+  unmarkReviewed,
+} from '../../src/services/ReviewedLedgerStore';
 import { Track } from '../../src/types';
 
 // Mock Sentry
@@ -82,31 +92,68 @@ jest.mock('react-native/Libraries/Alert/Alert', () => ({
 }));
 
 const mockTrack: Track = {
-  id: '1', name: 'Track A', artist: 'Artist A', album: 'Album A',
-  duration: 200, playCount: 10, dateAdded: '2020-01-01T00:00:00.000Z',
+  id: '1',
+  name: 'Track A',
+  artist: 'Artist A',
+  album: 'Album A',
+  duration: 200,
+  playCount: 10,
+  dateAdded: '2020-01-01T00:00:00.000Z',
 };
 
 const mockTrackB: Track = {
-  id: '2', name: 'Track B', artist: 'Artist B', album: 'Album B',
-  duration: 180, playCount: 3, dateAdded: '2020-02-01T00:00:00.000Z',
+  id: '2',
+  name: 'Track B',
+  artist: 'Artist B',
+  album: 'Album B',
+  duration: 180,
+  playCount: 3,
+  dateAdded: '2020-02-01T00:00:00.000Z',
 };
 
 let lastLoadPlaylistsResult: unknown[] = [];
 
 // Deliberately unsorted by playCount so a real sort is observable.
 const unsortedTracks: Track[] = [
-  { id: 'high', name: 'High', artist: 'A', album: 'A', duration: 200, playCount: 10, dateAdded: '2020-01-01T00:00:00.000Z' },
-  { id: 'low', name: 'Low', artist: 'B', album: 'B', duration: 200, playCount: 3, dateAdded: '2020-01-01T00:00:00.000Z' },
-  { id: 'mid', name: 'Mid', artist: 'C', album: 'C', duration: 200, playCount: 5, dateAdded: '2020-01-01T00:00:00.000Z' },
+  {
+    id: 'high',
+    name: 'High',
+    artist: 'A',
+    album: 'A',
+    duration: 200,
+    playCount: 10,
+    dateAdded: '2020-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'low',
+    name: 'Low',
+    artist: 'B',
+    album: 'B',
+    duration: 200,
+    playCount: 3,
+    dateAdded: '2020-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'mid',
+    name: 'Mid',
+    artist: 'C',
+    album: 'C',
+    duration: 200,
+    playCount: 5,
+    dateAdded: '2020-01-01T00:00:00.000Z',
+  },
 ];
 
 function TestConsumer() {
   const provider = useMusicProvider();
   return (
     <>
-      <TouchableOpacity testID="authorize" onPress={async () => {
-        await provider.authorize();
-      }} />
+      <TouchableOpacity
+        testID="authorize"
+        onPress={async () => {
+          await provider.authorize();
+        }}
+      />
       <TouchableOpacity testID="play" onPress={() => provider.play('1')} />
       <TouchableOpacity testID="play-pos" onPress={() => provider.play('1', 30)} />
       <TouchableOpacity testID="pause" onPress={() => provider.pause()} />
@@ -115,9 +162,12 @@ function TestConsumer() {
       <TouchableOpacity testID="toggle" onPress={() => provider.togglePlayPause()} />
       <TouchableOpacity testID="skip-fwd" onPress={() => provider.skipForward()} />
       <TouchableOpacity testID="skip-bwd" onPress={() => provider.skipBackward()} />
-      <TouchableOpacity testID="load-playlists" onPress={async () => {
-        lastLoadPlaylistsResult = await provider.loadPlaylists();
-      }} />
+      <TouchableOpacity
+        testID="load-playlists"
+        onPress={async () => {
+          lastLoadPlaylistsResult = await provider.loadPlaylists();
+        }}
+      />
       <TouchableOpacity testID="load-tracks" onPress={() => provider.loadTracks()} />
       <TouchableOpacity testID="warm-cache" onPress={() => provider.warmCache(['1', '2'])} />
     </>
@@ -131,18 +181,30 @@ function TestConsumerWithPlaylistActions() {
     <>
       <Text testID="load-error">{state.loadError ?? ''}</Text>
       <Text testID="phase">{state.phase}</Text>
-      <TouchableOpacity testID="set-source-playlist" onPress={() => {
-        dispatch({
-          type: 'SET_SOURCE',
-          source: { type: 'playlist', playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 } },
-        });
-      }} />
-      <TouchableOpacity testID="load-tracks" onPress={async () => {
-        await provider.loadTracks();
-      }} />
-      <TouchableOpacity testID="load-tracks-skip" onPress={async () => {
-        await provider.loadTracks({ skipFiltering: true });
-      }} />
+      <TouchableOpacity
+        testID="set-source-playlist"
+        onPress={() => {
+          dispatch({
+            type: 'SET_SOURCE',
+            source: {
+              type: 'playlist',
+              playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 },
+            },
+          });
+        }}
+      />
+      <TouchableOpacity
+        testID="load-tracks"
+        onPress={async () => {
+          await provider.loadTracks();
+        }}
+      />
+      <TouchableOpacity
+        testID="load-tracks-skip"
+        onPress={async () => {
+          await provider.loadTracks({ skipFiltering: true });
+        }}
+      />
       <TouchableOpacity testID="restore-pl" onPress={() => provider.restoreTrack(mockTrack)} />
       <TouchableOpacity testID="remove-track" onPress={() => provider.removeTrack(mockTrack)} />
       <TouchableOpacity testID="restore-track" onPress={() => provider.restoreTrack(mockTrack)} />
@@ -157,7 +219,7 @@ function renderWithProvider() {
   return render(
     <SiftProvider initialTracks={[mockTrack]}>
       <TestConsumer />
-    </SiftProvider>
+    </SiftProvider>,
   );
 }
 
@@ -169,7 +231,10 @@ function SortConsumer() {
   return (
     <>
       <Text testID="track-order">{state.tracks.map((t) => t.playCount).join(',')}</Text>
-      <TouchableOpacity testID="set-most-played" onPress={() => dispatch({ type: 'SET_SORT_ORDER', sortOrder: 'most-played' })} />
+      <TouchableOpacity
+        testID="set-most-played"
+        onPress={() => dispatch({ type: 'SET_SORT_ORDER', sortOrder: 'most-played' })}
+      />
       <TouchableOpacity testID="sort-load-tracks" onPress={() => provider.loadTracks()} />
     </>
   );
@@ -395,7 +460,7 @@ describe('useMusicProvider', () => {
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
-      </SiftProvider>
+      </SiftProvider>,
     );
 
     // Set source to playlist
@@ -444,7 +509,7 @@ describe('useMusicProvider', () => {
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <SortConsumer />
-      </SiftProvider>
+      </SiftProvider>,
     );
     await act(async () => {
       await fireEvent.press(getByTestId('sort-load-tracks'));
@@ -461,7 +526,7 @@ describe('useMusicProvider', () => {
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
-      </SiftProvider>
+      </SiftProvider>,
     );
     await act(async () => {
       await fireEvent.press(getByTestId('set-source-playlist'));
@@ -475,7 +540,15 @@ describe('useMusicProvider', () => {
   });
 
   test('loadTracks filters out remembered keeps and removed tracks for playlist source', async () => {
-    const trackB: Track = { id: '2', name: 'Track B', artist: 'B', album: 'B', duration: 100, playCount: 1, dateAdded: '2021-01-01T00:00:00.000Z' };
+    const trackB: Track = {
+      id: '2',
+      name: 'Track B',
+      artist: 'B',
+      album: 'B',
+      duration: 100,
+      playCount: 1,
+      dateAdded: '2021-01-01T00:00:00.000Z',
+    };
     mockProvider.loadPlaylistTracks.mockResolvedValueOnce([mockTrack, trackB]);
     (loadReviewedIds as jest.Mock).mockResolvedValueOnce(new Set(['2']));
     const { loadHistory } = require('../../src/services/RemovalHistoryStore');
@@ -484,7 +557,7 @@ describe('useMusicProvider', () => {
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[]}>
         <TestConsumerWithPlaylistActions />
-      </SiftProvider>
+      </SiftProvider>,
     );
     await act(async () => {
       await fireEvent.press(getByTestId('set-source-playlist'));
@@ -502,7 +575,7 @@ describe('useMusicProvider', () => {
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
-      </SiftProvider>
+      </SiftProvider>,
     );
     await act(async () => {
       await fireEvent.press(getByTestId('set-source-playlist'));
@@ -519,7 +592,7 @@ describe('useMusicProvider', () => {
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
-      </SiftProvider>
+      </SiftProvider>,
     );
     await act(async () => {
       await fireEvent.press(getByTestId('set-source-playlist'));
@@ -534,7 +607,7 @@ describe('useMusicProvider', () => {
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
-      </SiftProvider>
+      </SiftProvider>,
     );
     await act(async () => {
       await fireEvent.press(getByTestId('set-source-playlist'));
@@ -551,7 +624,7 @@ describe('useMusicProvider', () => {
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[mockTrack]}>
         <TestConsumerWithPlaylistActions />
-      </SiftProvider>
+      </SiftProvider>,
     );
     await act(async () => {
       await fireEvent.press(getByTestId('set-source-playlist'));
@@ -606,7 +679,7 @@ describe('useMusicProvider', () => {
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[]}>
         <TestConsumerWithPlaylistActions />
-      </SiftProvider>
+      </SiftProvider>,
     );
     await act(async () => {
       await fireEvent.press(getByTestId('set-source-playlist'));
@@ -626,7 +699,7 @@ describe('useMusicProvider', () => {
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[]}>
         <TestConsumerWithPlaylistActions />
-      </SiftProvider>
+      </SiftProvider>,
     );
     await act(async () => {
       await fireEvent.press(getByTestId('set-source-playlist'));
@@ -659,7 +732,7 @@ describe('useMusicProvider', () => {
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[]}>
         <TestConsumerWithPlaylistActions />
-      </SiftProvider>
+      </SiftProvider>,
     );
     await act(async () => {
       await fireEvent.press(getByTestId('set-source-playlist'));
@@ -689,7 +762,7 @@ describe('useMusicProvider', () => {
       const { getByTestId } = await render(
         <SiftProvider initialTracks={[]}>
           <TestConsumerWithPlaylistActions />
-        </SiftProvider>
+        </SiftProvider>,
       );
       await act(async () => {
         await fireEvent.press(getByTestId('set-source-playlist'));
@@ -708,12 +781,17 @@ describe('useMusicProvider', () => {
     mockProvider.loadPlaylists.mockResolvedValue([]);
     const { loadHistory } = require('../../src/services/RemovalHistoryStore');
     (loadHistory as jest.Mock).mockResolvedValueOnce([
-      { track: mockTrack, source: { type: 'library' }, provider: 'apple-music', removedAt: '2026-04-08T12:00:00.000Z' },
+      {
+        track: mockTrack,
+        source: { type: 'library' },
+        provider: 'apple-music',
+        removedAt: '2026-04-08T12:00:00.000Z',
+      },
     ]);
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[]}>
         <TestConsumerWithPlaylistActions />
-      </SiftProvider>
+      </SiftProvider>,
     );
     await act(async () => {
       await fireEvent.press(getByTestId('set-source-playlist'));
@@ -744,7 +822,7 @@ describe('useMusicProvider', () => {
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[]}>
         <TestConsumerWithPlaylistActions />
-      </SiftProvider>
+      </SiftProvider>,
     );
     await act(async () => {
       await fireEvent.press(getByTestId('set-source-playlist'));
@@ -763,7 +841,7 @@ describe('useMusicProvider', () => {
     const { getByTestId } = await render(
       <SiftProvider initialTracks={[]}>
         <TestConsumerWithPlaylistActions />
-      </SiftProvider>
+      </SiftProvider>,
     );
     await act(async () => {
       await fireEvent.press(getByTestId('load-tracks'));
@@ -781,13 +859,21 @@ describe('useMusicProvider', () => {
       }, [dispatch, phase]);
       return null;
     }
-    const { rerender } = await render(<SiftProvider initialTracks={[mockTrack]}><Playing phase="sifting" /></SiftProvider>);
+    const { rerender } = await render(
+      <SiftProvider initialTracks={[mockTrack]}>
+        <Playing phase="sifting" />
+      </SiftProvider>,
+    );
     await act(async () => {
       jest.advanceTimersByTime(600);
     });
     expect(mockProvider.getPlaybackState).toHaveBeenCalled();
     // The last decision moves to Done with isPlaying still set.
-    await rerender(<SiftProvider initialTracks={[mockTrack]}><Playing phase="done" /></SiftProvider>);
+    await rerender(
+      <SiftProvider initialTracks={[mockTrack]}>
+        <Playing phase="done" />
+      </SiftProvider>,
+    );
     mockProvider.getPlaybackState.mockClear();
     await act(async () => {
       jest.advanceTimersByTime(2000);
@@ -803,8 +889,18 @@ describe('useMusicProvider', () => {
         <>
           <Text testID="track-ids">{state.tracks.map((t) => t.id).join(',')}</Text>
           <Text testID="load-error">{state.loadError ?? ''}</Text>
-          <TouchableOpacity testID="load-tracks" onPress={async () => { await provider.loadTracks(); }} />
-          <TouchableOpacity testID="load-tracks-skip" onPress={async () => { await provider.loadTracks({ skipFiltering: true }); }} />
+          <TouchableOpacity
+            testID="load-tracks"
+            onPress={async () => {
+              await provider.loadTracks();
+            }}
+          />
+          <TouchableOpacity
+            testID="load-tracks-skip"
+            onPress={async () => {
+              await provider.loadTracks({ skipFiltering: true });
+            }}
+          />
           <TouchableOpacity testID="keep-track" onPress={() => provider.keepTrack(mockTrack)} />
         </>
       );
@@ -813,11 +909,12 @@ describe('useMusicProvider', () => {
       // Back to the empty default even when a test fails part-way.
       (loadReviewedIds as jest.Mock).mockReset().mockResolvedValue(new Set());
     });
-    const renderLedger = () => render(
-      <SiftProvider initialTracks={[]}>
-        <LedgerConsumer />
-      </SiftProvider>,
-    );
+    const renderLedger = () =>
+      render(
+        <SiftProvider initialTracks={[]}>
+          <LedgerConsumer />
+        </SiftProvider>,
+      );
 
     test('a library keep is recorded under the library key', async () => {
       const { getByTestId } = await renderLedger();
@@ -863,10 +960,17 @@ describe('useMusicProvider', () => {
       });
       return null;
     }
-    const playlistP1 = { type: 'playlist' as const, playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 } };
+    const playlistP1 = {
+      type: 'playlist' as const,
+      playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 },
+    };
     /** A sift of "My Playlist" (p1), loaded: its activeSource is p1. */
     async function renderOnPlaylist(tracks: Track[] = [mockTrack, mockTrackB]) {
-      await render(<SiftProvider initialTracks={[]}><Capture /></SiftProvider>);
+      await render(
+        <SiftProvider initialTracks={[]}>
+          <Capture />
+        </SiftProvider>,
+      );
       await act(async () => {
         ctx.dispatch({ type: 'SET_SOURCE', source: playlistP1 });
       });
@@ -874,11 +978,14 @@ describe('useMusicProvider', () => {
         ctx.dispatch({ type: 'LOAD_TRACKS', tracks });
       });
     }
-    const songs = (n: number, from = 0): Track[] => Array.from({ length: n }, (_, i) => ({
-      ...mockTrack, id: `s${from + i}`, name: `Song ${from + i}`,
-    }));
+    const songs = (n: number, from = 0): Track[] =>
+      Array.from({ length: n }, (_, i) => ({
+        ...mockTrack,
+        id: `s${from + i}`,
+        name: `Song ${from + i}`,
+      }));
 
-    test('a playlist keep is recorded under that playlist\'s key, and nothing is written to the service', async () => {
+    test("a playlist keep is recorded under that playlist's key, and nothing is written to the service", async () => {
       await renderOnPlaylist();
       await act(async () => {
         await api.keepTrack(mockTrack);
@@ -890,7 +997,7 @@ describe('useMusicProvider', () => {
       expect(mockProvider.addToPlaylist).not.toHaveBeenCalled();
     });
 
-    test('a keep goes to the sift\'s own source, not one Setup shows since', async () => {
+    test("a keep goes to the sift's own source, not one Setup shows since", async () => {
       await renderOnPlaylist();
       await act(async () => {
         ctx.dispatch({ type: 'SET_SOURCE', source: { type: 'library' } });
@@ -901,7 +1008,7 @@ describe('useMusicProvider', () => {
       expect(markReviewed).toHaveBeenCalledWith('apple-music:playlist:p1', '1');
     });
 
-    test('taking back a sent keep takes it out of that source\'s ledger and says it worked', async () => {
+    test("taking back a sent keep takes it out of that source's ledger and says it worked", async () => {
       await renderOnPlaylist();
       let result: boolean | undefined;
       await act(async () => {
@@ -913,7 +1020,11 @@ describe('useMusicProvider', () => {
     });
 
     test('so does a library one', async () => {
-      await render(<SiftProvider initialTracks={[mockTrack]}><Capture /></SiftProvider>);
+      await render(
+        <SiftProvider initialTracks={[mockTrack]}>
+          <Capture />
+        </SiftProvider>,
+      );
       await act(async () => {
         await expect(api.unkeepTrack(mockTrack)).resolves.toBe(true);
       });
@@ -922,12 +1033,22 @@ describe('useMusicProvider', () => {
 
     describe('saveKeptPlaylist (Done\'s "Save kept songs as a playlist")', () => {
       const NAME = 'My Playlist - Sifted';
-      const result = (over: Partial<Record<'kept' | 'added' | 'notAdded' | 'leftOut', number>>) => ({
-        playlistName: NAME, sourceName: 'My Playlist', kept: 0, added: 0, notAdded: 0, leftOut: 0, ...over,
+      const result = (
+        over: Partial<Record<'kept' | 'added' | 'notAdded' | 'leftOut', number>>,
+      ) => ({
+        playlistName: NAME,
+        sourceName: 'My Playlist',
+        kept: 0,
+        added: 0,
+        notAdded: 0,
+        leftOut: 0,
+        ...over,
       });
       /** Source "My Playlist" (p1) holds these; "- Sifted" playlists hold their own. */
       const holding = (source: Track[], sifted: Record<string, Track[]> = {}) => {
-        mockProvider.loadPlaylistTracks.mockImplementation(async (id: string) => (id === 'p1' ? source : sifted[id] ?? []));
+        mockProvider.loadPlaylistTracks.mockImplementation(async (id: string) =>
+          id === 'p1' ? source : (sifted[id] ?? []),
+        );
       };
 
       test('no "<name> - Sifted" yet: makes it empty, then adds every kept song still in the playlist', async () => {
@@ -944,7 +1065,9 @@ describe('useMusicProvider', () => {
         expect(mockProvider.findPlaylists).toHaveBeenCalledWith(NAME);
         expect(mockProvider.createPlaylist).toHaveBeenCalledTimes(1);
         expect(mockProvider.createPlaylist).toHaveBeenCalledWith(NAME);
-        expect((mockProvider.addToPlaylist as jest.Mock).mock.calls).toEqual([['new-1', ['1', '2']]]);
+        expect((mockProvider.addToPlaylist as jest.Mock).mock.calls).toEqual([
+          ['new-1', ['1', '2']],
+        ]);
         // A playlist just made has nothing in it to read.
         expect(mockProvider.loadPlaylistTracks).not.toHaveBeenCalledWith('new-1');
       });
@@ -956,7 +1079,9 @@ describe('useMusicProvider', () => {
         mockProvider.createPlaylist.mockResolvedValue('new-7');
         await renderOnPlaylist([]);
         await act(async () => {
-          await expect(api.saveKeptPlaylist()).resolves.toEqual(result({ kept: kept.length, added: kept.length }));
+          await expect(api.saveKeptPlaylist()).resolves.toEqual(
+            result({ kept: kept.length, added: kept.length }),
+          );
         });
         const ids = kept.map((t) => t.id);
         expect(KEPT_SAVE_BATCH).toBe(10);
@@ -967,7 +1092,7 @@ describe('useMusicProvider', () => {
         ]);
       });
 
-      test('an existing one gets only the songs not in it, matched by song across Apple\'s new ids', async () => {
+      test("an existing one gets only the songs not in it, matched by song across Apple's new ids", async () => {
         (loadReviewedIds as jest.Mock).mockResolvedValue(new Set(['1', '2']));
         mockProvider.findPlaylists.mockResolvedValue(['sifted-1']);
         // Track A landed under a library-instance id.
@@ -1004,7 +1129,9 @@ describe('useMusicProvider', () => {
         mockProvider.createPlaylist.mockResolvedValue('new-1');
         await renderOnPlaylist([]);
         await act(async () => {
-          await expect(api.saveKeptPlaylist()).resolves.toEqual(result({ kept: 1, added: 1, leftOut: 2 }));
+          await expect(api.saveKeptPlaylist()).resolves.toEqual(
+            result({ kept: 1, added: 1, leftOut: 2 }),
+          );
         });
         expect((mockProvider.addToPlaylist as jest.Mock).mock.calls).toEqual([['new-1', ['1']]]);
       });
@@ -1045,35 +1172,45 @@ describe('useMusicProvider', () => {
           );
         });
         expect(mockProvider.addToPlaylist).toHaveBeenCalledTimes(2);
-        expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'save-kept-playlist' } });
+        expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+          tags: { flow: 'save-kept-playlist' },
+        });
       });
 
-      test('songs Music can\'t add are counted, and the batches after them still go', async () => {
+      test("songs Music can't add are counted, and the batches after them still go", async () => {
         const kept = songs(15);
         (loadReviewedIds as jest.Mock).mockResolvedValue(new Set(kept.map((t) => t.id)));
         holding(kept);
         mockProvider.createPlaylist.mockResolvedValue('new-1');
-        mockProvider.addToPlaylist.mockRejectedValueOnce(new AddShortfallError({ added: 7, unresolved: 3, failed: 0 })).mockResolvedValueOnce(undefined);
+        mockProvider.addToPlaylist
+          .mockRejectedValueOnce(new AddShortfallError({ added: 7, unresolved: 3, failed: 0 }))
+          .mockResolvedValueOnce(undefined);
         await renderOnPlaylist([]);
         await act(async () => {
-          await expect(api.saveKeptPlaylist()).resolves.toEqual(result({ kept: 15, added: 12, notAdded: 3 }));
+          await expect(api.saveKeptPlaylist()).resolves.toEqual(
+            result({ kept: 15, added: 12, notAdded: 3 }),
+          );
         });
         expect(mockProvider.addToPlaylist).toHaveBeenCalledTimes(2);
         expect(Sentry.captureException).not.toHaveBeenCalled();
       });
 
-      test('nothing that can be added isn\'t an error to retry forever: the save says how many', async () => {
+      test("nothing that can be added isn't an error to retry forever: the save says how many", async () => {
         (loadReviewedIds as jest.Mock).mockResolvedValue(new Set(['1', '2']));
         holding([mockTrack, mockTrackB]);
         mockProvider.createPlaylist.mockResolvedValue('new-1');
-        mockProvider.addToPlaylist.mockRejectedValueOnce(new AddShortfallError({ added: 0, unresolved: 2, failed: 0 }));
+        mockProvider.addToPlaylist.mockRejectedValueOnce(
+          new AddShortfallError({ added: 0, unresolved: 2, failed: 0 }),
+        );
         await renderOnPlaylist([]);
         await act(async () => {
-          await expect(api.saveKeptPlaylist()).resolves.toEqual(result({ kept: 2, added: 0, notAdded: 2 }));
+          await expect(api.saveKeptPlaylist()).resolves.toEqual(
+            result({ kept: 2, added: 0, notAdded: 2 }),
+          );
         });
       });
 
-      test('a batch that fails doesn\'t keep the later ones out; the save then fails with the first error', async () => {
+      test("a batch that fails doesn't keep the later ones out; the save then fails with the first error", async () => {
         const kept = songs(KEPT_SAVE_BATCH * 3);
         (loadReviewedIds as jest.Mock).mockResolvedValue(new Set(kept.map((t) => t.id)));
         mockProvider.findPlaylists.mockResolvedValue(['sifted-1']);
@@ -1087,7 +1224,9 @@ describe('useMusicProvider', () => {
           await expect(api.saveKeptPlaylist()).rejects.toThrow('offline');
         });
         expect(mockProvider.addToPlaylist).toHaveBeenCalledTimes(3);
-        expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'save-kept-playlist' } });
+        expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+          tags: { flow: 'save-kept-playlist' },
+        });
       });
 
       test('a create that fails fails the save; nothing is added', async () => {
@@ -1118,7 +1257,7 @@ describe('useMusicProvider', () => {
         expect(mockProvider.addToPlaylist).toHaveBeenLastCalledWith('new-1', ['1']);
       });
 
-      test('without the provider\'s lookup, a playlist made here is used before the library lists it', async () => {
+      test("without the provider's lookup, a playlist made here is used before the library lists it", async () => {
         const findPlaylists = mockProvider.findPlaylists;
         (mockProvider as Partial<typeof mockProvider>).findPlaylists = undefined;
         try {
@@ -1141,7 +1280,7 @@ describe('useMusicProvider', () => {
         }
       });
 
-      test('without the provider\'s lookup, the library\'s list finds an existing one by name', async () => {
+      test("without the provider's lookup, the library's list finds an existing one by name", async () => {
         const findPlaylists = mockProvider.findPlaylists;
         (mockProvider as Partial<typeof mockProvider>).findPlaylists = undefined;
         try {
@@ -1165,7 +1304,12 @@ describe('useMusicProvider', () => {
       test('it waits for earlier library writes to finish before reading anything', async () => {
         (loadReviewedIds as jest.Mock).mockResolvedValue(new Set(['1']));
         let settle!: () => void;
-        mockProvider.writesSettled.mockImplementationOnce(() => new Promise<void>((res) => { settle = res; }));
+        mockProvider.writesSettled.mockImplementationOnce(
+          () =>
+            new Promise<void>((res) => {
+              settle = res;
+            }),
+        );
         await renderOnPlaylist();
         let saving!: Promise<unknown>;
         await act(async () => {
@@ -1191,7 +1335,12 @@ describe('useMusicProvider', () => {
         });
         // The timed-out add is still running.
         let settle!: () => void;
-        mockProvider.writesSettled.mockImplementation(() => new Promise<void>((res) => { settle = res; }));
+        mockProvider.writesSettled.mockImplementation(
+          () =>
+            new Promise<void>((res) => {
+              settle = res;
+            }),
+        );
         let retry!: Promise<unknown>;
         await act(async () => {
           retry = api.saveKeptPlaylist();
@@ -1205,7 +1354,9 @@ describe('useMusicProvider', () => {
           jest.advanceTimersByTime(1);
         });
         await expect(retry).rejects.toThrow(STILL_FINISHING);
-        expect(STILL_FINISHING).toBe('Music is still finishing an earlier change. Try again in a moment.');
+        expect(STILL_FINISHING).toBe(
+          'Music is still finishing an earlier change. Try again in a moment.',
+        );
         expect(mockProvider.addToPlaylist).toHaveBeenCalledTimes(1);
         // Once it landed, the next save reads it and adds nothing twice.
         holding([mockTrack], { 'sifted-1': [mockTrack] });
@@ -1218,14 +1369,20 @@ describe('useMusicProvider', () => {
       });
 
       test('a library sift has nothing to save this way', async () => {
-        await render(<SiftProvider initialTracks={[mockTrack]}><Capture /></SiftProvider>);
+        await render(
+          <SiftProvider initialTracks={[mockTrack]}>
+            <Capture />
+          </SiftProvider>,
+        );
         await act(async () => {
-          await expect(api.saveKeptPlaylist()).rejects.toThrow('Only a playlist sift saves its kept songs as a playlist');
+          await expect(api.saveKeptPlaylist()).rejects.toThrow(
+            'Only a playlist sift saves its kept songs as a playlist',
+          );
         });
         expect(loadReviewedIds).not.toHaveBeenCalled();
       });
 
-      test('it saves the sift\'s own playlist, not one Setup shows since', async () => {
+      test("it saves the sift's own playlist, not one Setup shows since", async () => {
         await renderOnPlaylist();
         await act(async () => {
           ctx.dispatch({ type: 'SET_SOURCE', source: { type: 'library' } });
@@ -1240,7 +1397,12 @@ describe('useMusicProvider', () => {
         (loadReviewedIds as jest.Mock).mockResolvedValue(new Set(['1']));
         let finishAdd!: () => void;
         mockProvider.createPlaylist.mockResolvedValue('new-1');
-        mockProvider.addToPlaylist.mockImplementationOnce(() => new Promise<void>((resolve) => { finishAdd = resolve; }));
+        mockProvider.addToPlaylist.mockImplementationOnce(
+          () =>
+            new Promise<void>((resolve) => {
+              finishAdd = resolve;
+            }),
+        );
         await renderOnPlaylist();
         let first!: Promise<unknown>;
         let second!: Promise<unknown>;
@@ -1262,7 +1424,7 @@ describe('useMusicProvider', () => {
         await expect(second).resolves.toEqual(result({ kept: 1 }));
       });
 
-      test('a failed save doesn\'t hold up the next', async () => {
+      test("a failed save doesn't hold up the next", async () => {
         (loadReviewedIds as jest.Mock).mockResolvedValue(new Set(['1']));
         mockProvider.createPlaylist.mockRejectedValueOnce(new Error('offline'));
         await renderOnPlaylist();
@@ -1274,7 +1436,6 @@ describe('useMusicProvider', () => {
         });
       });
     });
-
 
     test('a library that is all sifted says how to go again', async () => {
       mockProvider.loadLibrary.mockResolvedValue([mockTrack]);
@@ -1288,5 +1449,4 @@ describe('useMusicProvider', () => {
       );
     });
   });
-
 });
