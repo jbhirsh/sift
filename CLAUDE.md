@@ -560,8 +560,9 @@ Makefile                Dev commands (test, lint, typecheck, check)
   (`scripts/readme-screenshots.mjs`, rules in `scripts/readmeScreenshots.ts`;
   ImageMagick). The changes go in one PR from `bot/readme-screenshots`,
   opened or updated, with auto-merge on (squash), its pictures linked by
-  commit; a merge that changes no screen still brings an open one up to
-  date with main, which the rule requires. That workflow-owned branch is the one exception to "no new
+  commit. A merge whose shots match the README closes an open one (its
+  pictures are stale), and a merge with no shots (no E2E run) brings an open
+  one up to date with main, which the rule requires. That workflow-owned branch is the one exception to "no new
   branches". It opens the PR with the `BOT_PR_TOKEN` secret (a fine-grained
   token on this repo with Contents and Pull requests read/write); without
   it, the Actions token opens it but GitHub runs no workflow on it, so the

@@ -83,11 +83,11 @@ jobs:
           echo "files=$updated" >> "$GITHUB_OUTPUT"
 
       # main's rule wants a branch up to date before it merges. When this
-      # merge changed no README screen, an open bot PR would otherwise sit
-      # behind main for good: bring it up to date (create-pull-request below
-      # does that itself when there are new shots).
+      # merge brought no shots (its E2E job didn't run), an open bot PR would
+      # otherwise sit behind main for good: bring it up to date
+      # (create-pull-request below does that itself when there are new shots).
       - name: Bring an open bot PR up to date
-        if: steps.update.outputs.files == ''
+        if: steps.shots.outputs.found != 'true'
         env:
           GH_TOKEN: ${{ secrets.BOT_PR_TOKEN || github.token }}
         run: |
@@ -95,6 +95,20 @@ jobs:
           if [ -n "$pr" ]; then
             gh pr update-branch "$pr" --repo "$GITHUB_REPOSITORY" --rebase \
               || echo "::warning::Couldn't bring the README screenshots PR #$pr up to date with main."
+          fi
+
+      # This merge's shots match main's README, so an open bot PR's pictures
+      # are stale (an earlier screen change since reverted, say): close it
+      # rather than let auto-merge land them.
+      - name: Close a stale bot PR
+        if: steps.shots.outputs.found == 'true' && steps.update.outputs.files == ''
+        env:
+          GH_TOKEN: ${{ secrets.BOT_PR_TOKEN || github.token }}
+        run: |
+          pr=$(gh pr list --repo "$GITHUB_REPOSITORY" --head bot/readme-screenshots --state open --json number --jq '.[0].number // empty')
+          if [ -n "$pr" ]; then
+            gh pr close "$pr" --repo "$GITHUB_REPOSITORY" --delete-branch \
+              --comment "The screens now match the README again, so these shots are out of date."
           fi
 
       - name: Open or update the PR
