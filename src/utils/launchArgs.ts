@@ -5,5 +5,7 @@
  * boolean in a form iOS doesn't read, so flows quote it ("true").
  */
 export function launchFlagOn(value: unknown): boolean {
-  return value === true || value === 1 || (typeof value === 'string' && /^(true|yes|1)$/i.test(value));
+  return (
+    value === true || value === 1 || (typeof value === 'string' && /^(true|yes|1)$/i.test(value))
+  );
 }

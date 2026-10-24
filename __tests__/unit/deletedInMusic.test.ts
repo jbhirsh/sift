@@ -3,15 +3,30 @@ import type { MusicProviderService } from '../../src/services/MusicProviderInter
 import type { RemovalRecord, Track } from '../../src/types';
 
 const track = (id: string, over: Partial<Track> = {}): Track => ({
-  id, name: id, artist: 'Artist', album: 'Album', duration: 200, playCount: 3, dateAdded: '2020-01-01T00:00:00Z', ...over,
+  id,
+  name: id,
+  artist: 'Artist',
+  album: 'Album',
+  duration: 200,
+  playCount: 3,
+  dateAdded: '2020-01-01T00:00:00Z',
+  ...over,
 });
 const removal = (t: Track, over: Partial<RemovalRecord> = {}): RemovalRecord => ({
-  track: t, source: { type: 'library' }, provider: 'apple-music', removedAt: '2026-10-01T12:00:00Z', ...over,
+  track: t,
+  source: { type: 'library' },
+  provider: 'apple-music',
+  removedAt: '2026-10-01T12:00:00Z',
+  ...over,
 });
 
 const REPORTED = 'sift_deleted_in_music_reported';
 const asyncStorageModule = jest.requireMock('@react-native-async-storage/async-storage');
-const AsyncStorage = asyncStorageModule.default as { getItem: jest.Mock; setItem: jest.Mock; clear: jest.Mock };
+const AsyncStorage = asyncStorageModule.default as {
+  getItem: jest.Mock;
+  setItem: jest.Mock;
+  clear: jest.Mock;
+};
 const mockLoadHistory = jest.fn<Promise<RemovalRecord[]>, []>();
 const mockTrace = jest.fn();
 const Sentry = { captureException: jest.fn() };
@@ -21,10 +36,14 @@ function service(deleted: string[], over: Partial<MusicProviderService> = {}) {
   return {
     isAuthorized: jest.fn(async () => true),
     requestAuthorization: jest.fn(async () => true),
-    deletedFromLibrary: jest.fn(async (tracks: Track[]) => tracks.map((t) => t.id).filter((id) => deleted.includes(id))),
+    deletedFromLibrary: jest.fn(async (tracks: Track[]) =>
+      tracks.map((t) => t.id).filter((id) => deleted.includes(id)),
+    ),
     ...over,
   } as unknown as MusicProviderService & {
-    isAuthorized: jest.Mock; requestAuthorization: jest.Mock; deletedFromLibrary: jest.Mock;
+    isAuthorized: jest.Mock;
+    requestAuthorization: jest.Mock;
+    deletedFromLibrary: jest.Mock;
   };
 }
 
@@ -35,16 +54,25 @@ function relaunch() {
   jest.isolateModules(() => {
     jest.doMock('@react-native-async-storage/async-storage', () => asyncStorageModule);
     jest.doMock('@sentry/react-native', () => Sentry);
-    jest.doMock('../../src/services/RemovalHistoryStore', () => ({ loadHistory: () => mockLoadHistory() }));
-    jest.doMock('../../src/services/trace', () => ({ trace: (...args: unknown[]) => mockTrace(...args) }));
-    ({ deletedInMusicCount, markDeletedInMusicShown } = require('../../src/services/DeletedInMusic') as typeof DeletedInMusicModule);
+    jest.doMock('../../src/services/RemovalHistoryStore', () => ({
+      loadHistory: () => mockLoadHistory(),
+    }));
+    jest.doMock('../../src/services/trace', () => ({
+      trace: (...args: unknown[]) => mockTrace(...args),
+    }));
+    ({ deletedInMusicCount, markDeletedInMusicShown } =
+      require('../../src/services/DeletedInMusic') as typeof DeletedInMusicModule);
   });
 }
 
 beforeEach(async () => {
   jest.clearAllMocks();
   await AsyncStorage.clear();
-  mockLoadHistory.mockResolvedValue([removal(track('a')), removal(track('b')), removal(track('c'))]);
+  mockLoadHistory.mockResolvedValue([
+    removal(track('a')),
+    removal(track('b')),
+    removal(track('c')),
+  ]);
   relaunch();
 });
 
@@ -88,15 +116,23 @@ describe('songs deleted in Music (#183)', () => {
     await markDeletedInMusicShown();
     // The history mock has only loadHistory: a rewrite would throw, and be reported.
     expect(Sentry.captureException).not.toHaveBeenCalled();
-    expect(JSON.parse((await AsyncStorage.getItem(REPORTED)) ?? 'null')).toEqual({ 'apple-music': ['a', 'b', 'c'] });
+    expect(JSON.parse((await AsyncStorage.getItem(REPORTED)) ?? 'null')).toEqual({
+      'apple-music': ['a', 'b', 'c'],
+    });
   });
 
-  test('the reported list keeps only songs still collected (a restored one\'s records are gone)', async () => {
-    await AsyncStorage.setItem(REPORTED, JSON.stringify({ 'apple-music': ['restored', 'a'], spotify: ['x'] }));
+  test("the reported list keeps only songs still collected (a restored one's records are gone)", async () => {
+    await AsyncStorage.setItem(
+      REPORTED,
+      JSON.stringify({ 'apple-music': ['restored', 'a'], spotify: ['x'] }),
+    );
     relaunch();
     await expect(deletedInMusicCount(service(['b']), 'apple-music')).resolves.toBe(1);
     await markDeletedInMusicShown();
-    expect(JSON.parse((await AsyncStorage.getItem(REPORTED)) ?? 'null')).toEqual({ 'apple-music': ['a', 'b'], spotify: ['x'] });
+    expect(JSON.parse((await AsyncStorage.getItem(REPORTED)) ?? 'null')).toEqual({
+      'apple-music': ['a', 'b'],
+      spotify: ['x'],
+    });
   });
 
   test('nothing deleted: nothing traced', async () => {
@@ -106,12 +142,18 @@ describe('songs deleted in Music (#183)', () => {
     expect(mockTrace).not.toHaveBeenCalled();
   });
 
-  test('another provider\'s reported songs are kept as they were, ids only', async () => {
-    await AsyncStorage.setItem(REPORTED, JSON.stringify({ 'apple-music': 'not a list', spotify: ['x', 7] }));
+  test("another provider's reported songs are kept as they were, ids only", async () => {
+    await AsyncStorage.setItem(
+      REPORTED,
+      JSON.stringify({ 'apple-music': 'not a list', spotify: ['x', 7] }),
+    );
     relaunch();
     await deletedInMusicCount(service(['a']), 'apple-music');
     await markDeletedInMusicShown();
-    expect(JSON.parse((await AsyncStorage.getItem(REPORTED)) ?? 'null')).toEqual({ 'apple-music': ['a'], spotify: ['x'] });
+    expect(JSON.parse((await AsyncStorage.getItem(REPORTED)) ?? 'null')).toEqual({
+      'apple-music': ['a'],
+      spotify: ['x'],
+    });
   });
 
   test('marking shown before any look, or with nothing found, writes nothing', async () => {
@@ -134,7 +176,8 @@ describe('songs deleted in Music (#183)', () => {
     mockLoadHistory.mockResolvedValueOnce([
       // A playlist entry that isn't a library song can't be told deleted.
       removal(track('v', { dateAdded: '' }), {
-        source: { type: 'playlist', playlist: { id: 'p1', name: 'Mix', trackCount: 1 } }, collected: true,
+        source: { type: 'playlist', playlist: { id: 'p1', name: 'Mix', trackCount: 1 } },
+        collected: true,
       }),
     ]);
     const music = service(['v']);
@@ -142,12 +185,16 @@ describe('songs deleted in Music (#183)', () => {
     expect(music.deletedFromLibrary).not.toHaveBeenCalled();
   });
 
-  test('a provider whose Remove doesn\'t collect, or that can\'t tell, has nothing to say', async () => {
+  test("a provider whose Remove doesn't collect, or that can't tell, has nothing to say", async () => {
     const music = service(['a']);
-    await expect(deletedInMusicCount(music, 'spotify' as unknown as 'apple-music')).resolves.toBe(0);
+    await expect(deletedInMusicCount(music, 'spotify' as unknown as 'apple-music')).resolves.toBe(
+      0,
+    );
     expect(music.isAuthorized).not.toHaveBeenCalled();
     relaunch();
-    await expect(deletedInMusicCount(service(['a'], { deletedFromLibrary: undefined }), 'apple-music')).resolves.toBe(0);
+    await expect(
+      deletedInMusicCount(service(['a'], { deletedFromLibrary: undefined }), 'apple-music'),
+    ).resolves.toBe(0);
   });
 
   test('an unreadable reported list counts as empty, and is written fresh', async () => {
@@ -156,16 +203,20 @@ describe('songs deleted in Music (#183)', () => {
       relaunch();
       await expect(deletedInMusicCount(service(['a']), 'apple-music')).resolves.toBe(1);
       await markDeletedInMusicShown();
-      expect(JSON.parse((await AsyncStorage.getItem(REPORTED)) ?? 'null')).toEqual({ 'apple-music': ['a'] });
+      expect(JSON.parse((await AsyncStorage.getItem(REPORTED)) ?? 'null')).toEqual({
+        'apple-music': ['a'],
+      });
     }
     expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
-  test('a failed look or write is reported, says nothing it can\'t and never rejects', async () => {
+  test("a failed look or write is reported, says nothing it can't and never rejects", async () => {
     const music = service(['a']);
     music.deletedFromLibrary.mockRejectedValueOnce(new Error('offline'));
     await expect(deletedInMusicCount(music, 'apple-music')).resolves.toBe(0);
-    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'deleted-in-music' } });
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'deleted-in-music' },
+    });
     relaunch();
     await deletedInMusicCount(service(['a']), 'apple-music');
     AsyncStorage.setItem.mockImplementationOnce(async () => {

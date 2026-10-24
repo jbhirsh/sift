@@ -118,7 +118,8 @@ export function checkNativeBridge(input: {
 
   const seen = new Set<string>();
   for (const fn of native) {
-    if (seen.has(fn.name)) problems.push(`${fn.name} is declared twice in the Swift module (line ${fn.line}).`);
+    if (seen.has(fn.name))
+      problems.push(`${fn.name} is declared twice in the Swift module (line ${fn.line}).`);
     seen.add(fn.name);
     const description = allowed[fn.name];
     if (description === undefined) {
@@ -127,7 +128,9 @@ export function checkNativeBridge(input: {
           'platform one thing, add it there with that one thing; if it decides something, move the decision to TypeScript.',
       );
     } else if (description.trim() === '') {
-      problems.push(`${fn.name} has an empty description in native-api.json: say the one thing it asks the platform.`);
+      problems.push(
+        `${fn.name} has an empty description in native-api.json: say the one thing it asks the platform.`,
+      );
     }
     if (fn.lines > allowlist.maxFunctionLines) {
       problems.push(
@@ -140,10 +143,12 @@ export function checkNativeBridge(input: {
     }
   }
   for (const name of Object.keys(allowed)) {
-    if (!nativeNames.has(name)) problems.push(`native-api.json lists ${name}, which the Swift module doesn't declare.`);
+    if (!nativeNames.has(name))
+      problems.push(`native-api.json lists ${name}, which the Swift module doesn't declare.`);
   }
   for (const name of wrapperNames) {
-    if (!nativeNames.has(name)) problems.push(`index.ts exports ${name}, which the Swift module doesn't declare.`);
+    if (!nativeNames.has(name))
+      problems.push(`index.ts exports ${name}, which the Swift module doesn't declare.`);
   }
   for (const [file, source] of Object.entries(swiftFiles)) {
     if (allowlist.files[file] === undefined) {
@@ -161,7 +166,8 @@ export function checkNativeBridge(input: {
     }
   }
   for (const file of Object.keys(allowlist.files)) {
-    if (swiftFiles[file] === undefined) problems.push(`native-api.json lists ${file}, which doesn't exist.`);
+    if (swiftFiles[file] === undefined)
+      problems.push(`native-api.json lists ${file}, which doesn't exist.`);
   }
   return problems;
 }

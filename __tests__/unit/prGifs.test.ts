@@ -33,9 +33,9 @@ const PALETTE =
   'split[a][b];[a]palettegen=max_colors=96:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle';
 
 describe('keptTimes', () => {
-  it('reads the kept frames\' times from showinfo\'s lines and nothing else', () => {
+  it("reads the kept frames' times from showinfo's lines and nothing else", () => {
     const stderr = [
-      'Input #0, mov,mp4, from \'clip.mov\':',
+      "Input #0, mov,mp4, from 'clip.mov':",
       '[Parsed_showinfo_1 @ 0x6000] n:   0 pts:      0 pts_time:0       duration:512',
       '[Parsed_mpdecimate_0 @ 0x6001] pts_time:9.9 drop',
       '[Parsed_showinfo_1 @ 0x6000] n:   1 pts:  30720 pts_time:2.0667  duration:512',
@@ -97,7 +97,7 @@ describe('cutting the waits between touches', () => {
     expect(`#${hex}`.toUpperCase()).toBe(COLORS.touch.toUpperCase());
   });
 
-  it('counts the ring\'s pixels, near enough for compression, and never Remove\'s red', () => {
+  it("counts the ring's pixels, near enough for compression, and never Remove's red", () => {
     const pixels = (...rgb: number[][]) => Uint8Array.from(rgb.flat());
     const ring = [...RING_RGB];
     const blurred = [ring[0] + 10, ring[1] + 12, ring[2] - 8];
@@ -113,14 +113,31 @@ describe('cutting the waits between touches', () => {
     const counts = [0, many, many, many - 1, many, 0, many, many - 1];
     // 1.3 shows too little, but 1.5 is within TOUCH_JOIN_S of 1.1: one drag.
     expect(1.5 - 1.1).toBeLessThanOrEqual(TOUCH_JOIN_S);
-    expect(touchSpans(times, counts)).toEqual([{ start: 1, end: 1.5 }, { start: 3.1, end: 3.1 }]);
+    expect(touchSpans(times, counts)).toEqual([
+      { start: 1, end: 1.5 },
+      { start: 3.1, end: 3.1 },
+    ]);
     // Further apart than that, two touches.
-    expect(touchSpans([0, 0.6], [many, many])).toEqual([{ start: 0, end: 0 }, { start: 0.6, end: 0.6 }]);
-    expect(touchSpans(times, counts.map(() => 0))).toEqual([]);
+    expect(touchSpans([0, 0.6], [many, many])).toEqual([
+      { start: 0, end: 0 },
+      { start: 0.6, end: 0.6 },
+    ]);
+    expect(
+      touchSpans(
+        times,
+        counts.map(() => 0),
+      ),
+    ).toEqual([]);
   });
 
   it('keeps each touch with a lead-in and its result, the last with a closing hold, and cuts the waits', () => {
-    const kept = keptStretches([{ start: 2, end: 2.5 }, { start: 8, end: 8.1 }], 20);
+    const kept = keptStretches(
+      [
+        { start: 2, end: 2.5 },
+        { start: 8, end: 8.1 },
+      ],
+      20,
+    );
     expect(kept).toEqual([
       { start: 2 - TOUCH_LEAD_S, end: 2.5 + TOUCH_AFTER_S },
       { start: 8 - TOUCH_LEAD_S, end: 8.1 + END_HOLD_S },
@@ -136,7 +153,12 @@ describe('cutting the waits between touches', () => {
   });
 
   it('joins the kept stretches at a steady frame rate', () => {
-    expect(cutFilter([{ start: 1, end: 2.5 }, { start: 6, end: 7 }])).toBe(
+    expect(
+      cutFilter([
+        { start: 1, end: 2.5 },
+        { start: 6, end: 7 },
+      ]),
+    ).toBe(
       '[0:v]fps=30,trim=start=1:end=2.5,setpts=PTS-STARTPTS[s0];' +
         '[0:v]fps=30,trim=start=6:end=7,setpts=PTS-STARTPTS[s1];' +
         '[s0][s1]concat=n=2:v=1:a=0[cut]',
@@ -146,12 +168,23 @@ describe('cutting the waits between touches', () => {
 
 describe('the ffmpeg filters', () => {
   it('one GIF: frame rate, still frames dropped, scaled sharp, one palette', () => {
-    expect(gifFilter({ width: 360, fps: 15 })).toBe(`fps=15,mpdecimate,scale=360:-1:flags=lanczos,${PALETTE}`);
+    expect(gifFilter({ width: 360, fps: 15 })).toBe(
+      `fps=15,mpdecimate,scale=360:-1:flags=lanczos,${PALETTE}`,
+    );
   });
 
-  it('side by side: each side cut to its window, labelled, the shorter held to the longer\'s length', () => {
-    const filter = sideBySideFilter({ width: 720, fps: 15 }, { start: 1, end: 4 }, { start: 2, end: 7 }, "/f/Bold's.ttf", 2.1667);
-    const [left, right, joined] = filter.split(';[l][r]')[0].split(';').concat(filter.split(';[l][r]')[1]);
+  it("side by side: each side cut to its window, labelled, the shorter held to the longer's length", () => {
+    const filter = sideBySideFilter(
+      { width: 720, fps: 15 },
+      { start: 1, end: 4 },
+      { start: 2, end: 7 },
+      "/f/Bold's.ttf",
+      2.1667,
+    );
+    const [left, right, joined] = filter
+      .split(';[l][r]')[0]
+      .split(';')
+      .concat(filter.split(';[l][r]')[1]);
     expect(left).toBe(
       '[0:v]trim=start=1:end=4,setpts=PTS-STARTPTS,fps=15,' +
         // Fitted into one box (360 wide, the taller side's shape), so the
@@ -160,14 +193,20 @@ describe('the ffmpeg filters', () => {
         "drawtext=fontfile='/f/Bold'\\''s.ttf':text='Before':fontsize=22:fontcolor=white:box=1:boxcolor=black@0.55:boxborderw=8:x=(w-text_w)/2:y=12," +
         'tpad=stop_mode=clone:stop_duration=2[l]',
     );
-    expect(right).toContain("[1:v]trim=start=2:end=7,");
+    expect(right).toContain('[1:v]trim=start=2:end=7,');
     expect(right).toContain("text='After'");
     expect(right).toContain('tpad=stop_mode=clone:stop_duration=0[r]');
     expect(joined).toBe(`hstack=inputs=2,mpdecimate,${PALETTE}`);
   });
 
   it('side by side with no font file leaves the font to ffmpeg', () => {
-    const filter = sideBySideFilter({ width: 400, fps: 10 }, { start: 0, end: 1 }, { start: 0, end: 1 }, null, 1.5);
+    const filter = sideBySideFilter(
+      { width: 400, fps: 10 },
+      { start: 0, end: 1 },
+      { start: 0, end: 1 },
+      null,
+      1.5,
+    );
     expect(filter).toContain('scale=200:300:');
     expect(filter).toContain('pad=200:300:');
     expect(filter).toContain("drawtext=text='Before'");
@@ -191,7 +230,12 @@ describe('markdownTable', () => {
 
   it('a Before | After row per scenario, linked by the commit SHA', () => {
     const table = markdownTable(repo, sha, [
-      { name: 'swipe', before: 'pr-1/swipe/before.gif', after: 'pr-1/swipe/after.gif', sideBySide: null },
+      {
+        name: 'swipe',
+        before: 'pr-1/swipe/before.gif',
+        after: 'pr-1/swipe/after.gif',
+        sideBySide: null,
+      },
       { name: 'new-sheet', before: null, after: 'pr-1/new-sheet/after.gif', sideBySide: null },
     ]);
     expect(table.split('\n')).toEqual([
@@ -222,18 +266,30 @@ describe('markdownTable', () => {
 describe('parseArgs', () => {
   it('takes the PR number and the defaults', () => {
     expect(parseArgs(['189'])).toEqual({
-      pr: 189, repo: 'jbhirsh/sift', sideBySide: false, width: DEFAULT_WIDTH, fps: DEFAULT_FPS, noBefore: false,
+      pr: 189,
+      repo: 'jbhirsh/sift',
+      sideBySide: false,
+      width: DEFAULT_WIDTH,
+      fps: DEFAULT_FPS,
+      noBefore: false,
     });
   });
 
   it('takes each option, in any order', () => {
-    expect(parseArgs(['--side-by-side', '--width', '300', '42', '--fps', '12', '--repo', 'a-b/c.d'])).toEqual({
-      pr: 42, repo: 'a-b/c.d', sideBySide: true, width: 300, fps: 12, noBefore: false,
+    expect(
+      parseArgs(['--side-by-side', '--width', '300', '42', '--fps', '12', '--repo', 'a-b/c.d']),
+    ).toEqual({
+      pr: 42,
+      repo: 'a-b/c.d',
+      sideBySide: true,
+      width: 300,
+      fps: 12,
+      noBefore: false,
     });
     expect(parseArgs(['7', '--no-before']).noBefore).toBe(true);
   });
 
-  it('turns away what it can\'t use', () => {
+  it("turns away what it can't use", () => {
     expect(() => parseArgs([])).toThrow('Give the PR number');
     expect(() => parseArgs(['1', '2'])).toThrow('Unknown argument: 2');
     expect(() => parseArgs(['1', '--wat'])).toThrow('Unknown argument: --wat');
@@ -242,6 +298,8 @@ describe('parseArgs', () => {
     expect(() => parseArgs(['1', '--width', '2.5'])).toThrow('--width');
     expect(() => parseArgs(['1', '--repo', 'no slash'])).toThrow('--repo needs owner/name');
     expect(() => parseArgs(['1', '--repo', 'a/b; rm -rf /'])).toThrow('--repo needs owner/name');
-    expect(() => parseArgs(['1', '--side-by-side', '--no-before'])).toThrow('--side-by-side needs a before');
+    expect(() => parseArgs(['1', '--side-by-side', '--no-before'])).toThrow(
+      '--side-by-side needs a before',
+    );
   });
 });

@@ -34,14 +34,16 @@ jest.mock('react-native-reanimated', () => ({
 jest.mock('react-native-gesture-handler', () => ({
   GestureHandlerRootView: ({ children }: { children: React.ReactNode }) => children,
   GestureDetector: ({ children }: { children: React.ReactNode }) => children,
-    Gesture: {
-      Pan: () => ({
-        minDistance: () => ({ enabled: () => ({ onUpdate: () => ({ onEnd: () => ({ onFinalize: () => ({}) }) }) }) }),
-        onUpdate: () => ({ onFinalize: () => ({}) }),
+  Gesture: {
+    Pan: () => ({
+      minDistance: () => ({
+        enabled: () => ({ onUpdate: () => ({ onEnd: () => ({ onFinalize: () => ({}) }) }) }),
       }),
-      Tap: () => ({ onEnd: () => ({}) }),
-      Race: () => ({}),
-    },
+      onUpdate: () => ({ onFinalize: () => ({}) }),
+    }),
+    Tap: () => ({ onEnd: () => ({}) }),
+    Race: () => ({}),
+  },
 }));
 
 jest.mock('@sentry/react-native', () => ({
@@ -66,8 +68,24 @@ const mockProviderInstance = {
   requestAuthorization: jest.fn().mockResolvedValue(true),
   isAuthorized: jest.fn().mockResolvedValue(true),
   loadLibrary: jest.fn().mockResolvedValue([
-    { id: '1', name: 'A', artist: 'B', album: 'C', duration: 100, playCount: 1, dateAdded: '2020-01-01' },
-    { id: '2', name: 'D', artist: 'E', album: 'F', duration: 120, playCount: 2, dateAdded: '2020-01-02' },
+    {
+      id: '1',
+      name: 'A',
+      artist: 'B',
+      album: 'C',
+      duration: 100,
+      playCount: 1,
+      dateAdded: '2020-01-01',
+    },
+    {
+      id: '2',
+      name: 'D',
+      artist: 'E',
+      album: 'F',
+      duration: 120,
+      playCount: 2,
+      dateAdded: '2020-01-02',
+    },
   ]),
   play: jest.fn().mockResolvedValue(undefined),
   pause: jest.fn().mockResolvedValue(undefined),
@@ -84,10 +102,20 @@ jest.mock('../../src/services', () => ({
 // An E2E launch's reset (services/e2eReset): off unless a test turns it on.
 let mockResetRequested = false;
 let mockFinishReset: () => void = () => {};
-jest.mock('../../src/services/e2eReset', () => Object.defineProperties({}, {
-  resetRequested: { get: () => mockResetRequested },
-  resetAppData: { value: () => new Promise<void>((resolve) => { mockFinishReset = resolve; }) },
-}));
+jest.mock('../../src/services/e2eReset', () =>
+  Object.defineProperties(
+    {},
+    {
+      resetRequested: { get: () => mockResetRequested },
+      resetAppData: {
+        value: () =>
+          new Promise<void>((resolve) => {
+            mockFinishReset = resolve;
+          }),
+      },
+    },
+  ),
+);
 
 jest.mock('../../src/hooks/useResolvedArtwork', () => ({
   useResolvedArtwork: jest.fn().mockReturnValue(null),
@@ -110,7 +138,7 @@ function renderApp() {
   return render(
     <SafeAreaProvider initialMetrics={{ insets: mockInsets, frame: mockFrame }}>
       <App />
-    </SafeAreaProvider>
+    </SafeAreaProvider>,
   );
 }
 
@@ -118,8 +146,24 @@ describe('App', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockProviderInstance.loadLibrary.mockResolvedValue([
-      { id: '1', name: 'A', artist: 'B', album: 'C', duration: 100, playCount: 1, dateAdded: '2020-01-01' },
-      { id: '2', name: 'D', artist: 'E', album: 'F', duration: 120, playCount: 2, dateAdded: '2020-01-02' },
+      {
+        id: '1',
+        name: 'A',
+        artist: 'B',
+        album: 'C',
+        duration: 100,
+        playCount: 1,
+        dateAdded: '2020-01-01',
+      },
+      {
+        id: '2',
+        name: 'D',
+        artist: 'E',
+        album: 'F',
+        duration: 120,
+        playCount: 2,
+        dateAdded: '2020-01-02',
+      },
     ]);
   });
 
@@ -145,10 +189,14 @@ describe('App', () => {
   });
 
   test('an E2E reset launch reads nothing saved until the reset has run', async () => {
-    const { loadSession } = jest.requireMock<{ loadSession: jest.Mock }>('../../src/services/SessionStore');
+    const { loadSession } = jest.requireMock<{ loadSession: jest.Mock }>(
+      '../../src/services/SessionStore',
+    );
     // SiftProvider reads preferences as it mounts; Setup reads the session.
     const loadPreferences = jest.spyOn(
-      jest.requireActual<typeof import('../../src/services/PreferencesStore')>('../../src/services/PreferencesStore'),
+      jest.requireActual<typeof import('../../src/services/PreferencesStore')>(
+        '../../src/services/PreferencesStore',
+      ),
       'loadPreferences',
     );
     const reads = () => loadSession.mock.calls.length + loadPreferences.mock.calls.length;

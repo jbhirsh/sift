@@ -8,7 +8,8 @@ const PREFERENCES_KEY = 'sift_preferences';
 
 /** A stored filter, each choice kept only if Setup still offers it. */
 function readFilter(value: unknown): TrackFilter {
-  const saved = typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
+  const saved =
+    typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : {};
   const offered = (choices: readonly (number | null)[], choice: unknown): number | null =>
     choices.find((c) => c === choice) ?? null;
   return {
@@ -21,10 +22,13 @@ function readFilter(value: unknown): TrackFilter {
 function readPreferences(json: string | null): Preferences {
   // Nothing saved reads as JSON null, which falls through to the defaults.
   const parsed: unknown = JSON.parse(json ?? 'null');
-  const saved = typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {};
+  const saved =
+    typeof parsed === 'object' && parsed !== null ? (parsed as Record<string, unknown>) : {};
   return {
     startAtChorus:
-      typeof saved.startAtChorus === 'boolean' ? saved.startAtChorus : DEFAULT_PREFERENCES.startAtChorus,
+      typeof saved.startAtChorus === 'boolean'
+        ? saved.startAtChorus
+        : DEFAULT_PREFERENCES.startAtChorus,
     sortOrder: isSortOrder(saved.sortOrder) ? saved.sortOrder : DEFAULT_PREFERENCES.sortOrder,
     filter: readFilter(saved.filter),
   };
@@ -71,7 +75,11 @@ export function updatePreferences(changes: PreferenceChanges): Promise<void> {
       Sentry.captureException(err, { tags: { flow: 'preferences-save' } });
       current = DEFAULT_PREFERENCES;
     }
-    const next: Preferences = { ...current, ...changes, filter: { ...current.filter, ...changes.filter } };
+    const next: Preferences = {
+      ...current,
+      ...changes,
+      filter: { ...current.filter, ...changes.filter },
+    };
     try {
       await AsyncStorage.setItem(PREFERENCES_KEY, JSON.stringify(next));
     } catch (err) {

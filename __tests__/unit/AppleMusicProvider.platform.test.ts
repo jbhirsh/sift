@@ -18,9 +18,7 @@ jest.mock('../../modules/expo-musickit/src/index', () => ({}));
 describe('AppleMusicProvider platform guard', () => {
   test('throws on non-iOS platform', () => {
     const { AppleMusicProvider } = require('../../src/services/AppleMusicProvider');
-    expect(() => new AppleMusicProvider()).toThrow(
-      'AppleMusicProvider is only available on iOS',
-    );
+    expect(() => new AppleMusicProvider()).toThrow('AppleMusicProvider is only available on iOS');
   });
 
   test('names the current platform in the error', () => {

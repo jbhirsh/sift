@@ -8,7 +8,10 @@ export const UP_NEXT_COUNT = 3;
  * and Restore can still need them). A big library takes a while to warm,
  * and from the top it would reach the current card last.
  */
-export function warmUpOrder(trackIDs: readonly string[], cursor: number): { upNext: string[]; rest: string[] } {
+export function warmUpOrder(
+  trackIDs: readonly string[],
+  cursor: number,
+): { upNext: string[]; rest: string[] } {
   const start = Math.min(Math.max(0, cursor), trackIDs.length);
   const upNextEnd = Math.min(start + UP_NEXT_COUNT, trackIDs.length);
   return {

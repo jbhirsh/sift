@@ -3,13 +3,27 @@ import { Alert, Linking } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { useSift } from '../context/SiftContext';
 import { useMusicProviderService } from '../context/MusicProviderContext';
-import { forgetRemovals, logRemoval, loadHistory, removeFromHistory } from '../services/RemovalHistoryStore';
+import {
+  forgetRemovals,
+  logRemoval,
+  loadHistory,
+  removeFromHistory,
+} from '../services/RemovalHistoryStore';
 import { sortTracks } from '../utils/sorting';
 import { TrackIndex } from '../utils/trackIdentity';
-import { APPLE_REMOVED_PLAYLIST, collectedRemovalIds, collectsRemovals } from '../utils/libraryRemovals';
+import {
+  APPLE_REMOVED_PLAYLIST,
+  collectedRemovalIds,
+  collectsRemovals,
+} from '../utils/libraryRemovals';
 import { ledgerKey } from '../utils/reviewedLedger';
 import { AddShortfallError, batches } from '../utils/musicKit';
-import { ACCESS_REQUIRED, keptSaveRetryable, loadFailureMessage, siftedPlaylistName } from '../utils/sessionCopy';
+import {
+  ACCESS_REQUIRED,
+  keptSaveRetryable,
+  loadFailureMessage,
+  siftedPlaylistName,
+} from '../utils/sessionCopy';
 import { isFiltering, matchesFilter } from '../utils/trackFilter';
 import { loadReviewedIds, markReviewed, unmarkReviewed } from '../services/ReviewedLedgerStore';
 import { importSiftedKeeps } from '../services/SiftedImport';
@@ -32,8 +46,7 @@ export const KEPT_SAVE_BATCH = 10;
 // save that read the playlist meanwhile would add them again.
 export const KEPT_SAVE_SETTLE_MS = 15000;
 
-export const STILL_FINISHING =
-  'Music is still finishing an earlier change. Try again in a moment.';
+export const STILL_FINISHING = 'Music is still finishing an earlier change. Try again in a moment.';
 
 // One kept-songs save at a time, launch-wide: two would each read
 // "<name> - Sifted" before the other's adds landed and add the same songs
@@ -75,7 +88,13 @@ async function settlesWithin(promise: Promise<unknown>, ms: number): Promise<boo
     timer = setTimeout(() => resolve(false), ms);
   });
   try {
-    return await Promise.race([promise.then(() => true, () => true), timeout]);
+    return await Promise.race([
+      promise.then(
+        () => true,
+        () => true,
+      ),
+      timeout,
+    ]);
   } finally {
     clearTimeout(timer);
   }
@@ -175,22 +194,25 @@ export function useMusicProvider() {
    * When access is refused, say so and offer Settings: iOS asks only once,
    * so after that Settings is the only way to grant it.
    */
-  const ensureAccess = useCallback(async (stillWanted: () => boolean = () => true): Promise<boolean> => {
-    if (await providerRef.current.isAuthorized()) return true;
-    if (await providerRef.current.requestAuthorization()) return true;
-    // Asked for by a load that was cancelled since: say nothing.
-    if (!stillWanted()) return false;
-    dispatch({ type: 'SET_CONNECTION_STATUS', status: 'disconnected' });
-    Alert.alert(
-      'Music Access Required',
-      'Sift needs access to your music library. Please enable it in Settings.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Open Settings', onPress: () => Linking.openSettings() },
-      ],
-    );
-    return false;
-  }, [providerRef, dispatch]);
+  const ensureAccess = useCallback(
+    async (stillWanted: () => boolean = () => true): Promise<boolean> => {
+      if (await providerRef.current.isAuthorized()) return true;
+      if (await providerRef.current.requestAuthorization()) return true;
+      // Asked for by a load that was cancelled since: say nothing.
+      if (!stillWanted()) return false;
+      dispatch({ type: 'SET_CONNECTION_STATUS', status: 'disconnected' });
+      Alert.alert(
+        'Music Access Required',
+        'Sift needs access to your music library. Please enable it in Settings.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ],
+      );
+      return false;
+    },
+    [providerRef, dispatch],
+  );
 
   const play = useCallback(
     async (trackID: string, position?: number) => {
@@ -200,12 +222,16 @@ export function useMusicProvider() {
         dispatch({ type: 'SET_IS_PLAYING', isPlaying: true });
         dispatch({ type: 'SET_PLAYBACK_POSITION', position: position ?? 0 });
       } catch (err) {
-        Sentry.addBreadcrumb({ category: 'playback', message: `Play failed: ${err}`, level: 'warning' });
+        Sentry.addBreadcrumb({
+          category: 'playback',
+          message: `Play failed: ${err}`,
+          level: 'warning',
+        });
         // The player says so, rather than sitting at 0:00.
         dispatch({ type: 'SET_PLAYBACK_FAILED', trackId: trackID });
       }
     },
-    [providerRef, dispatch]
+    [providerRef, dispatch],
   );
 
   const pause = useCallback(async () => {
@@ -213,7 +239,11 @@ export function useMusicProvider() {
       await providerRef.current.pause();
       dispatch({ type: 'SET_IS_PLAYING', isPlaying: false });
     } catch (err) {
-      Sentry.addBreadcrumb({ category: 'playback', message: `Pause failed: ${err}`, level: 'warning' });
+      Sentry.addBreadcrumb({
+        category: 'playback',
+        message: `Pause failed: ${err}`,
+        level: 'warning',
+      });
     }
   }, [providerRef, dispatch]);
 
@@ -228,7 +258,11 @@ export function useMusicProvider() {
       await providerRef.current.resume();
       dispatch({ type: 'SET_IS_PLAYING', isPlaying: true });
     } catch (err) {
-      Sentry.addBreadcrumb({ category: 'playback', message: `Resume failed: ${err}`, level: 'warning' });
+      Sentry.addBreadcrumb({
+        category: 'playback',
+        message: `Resume failed: ${err}`,
+        level: 'warning',
+      });
     }
   }, [providerRef, dispatch]);
 
@@ -237,14 +271,14 @@ export function useMusicProvider() {
       providerRef.current.seek(position);
       dispatch({ type: 'SET_PLAYBACK_POSITION', position });
     },
-    [providerRef, dispatch]
+    [providerRef, dispatch],
   );
 
   /** Where a track's preview sits in the full track (a chorus hint); null when unknown. */
   const previewOffset = useCallback(
     async (trackID: string): Promise<number | null> =>
       (await providerRef.current.previewOffset?.(trackID)) ?? null,
-    [providerRef]
+    [providerRef],
   );
 
   const togglePlayPause = useCallback(async () => {
@@ -286,177 +320,194 @@ export function useMusicProvider() {
     }
   }, [providerRef]);
 
-  const loadTracks = useCallback(async (options?: { skipFiltering?: boolean }) => {
-    if (loadingInProgressRef.current !== null) {
-      Sentry.addBreadcrumb({
-        category: 'music-provider',
-        message: 'loadTracks skipped — already in progress',
-        level: 'debug',
-      });
-      return;
-    }
-    loadGeneration += 1;
-    const generation = loadGeneration;
-    loadingInProgressRef.current = generation;
-    // Every dispatch below goes through send: once Cancel (or a newer load)
-    // has moved the generation on, this load changes nothing.
-    const current = () => generation === loadGeneration;
-    const send: typeof dispatch = (action) => {
-      if (current()) dispatch(action);
-      // In the E2E trace, so a flow can show a late result was dropped.
-      else trace('load-dropped', { type: action.type });
-    };
-
-    const shouldFilter = !options?.skipFiltering;
-    const source = state.source;
-    const filter = state.filter;
-    const label = source.type === 'playlist' ? `"${source.playlist.name}"` : 'library';
-
-    send({ type: 'SET_LOAD_PROGRESS', progress: 0, message: `Loading ${label}…` });
-    send({ type: 'SET_PHASE', phase: 'loading' });
-
-    try {
-      if (!(await ensureAccess(current))) {
-        send({ type: 'SET_LOAD_ERROR', error: ACCESS_REQUIRED });
+  const loadTracks = useCallback(
+    async (options?: { skipFiltering?: boolean }) => {
+      if (loadingInProgressRef.current !== null) {
+        Sentry.addBreadcrumb({
+          category: 'music-provider',
+          message: 'loadTracks skipped — already in progress',
+          level: 'debug',
+        });
         return;
       }
-      if (!current()) return;
+      loadGeneration += 1;
+      const generation = loadGeneration;
+      loadingInProgressRef.current = generation;
+      // Every dispatch below goes through send: once Cancel (or a newer load)
+      // has moved the generation on, this load changes nothing.
+      const current = () => generation === loadGeneration;
+      const send: typeof dispatch = (action) => {
+        if (current()) dispatch(action);
+        // In the E2E trace, so a flow can show a late result was dropped.
+        else trace('load-dropped', { type: action.type });
+      };
 
-      send({ type: 'SET_LOAD_PROGRESS', progress: 0.3, message: 'Fetching tracks…' });
+      const shouldFilter = !options?.skipFiltering;
+      const source = state.source;
+      const filter = state.filter;
+      const label = source.type === 'playlist' ? `"${source.playlist.name}"` : 'library';
 
-      let tracks: Track[];
-      let unfilteredCount: number;
-      // How many tracks each independent filter dropped — the zero-track
-      // message below distinguishes "already sifted" from "previously
-      // removed" instead of blaming the ledger filter for both.
-      let filteredAsRemoved = 0;
-      let filteredAsReviewed = 0;
-      if (source.type === 'playlist') {
-        // Shared with Setup's "- Sifted" import of it, if that's loading
-        // it now (#179): the playlist is fetched once.
-        const result = await loadPlaylistTracksOnce(providerRef.current, source.playlist.id);
-        if (!result) throw new Error('This provider does not support playlist loading');
-        tracks = result;
-        unfilteredCount = tracks.length;
-        // Cancelled while it loaded: leave the rest (the import included).
+      send({ type: 'SET_LOAD_PROGRESS', progress: 0, message: `Loading ${label}…` });
+      send({ type: 'SET_PHASE', phase: 'loading' });
+
+      try {
+        if (!(await ensureAccess(current))) {
+          send({ type: 'SET_LOAD_ERROR', error: ACCESS_REQUIRED });
+          return;
+        }
         if (!current()) return;
-        // Keeps an older build saved to "<name> - Sifted", into the ledger
-        // first (once per playlist), so the filter below counts them.
-        await importSiftedKeeps(providerRef.current, state.provider, source, result);
 
-        if (shouldFilter) {
-          // Leave out songs kept in earlier sifts of this playlist, as a
-          // library sift does (#143): a keep leaves the song in the playlist.
-          // By id: the ids the keeps recorded came from this same load.
-          const reviewedIds = await loadReviewedIds(ledgerKey(state.provider, source));
-          const beforeReviewedFilter = tracks.length;
-          tracks = tracks.filter((t) => !reviewedIds.has(t.id));
-          filteredAsReviewed = beforeReviewedFilter - tracks.length;
+        send({ type: 'SET_LOAD_PROGRESS', progress: 0.3, message: 'Fetching tracks…' });
 
-          if (!collectsRemovals(state.provider)) {
-            // Exclude tracks previously removed from this playlist
-            const history = await loadHistory();
-            const removedIds = new Set(
-              history
-                .filter((r) => r.source.type === 'playlist' && r.source.playlist.id === source.playlist.id)
-                .map((r) => r.track.id),
-            );
+        let tracks: Track[];
+        let unfilteredCount: number;
+        // How many tracks each independent filter dropped — the zero-track
+        // message below distinguishes "already sifted" from "previously
+        // removed" instead of blaming the ledger filter for both.
+        let filteredAsRemoved = 0;
+        let filteredAsReviewed = 0;
+        if (source.type === 'playlist') {
+          // Shared with Setup's "- Sifted" import of it, if that's loading
+          // it now (#179): the playlist is fetched once.
+          const result = await loadPlaylistTracksOnce(providerRef.current, source.playlist.id);
+          if (!result) throw new Error('This provider does not support playlist loading');
+          tracks = result;
+          unfilteredCount = tracks.length;
+          // Cancelled while it loaded: leave the rest (the import included).
+          if (!current()) return;
+          // Keeps an older build saved to "<name> - Sifted", into the ledger
+          // first (once per playlist), so the filter below counts them.
+          await importSiftedKeeps(providerRef.current, state.provider, source, result);
+
+          if (shouldFilter) {
+            // Leave out songs kept in earlier sifts of this playlist, as a
+            // library sift does (#143): a keep leaves the song in the playlist.
+            // By id: the ids the keeps recorded came from this same load.
+            const reviewedIds = await loadReviewedIds(ledgerKey(state.provider, source));
+            const beforeReviewedFilter = tracks.length;
+            tracks = tracks.filter((t) => !reviewedIds.has(t.id));
+            filteredAsReviewed = beforeReviewedFilter - tracks.length;
+
+            if (!collectsRemovals(state.provider)) {
+              // Exclude tracks previously removed from this playlist
+              const history = await loadHistory();
+              const removedIds = new Set(
+                history
+                  .filter(
+                    (r) =>
+                      r.source.type === 'playlist' && r.source.playlist.id === source.playlist.id,
+                  )
+                  .map((r) => r.track.id),
+              );
+              const beforeRemovedFilter = tracks.length;
+              tracks = tracks.filter((t) => !removedIds.has(t.id));
+              filteredAsRemoved = beforeRemovedFilter - tracks.length;
+            }
+          }
+          if (collectsRemovals(state.provider)) {
+            // Skip songs removed in any earlier sift: they wait in "Sift —
+            // Removed" to be deleted from the library (Remove means that,
+            // whatever the sift). Applies with skipFiltering, as for the
+            // library: starting over un-removes nothing.
+            const removedIds = collectedRemovalIds(await loadHistory(), state.provider);
             const beforeRemovedFilter = tracks.length;
             tracks = tracks.filter((t) => !removedIds.has(t.id));
             filteredAsRemoved = beforeRemovedFilter - tracks.length;
           }
+        } else {
+          tracks = await providerRef.current.loadLibrary();
+          unfilteredCount = tracks.length;
+          if (collectsRemovals(state.provider)) {
+            // Skip songs removed in an earlier sift (#139). On Apple Music
+            // they never left the library (they sit in "Sift — Removed"), so
+            // without this every library sift offered them again. Applies
+            // with skipFiltering too: a library Start Over starts the decisions
+            // over but un-removes nothing. A provider whose Remove really
+            // deletes the song wouldn't need this: a song back in its library
+            // was re-added on purpose.
+            const removedIds = collectedRemovalIds(await loadHistory(), state.provider);
+            const beforeRemovedFilter = tracks.length;
+            tracks = tracks.filter((t) => !removedIds.has(t.id));
+            filteredAsRemoved = beforeRemovedFilter - tracks.length;
+          }
+          if (shouldFilter) {
+            // Leave out songs kept in earlier library sifts (#143), so a big
+            // library gets through over many sittings. By id, like the removal
+            // filter above. Skipped songs were never recorded, so they come
+            // back. Setup's "Include songs I've already sifted" switch passes
+            // skipFiltering to bring them all back.
+            const reviewedIds = await loadReviewedIds(ledgerKey(state.provider, source));
+            const beforeReviewedFilter = tracks.length;
+            tracks = tracks.filter((t) => !reviewedIds.has(t.id));
+            filteredAsReviewed = beforeReviewedFilter - tracks.length;
+          }
         }
-        if (collectsRemovals(state.provider)) {
-          // Skip songs removed in any earlier sift: they wait in "Sift —
-          // Removed" to be deleted from the library (Remove means that,
-          // whatever the sift). Applies with skipFiltering, as for the
-          // library: starting over un-removes nothing.
-          const removedIds = collectedRemovalIds(await loadHistory(), state.provider);
-          const beforeRemovedFilter = tracks.length;
-          tracks = tracks.filter((t) => !removedIds.has(t.id));
-          filteredAsRemoved = beforeRemovedFilter - tracks.length;
+
+        // Setup's Plays and Added limits, after the rest: the messages below
+        // blame these only for what they themselves left out.
+        let filteredByLimits = 0;
+        if (isFiltering(filter)) {
+          const now = new Date();
+          const beforeLimits = tracks.length;
+          tracks = tracks.filter((t) => matchesFilter(t, filter, now));
+          filteredByLimits = beforeLimits - tracks.length;
         }
-      } else {
-        tracks = await providerRef.current.loadLibrary();
-        unfilteredCount = tracks.length;
-        if (collectsRemovals(state.provider)) {
-          // Skip songs removed in an earlier sift (#139). On Apple Music
-          // they never left the library (they sit in "Sift — Removed"), so
-          // without this every library sift offered them again. Applies
-          // with skipFiltering too: a library Start Over starts the decisions
-          // over but un-removes nothing. A provider whose Remove really
-          // deletes the song wouldn't need this: a song back in its library
-          // was re-added on purpose.
-          const removedIds = collectedRemovalIds(await loadHistory(), state.provider);
-          const beforeRemovedFilter = tracks.length;
-          tracks = tracks.filter((t) => !removedIds.has(t.id));
-          filteredAsRemoved = beforeRemovedFilter - tracks.length;
+
+        Sentry.addBreadcrumb({
+          category: 'music-provider',
+          // Not the playlist's name (#147).
+          message: `Loaded ${tracks.length} tracks from ${source.type === 'playlist' ? 'a playlist' : 'the library'}`,
+          level: 'info',
+        });
+
+        // Never enter the sifting phase with zero tracks — there would be no
+        // card and no way out. Distinguish "everything was filtered out" from
+        // "the source is genuinely empty" — and, within the filtered case,
+        // which filter actually emptied it: blaming the sifted filter for
+        // tracks that were removed (not kept) would be a false claim.
+        if (tracks.length === 0) {
+          const error =
+            filteredByLimits > 0
+              ? `No songs ${source.type === 'playlist' ? 'in this playlist ' : ''}match your Plays and Added choices.`
+              : source.type === 'playlist' &&
+                  unfilteredCount > 0 &&
+                  (shouldFilter || filteredAsRemoved > 0)
+                ? filteredAsRemoved === 0
+                  ? 'You\u2019ve sifted every song in this playlist. Turn on \u201cInclude songs I\u2019ve already sifted\u201d to go through them again.'
+                  : filteredAsReviewed === 0
+                    ? 'All tracks in this playlist were removed in a previous sift.'
+                    : 'All tracks in this playlist have already been sifted or removed.'
+                : source.type === 'playlist'
+                  ? 'This playlist has no tracks to sift.'
+                  : filteredAsReviewed > 0
+                    ? 'You\u2019ve sifted every song in your library. Turn on \u201cInclude songs I\u2019ve already sifted\u201d to go through them again.'
+                    : filteredAsRemoved > 0
+                      ? 'Every song in your library was removed in a previous sift.'
+                      : 'Your library has no tracks to sift.';
+          send({ type: 'SET_LOAD_ERROR', error });
+          return;
         }
-        if (shouldFilter) {
-          // Leave out songs kept in earlier library sifts (#143), so a big
-          // library gets through over many sittings. By id, like the removal
-          // filter above. Skipped songs were never recorded, so they come
-          // back. Setup's "Include songs I've already sifted" switch passes
-          // skipFiltering to bring them all back.
-          const reviewedIds = await loadReviewedIds(ledgerKey(state.provider, source));
-          const beforeReviewedFilter = tracks.length;
-          tracks = tracks.filter((t) => !reviewedIds.has(t.id));
-          filteredAsReviewed = beforeReviewedFilter - tracks.length;
-        }
+
+        send({ type: 'SET_LOAD_PROGRESS', progress: 0.9, message: 'Sorting tracks…' });
+        send({ type: 'LOAD_TRACKS', tracks: sortTracks(tracks, state.sortOrder) });
+      } catch (err) {
+        // The raw error goes to Sentry; the user gets plain words (#174).
+        Sentry.captureException(err, { tags: { flow: 'load-tracks' } });
+        send({ type: 'SET_LOAD_ERROR', error: loadFailureMessage(source, err) });
+      } finally {
+        if (loadingInProgressRef.current === generation) loadingInProgressRef.current = null;
       }
-
-      // Setup's Plays and Added limits, after the rest: the messages below
-      // blame these only for what they themselves left out.
-      let filteredByLimits = 0;
-      if (isFiltering(filter)) {
-        const now = new Date();
-        const beforeLimits = tracks.length;
-        tracks = tracks.filter((t) => matchesFilter(t, filter, now));
-        filteredByLimits = beforeLimits - tracks.length;
-      }
-
-      Sentry.addBreadcrumb({
-        category: 'music-provider',
-        // Not the playlist's name (#147).
-        message: `Loaded ${tracks.length} tracks from ${source.type === 'playlist' ? 'a playlist' : 'the library'}`,
-        level: 'info',
-      });
-
-      // Never enter the sifting phase with zero tracks — there would be no
-      // card and no way out. Distinguish "everything was filtered out" from
-      // "the source is genuinely empty" — and, within the filtered case,
-      // which filter actually emptied it: blaming the sifted filter for
-      // tracks that were removed (not kept) would be a false claim.
-      if (tracks.length === 0) {
-        const error = filteredByLimits > 0
-          ? `No songs ${source.type === 'playlist' ? 'in this playlist ' : ''}match your Plays and Added choices.`
-          : source.type === 'playlist' && unfilteredCount > 0 && (shouldFilter || filteredAsRemoved > 0)
-            ? filteredAsRemoved === 0
-              ? 'You\u2019ve sifted every song in this playlist. Turn on \u201cInclude songs I\u2019ve already sifted\u201d to go through them again.'
-              : filteredAsReviewed === 0
-                ? 'All tracks in this playlist were removed in a previous sift.'
-                : 'All tracks in this playlist have already been sifted or removed.'
-            : source.type === 'playlist'
-              ? 'This playlist has no tracks to sift.'
-              : filteredAsReviewed > 0
-                ? 'You\u2019ve sifted every song in your library. Turn on \u201cInclude songs I\u2019ve already sifted\u201d to go through them again.'
-                : filteredAsRemoved > 0
-                  ? 'Every song in your library was removed in a previous sift.'
-                  : 'Your library has no tracks to sift.';
-        send({ type: 'SET_LOAD_ERROR', error });
-        return;
-      }
-
-      send({ type: 'SET_LOAD_PROGRESS', progress: 0.9, message: 'Sorting tracks…' });
-      send({ type: 'LOAD_TRACKS', tracks: sortTracks(tracks, state.sortOrder) });
-    } catch (err) {
-      // The raw error goes to Sentry; the user gets plain words (#174).
-      Sentry.captureException(err, { tags: { flow: 'load-tracks' } });
-      send({ type: 'SET_LOAD_ERROR', error: loadFailureMessage(source, err) });
-    } finally {
-      if (loadingInProgressRef.current === generation) loadingInProgressRef.current = null;
-    }
-  }, [providerRef, dispatch, ensureAccess, state.source, state.sortOrder, state.provider, state.filter]);
+    },
+    [
+      providerRef,
+      dispatch,
+      ensureAccess,
+      state.source,
+      state.sortOrder,
+      state.provider,
+      state.filter,
+    ],
+  );
 
   /**
    * Loading's Cancel (#177): back to Setup, and whatever the load under way
@@ -483,19 +534,26 @@ export function useMusicProvider() {
     // Nothing to retry with: a missing call must not count as a removal.
     let remove: ((id: string) => Promise<void>) | undefined;
     if (source.type === 'playlist' && !collecting) {
-      if (removeFromPlaylist) remove = async (id) => { await removeFromPlaylist.call(service, source.playlist.id, [id]); };
+      if (removeFromPlaylist)
+        remove = async (id) => {
+          await removeFromPlaylist.call(service, source.playlist.id, [id]);
+        };
     } else if (removeFromLibrary) {
       remove = (id) => removeFromLibrary.call(service, [id]);
     }
     if (!remove) return;
-    const due = removed.filter((track) =>
-      failedRemovalIds.includes(track.id) && (removalRetryAttempts.get(track.id) ?? 0) < MAX_REMOVAL_RETRIES);
+    const due = removed.filter(
+      (track) =>
+        failedRemovalIds.includes(track.id) &&
+        (removalRetryAttempts.get(track.id) ?? 0) < MAX_REMOVAL_RETRIES,
+    );
     if (due.length === 0) return;
     // Still removed and still failed, read now: a Restore (or another
     // screen's retry) may have settled it since this retry started.
-    const stillDue = (id: string) => !restoringIds.has(id)
-      && removalStateRef.current.failedRemovalIds.includes(id)
-      && removalStateRef.current.removed.some((t) => t.id === id);
+    const stillDue = (id: string) =>
+      !restoringIds.has(id) &&
+      removalStateRef.current.failedRemovalIds.includes(id) &&
+      removalStateRef.current.removed.some((t) => t.id === id);
     const run = async () => {
       for (const track of due) {
         if (!stillDue(track.id)) continue;
@@ -507,7 +565,13 @@ export function useMusicProvider() {
           // The failed collected removal dropped its history record; now
           // it has landed, record it again so later sifts leave it out.
           if (collecting) {
-            await logRemoval({ track, source, provider, removedAt: new Date().toISOString(), collected: true });
+            await logRemoval({
+              track,
+              source,
+              provider,
+              removedAt: new Date().toISOString(),
+              collected: true,
+            });
           }
           dispatch({ type: 'CLEAR_REMOVAL_FAILURE', trackId: track.id, error: track.name });
         } catch (err) {
@@ -553,7 +617,8 @@ export function useMusicProvider() {
         }
       } catch (err) {
         Sentry.captureException(err, { tags: { flow: 'remove-track' } });
-        if (report) dispatch({ type: 'ADD_REMOVAL_ERROR', error: track.name, failedRemovalId: track.id });
+        if (report)
+          dispatch({ type: 'ADD_REMOVAL_ERROR', error: track.name, failedRemovalId: track.id });
         // A failed collected removal left the song where it was and out of
         // "Sift — Removed": drop its record so the next sift offers it
         // again rather than hiding it for good.
@@ -617,8 +682,10 @@ export function useMusicProvider() {
           // Asked rather than read from failedRemovalIds: one can fail after
           // taking effect, and a failure that just came in may not be in
           // this screen's state yet.
-          const stillThere = source.type === 'playlist' && service.removalLanded != null
-            && !(await service.removalLanded(source, track.id));
+          const stillThere =
+            source.type === 'playlist' &&
+            service.removalLanded != null &&
+            !(await service.removalLanded(source, track.id));
           if (source.type === 'playlist') {
             if (!stillThere) await service.addToPlaylist?.(source.playlist.id, [track.id]);
           } else {
@@ -646,7 +713,10 @@ export function useMusicProvider() {
   );
 
   /** Whether a restore of this song is running (from Done or the decisions list). */
-  const restoreUnderWay = useCallback((trackId: string): boolean => restoresInFlight.has(trackId), []);
+  const restoreUnderWay = useCallback(
+    (trackId: string): boolean => restoresInFlight.has(trackId),
+    [],
+  );
 
   const restoreTrack = useCallback(
     (track: Track): Promise<boolean> => {
@@ -682,12 +752,16 @@ export function useMusicProvider() {
         const service = providerRef.current;
         // An earlier write that timed out may still be landing: wait for the
         // library writes to finish rather than read the playlist under them.
-        if (service.writesSettled && !(await settlesWithin(service.writesSettled(), KEPT_SAVE_SETTLE_MS))) {
+        if (
+          service.writesSettled &&
+          !(await settlesWithin(service.writesSettled(), KEPT_SAVE_SETTLE_MS))
+        ) {
           throw new Error(STILL_FINISHING);
         }
         // Read after the queue: keeps recorded while an earlier save ran count.
-        const remembered = [...await loadReviewedIds(ledgerKey(provider, source))];
-        if (remembered.length === 0) return { playlistName, sourceName, kept: 0, added: 0, notAdded: 0, leftOut: 0 };
+        const remembered = [...(await loadReviewedIds(ledgerKey(provider, source)))];
+        if (remembered.length === 0)
+          return { playlistName, sourceName, kept: 0, added: 0, notAdded: 0, leftOut: 0 };
         // Only songs still in the playlist: the ledger's ids came from its
         // loads, and a song taken out of it since can't be matched by song.
         const sourceTracks = await service.loadPlaylistTracks?.(source.playlist.id);
@@ -695,21 +769,25 @@ export function useMusicProvider() {
         const inSource = new Map(sourceTracks.map((t) => [t.id, t]));
         const kept = remembered.flatMap((id) => inSource.get(id) ?? []);
         const leftOut = remembered.length - kept.length;
-        if (kept.length === 0) return { playlistName, sourceName, kept: 0, added: 0, notAdded: 0, leftOut };
+        if (kept.length === 0)
+          return { playlistName, sourceName, kept: 0, added: 0, notAdded: 0, leftOut };
         const addToPlaylist = service.addToPlaylist?.bind(service);
         if (!addToPlaylist) throw new Error('This provider does not support adding to playlists');
 
         const listed = service.findPlaylists
           ? await service.findPlaylists(playlistName)
-          : (await service.loadPlaylists?.() ?? []).filter((p) => p.name === playlistName).map((p) => p.id);
+          : ((await service.loadPlaylists?.()) ?? [])
+              .filter((p) => p.name === playlistName)
+              .map((p) => p.id);
         const mine = createdKeptPlaylists.get(playlistName);
-        let playlistId = mine != null && (listed.includes(mine) || !service.findPlaylists) ? mine : listed[0];
+        let playlistId =
+          mine != null && (listed.includes(mine) || !service.findPlaylists) ? mine : listed[0];
         let entries: Track[] = [];
         if (playlistId == null) {
           playlistId = await service.createPlaylist(playlistName);
           createdKeptPlaylists.set(playlistName, playlistId);
         } else {
-          entries = await service.loadPlaylistTracks?.(playlistId) ?? [];
+          entries = (await service.loadPlaylistTracks?.(playlistId)) ?? [];
         }
         // Apple Music files a song under a new id when it lands in a
         // playlist: compare by song (name, artist, duration).
@@ -784,7 +862,8 @@ export function useMusicProvider() {
    * (services/SiftedImport). Never rejects.
    */
   const rememberSiftedKeeps = useCallback(
-    (source: SiftSource): Promise<void> => importSiftedKeeps(providerRef.current, state.provider, source),
+    (source: SiftSource): Promise<void> =>
+      importSiftedKeeps(providerRef.current, state.provider, source),
     [providerRef, state.provider],
   );
 
@@ -798,28 +877,31 @@ export function useMusicProvider() {
     [providerRef, state.provider],
   );
 
-  const warmCache = useCallback(async (trackIDs: string[], playlistID?: string): Promise<void> => {
-    try {
-      const isAuth = await providerRef.current.isAuthorized();
-      if (!isAuth) {
-        const granted = await providerRef.current.requestAuthorization();
-        if (!granted) return;
+  const warmCache = useCallback(
+    async (trackIDs: string[], playlistID?: string): Promise<void> => {
+      try {
+        const isAuth = await providerRef.current.isAuthorized();
+        if (!isAuth) {
+          const granted = await providerRef.current.requestAuthorization();
+          if (!granted) return;
+        }
+        const resolved = await providerRef.current.warmSongCache?.(trackIDs, playlistID);
+        // Observability: the native warm-up tolerates per-id failures, so a
+        // shortfall here is otherwise invisible — those tracks degrade to no
+        // playback/artwork until re-resolved. Breadcrumb only; not an error.
+        if (resolved != null && resolved < trackIDs.length) {
+          Sentry.addBreadcrumb({
+            category: 'music-provider',
+            message: `warmCache: ${trackIDs.length - resolved} of ${trackIDs.length} ids unresolved`,
+            level: 'warning',
+          });
+        }
+      } catch (err) {
+        Sentry.captureException(err, { tags: { flow: 'warm-cache' } });
       }
-      const resolved = await providerRef.current.warmSongCache?.(trackIDs, playlistID);
-      // Observability: the native warm-up tolerates per-id failures, so a
-      // shortfall here is otherwise invisible — those tracks degrade to no
-      // playback/artwork until re-resolved. Breadcrumb only; not an error.
-      if (resolved != null && resolved < trackIDs.length) {
-        Sentry.addBreadcrumb({
-          category: 'music-provider',
-          message: `warmCache: ${trackIDs.length - resolved} of ${trackIDs.length} ids unresolved`,
-          level: 'warning',
-        });
-      }
-    } catch (err) {
-      Sentry.captureException(err, { tags: { flow: 'warm-cache' } });
-    }
-  }, [providerRef]);
+    },
+    [providerRef],
+  );
 
   return {
     authorize,

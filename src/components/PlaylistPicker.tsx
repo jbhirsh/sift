@@ -50,22 +50,19 @@ export default function PlaylistPicker({
   );
 
   return (
-    <Modal
-      visible
-      transparent
-      animationType="slide"
-    >
+    <Modal visible transparent animationType="slide">
       <View style={styles.overlay} testID="playlist-picker-modal">
         <View style={styles.sheetContainer}>
           <GlassCard intensity="thick" radius={RADIUS.lg} style={styles.sheet}>
             <View style={styles.header}>
-              <Text style={[styles.title, { color: colors.text }]}>
-                Choose a Playlist
-              </Text>
-              <TouchableOpacity onPress={onCancel} activeOpacity={0.7} testID="playlist-picker-cancel" accessibilityRole="button">
-                <Text style={[styles.cancelText, { color: colors.accent }]}>
-                  Cancel
-                </Text>
+              <Text style={[styles.title, { color: colors.text }]}>Choose a Playlist</Text>
+              <TouchableOpacity
+                onPress={onCancel}
+                activeOpacity={0.7}
+                testID="playlist-picker-cancel"
+                accessibilityRole="button"
+              >
+                <Text style={[styles.cancelText, { color: colors.accent }]}>Cancel</Text>
               </TouchableOpacity>
             </View>
 

@@ -5,11 +5,21 @@ import type { PendingDecision, SiftSource, Track } from '../../src/types';
 // The send and hold logic on its own (#152), with SiftContext and the music
 // provider stubbed.
 const track = (id: string): Track => ({
-  id, name: id, artist: 'A', album: 'B', duration: 200, playCount: 1, dateAdded: '2020-01-01T00:00:00.000Z',
+  id,
+  name: id,
+  artist: 'A',
+  album: 'B',
+  duration: 200,
+  playCount: 1,
+  dateAdded: '2020-01-01T00:00:00.000Z',
 });
 
 const mockSift = {
-  state: { tracks: [track('a'), track('b')], source: { type: 'library' } as SiftSource, pending: null as PendingDecision | null },
+  state: {
+    tracks: [track('a'), track('b')],
+    source: { type: 'library' } as SiftSource,
+    pending: null as PendingDecision | null,
+  },
   dispatch: jest.fn(),
   flushPendingSave: jest.fn(),
 };
@@ -20,15 +30,27 @@ const mockProvider = {
 
 jest.mock('../../src/context/SiftContext', () => ({ useSift: () => mockSift }));
 jest.mock('../../src/hooks/useMusicProvider', () => ({ useMusicProvider: () => mockProvider }));
-jest.mock('../../src/services/ReviewedLedgerStore', () => ({ markReviewed: jest.fn(() => Promise.resolve()) }));
+jest.mock('../../src/services/ReviewedLedgerStore', () => ({
+  markReviewed: jest.fn(() => Promise.resolve()),
+}));
 
-import { useHoldPendingDecision, useSendPending, useSendSavedPending, wasSent, UNDO_WINDOW_MS } from '../../src/hooks/usePendingDecision';
+import {
+  useHoldPendingDecision,
+  useSendPending,
+  useSendSavedPending,
+  wasSent,
+  UNDO_WINDOW_MS,
+} from '../../src/hooks/usePendingDecision';
 import { markReviewed } from '../../src/services/ReviewedLedgerStore';
 import type { SiftSession } from '../../src/types';
 
 // Each test uses its own times: the sent set lives for the module.
 let clock = 1_000;
-const held = (trackId: string, decision: PendingDecision['decision']): PendingDecision => ({ trackId, decision, at: (clock += 1) });
+const held = (trackId: string, decision: PendingDecision['decision']): PendingDecision => ({
+  trackId,
+  decision,
+  at: (clock += 1),
+});
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -41,7 +63,11 @@ describe('useSendPending', () => {
     const pending = held('b', 'remove');
     await act(async () => result.current(pending));
     expect(mockSift.flushPendingSave).toHaveBeenCalledTimes(1);
-    expect(mockSift.dispatch).toHaveBeenCalledWith({ type: 'PENDING_SENT', trackId: 'b', at: pending.at });
+    expect(mockSift.dispatch).toHaveBeenCalledWith({
+      type: 'PENDING_SENT',
+      trackId: 'b',
+      at: pending.at,
+    });
     expect(mockProvider.removeTrack).toHaveBeenCalledWith(track('b'));
     expect(mockProvider.keepTrack).not.toHaveBeenCalled();
     expect(wasSent(pending)).toBe(true);
@@ -55,7 +81,11 @@ describe('useSendPending', () => {
     await act(async () => result.current(pending));
     expect(mockProvider.removeTrack).not.toHaveBeenCalled();
     expect(mockSift.flushPendingSave).not.toHaveBeenCalled();
-    expect(mockSift.dispatch).toHaveBeenCalledWith({ type: 'PENDING_SENT', trackId: 'a', at: pending.at });
+    expect(mockSift.dispatch).toHaveBeenCalledWith({
+      type: 'PENDING_SENT',
+      trackId: 'a',
+      at: pending.at,
+    });
   });
 
   test('sends a Keep; a Skip and an unknown track send nothing but still clear', async () => {
@@ -83,7 +113,11 @@ describe('useSendPending', () => {
     await act(async () => result.current(pending));
     expect(mockProvider.keepTrack).toHaveBeenCalledWith(track('a'));
     expect(mockSift.dispatch).toHaveBeenCalledTimes(1);
-    expect(mockSift.dispatch).toHaveBeenCalledWith({ type: 'PENDING_SENT', trackId: 'a', at: pending.at });
+    expect(mockSift.dispatch).toHaveBeenCalledWith({
+      type: 'PENDING_SENT',
+      trackId: 'a',
+      at: pending.at,
+    });
   });
 
   test('finds tracks from the latest render', async () => {
@@ -153,30 +187,49 @@ describe('useHoldPendingDecision', () => {
 });
 
 describe('useSendSavedPending', () => {
-  const playlist: SiftSource = { type: 'playlist', playlist: { id: 'p', name: 'Mix', trackCount: 2 } };
-  const saved = (pending: PendingDecision | null, over: Partial<SiftSession> = {}): SiftSession => ({
-    tracks: [track('a'), track('b')], cursor: 1, kept: [], removed: [], skipped: [], sortOrder: 'random',
-    savedAt: '2026-01-01T00:00:00.000Z', provider: 'apple-music', source: playlist, pending,
+  const playlist: SiftSource = {
+    type: 'playlist',
+    playlist: { id: 'p', name: 'Mix', trackCount: 2 },
+  };
+  const saved = (
+    pending: PendingDecision | null,
+    over: Partial<SiftSession> = {},
+  ): SiftSession => ({
+    tracks: [track('a'), track('b')],
+    cursor: 1,
+    kept: [],
+    removed: [],
+    skipped: [],
+    sortOrder: 'random',
+    savedAt: '2026-01-01T00:00:00.000Z',
+    provider: 'apple-music',
+    source: playlist,
+    pending,
     ...over,
   });
 
-  test('sends a held Remove to the saved session\'s own source, leaving state alone', async () => {
+  test("sends a held Remove to the saved session's own source, leaving state alone", async () => {
     const { result } = await renderHook(() => useSendSavedPending());
     const pending = held('b', 'remove');
     await act(async () => result.current(saved(pending)));
-    expect(mockProvider.removeTrack).toHaveBeenCalledWith(track('b'), { source: playlist, provider: 'apple-music' });
+    expect(mockProvider.removeTrack).toHaveBeenCalledWith(track('b'), {
+      source: playlist,
+      provider: 'apple-music',
+    });
     expect(mockSift.dispatch).not.toHaveBeenCalled();
     expect(wasSent(pending)).toBe(true);
   });
 
-  test('records a held Keep in the saved session\'s own source\'s ledger, writing nothing to the service', async () => {
+  test("records a held Keep in the saved session's own source's ledger, writing nothing to the service", async () => {
     const { result } = await renderHook(() => useSendSavedPending());
     await act(async () => result.current(saved(held('a', 'keep'))));
     expect(markReviewed).toHaveBeenCalledTimes(1);
     expect(markReviewed).toHaveBeenCalledWith('apple-music:playlist:p', 'a');
     expect(mockProvider.keepTrack).not.toHaveBeenCalled();
     jest.clearAllMocks();
-    await act(async () => result.current(saved(held('b', 'keep'), { source: { type: 'library' } })));
+    await act(async () =>
+      result.current(saved(held('b', 'keep'), { source: { type: 'library' } })),
+    );
     expect(markReviewed).toHaveBeenCalledWith('apple-music:library', 'b');
   });
 

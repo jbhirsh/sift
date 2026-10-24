@@ -12,7 +12,9 @@ jest.mock('../../src/services', () => ({
   createMusicProvider: jest.fn(() => mockProvider),
 }));
 
-const wrapper = ({ children }: { children: React.ReactNode }) => <SiftProvider>{children}</SiftProvider>;
+const wrapper = ({ children }: { children: React.ReactNode }) => (
+  <SiftProvider>{children}</SiftProvider>
+);
 
 describe('useMusicProvider.previewOffset', () => {
   it("returns the provider's preview offset", async () => {
@@ -31,7 +33,9 @@ describe('useMusicProvider.previewOffset', () => {
   });
 
   it('stop pauses and resets the position', async () => {
-    const { result } = await renderHook(() => ({ provider: useMusicProvider(), sift: useSift() }), { wrapper });
+    const { result } = await renderHook(() => ({ provider: useMusicProvider(), sift: useSift() }), {
+      wrapper,
+    });
     await act(async () => {
       result.current.sift.dispatch({ type: 'SET_PLAYBACK_POSITION', position: 33 });
       result.current.sift.dispatch({ type: 'SET_IS_PLAYING', isPlaying: true });

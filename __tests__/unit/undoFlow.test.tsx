@@ -23,7 +23,12 @@ jest.mock('expo-image', () => ({ Image: 'Image' }));
 jest.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: { View: 'View', createAnimatedComponent: (comp: unknown) => comp },
-  useSharedValue: (val: number) => ({ value: val, set(v: number) { this.value = v; } }),
+  useSharedValue: (val: number) => ({
+    value: val,
+    set(v: number) {
+      this.value = v;
+    },
+  }),
   useAnimatedStyle: (fn: () => unknown) => fn(),
   withTiming: (val: number, _config: unknown, callback?: (finished: boolean) => void) => {
     if (callback) callback(true);
@@ -41,7 +46,9 @@ jest.mock('react-native-gesture-handler', () => ({
   GestureDetector: ({ children }: { children: React.ReactNode }) => children,
   Gesture: {
     Pan: () => ({
-      minDistance: () => ({ enabled: () => ({ onUpdate: () => ({ onEnd: () => ({ onFinalize: () => ({}) }) }) }) }),
+      minDistance: () => ({
+        enabled: () => ({ onUpdate: () => ({ onEnd: () => ({ onFinalize: () => ({}) }) }) }),
+      }),
       onUpdate: () => ({ onFinalize: () => ({}) }),
     }),
     Tap: () => ({ onEnd: () => ({}) }),
@@ -75,7 +82,13 @@ jest.mock('../../src/services/RemovalHistoryStore', () => ({
 }));
 
 const track = (id: string, name: string): Track => ({
-  id, name, artist: 'Artist', album: 'Album', duration: 200, playCount: 1, dateAdded: '2020-01-01T00:00:00.000Z',
+  id,
+  name,
+  artist: 'Artist',
+  album: 'Album',
+  duration: 200,
+  playCount: 1,
+  dateAdded: '2020-01-01T00:00:00.000Z',
 });
 const tracks = [track('a', 'Peaches'), track('b', 'Stay'), track('c', 'Montero')];
 
@@ -127,7 +140,10 @@ describe('held-back decisions and Undo (#152)', () => {
 
   test('Undo brings the card back and nothing is sent', async () => {
     const { getByLabelText, getByTestId, queryByTestId } = await renderWithProviders(
-      <><SiftScreen /><Probe /></>,
+      <>
+        <SiftScreen />
+        <Probe />
+      </>,
       { initialTracks: tracks },
     );
     await fireEvent.press(getByLabelText('Remove'));
@@ -141,11 +157,10 @@ describe('held-back decisions and Undo (#152)', () => {
     expect(removeSpy).not.toHaveBeenCalled();
   });
 
-  test('the pill takes the action labels\' place while it shows, then goes', async () => {
-    const { getByLabelText, getByText, queryByTestId } = await renderWithProviders(
-      <SiftScreen />,
-      { initialTracks: tracks },
-    );
+  test("the pill takes the action labels' place while it shows, then goes", async () => {
+    const { getByLabelText, getByText, queryByTestId } = await renderWithProviders(<SiftScreen />, {
+      initialTracks: tracks,
+    });
     const labelOpacity = () => StyleSheet.flatten(getByText('REMOVE').props.style).opacity;
     expect(labelOpacity()).toBe(1);
     await fireEvent.press(getByLabelText('Remove'));
@@ -163,7 +178,9 @@ describe('held-back decisions and Undo (#152)', () => {
       const { state } = useSift();
       return state.phase === 'sifting' ? <SiftScreen /> : <Text testID="done">done</Text>;
     }
-    const { getByLabelText, getByTestId } = await renderWithProviders(<Router />, { initialTracks: tracks });
+    const { getByLabelText, getByTestId } = await renderWithProviders(<Router />, {
+      initialTracks: tracks,
+    });
     await fireEvent.press(getByLabelText('Remove'));
     await advance(400);
     await fireEvent.press(getByTestId('finish-button'));
@@ -173,7 +190,9 @@ describe('held-back decisions and Undo (#152)', () => {
   });
 
   test('the Undo pill passes the VoiceOver scan', async () => {
-    const { getByLabelText, toJSON } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+    const { getByLabelText, toJSON } = await renderWithProviders(<SiftScreen />, {
+      initialTracks: tracks,
+    });
     await fireEvent.press(getByLabelText('Skip'));
     expect(getByLabelText('Undo: Skipped Peaches')).toBeTruthy();
     expect(a11yViolations(toJSON())).toEqual([]);
@@ -207,13 +226,21 @@ describe('held-back decisions and Undo (#152)', () => {
       React.useEffect(() => {
         if (ran.current) return;
         ran.current = true;
-        dispatch({ type: 'SET_SOURCE', source: { type: 'playlist', playlist: { id: 'p1', name: 'Mix', trackCount: 3 } } });
+        dispatch({
+          type: 'SET_SOURCE',
+          source: { type: 'playlist', playlist: { id: 'p1', name: 'Mix', trackCount: 3 } },
+        });
         dispatch({ type: 'DECIDE', decision: 'keep', at: 1 });
         dispatch({ type: 'DECIDE', decision: 'keep', at: 2 });
         dispatch({ type: 'PENDING_SENT', trackId: 'a', at: 1 });
         dispatch({ type: 'FINISH' });
       }, [dispatch]);
-      return <><DoneScreen /><Text testID="held">{String(state.pending)}</Text></>;
+      return (
+        <>
+          <DoneScreen />
+          <Text testID="held">{String(state.pending)}</Text>
+        </>
+      );
     }
     const { getByTestId } = await renderWithProviders(<ResumedKeep />, { initialTracks: tracks });
     await advance(5000);
@@ -231,7 +258,9 @@ describe('held-back decisions and Undo (#152)', () => {
       const { state } = useSift();
       return state.phase === 'sifting' ? <SiftScreen /> : <Text testID="done">done</Text>;
     }
-    const { getByLabelText, getByTestId } = await renderWithProviders(<Router />, { initialTracks: [tracks[0]] });
+    const { getByLabelText, getByTestId } = await renderWithProviders(<Router />, {
+      initialTracks: [tracks[0]],
+    });
     await fireEvent.press(getByLabelText('Remove'));
     expect(getByTestId('done')).toBeTruthy();
     await advance(10);
@@ -257,17 +286,30 @@ describe('held-back decisions and Undo (#152)', () => {
           {state.phase === 'sifting' ? <SiftScreen /> : <Text testID="setup">setup</Text>}
           <TouchableOpacity
             testID="resume-stale"
-            onPress={() => dispatch({
-              type: 'RESUME_SESSION',
-              // As Setup's copy saved before the send: pending still set.
-              session: { ...state, phase: 'sifting', cursor: 1, removed: [tracks[0]], pending: heldRef.current },
-            })}
+            onPress={() =>
+              dispatch({
+                type: 'RESUME_SESSION',
+                // As Setup's copy saved before the send: pending still set.
+                session: {
+                  ...state,
+                  phase: 'sifting',
+                  cursor: 1,
+                  removed: [tracks[0]],
+                  pending: heldRef.current,
+                },
+              })
+            }
           />
         </>
       );
     }
     const heldRef: { current: PendingDecision | null } = { current: null };
-    const { getByLabelText, getByTestId, queryByTestId } = await renderWithProviders(<><Router /><Probe /></>);
+    const { getByLabelText, getByTestId, queryByTestId } = await renderWithProviders(
+      <>
+        <Router />
+        <Probe />
+      </>,
+    );
     await advance(10);
     await fireEvent.press(getByLabelText('Remove'));
     await advance(100);
@@ -287,10 +329,12 @@ describe('held-back decisions and Undo (#152)', () => {
 
   test('the app leaving the foreground sends what is held', async () => {
     const listeners: ((state: string) => void)[] = [];
-    const addListener = jest.spyOn(AppState, 'addEventListener').mockImplementation((_type, listener) => {
-      listeners.push(listener as (state: string) => void);
-      return { remove: () => undefined } as ReturnType<typeof AppState.addEventListener>;
-    });
+    const addListener = jest
+      .spyOn(AppState, 'addEventListener')
+      .mockImplementation((_type, listener) => {
+        listeners.push(listener as (state: string) => void);
+        return { remove: () => undefined } as ReturnType<typeof AppState.addEventListener>;
+      });
     const { getByLabelText } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
     await fireEvent.press(getByLabelText('Remove'));
     await advance(400);

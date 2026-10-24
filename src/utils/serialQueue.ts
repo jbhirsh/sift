@@ -21,7 +21,9 @@ export interface SerialQueue {
  */
 export class QueueStallError extends Error {
   constructor(stallMs: number) {
-    super(`No answer after ${Math.round(stallMs / 1000)} s. It may still finish; try again in a moment.`);
+    super(
+      `No answer after ${Math.round(stallMs / 1000)} s. It may still finish; try again in a moment.`,
+    );
     this.name = 'QueueStallError';
   }
 }
@@ -32,31 +34,41 @@ export function createSerialQueue(stallMs: number, giveUpMs = stallMs * 4): Seri
   return {
     run<T>(job: () => Promise<T>): Promise<T> {
       let finished!: () => void;
-      const done = new Promise<void>((resolve) => { finished = resolve; });
+      const done = new Promise<void>((resolve) => {
+        finished = resolve;
+      });
       everything = Promise.all([everything, done]).then(() => undefined);
       // The stall time counts from when this job starts, not when it was
       // queued. Whichever comes first, the job settling or the stall
       // timeout, settles the caller's promise and lets the next job start.
-      const result = tail.then(() => new Promise<T>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new QueueStallError(stallMs)), stallMs);
-        const giveUp = setTimeout(finished, giveUpMs);
-        const settle = () => {
-          clearTimeout(timer);
-          clearTimeout(giveUp);
-          finished();
-        };
-        Promise.resolve().then(job).then(
-          (value) => {
-            settle();
-            resolve(value);
-          },
-          (err: unknown) => {
-            settle();
-            reject(err);
-          },
-        );
-      }));
-      tail = result.then(() => undefined, () => undefined);
+      const result = tail.then(
+        () =>
+          new Promise<T>((resolve, reject) => {
+            const timer = setTimeout(() => reject(new QueueStallError(stallMs)), stallMs);
+            const giveUp = setTimeout(finished, giveUpMs);
+            const settle = () => {
+              clearTimeout(timer);
+              clearTimeout(giveUp);
+              finished();
+            };
+            Promise.resolve()
+              .then(job)
+              .then(
+                (value) => {
+                  settle();
+                  resolve(value);
+                },
+                (err: unknown) => {
+                  settle();
+                  reject(err);
+                },
+              );
+          }),
+      );
+      tail = result.then(
+        () => undefined,
+        () => undefined,
+      );
       return result;
     },
     settled(): Promise<void> {

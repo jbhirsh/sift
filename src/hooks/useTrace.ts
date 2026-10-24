@@ -42,14 +42,21 @@ type TouchTraceProps = {
 };
 
 // What a touch phase does to the drawn marks of a PR GIF (TouchOverlay).
-const markPhase = { start: touchMarks.down, move: touchMarks.move, end: touchMarks.up, cancel: touchMarks.up };
-
-const touchHandler = (phase: keyof typeof markPhase): TouchHandler => (event) => {
-  const { pageX, pageY, timestamp } = event.nativeEvent;
-  // Moves would bury the trace; only the overlay wants them.
-  if (phase !== 'move') traceTouch(phase, pageX, pageY, timestamp);
-  if (showTouches) markPhase[phase](pageX, pageY, performance.now());
+const markPhase = {
+  start: touchMarks.down,
+  move: touchMarks.move,
+  end: touchMarks.up,
+  cancel: touchMarks.up,
 };
+
+const touchHandler =
+  (phase: keyof typeof markPhase): TouchHandler =>
+  (event) => {
+    const { pageX, pageY, timestamp } = event.nativeEvent;
+    // Moves would bury the trace; only the overlay wants them.
+    if (phase !== 'move') traceTouch(phase, pageX, pageY, timestamp);
+    if (showTouches) markPhase[phase](pageX, pageY, performance.now());
+  };
 
 /**
  * Capture handlers for the app's root view: every touch JavaScript sees, on
@@ -62,12 +69,12 @@ const touchHandler = (phase: keyof typeof markPhase): TouchHandler => (event) =>
  */
 export const touchTraceProps: TouchTraceProps = tracing
   ? {
-    onTouchStartCapture: touchHandler('start'),
-    // Only a GIF recording follows the finger (services/touchOverlay).
-    ...(showTouches && { onTouchMoveCapture: touchHandler('move') }),
-    onTouchEndCapture: touchHandler('end'),
-    onTouchCancelCapture: touchHandler('cancel'),
-  }
+      onTouchStartCapture: touchHandler('start'),
+      // Only a GIF recording follows the finger (services/touchOverlay).
+      ...(showTouches && { onTouchMoveCapture: touchHandler('move') }),
+      onTouchEndCapture: touchHandler('end'),
+      onTouchCancelCapture: touchHandler('cancel'),
+    }
   : {};
 
 /**

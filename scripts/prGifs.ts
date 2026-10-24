@@ -69,14 +69,21 @@ export interface Window {
  * with `showinfo` after it: the first frame, then each one that changed.
  */
 export function keptTimes(stderr: string): number[] {
-  return [...stderr.matchAll(/Parsed_showinfo\S*\s.*?pts_time:\s*([\d.]+)/g)].map((m) => Number(m[1]));
+  return [...stderr.matchAll(/Parsed_showinfo\S*\s.*?pts_time:\s*([\d.]+)/g)].map((m) =>
+    Number(m[1]),
+  );
 }
 
 /**
  * The part of the video worth keeping: from just before the first change
  * on screen to just after the last. Null when nothing ever changed.
  */
-export function activeWindow(times: number[], duration: number, lead = LEAD_S, tail = TAIL_S): Window | null {
+export function activeWindow(
+  times: number[],
+  duration: number,
+  lead = LEAD_S,
+  tail = TAIL_S,
+): Window | null {
   // The first kept frame is the opening still, not a change.
   const changes = times.slice(1);
   if (changes.length === 0) return null;
@@ -119,7 +126,11 @@ export function ringPixels(rgb: Uint8Array, tolerance = RING_TOLERANCE): number 
 }
 
 /** The stretches of the video where a touch shows, from each frame's ring count. */
-export function touchSpans(times: number[], counts: number[], minPixels = RING_MIN_PIXELS): Window[] {
+export function touchSpans(
+  times: number[],
+  counts: number[],
+  minPixels = RING_MIN_PIXELS,
+): Window[] {
   const spans: Window[] = [];
   times.forEach((t, i) => {
     if (counts[i] < minPixels) return;
@@ -140,7 +151,10 @@ export function keptStretches(spans: Window[], duration: number): Window[] | nul
   const kept: Window[] = [];
   spans.forEach((span, i) => {
     const after = i === spans.length - 1 ? END_HOLD_S : TOUCH_AFTER_S;
-    const next = { start: Math.max(0, span.start - TOUCH_LEAD_S), end: Math.min(duration, span.end + after) };
+    const next = {
+      start: Math.max(0, span.start - TOUCH_LEAD_S),
+      end: Math.min(duration, span.end + after),
+    };
     const last = kept[kept.length - 1];
     if (last && next.start - last.end < MIN_CUT_S) last.end = Math.max(last.end, next.end);
     else kept.push(next);
@@ -155,7 +169,9 @@ export function keptStretches(spans: Window[], duration: number): Window[] | nul
  * its last change and lose the still time after it.
  */
 export function cutFilter(stretches: Window[]): string {
-  const parts = stretches.map((w, i) => `[0:v]fps=30,trim=start=${w.start}:end=${w.end},setpts=PTS-STARTPTS[s${i}]`);
+  const parts = stretches.map(
+    (w, i) => `[0:v]fps=30,trim=start=${w.start}:end=${w.end},setpts=PTS-STARTPTS[s${i}]`,
+  );
   const inputs = stretches.map((_, i) => `[s${i}]`).join('');
   return `${parts.join(';')};${inputs}concat=n=${stretches.length}:v=1:a=0[cut]`;
 }
@@ -209,8 +225,10 @@ export function sideBySideFilter(
 export function sizeWarning(path: string, bytes: number): string | null {
   if (bytes <= MAX_GIF_BYTES) return null;
   const mb = (n: number) => (n / 1024 / 1024).toFixed(1);
-  return `${path} is ${mb(bytes)} MB, over the ${mb(MAX_GIF_BYTES)} MB a PR may show: ` +
-    'try a lower --fps, a narrower --width or a shorter scenario';
+  return (
+    `${path} is ${mb(bytes)} MB, over the ${mb(MAX_GIF_BYTES)} MB a PR may show: ` +
+    'try a lower --fps, a narrower --width or a shorter scenario'
+  );
 }
 
 export interface Scenario {
@@ -243,7 +261,8 @@ export function markdownTable(repo: string, sha: string, scenarios: Scenario[]):
   if (pairs.length > 0) {
     if (rows.length > 0) rows.push('');
     rows.push('| Scenario | Before (`main`) | After |', '|---|---|---|');
-    for (const s of pairs) rows.push(`| ${s.name} | ${img(s.before, 260)} | ${img(s.after, 260)} |`);
+    for (const s of pairs)
+      rows.push(`| ${s.name} | ${img(s.before, 260)} | ${img(s.after, 260)} |`);
   }
   return rows.join('\n');
 }
@@ -269,7 +288,8 @@ export function parseArgs(argv: string[]): CliOptions {
   };
   const number = (flag: string, value: string | undefined) => {
     const n = Number(value);
-    if (!value || !Number.isInteger(n) || n <= 0) throw new Error(`${flag} needs a whole number above 0`);
+    if (!value || !Number.isInteger(n) || n <= 0)
+      throw new Error(`${flag} needs a whole number above 0`);
     return n;
   };
   for (let i = 0; i < argv.length; i += 1) {

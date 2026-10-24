@@ -103,7 +103,11 @@ export function isRemovalRecord(value: unknown): value is RemovalRecord {
   const source = value.source;
   if (!isObject(source)) return false;
   if (source.type === 'library') return true;
-  return source.type === 'playlist' && isObject(source.playlist) && typeof source.playlist.id === 'string';
+  return (
+    source.type === 'playlist' &&
+    isObject(source.playlist) &&
+    typeof source.playlist.id === 'string'
+  );
 }
 
 /**

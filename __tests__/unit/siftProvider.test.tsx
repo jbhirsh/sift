@@ -14,16 +14,31 @@ jest.mock('@sentry/react-native', () => ({
 }));
 
 const mockTrackA: Track = {
-  id: '1', name: 'Track A', artist: 'Artist A', album: 'Album A',
-  duration: 200, playCount: 10, dateAdded: '2020-01-01T00:00:00.000Z',
+  id: '1',
+  name: 'Track A',
+  artist: 'Artist A',
+  album: 'Album A',
+  duration: 200,
+  playCount: 10,
+  dateAdded: '2020-01-01T00:00:00.000Z',
 };
 const mockTrackB: Track = {
-  id: '2', name: 'Track B', artist: 'Artist B', album: 'Album B',
-  duration: 180, playCount: 20, dateAdded: '2021-06-15T00:00:00.000Z',
+  id: '2',
+  name: 'Track B',
+  artist: 'Artist B',
+  album: 'Album B',
+  duration: 180,
+  playCount: 20,
+  dateAdded: '2021-06-15T00:00:00.000Z',
 };
 const mockTrackC: Track = {
-  id: '3', name: 'Track C', artist: 'Artist C', album: 'Album C',
-  duration: 240, playCount: 5, dateAdded: '2019-03-10T00:00:00.000Z',
+  id: '3',
+  name: 'Track C',
+  artist: 'Artist C',
+  album: 'Album C',
+  duration: 240,
+  playCount: 5,
+  dateAdded: '2019-03-10T00:00:00.000Z',
 };
 
 function TestConsumer() {
@@ -49,20 +64,30 @@ function TestConsumer() {
       <TouchableOpacity testID="reset-to-setup" onPress={ctx.resetToSetup} />
       <TouchableOpacity testID="flush-pending-save" onPress={ctx.flushPendingSave} />
       <Text testID="removalErrorsCount">{ctx.state.removalErrors.length}</Text>
-      <TouchableOpacity testID="add-removal-error" onPress={() => ctx.dispatch({ type: 'ADD_REMOVAL_ERROR', error: 'Could not remove Track B' })} />
+      <TouchableOpacity
+        testID="add-removal-error"
+        onPress={() =>
+          ctx.dispatch({ type: 'ADD_REMOVAL_ERROR', error: 'Could not remove Track B' })
+        }
+      />
       <TouchableOpacity
         testID="resume-with-pending"
-        onPress={() => ctx.dispatch({
-          type: 'RESUME_SESSION',
-          session: {
-            ...ctx.state,
-            tracks: [mockTrackA, mockTrackB],
-            cursor: 1,
-            removalErrors: ['Could not remove Track B'],
-          },
-        })}
+        onPress={() =>
+          ctx.dispatch({
+            type: 'RESUME_SESSION',
+            session: {
+              ...ctx.state,
+              tracks: [mockTrackA, mockTrackB],
+              cursor: 1,
+              removalErrors: ['Could not remove Track B'],
+            },
+          })
+        }
       />
-      <TouchableOpacity testID="set-phase-setup" onPress={() => ctx.dispatch({ type: 'SET_PHASE', phase: 'setup' })} />
+      <TouchableOpacity
+        testID="set-phase-setup"
+        onPress={() => ctx.dispatch({ type: 'SET_PHASE', phase: 'setup' })}
+      />
     </>
   );
 }
@@ -71,7 +96,7 @@ function renderWithProvider(initialTracks?: Track[]) {
   return render(
     <SiftProvider initialTracks={initialTracks}>
       <TestConsumer />
-    </SiftProvider>
+    </SiftProvider>,
   );
 }
 
@@ -159,7 +184,9 @@ describe('SiftProvider', () => {
 
   test('useSift throws when used outside SiftProvider', async () => {
     const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
-    await expect(render(<TestConsumer />)).rejects.toThrow('useSift must be used within a SiftProvider');
+    await expect(render(<TestConsumer />)).rejects.toThrow(
+      'useSift must be used within a SiftProvider',
+    );
     consoleError.mockRestore();
   });
 

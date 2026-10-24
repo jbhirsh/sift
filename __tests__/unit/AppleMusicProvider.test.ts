@@ -66,8 +66,12 @@ const mockNative = {
   }),
   loadPlaylistsPage: jest.fn(async (offset: number, limit: number) =>
     [...fake.playlists.entries()].slice(offset, offset + limit).map(([id, p]) => ({
-      id, name: p.name, trackCount: p.items.length, artworkURL: id === 'pl-1' ? 'https://example.com/pl.jpg' : null,
-    }))),
+      id,
+      name: p.name,
+      trackCount: p.items.length,
+      artworkURL: id === 'pl-1' ? 'https://example.com/pl.jpg' : null,
+    })),
+  ),
   loadPlaylistItems: jest.fn(async (playlistID: string) => {
     const playlist = fake.playlists.get(playlistID);
     if (!playlist) throw new Error('No tracks found for the given IDs.');
@@ -77,12 +81,14 @@ const mockNative = {
       return entry;
     });
   }),
-  lookupLibrarySongs: jest.fn(async (ids: string[]) => ids.map((id) => {
-    if (fake.failLibraryLookups.has(id)) return { id, song: null, failed: true };
-    const s = fake.library.get(id) ?? null;
-    if (s) fake.songCache.set(id, s);
-    return { id, song: s, failed: false };
-  })),
+  lookupLibrarySongs: jest.fn(async (ids: string[]) =>
+    ids.map((id) => {
+      if (fake.failLibraryLookups.has(id)) return { id, song: null, failed: true };
+      const s = fake.library.get(id) ?? null;
+      if (s) fake.songCache.set(id, s);
+      return { id, song: s, failed: false };
+    }),
+  ),
   lookupCatalogSongs: jest.fn(async (ids: string[]) => {
     if (fake.catalogDown) throw new Error('offline');
     return ids.flatMap((id) => {
@@ -100,7 +106,8 @@ const mockNative = {
     return true;
   }),
   cachedKinds: jest.fn((ids: string[]) =>
-    ids.map((id) => (fake.songCache.has(id) ? 'song' : fake.trackCache.has(id) ? 'track' : null))),
+    ids.map((id) => (fake.songCache.has(id) ? 'song' : fake.trackCache.has(id) ? 'track' : null)),
+  ),
   play: jest.fn().mockResolvedValue(undefined),
   pause: jest.fn().mockResolvedValue(undefined),
   resume: jest.fn().mockResolvedValue(undefined),
@@ -112,7 +119,8 @@ const mockNative = {
     return id;
   }),
   findPlaylistsByName: jest.fn(async (name: string, _recentSeconds: number, _pageSize: number) =>
-    [...fake.playlists.entries()].filter(([, p]) => p.name === name).map(([id]) => id)),
+    [...fake.playlists.entries()].filter(([, p]) => p.name === name).map(([id]) => id),
+  ),
   addEachToPlaylist: jest.fn(async (playlistID: string, ids: string[]): Promise<AddResult[]> => {
     const playlist = fake.playlists.get(playlistID);
     if (!playlist) throw new Error('No tracks found for the given IDs.');
@@ -124,10 +132,12 @@ const mockNative = {
     });
   }),
   removeFromPlaylist: jest.fn().mockResolvedValue(undefined),
-  addEachToLibrary: jest.fn(async (ids: string[]): Promise<AddResult[]> => ids.map((id) => {
-    if (!fake.songCache.has(id)) return 'unresolved';
-    return fake.refuseAdds.has(id) ? 'failed' : 'added';
-  })),
+  addEachToLibrary: jest.fn(async (ids: string[]): Promise<AddResult[]> =>
+    ids.map((id) => {
+      if (!fake.songCache.has(id)) return 'unresolved';
+      return fake.refuseAdds.has(id) ? 'failed' : 'added';
+    }),
+  ),
   previewInfo: jest.fn(),
   catalogPreviewForISRC: jest.fn(),
   searchCatalogSongs: jest.fn(),
@@ -151,7 +161,11 @@ afterAll(() => {
 });
 
 import * as Sentry from '@sentry/react-native';
-import { AppleMusicProvider, RECENT_PLAYLIST_SECONDS, WRITE_STALL_MS } from '../../src/services/AppleMusicProvider';
+import {
+  AppleMusicProvider,
+  RECENT_PLAYLIST_SECONDS,
+  WRITE_STALL_MS,
+} from '../../src/services/AppleMusicProvider';
 import { AddShortfallError, PLAYLISTS_PAGE_SIZE } from '../../src/utils/musicKit';
 import { QueueStallError } from '../../src/utils/serialQueue';
 
@@ -199,10 +213,19 @@ describe('AppleMusicProvider', () => {
       fake.library.set('s1', rawSong('s1', { artworkURL: 'musicKit://x', album: null }));
       const tracks = await provider.loadLibrary();
       expect(tracks).toHaveLength(501);
-      expect(mockNative.loadLibraryPage.mock.calls).toEqual([[0, 500], [500, 500]]);
+      expect(mockNative.loadLibraryPage.mock.calls).toEqual([
+        [0, 500],
+        [500, 500],
+      ]);
       expect(tracks[0]).toEqual({
-        id: 's0', name: 'Song s0', artist: 'Artist', album: 'Album', duration: 200,
-        playCount: 10, dateAdded: '2020-01-01T00:00:00Z', artworkURL: 'https://example.com/s0.jpg',
+        id: 's0',
+        name: 'Song s0',
+        artist: 'Artist',
+        album: 'Album',
+        duration: 200,
+        playCount: 10,
+        dateAdded: '2020-01-01T00:00:00Z',
+        artworkURL: 'https://example.com/s0.jpg',
       });
       expect(tracks[1]).toMatchObject({ album: '', artworkURL: undefined });
     });
@@ -227,11 +250,13 @@ describe('AppleMusicProvider', () => {
       ]);
       expect(mockNative.lookupLibrarySongs).toHaveBeenCalledWith(['lib', 'entry']);
       // One entry had no library song: breadcrumbed for the sorts.
-      expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(expect.objectContaining({
-        category: 'music-provider',
-        level: 'warning',
-        message: expect.stringContaining('1 of 2 tracks have no library song'),
-      }));
+      expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+        expect.objectContaining({
+          category: 'music-provider',
+          level: 'warning',
+          message: expect.stringContaining('1 of 2 tracks have no library song'),
+        }),
+      );
     });
 
     test('loadPlaylistTracks looks songs up 100 at a time, and a failed lookup keeps the entry', async () => {
@@ -240,7 +265,9 @@ describe('AppleMusicProvider', () => {
       ids.forEach((id) => fake.library.set(id, rawSong(id)));
       fake.failLibraryLookups.add('t3');
       const tracks = await provider.loadPlaylistTracks('pl');
-      expect(mockNative.lookupLibrarySongs.mock.calls.map(([batch]) => batch.length)).toEqual([100, 50]);
+      expect(mockNative.lookupLibrarySongs.mock.calls.map(([batch]) => batch.length)).toEqual([
+        100, 50,
+      ]);
       expect(tracks[3].playCount).toBe(0);
       expect(tracks[4].playCount).toBe(10);
     });
@@ -266,7 +293,7 @@ describe('AppleMusicProvider', () => {
       expect(mockNative.lookupCatalogSongs).toHaveBeenCalledWith(['cat', 'gone']);
     });
 
-    test('cached and repeated ids aren\'t looked up again', async () => {
+    test("cached and repeated ids aren't looked up again", async () => {
       fake.songCache.set('cached', rawSong('cached'));
       fake.library.set('a', rawSong('a'));
       await provider.warmSongCache(['cached', 'a', 'a']);
@@ -283,8 +310,12 @@ describe('AppleMusicProvider', () => {
     test('lookups go out 100 ids at a time', async () => {
       const ids = Array.from({ length: 250 }, (_, i) => `x${i}`);
       await provider.warmSongCache(ids);
-      expect(mockNative.lookupLibrarySongs.mock.calls.map(([b]) => b.length)).toEqual([100, 100, 50]);
-      expect(mockNative.lookupCatalogSongs.mock.calls.map(([b]) => b.length)).toEqual([100, 100, 50]);
+      expect(mockNative.lookupLibrarySongs.mock.calls.map(([b]) => b.length)).toEqual([
+        100, 100, 50,
+      ]);
+      expect(mockNative.lookupCatalogSongs.mock.calls.map(([b]) => b.length)).toEqual([
+        100, 100, 50,
+      ]);
     });
 
     test('a playlist sift reloads its playlist, bringing back entries no lookup finds (#54)', async () => {
@@ -300,11 +331,14 @@ describe('AppleMusicProvider', () => {
     test('a playlist that is gone is breadcrumbed, and the lookups still run', async () => {
       fake.library.set('lib', rawSong('lib'));
       await expect(provider.warmSongCache(['lib'], 'gone')).resolves.toBe(1);
-      expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(expect.objectContaining({
-        category: 'music-provider',
-        level: 'warning',
-        message: 'warmSongCache: reloading the playlist failed (No tracks found for the given IDs.)',
-      }));
+      expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+        expect.objectContaining({
+          category: 'music-provider',
+          level: 'warning',
+          message:
+            'warmSongCache: reloading the playlist failed (No tracks found for the given IDs.)',
+        }),
+      );
     });
 
     test('a failed library lookup falls through to the catalog', async () => {
@@ -315,7 +349,9 @@ describe('AppleMusicProvider', () => {
     });
 
     test('a rejected library lookup (not authorized) reaches the caller', async () => {
-      mockNative.lookupLibrarySongs.mockRejectedValueOnce(new Error('Music library access not authorized.'));
+      mockNative.lookupLibrarySongs.mockRejectedValueOnce(
+        new Error('Music library access not authorized.'),
+      );
       await expect(provider.warmSongCache(['x'])).rejects.toThrow('not authorized');
     });
 
@@ -333,31 +369,59 @@ describe('AppleMusicProvider', () => {
 
     // No caller passes metadata yet; the pairing is ready for one that does
     // (an EAS Update away), so exercise it directly.
-    type Resolver = { resolveIntoCaches(ids: string[], known?: Map<string, unknown>): Promise<void> };
+    type Resolver = {
+      resolveIntoCaches(ids: string[], known?: Map<string, unknown>): Promise<void>;
+    };
     const resolve = (ids: string[], known: Map<string, unknown>) =>
       (provider as unknown as Resolver).resolveIntoCaches(ids, known);
 
     test('with matching metadata, a catalog answer under another id is filed under the requested one', async () => {
       fake.catalogAliases.set('req', 'canon');
-      fake.catalog.set('canon', rawSong('canon', { name: 'Peaches', artist: 'Justin Bieber', duration: 198 }));
-      await resolve(['req'], new Map([['req', { id: 'req', title: 'Peaches', artist: 'Justin Bieber', duration: 198.5 }]]));
+      fake.catalog.set(
+        'canon',
+        rawSong('canon', { name: 'Peaches', artist: 'Justin Bieber', duration: 198 }),
+      );
+      await resolve(
+        ['req'],
+        new Map([
+          ['req', { id: 'req', title: 'Peaches', artist: 'Justin Bieber', duration: 198.5 }],
+        ]),
+      );
       expect(mockNative.aliasCachedItem).toHaveBeenCalledWith('canon', 'req');
       expect(mockNative.cachedKinds(['req'])).toEqual(['song']);
     });
 
-    test('metadata that doesn\'t match, or belongs to another id, pairs nothing', async () => {
+    test("metadata that doesn't match, or belongs to another id, pairs nothing", async () => {
       fake.catalogAliases.set('req', 'canon');
-      fake.catalog.set('canon', rawSong('canon', { name: 'Peaches', artist: 'Justin Bieber', duration: 198 }));
-      await resolve(['req'], new Map([['req', { id: 'req', title: 'Other', artist: 'Justin Bieber', duration: 198 }]]));
-      await resolve(['req'], new Map([['zzz', { id: 'zzz', title: 'Peaches', artist: 'Justin Bieber', duration: 198 }]]));
+      fake.catalog.set(
+        'canon',
+        rawSong('canon', { name: 'Peaches', artist: 'Justin Bieber', duration: 198 }),
+      );
+      await resolve(
+        ['req'],
+        new Map([['req', { id: 'req', title: 'Other', artist: 'Justin Bieber', duration: 198 }]]),
+      );
+      await resolve(
+        ['req'],
+        new Map([['zzz', { id: 'zzz', title: 'Peaches', artist: 'Justin Bieber', duration: 198 }]]),
+      );
       expect(mockNative.aliasCachedItem).not.toHaveBeenCalled();
     });
 
     test('two unanswered ids in one batch pair nothing, even with metadata', async () => {
       fake.catalogAliases.set('r1', 'canon');
-      fake.catalog.set('canon', rawSong('canon', { name: 'Peaches', artist: 'Justin Bieber', duration: 198 }));
+      fake.catalog.set(
+        'canon',
+        rawSong('canon', { name: 'Peaches', artist: 'Justin Bieber', duration: 198 }),
+      );
       const meta = { title: 'Peaches', artist: 'Justin Bieber', duration: 198 };
-      await resolve(['r1', 'r2'], new Map([['r1', { id: 'r1', ...meta }], ['r2', { id: 'r2', ...meta }]]));
+      await resolve(
+        ['r1', 'r2'],
+        new Map([
+          ['r1', { id: 'r1', ...meta }],
+          ['r2', { id: 'r2', ...meta }],
+        ]),
+      );
       expect(mockNative.aliasCachedItem).not.toHaveBeenCalled();
     });
   });
@@ -376,7 +440,11 @@ describe('AppleMusicProvider', () => {
       fake.playlists.set('s1', { name: 'Mix - Sifted', items: [] });
       fake.playlists.set('other', { name: 'Mix', items: [] });
       await expect(provider.findPlaylists('Mix - Sifted')).resolves.toEqual(['s1']);
-      expect(mockNative.findPlaylistsByName).toHaveBeenCalledWith('Mix - Sifted', RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE);
+      expect(mockNative.findPlaylistsByName).toHaveBeenCalledWith(
+        'Mix - Sifted',
+        RECENT_PLAYLIST_SECONDS,
+        PLAYLISTS_PAGE_SIZE,
+      );
     });
   });
 
@@ -407,7 +475,12 @@ describe('AppleMusicProvider', () => {
       jest.useFakeTimers();
       try {
         let finish!: (count: number) => void;
-        mockNative.removeFromPlaylist.mockImplementationOnce(() => new Promise<number>((res) => { finish = res; }));
+        mockNative.removeFromPlaylist.mockImplementationOnce(
+          () =>
+            new Promise<number>((res) => {
+              finish = res;
+            }),
+        );
         const hung = provider.removeFromPlaylist('pl', ['a']);
         hung.catch(() => undefined);
         const settled = jest.fn();
@@ -441,7 +514,13 @@ describe('AppleMusicProvider', () => {
       const shortfall = provider.addToPlaylist('pl', ['a', 'gone', 'b']);
       await expect(shortfall).rejects.toThrow('2 of 3 tracks could not be added to the playlist');
       await expect(shortfall).rejects.toBeInstanceOf(AddShortfallError);
-      await expect(shortfall).rejects.toMatchObject({ added: 1, unresolved: 1, failed: 1, requested: 3, name: 'AddShortfallError' });
+      await expect(shortfall).rejects.toMatchObject({
+        added: 1,
+        unresolved: 1,
+        failed: 1,
+        requested: 3,
+        name: 'AddShortfallError',
+      });
     });
 
     test('a missing playlist fails', async () => {
@@ -455,13 +534,15 @@ describe('AppleMusicProvider', () => {
     // without the removed entries. The fake does the same, with a pause
     // between the two, so overlapping removals would undo each other.
     beforeEach(() => {
-      mockNative.removeFromPlaylist.mockImplementation(async (playlistID: string, ids: string[]) => {
-        const playlist = fake.playlists.get(playlistID);
-        if (!playlist) throw new Error('No tracks found for the given IDs.');
-        const remaining = playlist.items.filter((id) => !ids.includes(id));
-        await new Promise((resolve) => setTimeout(resolve, 5));
-        playlist.items = remaining;
-      });
+      mockNative.removeFromPlaylist.mockImplementation(
+        async (playlistID: string, ids: string[]) => {
+          const playlist = fake.playlists.get(playlistID);
+          if (!playlist) throw new Error('No tracks found for the given IDs.');
+          const remaining = playlist.items.filter((id) => !ids.includes(id));
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          playlist.items = remaining;
+        },
+      );
     });
     afterEach(() => mockNative.removeFromPlaylist.mockReset().mockResolvedValue(undefined));
 
@@ -478,7 +559,10 @@ describe('AppleMusicProvider', () => {
     test('a restore made while a removal is running lands after it', async () => {
       fake.playlists.set('pl', { name: 'Mix', items: ['a', 'b'] });
       fake.library.set('a', rawSong('a'));
-      await Promise.all([provider.removeFromPlaylist('pl', ['a']), provider.addToPlaylist('pl', ['a'])]);
+      await Promise.all([
+        provider.removeFromPlaylist('pl', ['a']),
+        provider.addToPlaylist('pl', ['a']),
+      ]);
       expect(fake.playlists.get('pl')?.items).toEqual(['b', 'a']);
     });
 
@@ -490,7 +574,7 @@ describe('AppleMusicProvider', () => {
       expect(fake.playlists.get('new-1')).toEqual({ name: 'Sift — Removed', items: ['a', 'b'] });
     });
 
-    test('a failed write doesn\'t hold up the next', async () => {
+    test("a failed write doesn't hold up the next", async () => {
       fake.playlists.set('pl', { name: 'Mix', items: ['a'] });
       fake.library.set('a', rawSong('a'));
       const failing = provider.addToPlaylist('nope', ['a']);
@@ -507,7 +591,10 @@ describe('AppleMusicProvider', () => {
         mockNative.removeFromPlaylist.mockImplementationOnce(() => new Promise<void>(() => {}));
         const hung = provider.removeFromPlaylist('pl', ['a']);
         const outcome = jest.fn();
-        hung.then(() => outcome('resolved'), (err: unknown) => outcome(err));
+        hung.then(
+          () => outcome('resolved'),
+          (err: unknown) => outcome(err),
+        );
         fake.library.set('a', rawSong('a'));
         const next = provider.addToPlaylist('pl', ['a']);
         await jest.advanceTimersByTimeAsync(WRITE_STALL_MS - 1);
@@ -535,7 +622,11 @@ describe('AppleMusicProvider', () => {
         return ids.map(() => 'added' as const);
       });
       const removal = provider.removeFromPlaylist('pl', ['a']).then(() => order.push('remove'));
-      await Promise.all([removal, provider.createPlaylist('Mix - Sifted'), provider.addToLibrary(['a'])]);
+      await Promise.all([
+        removal,
+        provider.createPlaylist('Mix - Sifted'),
+        provider.addToLibrary(['a']),
+      ]);
       expect(order).toEqual(['remove', 'create', 'library']);
     });
   });
@@ -545,7 +636,11 @@ describe('AppleMusicProvider', () => {
       fake.library.set('a', rawSong('a'));
       await provider.removeFromLibrary(['a']);
       // One created here counts only briefly: the user may delete it in Music.
-      expect(mockNative.findPlaylistsByName).toHaveBeenCalledWith('Sift — Removed', RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE);
+      expect(mockNative.findPlaylistsByName).toHaveBeenCalledWith(
+        'Sift — Removed',
+        RECENT_PLAYLIST_SECONDS,
+        PLAYLISTS_PAGE_SIZE,
+      );
       expect(RECENT_PLAYLIST_SECONDS).toBe(60);
       expect(mockNative.createEmptyPlaylist).toHaveBeenCalledWith('Sift — Removed');
       expect(fake.playlists.get('new-1')).toEqual({ name: 'Sift — Removed', items: ['a'] });
@@ -573,7 +668,9 @@ describe('AppleMusicProvider', () => {
     });
 
     test('no library songs at all is an error, and nothing is created', async () => {
-      await expect(provider.removeFromLibrary(['gone'])).rejects.toThrow('No tracks found for the given IDs.');
+      await expect(provider.removeFromLibrary(['gone'])).rejects.toThrow(
+        'No tracks found for the given IDs.',
+      );
       expect(mockNative.findPlaylistsByName).not.toHaveBeenCalled();
     });
 
@@ -587,7 +684,9 @@ describe('AppleMusicProvider', () => {
     test('a failed lookup fails the Remove before anything moves', async () => {
       fake.library.set('a', rawSong('a'));
       fake.failLibraryLookups.add('b');
-      await expect(provider.removeFromLibrary(['a', 'b'])).rejects.toThrow('Library lookup failed for 1 of 2 songs');
+      await expect(provider.removeFromLibrary(['a', 'b'])).rejects.toThrow(
+        'Library lookup failed for 1 of 2 songs',
+      );
       expect(mockNative.addEachToPlaylist).not.toHaveBeenCalled();
     });
 
@@ -629,8 +728,12 @@ describe('AppleMusicProvider', () => {
       fake.playlists.set('ours', { name: 'Sift — Removed', items: [] });
       fake.library.set('a', rawSong('a'));
       fake.refuseAdds.add('a');
-      await expect(provider.removeFromLibrary(['a'])).rejects.toThrow('1 of 1 songs could not be moved');
-      await expect(provider.removeFromLibrary(['a'])).rejects.toThrow('1 of 1 songs could not be moved');
+      await expect(provider.removeFromLibrary(['a'])).rejects.toThrow(
+        '1 of 1 songs could not be moved',
+      );
+      await expect(provider.removeFromLibrary(['a'])).rejects.toThrow(
+        '1 of 1 songs could not be moved',
+      );
       expect(mockNative.createEmptyPlaylist).toHaveBeenCalledTimes(1);
     });
 
@@ -645,7 +748,10 @@ describe('AppleMusicProvider', () => {
   });
 
   describe('removalLanded (#151)', () => {
-    const playlist = { type: 'playlist' as const, playlist: { id: 'pl', name: 'Mix', trackCount: 2 } };
+    const playlist = {
+      type: 'playlist' as const,
+      playlist: { id: 'pl', name: 'Mix', trackCount: 2 },
+    };
 
     test('a library song landed once it is in "Sift — Removed"', async () => {
       fake.playlists.set('other', { name: 'Gym', items: ['a'] });
@@ -663,13 +769,17 @@ describe('AppleMusicProvider', () => {
       await expect(provider.removalLanded({ type: 'library' }, 'a')).resolves.toBe(true);
     });
 
-    test("a playlist sift's removal also landed once the song is in \"Sift — Removed\", wherever the playlist stands", async () => {
+    test('a playlist sift\'s removal also landed once the song is in "Sift — Removed", wherever the playlist stands', async () => {
       // Sift never edits the user's playlist: it stays as it was.
       fake.playlists.set('pl', { name: 'Mix', items: ['a', 'b'] });
       await expect(provider.removalLanded(playlist, 'a')).resolves.toBe(false);
       fake.playlists.set('removed', { name: 'Sift — Removed', items: ['a'] });
       await expect(provider.removalLanded(playlist, 'a')).resolves.toBe(true);
-      expect(mockNative.findPlaylistsByName).toHaveBeenLastCalledWith('Sift — Removed', RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE);
+      expect(mockNative.findPlaylistsByName).toHaveBeenLastCalledWith(
+        'Sift — Removed',
+        RECENT_PLAYLIST_SECONDS,
+        PLAYLISTS_PAGE_SIZE,
+      );
       expect(mockNative.loadPlaylistItems).not.toHaveBeenCalledWith('pl');
     });
   });
@@ -677,14 +787,26 @@ describe('AppleMusicProvider', () => {
   describe('deletedFromLibrary (#183)', () => {
     // A song as Sift collected it: a library song.
     const collected = (id: string) => ({
-      id, name: `Song ${id}`, artist: 'Artist', album: 'Album', duration: 200, playCount: 10, dateAdded: '2020-01-01T00:00:00Z',
+      id,
+      name: `Song ${id}`,
+      artist: 'Artist',
+      album: 'Album',
+      duration: 200,
+      playCount: 10,
+      dateAdded: '2020-01-01T00:00:00Z',
     });
 
     test('a song gone from "Sift — Removed" and from the library was deleted', async () => {
       fake.playlists.set('removed', { name: 'Sift — Removed', items: ['kept-there'] });
       fake.library.set('kept-there', rawSong('kept-there'));
-      await expect(provider.deletedFromLibrary([collected('gone'), collected('kept-there')])).resolves.toEqual(['gone']);
-      expect(mockNative.findPlaylistsByName).toHaveBeenLastCalledWith('Sift — Removed', RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE);
+      await expect(
+        provider.deletedFromLibrary([collected('gone'), collected('kept-there')]),
+      ).resolves.toEqual(['gone']);
+      expect(mockNative.findPlaylistsByName).toHaveBeenLastCalledWith(
+        'Sift — Removed',
+        RECENT_PLAYLIST_SECONDS,
+        PLAYLISTS_PAGE_SIZE,
+      );
       // One still in the playlist isn't looked up at all.
       expect(mockNative.lookupLibrarySongs).toHaveBeenCalledWith(['gone']);
     });
@@ -697,7 +819,9 @@ describe('AppleMusicProvider', () => {
 
     test('still in "Sift — Removed" under another id (the same song) is not deleted', async () => {
       fake.playlists.set('removed', { name: 'Sift — Removed', items: ['i.a'] });
-      await expect(provider.deletedFromLibrary([{ ...collected('a'), name: 'Song i.a' }])).resolves.toEqual([]);
+      await expect(
+        provider.deletedFromLibrary([{ ...collected('a'), name: 'Song i.a' }]),
+      ).resolves.toEqual([]);
       expect(mockNative.lookupLibrarySongs).not.toHaveBeenCalled();
     });
 
@@ -712,7 +836,9 @@ describe('AppleMusicProvider', () => {
       const deleted = await provider.deletedFromLibrary(many);
       expect(deleted).toHaveLength(149);
       expect(deleted).not.toContain('s3');
-      expect(mockNative.lookupLibrarySongs.mock.calls.map(([batch]) => batch.length)).toEqual([100, 50]);
+      expect(mockNative.lookupLibrarySongs.mock.calls.map(([batch]) => batch.length)).toEqual([
+        100, 50,
+      ]);
     });
 
     test('nothing to look up: nothing asked', async () => {
@@ -726,7 +852,11 @@ describe('AppleMusicProvider', () => {
       fake.playlists.set('removed', { name: 'Sift — Removed', items: ['a', 'b'] });
       mockNative.removeFromPlaylist.mockResolvedValueOnce(1);
       await expect(provider.restoreRemoved(['a'])).resolves.toBe(1);
-      expect(mockNative.findPlaylistsByName).toHaveBeenCalledWith('Sift — Removed', RECENT_PLAYLIST_SECONDS, PLAYLISTS_PAGE_SIZE);
+      expect(mockNative.findPlaylistsByName).toHaveBeenCalledWith(
+        'Sift — Removed',
+        RECENT_PLAYLIST_SECONDS,
+        PLAYLISTS_PAGE_SIZE,
+      );
       expect(mockNative.removeFromPlaylist).toHaveBeenCalledWith('removed', ['a']);
     });
 
@@ -739,14 +869,16 @@ describe('AppleMusicProvider', () => {
       expect(mockNative.removeFromPlaylist).toHaveBeenCalledWith('removed-2', ['a']);
     });
 
-    test('one Sift can\'t edit (the user made it) is skipped when another gave the song back', async () => {
+    test("one Sift can't edit (the user made it) is skipped when another gave the song back", async () => {
       fake.playlists.set('mine', { name: 'Sift — Removed', items: ['a'] });
       fake.playlists.set('removed', { name: 'Sift — Removed', items: ['a'] });
-      mockNative.removeFromPlaylist.mockRejectedValueOnce(new Error('not editable')).mockResolvedValueOnce(1);
+      mockNative.removeFromPlaylist
+        .mockRejectedValueOnce(new Error('not editable'))
+        .mockResolvedValueOnce(1);
       await expect(provider.restoreRemoved(['a'])).resolves.toBe(1);
     });
 
-    test('fails when nothing came out and one couldn\'t be edited', async () => {
+    test("fails when nothing came out and one couldn't be edited", async () => {
       fake.playlists.set('mine', { name: 'Sift — Removed', items: ['a'] });
       mockNative.removeFromPlaylist.mockRejectedValueOnce(new Error('not editable'));
       await expect(provider.restoreRemoved(['a'])).rejects.toThrow('not editable');
@@ -783,20 +915,30 @@ describe('AppleMusicProvider', () => {
     test('a song MusicKit refuses fails the call', async () => {
       fake.library.set('a', rawSong('a'));
       fake.refuseAdds.add('a');
-      await expect(provider.addToLibrary(['a'])).rejects.toThrow('1 of 1 tracks could not be added to the library');
+      await expect(provider.addToLibrary(['a'])).rejects.toThrow(
+        '1 of 1 tracks could not be added to the library',
+      );
     });
 
     test('a failed lookup fails the call', async () => {
       fake.failLibraryLookups.add('a');
-      await expect(provider.addToLibrary(['a'])).rejects.toThrow('Library lookup failed for 1 of 1 songs');
+      await expect(provider.addToLibrary(['a'])).rejects.toThrow(
+        'Library lookup failed for 1 of 1 songs',
+      );
       expect(mockNative.addEachToLibrary).not.toHaveBeenCalled();
     });
   });
 
   describe('previewOffset ("Start at chorus")', () => {
-    const info = { previewURL: null, isrc: null, title: 'Peaches', artist: 'Justin Bieber', duration: 198 };
+    const info = {
+      previewURL: null,
+      isrc: null,
+      title: 'Peaches',
+      artist: 'Justin Bieber',
+      duration: 198,
+    };
 
-    test('the song\'s own preview', async () => {
+    test("the song's own preview", async () => {
       mockNative.previewInfo.mockResolvedValueOnce({ ...info, previewURL: 'own.m4a' });
       mockNative.shazamOffset.mockResolvedValueOnce(42);
       await expect(provider.previewOffset('t')).resolves.toBe(42);
@@ -804,7 +946,7 @@ describe('AppleMusicProvider', () => {
       expect(mockNative.catalogPreviewForISRC).not.toHaveBeenCalled();
     });
 
-    test('else the catalog\'s by ISRC', async () => {
+    test("else the catalog's by ISRC", async () => {
       mockNative.previewInfo.mockResolvedValueOnce({ ...info, isrc: 'US123' });
       mockNative.catalogPreviewForISRC.mockResolvedValueOnce('isrc.m4a');
       mockNative.shazamOffset.mockResolvedValueOnce(30);
@@ -825,8 +967,20 @@ describe('AppleMusicProvider', () => {
       mockNative.previewInfo.mockResolvedValueOnce({ ...info, isrc: 'US123' });
       mockNative.catalogPreviewForISRC.mockResolvedValueOnce(null);
       mockNative.searchCatalogSongs.mockResolvedValueOnce([
-        { id: 'h1', title: 'Peaches', artist: 'Justin Bieber', duration: 205, previewURL: 'far.m4a' },
-        { id: 'h2', title: 'Peaches', artist: 'Justin Bieber', duration: 199, previewURL: 'near.m4a' },
+        {
+          id: 'h1',
+          title: 'Peaches',
+          artist: 'Justin Bieber',
+          duration: 205,
+          previewURL: 'far.m4a',
+        },
+        {
+          id: 'h2',
+          title: 'Peaches',
+          artist: 'Justin Bieber',
+          duration: 199,
+          previewURL: 'near.m4a',
+        },
       ]);
       mockNative.shazamOffset.mockResolvedValueOnce(12);
       await expect(provider.previewOffset('t')).resolves.toBe(12);
@@ -837,7 +991,13 @@ describe('AppleMusicProvider', () => {
     test('no close hit, or a hit without a preview: no hint', async () => {
       mockNative.previewInfo.mockResolvedValue(info);
       mockNative.searchCatalogSongs.mockResolvedValueOnce([
-        { id: 'h', title: 'Peaches', artist: 'Justin Bieber', duration: 260, previewURL: 'live.m4a' },
+        {
+          id: 'h',
+          title: 'Peaches',
+          artist: 'Justin Bieber',
+          duration: 260,
+          previewURL: 'live.m4a',
+        },
       ]);
       await expect(provider.previewOffset('t')).resolves.toBeNull();
       mockNative.searchCatalogSongs.mockResolvedValueOnce([

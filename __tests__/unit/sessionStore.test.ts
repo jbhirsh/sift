@@ -56,7 +56,12 @@ beforeEach(() => {
   mockSetItem = AsyncStorage.setItem;
   mockRemoveItem = AsyncStorage.removeItem;
   Sentry = require('@sentry/react-native');
-  ({ saveSession, loadSession, clearSession, hasSession } = require('../../src/services/SessionStore'));
+  ({
+    saveSession,
+    loadSession,
+    clearSession,
+    hasSession,
+  } = require('../../src/services/SessionStore'));
 });
 
 describe('saveSession', () => {
@@ -72,11 +77,19 @@ describe('saveSession', () => {
     expect(tracksKey).toBe('sift_session_v2_tracks_a');
     expect(JSON.parse(tracksJson).tracks).toEqual(sampleSession.tracks);
     expect(stateKey).toBe('sift_session_v2');
-    expect(JSON.parse(stateJson)).toMatchObject({ v: 2, tracksSlot: 'a', cursor: 0, keptIds: [], sortOrder: 'least-played' });
+    expect(JSON.parse(stateJson)).toMatchObject({
+      v: 2,
+      tracksSlot: 'a',
+      cursor: 0,
+      keptIds: [],
+      sortOrder: 'least-played',
+    });
     expect(stateJson).not.toContain('Test Song');
     // Only after the new record is down.
     expect(mockRemoveItem).toHaveBeenCalledWith('sift_session');
-    expect(mockSetItem.mock.invocationCallOrder[1]).toBeLessThan(mockRemoveItem.mock.invocationCallOrder[0]);
+    expect(mockSetItem.mock.invocationCallOrder[1]).toBeLessThan(
+      mockRemoveItem.mock.invocationCallOrder[0],
+    );
 
     // The next decision writes only the record.
     mockSetItem.mockClear();
@@ -127,7 +140,10 @@ describe('clearSession', () => {
     await clearSession();
 
     expect(mockRemoveItem.mock.calls.map(([key]) => key)).toEqual([
-      'sift_session_v2', 'sift_session_v2_tracks_a', 'sift_session_v2_tracks_b', 'sift_session',
+      'sift_session_v2',
+      'sift_session_v2_tracks_a',
+      'sift_session_v2_tracks_b',
+      'sift_session',
     ]);
   });
 });
@@ -226,7 +242,6 @@ describe('hasSession error handling', () => {
 });
 
 describe('loadSession with a session saved by a different build', () => {
-
   beforeEach(() => {
     // An earlier suite leaves setItem rejecting; these tests need it to work.
     mockSetItem.mockResolvedValue(undefined);
@@ -239,23 +254,28 @@ describe('loadSession with a session saved by a different build', () => {
     ['skipped', { ...sampleSession, skipped: undefined }],
     ['cursor', { ...sampleSession, cursor: undefined }],
     ['sortOrder', { ...sampleSession, sortOrder: undefined }],
-  ])('treats a session missing %s as no session, reports it and sets it aside', async (_field, stored) => {
-    storeLegacy(JSON.stringify(stored));
-    mockRemoveItem.mockResolvedValue(undefined);
+  ])(
+    'treats a session missing %s as no session, reports it and sets it aside',
+    async (_field, stored) => {
+      storeLegacy(JSON.stringify(stored));
+      mockRemoveItem.mockResolvedValue(undefined);
 
-    const result = await loadSession();
+      const result = await loadSession();
 
-    expect(result).toBeNull();
-    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
-    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
-      tags: { flow: 'session-load' },
-    });
-    // Moved aside, never destroyed: the raw JSON is kept under another key
-    // before the live key is cleared, so a validator bug is recoverable.
-    expect(mockSetItem).toHaveBeenCalledWith('sift_session.invalid', JSON.stringify(stored));
-    expect(mockSetItem.mock.invocationCallOrder[0]).toBeLessThan(mockRemoveItem.mock.invocationCallOrder[0]);
-    expect(mockRemoveItem).toHaveBeenCalledWith('sift_session');
-  });
+      expect(result).toBeNull();
+      expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+      expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+        tags: { flow: 'session-load' },
+      });
+      // Moved aside, never destroyed: the raw JSON is kept under another key
+      // before the live key is cleared, so a validator bug is recoverable.
+      expect(mockSetItem).toHaveBeenCalledWith('sift_session.invalid', JSON.stringify(stored));
+      expect(mockSetItem.mock.invocationCallOrder[0]).toBeLessThan(
+        mockRemoveItem.mock.invocationCallOrder[0],
+      );
+      expect(mockRemoveItem).toHaveBeenCalledWith('sift_session');
+    },
+  );
 
   it('rejects a session whose tracks are malformed', async () => {
     storeLegacy(JSON.stringify({ ...sampleSession, tracks: [{ id: '1' }] }));
@@ -288,7 +308,10 @@ describe('loadSession with a session saved by a different build', () => {
     // One event for the invalid session, carrying the failure as a breadcrumb.
     expect(Sentry.captureException).toHaveBeenCalledTimes(1);
     expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
-      expect.objectContaining({ category: 'session', message: expect.stringContaining('left in place') }),
+      expect.objectContaining({
+        category: 'session',
+        message: expect.stringContaining('left in place'),
+      }),
     );
   });
 

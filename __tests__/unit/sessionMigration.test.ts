@@ -27,7 +27,13 @@ jest.mock('@sentry/react-native', () => ({
 const ROAD_TRIP = 'apple-music:playlist:p1';
 // Fields the automatic "- Sifted" playlist used, gone once keeps were
 // remembered for playlists too.
-const GONE = ['pendingKeeps', 'siftedPlaylistId', 'removalPlaylistCreated', 'removalPlaylistError', 'isCreatingPlaylist'];
+const GONE = [
+  'pendingKeeps',
+  'siftedPlaylistId',
+  'removalPlaylistCreated',
+  'removalPlaylistError',
+  'isCreatingPlaylist',
+];
 const expectNoGoneFields = (value: object) => {
   for (const key of GONE) expect(value).not.toHaveProperty(key);
 };
@@ -66,7 +72,10 @@ describe('saved sessions from every build (#61)', () => {
 
   test('with provider and source: the playlist comes back', async () => {
     const state = await resumeFrom(v2);
-    expect(state.source).toEqual({ type: 'playlist', playlist: { id: 'p1', name: 'Road Trip', trackCount: 4 } });
+    expect(state.source).toEqual({
+      type: 'playlist',
+      playlist: { id: 'p1', name: 'Road Trip', trackCount: 4 },
+    });
     expect(state.activeSource).toEqual(state.source);
     expectNoGoneFields(state);
   });
@@ -124,7 +133,9 @@ describe('saved sessions from every build (#61)', () => {
     const saved = await loadSession();
     if (!saved) throw new Error('fixture did not load');
     expectNoGoneFields(saved);
-    expectNoGoneFields(resumeState(saved, { provider: 'apple-music', connectionStatus: 'connected' }));
+    expectNoGoneFields(
+      resumeState(saved, { provider: 'apple-music', connectionStatus: 'connected' }),
+    );
     await expect(loadReviewedIds(ROAD_TRIP)).resolves.toEqual(new Set(['a']));
   });
 
@@ -143,7 +154,9 @@ describe('saved sessions from every build (#61)', () => {
     for (let i = 0; i < 20 && !(await AsyncStorage.getItem('sift_sifted_ids')); i += 1) {
       await new Promise<void>((resolve) => setImmediate(resolve));
     }
-    expect(JSON.parse((await AsyncStorage.getItem('sift_sifted_ids')) ?? 'null')).toEqual({ [ROAD_TRIP]: ['sifted-1'] });
+    expect(JSON.parse((await AsyncStorage.getItem('sift_sifted_ids')) ?? 'null')).toEqual({
+      [ROAD_TRIP]: ['sifted-1'],
+    });
   });
 
   test('an old playlist session: the keeps it sent to "- Sifted" are remembered, not the one held for Undo', async () => {
@@ -173,7 +186,10 @@ describe('saved sessions from every build (#61)', () => {
     const saved = await loadSession();
     if (!saved) throw new Error('fixture did not load');
     const state = resumeState(saved, { provider: 'apple-music', connectionStatus: 'connected' });
-    expect(state.source).toEqual({ type: 'playlist', playlist: { id: 'p1', name: 'Road Trip', trackCount: 4 } });
+    expect(state.source).toEqual({
+      type: 'playlist',
+      playlist: { id: 'p1', name: 'Road Trip', trackCount: 4 },
+    });
     expect(state.kept.map((t) => t.name)).toEqual(['Peaches', 'Intro']);
     expect(state.pending).toEqual({ trackId: 'c', decision: 'keep', at: 1760529600000 });
     expect(state.phase).toBe('sifting');
@@ -189,18 +205,28 @@ describe('saved sessions from every build (#61)', () => {
     if (!saved) throw new Error('fixture did not load');
     const state = resumeState(saved, { provider: 'apple-music', connectionStatus: 'connected' });
     expect(state.sortOrder).toBe('album');
-    expect(state.tracks.map((t) => [t.trackNumber, t.discNumber])).toEqual([[6, 1], [3, 1], [1, 1], [10, 1]]);
+    expect(state.tracks.map((t) => [t.trackNumber, t.discNumber])).toEqual([
+      [6, 1],
+      [3, 1],
+      [1, 1],
+      [10, 1],
+    ]);
   });
 
   test('older track lists, with no track numbers, still load', async () => {
     await AsyncStorage.setItem('sift_session_v2', JSON.stringify(v7State));
     await AsyncStorage.setItem('sift_session_v2_tracks_b', JSON.stringify(v5Tracks));
     const saved = await loadSession();
-    expect(saved?.tracks.every((t) => t.trackNumber === undefined && t.discNumber === undefined)).toBe(true);
+    expect(
+      saved?.tracks.every((t) => t.trackNumber === undefined && t.discNumber === undefined),
+    ).toBe(true);
   });
 
   test('this build saves the current shape: the "- Sifted" fields are never written', async () => {
-    await AsyncStorage.setItem('sift_session_v2', JSON.stringify({ ...v5State, pendingKeeps: [], siftedPlaylistId: null }));
+    await AsyncStorage.setItem(
+      'sift_session_v2',
+      JSON.stringify({ ...v5State, pendingKeeps: [], siftedPlaylistId: null }),
+    );
     await AsyncStorage.setItem('sift_session_v2_tracks_b', JSON.stringify(v5Tracks));
     const saved = await loadSession();
     if (!saved) throw new Error('fixture did not load');
@@ -215,8 +241,9 @@ describe('saved sessions from every build (#61)', () => {
     await AsyncStorage.setItem('sift_session_v2_tracks_b', JSON.stringify(v5Tracks));
     const saved = await loadSession();
     if (!saved) throw new Error('fixture did not load');
-    expect(resumeState(saved, { provider: 'apple-music', connectionStatus: 'connected' }).pending)
-      .toEqual({ trackId: 'c', decision: 'skip', at: 1760097600000 });
+    expect(
+      resumeState(saved, { provider: 'apple-music', connectionStatus: 'connected' }).pending,
+    ).toEqual({ trackId: 'c', decision: 'skip', at: 1760097600000 });
   });
 
   test('older shapes resume with nothing held', async () => {
@@ -231,6 +258,8 @@ describe('saved sessions from every build (#61)', () => {
   test('a Spotify session (#140) is set aside, not resumed', async () => {
     await AsyncStorage.setItem('sift_session', JSON.stringify(spotify));
     await expect(loadSession()).resolves.toBeNull();
-    await expect(AsyncStorage.getItem('sift_session.invalid')).resolves.toBe(JSON.stringify(spotify));
+    await expect(AsyncStorage.getItem('sift_session.invalid')).resolves.toBe(
+      JSON.stringify(spotify),
+    );
   });
 });

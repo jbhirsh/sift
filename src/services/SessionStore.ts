@@ -58,7 +58,10 @@ export function saveSession(session: SiftSession): Promise<void> {
         // Forget the old list first: if this write fails, the next save
         // must try again rather than point at a list that isn't there.
         storedTracks = null;
-        await AsyncStorage.setItem(tracksKey(slot), JSON.stringify({ version, tracks: session.tracks }));
+        await AsyncStorage.setItem(
+          tracksKey(slot),
+          JSON.stringify({ version, tracks: session.tracks }),
+        );
         storedTracks = { tracks: session.tracks, version, slot };
       }
       await AsyncStorage.setItem(STATE_KEY, JSON.stringify(toCompact(session, storedTracks)));
@@ -107,15 +110,20 @@ async function loadQueued(): Promise<SiftSession | null> {
       // The list this store last wrote or loaded, when it is the one on
       // disk: the resumed session then holds the same array, and the next
       // save doesn't rewrite a list that hasn't changed.
-      const tracks = storedTracks?.version === stored.version ? (storedTracks.tracks as Track[]) : stored.tracks;
+      const tracks =
+        storedTracks?.version === stored.version ? (storedTracks.tracks as Track[]) : stored.tracks;
       const session = fromCompact(compact, { version: stored.version, tracks });
-      if (!session || !isSiftSession(session)) throw new Error('Saved session does not match its track list');
+      if (!session || !isSiftSession(session))
+        throw new Error('Saved session does not match its track list');
       storedTracks = { tracks: session.tracks, version: stored.version, slot: compact.tracksSlot };
       committedSlot = compact.tracksSlot;
       rememberLegacyKeeps(session, compact);
       return session;
     } catch (err) {
-      await setAside(JSON.stringify({ state: stateJson, tracks: tracksJson }), [STATE_KEY, ...ALL_TRACKS_KEYS]);
+      await setAside(JSON.stringify({ state: stateJson, tracks: tracksJson }), [
+        STATE_KEY,
+        ...ALL_TRACKS_KEYS,
+      ]);
       Sentry.captureException(err, { tags: { flow: 'session-load' } });
       // A legacy session still on disk is the one this replaced: offer it.
       return loadLegacySession();
@@ -136,7 +144,11 @@ async function loadQueued(): Promise<SiftSession | null> {
  * remembered too, so the one-time import of its earlier sifts' keeps finds
  * it by id after a rename (#179).
  */
-function rememberLegacyKeeps(session: SiftSession, stored: unknown, legacy = savedBeforeKeepsRemembered(stored)): void {
+function rememberLegacyKeeps(
+  session: SiftSession,
+  stored: unknown,
+  legacy = savedBeforeKeepsRemembered(stored),
+): void {
   if (session.source?.type !== 'playlist' || !legacy) return;
   const provider = session.provider ?? 'apple-music';
   const key = ledgerKey(provider, session.source);
@@ -174,8 +186,11 @@ async function loadLegacySession(): Promise<SiftSession | null> {
     const parsed = migrateLegacySession(JSON.parse(json));
     if (isSiftSession(parsed)) {
       // Fields this build no longer has stay behind.
-      const { pendingKeeps: _pendingKeeps, siftedPlaylistId: _siftedPlaylistId, ...session } =
-        parsed as SiftSession & { pendingKeeps?: unknown; siftedPlaylistId?: unknown };
+      const {
+        pendingKeeps: _pendingKeeps,
+        siftedPlaylistId: _siftedPlaylistId,
+        ...session
+      } = parsed as SiftSession & { pendingKeeps?: unknown; siftedPlaylistId?: unknown };
       // Every session saved in this shape predates remembered keeps.
       rememberLegacyKeeps(session, parsed, true);
       return session;
@@ -211,7 +226,11 @@ async function removeKeys(keys: string[]): Promise<boolean> {
     for (const key of keys) await AsyncStorage.removeItem(key);
     return true;
   } catch (err) {
-    Sentry.addBreadcrumb({ category: 'session', message: `Clear session failed: ${err}`, level: 'warning' });
+    Sentry.addBreadcrumb({
+      category: 'session',
+      message: `Clear session failed: ${err}`,
+      level: 'warning',
+    });
     return false;
   }
 }
@@ -226,9 +245,16 @@ export function clearSession(): Promise<void> {
 
 export async function hasSession(): Promise<boolean> {
   try {
-    return (await AsyncStorage.getItem(STATE_KEY)) !== null || (await AsyncStorage.getItem(LEGACY_KEY)) !== null;
+    return (
+      (await AsyncStorage.getItem(STATE_KEY)) !== null ||
+      (await AsyncStorage.getItem(LEGACY_KEY)) !== null
+    );
   } catch (err) {
-    Sentry.addBreadcrumb({ category: 'session', message: `Check session failed: ${err}`, level: 'warning' });
+    Sentry.addBreadcrumb({
+      category: 'session',
+      message: `Check session failed: ${err}`,
+      level: 'warning',
+    });
     return false;
   }
 }

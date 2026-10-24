@@ -52,7 +52,10 @@ export class TrackIndex {
   /** Whether a track that is sameSong as this one was added. */
   has(track: Track): boolean {
     if (this.ids.has(track.id)) return true;
-    return this.durations.get(nameArtistKey(track))?.some((d) => durationsAgree(d, track.duration)) ?? false;
+    return (
+      this.durations.get(nameArtistKey(track))?.some((d) => durationsAgree(d, track.duration)) ??
+      false
+    );
   }
 }
 

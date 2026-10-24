@@ -1,19 +1,33 @@
-import { ledgerKey, mergeIntoLedger, parseLedger, removeFromLedger, reviewedNote } from '../../src/utils/reviewedLedger';
+import {
+  ledgerKey,
+  mergeIntoLedger,
+  parseLedger,
+  removeFromLedger,
+  reviewedNote,
+} from '../../src/utils/reviewedLedger';
 
 describe('reviewedLedger', () => {
   test('keys by provider and source', () => {
     expect(ledgerKey('apple-music', { type: 'library' })).toBe('apple-music:library');
-    expect(ledgerKey('apple-music', { type: 'playlist', playlist: { id: 'p1', name: 'Mix', trackCount: 3 } }))
-      .toBe('apple-music:playlist:p1');
+    expect(
+      ledgerKey('apple-music', {
+        type: 'playlist',
+        playlist: { id: 'p1', name: 'Mix', trackCount: 3 },
+      }),
+    ).toBe('apple-music:playlist:p1');
   });
 
   test('parses a stored ledger, nothing stored reads as empty', () => {
-    expect(parseLedger('{"apple-music:library":["a","b"]}')).toEqual({ 'apple-music:library': ['a', 'b'] });
+    expect(parseLedger('{"apple-music:library":["a","b"]}')).toEqual({
+      'apple-music:library': ['a', 'b'],
+    });
     expect(parseLedger(null)).toEqual({});
   });
 
   test('drops bad entries one by one and ignores a non-object', () => {
-    expect(parseLedger('{"good":["a",3,null,"b"],"bad":"x","worse":{}}')).toEqual({ good: ['a', 'b'] });
+    expect(parseLedger('{"good":["a",3,null,"b"],"bad":"x","worse":{}}')).toEqual({
+      good: ['a', 'b'],
+    });
     expect(parseLedger('[1,2]')).toEqual({});
     expect(parseLedger('null')).toEqual({});
     expect(parseLedger('"text"')).toEqual({});
@@ -35,13 +49,19 @@ describe('reviewedLedger', () => {
     const ledger = { k: ['a', 'b', 'c'], other: ['a'] };
     expect(removeFromLedger(ledger, 'k', ['a', 'c', 'zz'])).toEqual({ k: ['b'], other: ['a'] });
     expect(ledger.k).toEqual(['a', 'b', 'c']);
-    expect(removeFromLedger({ k: ['a'], other: ['x'] }, 'k', new Set(['a']))).toEqual({ other: ['x'] });
+    expect(removeFromLedger({ k: ['a'], other: ['x'] }, 'k', new Set(['a']))).toEqual({
+      other: ['x'],
+    });
     expect(removeFromLedger({ other: ['x'] }, 'k', ['a'])).toEqual({ other: ['x'] });
   });
 
   test('footnote copy', () => {
     expect(reviewedNote(1, false)).toBe('1 song you’ve already kept is left out of new sifts.');
-    expect(reviewedNote(2655, false)).toBe('2,655 songs you’ve already kept are left out of new sifts.');
-    expect(reviewedNote(2655, true)).toBe('Songs you’ve already kept are included in new sifts. Songs you removed stay out.');
+    expect(reviewedNote(2655, false)).toBe(
+      '2,655 songs you’ve already kept are left out of new sifts.',
+    );
+    expect(reviewedNote(2655, true)).toBe(
+      'Songs you’ve already kept are included in new sifts. Songs you removed stay out.',
+    );
   });
 });

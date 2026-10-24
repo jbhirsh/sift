@@ -72,11 +72,16 @@ jest.mock('../../src/services/haptics', () => ({ thresholdHaptic: jest.fn() }));
 let mockShowTouches = false;
 const mockFollowTouch = jest.fn();
 const mockLiftTouch = jest.fn();
-jest.mock('../../src/services/touchOverlay', () => Object.defineProperties({}, {
-  showTouches: { get: () => mockShowTouches },
-  followTouch: { value: (x: number, y: number) => mockFollowTouch(x, y) },
-  liftTouch: { value: (x: number, y: number) => mockLiftTouch(x, y) },
-}));
+jest.mock('../../src/services/touchOverlay', () =>
+  Object.defineProperties(
+    {},
+    {
+      showTouches: { get: () => mockShowTouches },
+      followTouch: { value: (x: number, y: number) => mockFollowTouch(x, y) },
+      liftTouch: { value: (x: number, y: number) => mockLiftTouch(x, y) },
+    },
+  ),
+);
 
 jest.mock('../../src/hooks/useResolvedArtwork', () => ({
   useResolvedArtwork: jest.fn().mockReturnValue('https://example.com/art.jpg'),
@@ -88,19 +93,27 @@ import { ThemeProvider } from '../../src/theme/ThemeContext';
 import { a11yViolations } from '../helpers/a11yScan';
 
 const mockTrack: Track = {
-  id: '1', name: 'Test Track', artist: 'Test Artist', album: 'Test Album',
-  duration: 200, playCount: 42, dateAdded: '2020-01-15T12:00:00.000Z',
+  id: '1',
+  name: 'Test Track',
+  artist: 'Test Artist',
+  album: 'Test Album',
+  duration: 200,
+  playCount: 42,
+  dateAdded: '2020-01-15T12:00:00.000Z',
   artworkURL: 'https://example.com/art.jpg',
 };
 
 async function renderCard(track = mockTrack, onDecide = jest.fn(), playsKnown?: boolean) {
   panOnUpdate = undefined;
   panOnEnd = undefined;
-  return { ...(await render(
-    <ThemeProvider>
-      <InteractiveCard track={track} onDecide={onDecide} playsKnown={playsKnown} />
-    </ThemeProvider>
-  )), onDecide };
+  return {
+    ...(await render(
+      <ThemeProvider>
+        <InteractiveCard track={track} onDecide={onDecide} playsKnown={playsKnown} />
+      </ThemeProvider>,
+    )),
+    onDecide,
+  };
 }
 
 describe('InteractiveCard', () => {
@@ -121,8 +134,12 @@ describe('InteractiveCard', () => {
 
   test('renders the play count and add date as one meta line', async () => {
     const { getByTestId } = await renderCard();
-    expect(getByTestId('card-play-count').props.children).toBe('Played 42\u00D7 \u00B7 Added Jan 2020');
-    expect(getByTestId('card-play-count').props.accessibilityLabel).toBe('Played 42 times, added January 2020');
+    expect(getByTestId('card-play-count').props.children).toBe(
+      'Played 42\u00D7 \u00B7 Added Jan 2020',
+    );
+    expect(getByTestId('card-play-count').props.accessibilityLabel).toBe(
+      'Played 42 times, added January 2020',
+    );
   });
 
   test('a provider without play counts shows only the add date', async () => {
@@ -162,7 +179,7 @@ describe('InteractiveCard', () => {
     panOnUpdate?.({ translationX: 50, translationY: 10 });
   });
 
-  test('a GIF recording\'s drawn ring follows the swipe and lets go with it; nothing otherwise', async () => {
+  test("a GIF recording's drawn ring follows the swipe and lets go with it; nothing otherwise", async () => {
     // The gesture's worklets take the switch as it was when it was built.
     await renderCard();
     panOnUpdate?.({ translationX: 50, translationY: 10, absoluteX: 250, absoluteY: 410 });
@@ -221,7 +238,7 @@ describe('InteractiveCard', () => {
     expect(onDecide).not.toHaveBeenCalled();
   });
 
-  test('a quick flick decides short of the threshold; a slow one doesn\'t', async () => {
+  test("a quick flick decides short of the threshold; a slow one doesn't", async () => {
     const onDecide = jest.fn();
     await renderCard(mockTrack, onDecide);
     panOnEnd?.({ translationX: 40, velocityX: 1200 });
@@ -252,13 +269,13 @@ describe('InteractiveCard', () => {
     expect(thresholdHaptic).toHaveBeenCalledTimes(4);
   });
 
-  test('can\'t be dragged while a decision is under way', async () => {
+  test("can't be dragged while a decision is under way", async () => {
     await renderCard();
     expect(panEnabled).toBe(true);
     await render(
       <ThemeProvider>
         <InteractiveCard track={mockTrack} onDecide={jest.fn()} disabled />
-      </ThemeProvider>
+      </ThemeProvider>,
     );
     expect(panEnabled).toBe(false);
   });
@@ -268,7 +285,7 @@ describe('InteractiveCard', () => {
     await render(
       <ThemeProvider>
         <InteractiveCard track={mockTrack} onDecide={jest.fn()} artworkRetryKey={3} />
-      </ThemeProvider>
+      </ThemeProvider>,
     );
     expect(useResolvedArtwork).toHaveBeenCalledWith('1', mockTrack.artworkURL, 3);
     jest.mocked(useResolvedArtwork).mockClear();
@@ -286,7 +303,7 @@ describe('InteractiveCard', () => {
           onDecide={onDecide}
           programmaticOffset={programmaticOffset as never}
         />
-      </ThemeProvider>
+      </ThemeProvider>,
     );
     expect(getByTestId('card-track-name')).toHaveTextContent('Test Track');
   });
@@ -296,7 +313,11 @@ describe('InteractiveCard VoiceOver (#146)', () => {
   test('Keep, Remove and Skip are actions on the song name', async () => {
     const { getByTestId, onDecide } = await renderCard();
     const name = getByTestId('card-track-name');
-    expect(name.props.accessibilityActions.map((a: { name: string }) => a.name)).toEqual(['keep', 'remove', 'skip']);
+    expect(name.props.accessibilityActions.map((a: { name: string }) => a.name)).toEqual([
+      'keep',
+      'remove',
+      'skip',
+    ]);
     await fireEvent(name, 'accessibilityAction', { nativeEvent: { actionName: 'remove' } });
     expect(onDecide).toHaveBeenLastCalledWith('remove');
     await fireEvent(name, 'accessibilityAction', { nativeEvent: { actionName: 'skip' } });

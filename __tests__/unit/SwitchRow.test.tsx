@@ -10,10 +10,22 @@ jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
   default: jest.fn().mockReturnValue('light'),
 }));
 
-function Row({ value, onValueChange }: { value: boolean; onValueChange: (value: boolean) => void }) {
+function Row({
+  value,
+  onValueChange,
+}: {
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+}) {
   return (
     <ThemeProvider>
-      <SwitchRow testID="row" label="Start at chorus" hint="Begin each song at its chorus." value={value} onValueChange={onValueChange}>
+      <SwitchRow
+        testID="row"
+        label="Start at chorus"
+        hint="Begin each song at its chorus."
+        value={value}
+        onValueChange={onValueChange}
+      >
         <Text>Start at chorus</Text>
       </SwitchRow>
     </ThemeProvider>
@@ -23,7 +35,9 @@ function Row({ value, onValueChange }: { value: boolean; onValueChange: (value: 
 describe('SwitchRow', () => {
   test('a tap anywhere on the row flips the value', async () => {
     const onValueChange = jest.fn();
-    const { getByTestId, rerender } = await render(<Row value={false} onValueChange={onValueChange} />);
+    const { getByTestId, rerender } = await render(
+      <Row value={false} onValueChange={onValueChange} />,
+    );
     await fireEvent.press(getByTestId('row'));
     expect(onValueChange).toHaveBeenLastCalledWith(true);
     await rerender(<Row value onValueChange={onValueChange} />);
@@ -42,8 +56,12 @@ describe('SwitchRow', () => {
     expect(a11yViolations(toJSON())).toEqual([]);
   });
 
-  test('the native switch only draws the value: it takes no touches and isn\'t a second element', async () => {
-    type Node = { type: string; props: Record<string, unknown>; children: (Node | string)[] | null };
+  test("the native switch only draws the value: it takes no touches and isn't a second element", async () => {
+    type Node = {
+      type: string;
+      props: Record<string, unknown>;
+      children: (Node | string)[] | null;
+    };
     const { toJSON } = await render(<Row value onValueChange={jest.fn()} />);
     // The host view holding the native switch, and the switch.
     const find = (node: Node | string, parent: Node | null): [Node, Node] | null => {

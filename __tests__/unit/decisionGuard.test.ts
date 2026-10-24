@@ -15,7 +15,7 @@ describe('createDecisionGuard', () => {
     expect(guard.press(1_300, 300, true)).toEqual({ verdict: 'go' });
   });
 
-  test('a turned-away press doesn\'t restart the hold', () => {
+  test("a turned-away press doesn't restart the hold", () => {
     const guard = createDecisionGuard();
     guard.press(0, 300, true);
     guard.shown();
@@ -35,7 +35,7 @@ describe('createDecisionGuard', () => {
     expect(guard.busy(20_700)).toBe(false);
   });
 
-  test('one that can\'t wait is turned away until the decision before it shows', () => {
+  test("one that can't wait is turned away until the decision before it shows", () => {
     // A Keep or Remove would land on a card nobody has seen yet.
     const guard = createDecisionGuard();
     guard.press(0, 300, true);
@@ -55,7 +55,7 @@ describe('createDecisionGuard', () => {
     expect(guard.press(500, 300, true)).toEqual({ verdict: 'busy', sinceMs: 100 });
   });
 
-  test('busy while a decision isn\'t on screen, however long that takes, or within the hold', () => {
+  test("busy while a decision isn't on screen, however long that takes, or within the hold", () => {
     const guard = createDecisionGuard();
     guard.press(0, 300, true);
     expect(guard.busy(60_000)).toBe(true);
@@ -64,7 +64,7 @@ describe('createDecisionGuard', () => {
     expect(guard.busy(300)).toBe(false);
   });
 
-  test('under way only until it shows: the hold doesn\'t count', () => {
+  test("under way only until it shows: the hold doesn't count", () => {
     const guard = createDecisionGuard();
     expect(guard.underWay()).toBe(false);
     guard.press(0, 300, true);

@@ -1,11 +1,14 @@
 module.exports = {
   preset: 'jest-expo',
-  setupFilesAfterEnv: ['@testing-library/react-native/matchers', '<rootDir>/__tests__/helpers/clock.setup.ts'],
+  setupFilesAfterEnv: [
+    '@testing-library/react-native/matchers',
+    '<rootDir>/__tests__/helpers/clock.setup.ts',
+  ],
   // performance.now() follows Date.now() (helpers/clock.setup.ts), which fake
   // timers do move.
   fakeTimers: { doNotFake: ['performance'] },
   transformIgnorePatterns: [
-    'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|@sentry/.*|native-base|react-native-svg|react-native-reanimated|react-native-gesture-handler|react-native-worklets|@react-native-async-storage/async-storage)'
+    'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|@sentry/.*|native-base|react-native-svg|react-native-reanimated|react-native-gesture-handler|react-native-worklets|@react-native-async-storage/async-storage)',
   ],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   // Anchor the worktree exclusion to this config's rootDir: the main checkout
@@ -16,7 +19,12 @@ module.exports = {
   // must not be scanned from the main checkout (it doubles every suite and
   // duplicates manual mocks), but Stryker's own in-sandbox jest runs — whose
   // rootDir is the sandbox — must not have their paths filtered.
-  testPathIgnorePatterns: ['/node_modules/', '__tests__/helpers/', '<rootDir>/\\.claude/worktrees/', '<rootDir>/\\.stryker-tmp/'],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '__tests__/helpers/',
+    '<rootDir>/\\.claude/worktrees/',
+    '<rootDir>/\\.stryker-tmp/',
+  ],
   modulePathIgnorePatterns: ['<rootDir>/\\.stryker-tmp/'],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',

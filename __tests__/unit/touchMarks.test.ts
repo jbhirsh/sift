@@ -17,7 +17,14 @@ import {
 describe('touch marks for PR GIFs', () => {
   it('a press puts a ring where the finger lands', () => {
     const marks = touchDown(NO_MARKS, 100, 200, 1000);
-    expect(marks.press).toEqual({ x: 100, y: 200, fromX: 100, fromY: 200, downAt: 1000, upAt: null });
+    expect(marks.press).toEqual({
+      x: 100,
+      y: 200,
+      fromX: 100,
+      fromY: 200,
+      downAt: 1000,
+      upAt: null,
+    });
     expect(marks.trail).toEqual([]);
     expect(hasMarks(marks)).toBe(true);
     expect(hasMarks(NO_MARKS)).toBe(false);
@@ -40,7 +47,11 @@ describe('touch marks for PR GIFs', () => {
   it('a slow drag still leaves dots: it measures from the last dot, not the moving ring', () => {
     let marks = touchDown(NO_MARKS, 0, 0, 0);
     for (let x = 1; x <= TRAIL_SPACING * 3; x += 1) marks = touchMove(marks, x, 0, x);
-    expect(marks.trail.map((dot) => dot.x)).toEqual([TRAIL_SPACING, TRAIL_SPACING * 2, TRAIL_SPACING * 3]);
+    expect(marks.trail.map((dot) => dot.x)).toEqual([
+      TRAIL_SPACING,
+      TRAIL_SPACING * 2,
+      TRAIL_SPACING * 3,
+    ]);
     expect(marks.press).toMatchObject({ x: TRAIL_SPACING * 3 });
   });
 
@@ -52,17 +63,32 @@ describe('touch marks for PR GIFs', () => {
     expect(touchUp(NO_MARKS, 9, 9, 30)).toBe(NO_MARKS);
   });
 
-  it('a native gesture carries the ring on, even after React Native\'s touch was cancelled', () => {
+  it("a native gesture carries the ring on, even after React Native's touch was cancelled", () => {
     // React Native's copy of the touch ends in a cancel when a pan takes it.
     const cancelled = touchUp(touchDown(NO_MARKS, 0, 0, 0), 2, 0, 50);
     const followed = touchFollow(cancelled, TRAIL_SPACING * 2, 0, 60);
     expect(followed.press).toEqual({
-      x: TRAIL_SPACING * 2, y: 0, fromX: TRAIL_SPACING * 2, fromY: 0, downAt: 0, upAt: null,
+      x: TRAIL_SPACING * 2,
+      y: 0,
+      fromX: TRAIL_SPACING * 2,
+      fromY: 0,
+      downAt: 0,
+      upAt: null,
     });
     expect(followed.trail).toEqual([{ x: TRAIL_SPACING * 2, y: 0, at: 60 }]);
     // Still held, it just moves; with nothing pressed, it starts a press.
-    expect(touchFollow(followed, TRAIL_SPACING * 2 + 1, 0, 70).press).toMatchObject({ x: TRAIL_SPACING * 2 + 1, upAt: null });
-    expect(touchFollow(NO_MARKS, 5, 6, 80).press).toEqual({ x: 5, y: 6, fromX: 5, fromY: 6, downAt: 80, upAt: null });
+    expect(touchFollow(followed, TRAIL_SPACING * 2 + 1, 0, 70).press).toMatchObject({
+      x: TRAIL_SPACING * 2 + 1,
+      upAt: null,
+    });
+    expect(touchFollow(NO_MARKS, 5, 6, 80).press).toEqual({
+      x: 5,
+      y: 6,
+      fromX: 5,
+      fromY: 6,
+      downAt: 80,
+      upAt: null,
+    });
   });
 
   it('a release leaves the ring where the finger lifted, to scale out', () => {

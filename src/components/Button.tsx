@@ -1,11 +1,5 @@
 import React from 'react';
-import {
-  Pressable,
-  Text,
-  StyleSheet,
-  type ViewStyle,
-  type TextStyle,
-} from 'react-native';
+import { Pressable, Text, StyleSheet, type ViewStyle, type TextStyle } from 'react-native';
 import { RADIUS, SPACING, SHADOWS } from '../theme';
 import { useThemeColors } from '../theme/useThemeColors';
 
@@ -58,23 +52,14 @@ export function Button({
       testID={testID}
       accessibilityRole="button"
       accessibilityState={{ disabled }}
-      style={({ pressed }) => [
-        ...containerStyle,
-        pressed && !disabled && styles.pressed,
-      ]}
+      style={({ pressed }) => [...containerStyle, pressed && !disabled && styles.pressed]}
     >
-      <Text style={textStyle}>
-        {icon ? `${icon} ${title}` : title}
-      </Text>
+      <Text style={textStyle}>{icon ? `${icon} ${title}` : title}</Text>
     </Pressable>
   );
 }
 
-function variantContainer(
-  variant: Variant,
-  tint: string,
-  disabled: boolean,
-): ViewStyle {
+function variantContainer(variant: Variant, tint: string, disabled: boolean): ViewStyle {
   const opacity = disabled ? 0.4 : 1;
 
   switch (variant) {

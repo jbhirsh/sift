@@ -1,12 +1,5 @@
 import React, { useCallback } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ActivityIndicator,
-  Linking,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Linking, StyleSheet } from 'react-native';
 import Constants from 'expo-constants';
 import { SymbolView } from 'expo-symbols';
 import type { SFSymbol } from 'sf-symbols-typescript';
@@ -82,7 +75,12 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
       case 'unknown':
         return (
           <View testID="connection-status-indicator">
-            <SymbolView accessibilityElementsHidden name="questionmark.circle" size={28} tintColor={colors.textSecondary} />
+            <SymbolView
+              accessibilityElementsHidden
+              name="questionmark.circle"
+              size={28}
+              tintColor={colors.textSecondary}
+            />
           </View>
         );
       case 'checking':
@@ -94,13 +92,23 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
       case 'connected':
         return (
           <View testID="connection-status-indicator">
-            <SymbolView accessibilityElementsHidden name="checkmark.circle.fill" size={28} tintColor={COLORS.keep} />
+            <SymbolView
+              accessibilityElementsHidden
+              name="checkmark.circle.fill"
+              size={28}
+              tintColor={COLORS.keep}
+            />
           </View>
         );
       case 'disconnected':
         return (
           <View testID="connection-status-indicator">
-            <SymbolView accessibilityElementsHidden name="xmark.circle.fill" size={28} tintColor={COLORS.remove} />
+            <SymbolView
+              accessibilityElementsHidden
+              name="xmark.circle.fill"
+              size={28}
+              tintColor={COLORS.remove}
+            />
           </View>
         );
     }
@@ -114,11 +122,12 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Settings
-        </Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Settings</Text>
         {appVersion != null && (
-          <Text style={[styles.headerVersion, { color: colors.textSecondary }]} testID="settings-version">
+          <Text
+            style={[styles.headerVersion, { color: colors.textSecondary }]}
+            testID="settings-version"
+          >
             Version {appVersion}
           </Text>
         )}
@@ -186,7 +195,10 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
               alone is a dead end: only Settings can turn it back on. */}
           {state.connectionStatus === 'disconnected' && (
             <>
-              <Text style={[styles.settingDescription, { color: colors.textSecondary }]} testID="connection-help">
+              <Text
+                style={[styles.settingDescription, { color: colors.textSecondary }]}
+                testID="connection-help"
+              >
                 {'Turn on Media & Apple Music for Sift in Settings, then check again.'}
               </Text>
               <GlassCard intensity="thin" radius={RADIUS.sm}>
@@ -194,7 +206,9 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
                   testID="open-settings-button"
                   accessibilityRole="button"
                   style={styles.checkButton}
-                  onPress={() => { void Linking.openSettings(); }}
+                  onPress={() => {
+                    void Linking.openSettings();
+                  }}
                   activeOpacity={0.8}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -230,9 +244,7 @@ export default function SettingsScreen({ onClose }: SettingsScreenProps) {
                 tintColor={colors.text}
               />
               <View style={styles.settingText}>
-                <Text style={[styles.settingTitle, { color: colors.text }]}>
-                  Start at chorus
-                </Text>
+                <Text style={[styles.settingTitle, { color: colors.text }]}>Start at chorus</Text>
                 <Text style={[styles.settingDescription, { color: colors.textSecondary }]}>
                   {START_AT_CHORUS_DESCRIPTION}
                 </Text>

@@ -4,8 +4,17 @@ import { Alert, Linking } from 'react-native';
 import * as Sentry from '@sentry/react-native';
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
 import { useMusicProvider } from '../../src/hooks/useMusicProvider';
-import { forgetRemovals, loadHistory, logRemoval, removeFromHistory } from '../../src/services/RemovalHistoryStore';
-import { loadReviewedIds, markReviewed, unmarkReviewed } from '../../src/services/ReviewedLedgerStore';
+import {
+  forgetRemovals,
+  loadHistory,
+  logRemoval,
+  removeFromHistory,
+} from '../../src/services/RemovalHistoryStore';
+import {
+  loadReviewedIds,
+  markReviewed,
+  unmarkReviewed,
+} from '../../src/services/ReviewedLedgerStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MusicProviderService } from '../../src/services/MusicProviderInterface';
 import { Playlist, Track } from '../../src/types';
@@ -101,13 +110,23 @@ jest.mock('react-native/Libraries/Linking/Linking', () => ({
 }));
 
 const mockTrack: Track = {
-  id: '1', name: 'Track A', artist: 'Artist A', album: 'Album A',
-  duration: 200, playCount: 10, dateAdded: '2020-01-01T00:00:00.000Z',
+  id: '1',
+  name: 'Track A',
+  artist: 'Artist A',
+  album: 'Album A',
+  duration: 200,
+  playCount: 10,
+  dateAdded: '2020-01-01T00:00:00.000Z',
 };
 
 const mockTrackB: Track = {
-  id: '2', name: 'Track B', artist: 'Artist B', album: 'Album B',
-  duration: 180, playCount: 3, dateAdded: '2020-02-01T00:00:00.000Z',
+  id: '2',
+  name: 'Track B',
+  artist: 'Artist B',
+  album: 'Album B',
+  duration: 180,
+  playCount: 3,
+  dateAdded: '2020-02-01T00:00:00.000Z',
 };
 
 // ── Harness ────────────────────────────────────────────
@@ -198,7 +217,10 @@ describe('useMusicProvider — observable state', () => {
   test('authorize surfaces checking → connected and returns the grant', async () => {
     let resolveAuth!: (granted: boolean) => void;
     mockProvider.requestAuthorization.mockImplementationOnce(
-      () => new Promise<boolean>((res) => { resolveAuth = res; }),
+      () =>
+        new Promise<boolean>((res) => {
+          resolveAuth = res;
+        }),
     );
     await renderHarness([mockTrack]);
 
@@ -431,10 +453,16 @@ describe('useMusicProvider — observable state', () => {
     let resolveAuthCheck!: (authorized: boolean) => void;
     let resolveTracks!: (tracks: Track[]) => void;
     mockProvider.isAuthorized.mockImplementationOnce(
-      () => new Promise<boolean>((res) => { resolveAuthCheck = res; }),
+      () =>
+        new Promise<boolean>((res) => {
+          resolveAuthCheck = res;
+        }),
     );
     mockProvider.loadPlaylistTracks.mockImplementationOnce(
-      () => new Promise<Track[]>((res) => { resolveTracks = res; }),
+      () =>
+        new Promise<Track[]>((res) => {
+          resolveTracks = res;
+        }),
     );
     await renderHarness([]);
     await setPlaylistSource();
@@ -466,7 +494,10 @@ describe('useMusicProvider — observable state', () => {
   test('loadTracks ignores a second call while one is in flight, then accepts new ones', async () => {
     let resolveAuthCheck!: (authorized: boolean) => void;
     mockProvider.isAuthorized.mockImplementationOnce(
-      () => new Promise<boolean>((res) => { resolveAuthCheck = res; }),
+      () =>
+        new Promise<boolean>((res) => {
+          resolveAuthCheck = res;
+        }),
     );
     await renderHarness();
 
@@ -520,7 +551,10 @@ describe('useMusicProvider — observable state', () => {
     function deferred<T>() {
       let resolve!: (value: T) => void;
       let reject!: (err: Error) => void;
-      const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+      const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
       return { promise, resolve, reject };
     }
 
@@ -641,7 +675,7 @@ describe('useMusicProvider — observable state', () => {
       expectBackOnSetup();
     });
 
-    test('a new load goes ahead at once, and the cancelled one\'s late songs don\'t replace its own', async () => {
+    test("a new load goes ahead at once, and the cancelled one's late songs don't replace its own", async () => {
       const first = deferred<Track[]>();
       mockProvider.loadLibrary.mockImplementationOnce(() => first.promise);
       mockProvider.loadLibrary.mockResolvedValueOnce([mockTrackB]);
@@ -664,7 +698,7 @@ describe('useMusicProvider — observable state', () => {
       expect(sift.state.tracks.map((t) => t.id)).toEqual(['2']);
     });
 
-    test('the cancelled load finishing doesn\'t free the lock the new one holds', async () => {
+    test("the cancelled load finishing doesn't free the lock the new one holds", async () => {
       const first = deferred<Track[]>();
       const second = deferred<Track[]>();
       mockProvider.loadLibrary.mockImplementationOnce(() => first.promise);
@@ -745,8 +779,20 @@ describe('useMusicProvider — observable state', () => {
       return at.toISOString();
     };
     const old = { ...mockTrack, id: 'old', name: 'Old', playCount: 2, dateAdded: yearsAgo(4) };
-    const loved = { ...mockTrack, id: 'loved', name: 'Loved', playCount: 90, dateAdded: yearsAgo(4) };
-    const fresh = { ...mockTrack, id: 'fresh', name: 'Fresh', playCount: 0, dateAdded: yearsAgo(0) };
+    const loved = {
+      ...mockTrack,
+      id: 'loved',
+      name: 'Loved',
+      playCount: 90,
+      dateAdded: yearsAgo(4),
+    };
+    const fresh = {
+      ...mockTrack,
+      id: 'fresh',
+      name: 'Fresh',
+      playCount: 0,
+      dateAdded: yearsAgo(0),
+    };
 
     test('a library sift takes only the songs that match', async () => {
       mockProvider.loadLibrary.mockResolvedValueOnce([old, loved, fresh]);
@@ -790,7 +836,9 @@ describe('useMusicProvider — observable state', () => {
       await act(async () => {
         await api.loadTracks();
       });
-      expect(sift.state.loadError).toBe('No songs in this playlist match your Plays and Added choices.');
+      expect(sift.state.loadError).toBe(
+        'No songs in this playlist match your Plays and Added choices.',
+      );
     });
 
     test('a source already empty before the filters keeps its own message', async () => {
@@ -818,7 +866,7 @@ describe('useMusicProvider — observable state', () => {
     expect(sift.state.phase).toBe('setup');
   });
 
-  test('loadTracks failure says what didn\'t load in plain words; the raw error goes to Sentry (#174)', async () => {
+  test("loadTracks failure says what didn't load in plain words; the raw error goes to Sentry (#174)", async () => {
     const raw = new Error('No tracks found for the given IDs.');
     mockProvider.loadLibrary.mockRejectedValueOnce(raw);
     await renderHarness();
@@ -830,7 +878,9 @@ describe('useMusicProvider — observable state', () => {
     expect(sift.state.phase).toBe('setup');
     expect(Sentry.captureException).toHaveBeenCalledWith(raw, { tags: { flow: 'load-tracks' } });
 
-    mockProvider.loadLibrary.mockRejectedValueOnce(new Error('The Internet connection appears to be offline.'));
+    mockProvider.loadLibrary.mockRejectedValueOnce(
+      new Error('The Internet connection appears to be offline.'),
+    );
     await act(async () => {
       await api.loadTracks();
     });
@@ -867,10 +917,9 @@ describe('useMusicProvider — observable state', () => {
       result = await api.loadPlaylists();
     });
     expect(result).toEqual([]);
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      { tags: { flow: 'load-playlists' } },
-    );
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'load-playlists' },
+    });
   });
 
   // ── Remove / restore ─────────────────────────────────
@@ -905,10 +954,9 @@ describe('useMusicProvider — observable state', () => {
     expect(sift.state.failedRemovalIds).toEqual(['1']);
     // The user's intent is what matters — it is logged before the attempt.
     expect(logRemoval).toHaveBeenCalledTimes(1);
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      { tags: { flow: 'remove-track' } },
-    );
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'remove-track' },
+    });
   });
 
   test('restoreTrack moves the track from removed back to kept', async () => {
@@ -936,10 +984,9 @@ describe('useMusicProvider — observable state', () => {
     });
     expect(sift.state.removalErrors).toEqual(['Track A: network down']);
     expect(forgetRemovals).not.toHaveBeenCalled();
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      { tags: { flow: 'restore-track' } },
-    );
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'restore-track' },
+    });
 
     // Non-Error rejections get the generic reason.
     mockProvider.restoreRemoved.mockRejectedValueOnce('boom');
@@ -958,11 +1005,19 @@ describe('useMusicProvider — observable state', () => {
   // no-duplicate guard and the restore that takes it back out of there.
 
   const peaches: Track = {
-    id: 'peaches', name: 'Peaches', artist: 'Justin Bieber', album: 'Justice',
-    duration: 198, playCount: 4, dateAdded: '2021-03-19T00:00:00.000Z',
+    id: 'peaches',
+    name: 'Peaches',
+    artist: 'Justin Bieber',
+    album: 'Justice',
+    duration: 198,
+    playCount: 4,
+    dateAdded: '2021-03-19T00:00:00.000Z',
   };
   const libraryRemoval = (track: Track) => ({
-    track, source: { type: 'library' as const }, provider: 'apple-music' as const, removedAt: '2026-10-01T12:00:00.000Z',
+    track,
+    source: { type: 'library' as const },
+    provider: 'apple-music' as const,
+    removedAt: '2026-10-01T12:00:00.000Z',
   });
 
   test('a library sift skips songs removed in an earlier Apple library sift', async () => {
@@ -1075,7 +1130,9 @@ describe('useMusicProvider — observable state', () => {
     await act(async () => {
       await api.removeTrack(peaches);
     });
-    expect(logRemoval).toHaveBeenCalledWith(expect.objectContaining({ track: peaches, collected: true }));
+    expect(logRemoval).toHaveBeenCalledWith(
+      expect.objectContaining({ track: peaches, collected: true }),
+    );
     expect(removeFromHistory).toHaveBeenCalledWith('peaches', {
       type: 'playlist',
       playlist: { id: 'p1', name: 'My Playlist', trackCount: 5 },
@@ -1126,13 +1183,15 @@ describe('useMusicProvider — observable state', () => {
     expect(forgetRemovals).toHaveBeenCalledWith('1', 'apple-music');
   });
 
-  test("the load breadcrumb never names the playlist (#147)", async () => {
+  test('the load breadcrumb never names the playlist (#147)', async () => {
     await renderHarness([]);
     await setPlaylistSource();
     await act(async () => {
       await api.loadTracks();
     });
-    const messages = (Sentry.addBreadcrumb as jest.Mock).mock.calls.map(([crumb]) => String(crumb.message));
+    const messages = (Sentry.addBreadcrumb as jest.Mock).mock.calls.map(([crumb]) =>
+      String(crumb.message),
+    );
     expect(messages).toContain('Loaded 1 tracks from a playlist');
     expect(messages.join('\n')).not.toContain('My Playlist');
   });
@@ -1165,7 +1224,7 @@ describe('useMusicProvider — observable state', () => {
     });
   });
 
-  test('warmCache passes the session\'s playlist through (#54)', async () => {
+  test("warmCache passes the session's playlist through (#54)", async () => {
     mockProvider.warmSongCache.mockResolvedValueOnce(2);
     await renderHarness([mockTrack]);
     await act(async () => {
@@ -1251,7 +1310,9 @@ describe('useMusicProvider — observable state', () => {
     await act(async () => {
       await api.loadTracks({ skipFiltering: true });
     });
-    expect(sift.state.loadError).toBe('All tracks in this playlist were removed in a previous sift.');
+    expect(sift.state.loadError).toBe(
+      'All tracks in this playlist were removed in a previous sift.',
+    );
   });
 
   test('skipFiltering still leaves out a song waiting in "Sift \u2014 Removed"', async () => {
@@ -1284,7 +1345,9 @@ describe('useMusicProvider — observable state', () => {
     await act(async () => {
       await api.loadTracks();
     });
-    expect(sift.state.loadError).toBe('All tracks in this playlist were removed in a previous sift.');
+    expect(sift.state.loadError).toBe(
+      'All tracks in this playlist were removed in a previous sift.',
+    );
   });
 
   test('older removals from another playlist, which never took effect, hide nothing', async () => {
@@ -1351,7 +1414,10 @@ describe('useMusicProvider — observable state', () => {
   });
 
   test('a playlist sift leaves out songs kept in earlier sifts of that playlist, by id', async () => {
-    mockProvider.loadPlaylistTracks.mockResolvedValueOnce([{ ...mockTrack, name: 'Track A (Remastered)' }, mockTrackB]);
+    mockProvider.loadPlaylistTracks.mockResolvedValueOnce([
+      { ...mockTrack, name: 'Track A (Remastered)' },
+      mockTrackB,
+    ]);
     await markReviewed('apple-music:playlist:p1', '1');
     // Keeps of the library or another playlist don't count here.
     await markReviewed('apple-music:library', '2');
@@ -1380,7 +1446,8 @@ describe('useMusicProvider — observable state', () => {
       { id: 's1', name: 'My Playlist - Sifted', trackCount: 1 },
     ]);
     mockProvider.loadPlaylistTracks.mockImplementation(async (id: string) =>
-      (id === 's1' ? [{ ...mockTrack, id: 'i.77' }] : [mockTrack, mockTrackB]));
+      id === 's1' ? [{ ...mockTrack, id: 'i.77' }] : [mockTrack, mockTrackB],
+    );
     await renderHarness([]);
     await setPlaylistSource();
 
@@ -1432,7 +1499,9 @@ describe('useMusicProvider — observable state', () => {
     await act(async () => {
       await api.loadTracks();
     });
-    expect(sift.state.loadError).toBe('All tracks in this playlist have already been sifted or removed.');
+    expect(sift.state.loadError).toBe(
+      'All tracks in this playlist have already been sifted or removed.',
+    );
   });
 
   test('warmCache failures are captured, never thrown', async () => {
@@ -1442,10 +1511,9 @@ describe('useMusicProvider — observable state', () => {
     await act(async () => {
       await api.warmCache(['1', '2']);
     });
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      { tags: { flow: 'warm-cache' } },
-    );
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'warm-cache' },
+    });
   });
 
   // ── Providers without optional APIs ──────────────────
@@ -1471,29 +1539,42 @@ describe('useMusicProvider — observable state', () => {
     // No playlists to list: none by that name, so it's made.
     expect(minimal.createPlaylist).toHaveBeenCalledWith('My Playlist - Sifted');
     expect(minimal.addToPlaylist).toHaveBeenCalledWith('new-1', ['1']);
-    expect(result).toEqual({ playlistName: 'My Playlist - Sifted', sourceName: 'My Playlist', kept: 1, added: 1, notAdded: 0, leftOut: 0 });
+    expect(result).toEqual({
+      playlistName: 'My Playlist - Sifted',
+      sourceName: 'My Playlist',
+      kept: 1,
+      added: 1,
+      notAdded: 0,
+      leftOut: 0,
+    });
   });
 
   test('saveKeptPlaylist without addToPlaylist fails before making anything', async () => {
-    const minimal = makeMinimalProvider({ loadPlaylistTracks: jest.fn().mockResolvedValue([mockTrack]) });
+    const minimal = makeMinimalProvider({
+      loadPlaylistTracks: jest.fn().mockResolvedValue([mockTrack]),
+    });
     mockActiveProvider = minimal;
     await markReviewed('apple-music:playlist:p1', '1');
     await renderHarness([mockTrack]);
     await setPlaylistSource();
     await act(async () => {
-      await expect(api.saveKeptPlaylist()).rejects.toThrow('This provider does not support adding to playlists');
+      await expect(api.saveKeptPlaylist()).rejects.toThrow(
+        'This provider does not support adding to playlists',
+      );
     });
     expect(minimal.createPlaylist).not.toHaveBeenCalled();
   });
 
-  test('saveKeptPlaylist without playlist reads can\'t tell what is still in the playlist, and says so', async () => {
+  test("saveKeptPlaylist without playlist reads can't tell what is still in the playlist, and says so", async () => {
     const minimal = makeMinimalProvider();
     mockActiveProvider = minimal;
     await markReviewed('apple-music:playlist:p1', '1');
     await renderHarness([mockTrack]);
     await setPlaylistSource();
     await act(async () => {
-      await expect(api.saveKeptPlaylist()).rejects.toThrow('This provider does not support playlist loading');
+      await expect(api.saveKeptPlaylist()).rejects.toThrow(
+        'This provider does not support playlist loading',
+      );
     });
     expect(minimal.createPlaylist).not.toHaveBeenCalled();
   });
@@ -1569,5 +1650,4 @@ describe('useMusicProvider — observable state', () => {
       expect.objectContaining({ message: expect.stringContaining('unresolved') }),
     );
   });
-
 });

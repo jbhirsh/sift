@@ -36,10 +36,15 @@ export function collectsRemovals(provider: MusicProvider): boolean {
  * would also catch a second copy of a duplicated song, or a song deleted in
  * Music and re-added from the catalog, neither of which the user removed.
  */
-export function collectedRemovalIds(history: readonly RemovalRecord[], provider: MusicProvider): Set<string> {
+export function collectedRemovalIds(
+  history: readonly RemovalRecord[],
+  provider: MusicProvider,
+): Set<string> {
   return new Set(
     history
-      .filter((r) => r.provider === provider && (r.source.type === 'library' || r.collected === true))
+      .filter(
+        (r) => r.provider === provider && (r.source.type === 'library' || r.collected === true),
+      )
       .map((r) => r.track.id),
   );
 }
@@ -51,11 +56,15 @@ export function collectedRemovalIds(history: readonly RemovalRecord[], provider:
  * added (utils/musicKit toTrack), and a library lookup that can't find it
  * says nothing about whether the user deleted it.
  */
-export function deletionCandidates(history: readonly RemovalRecord[], provider: MusicProvider): Track[] {
+export function deletionCandidates(
+  history: readonly RemovalRecord[],
+  provider: MusicProvider,
+): Track[] {
   const ids = collectedRemovalIds(history, provider);
   const byId = new Map<string, Track>();
   for (const record of history) {
-    if (ids.has(record.track.id) && record.track.dateAdded !== '') byId.set(record.track.id, record.track);
+    if (ids.has(record.track.id) && record.track.dateAdded !== '')
+      byId.set(record.track.id, record.track);
   }
   return [...byId.values()];
 }

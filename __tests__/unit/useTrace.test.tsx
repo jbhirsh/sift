@@ -104,7 +104,9 @@ describe('touchTraceProps', () => {
   test('draws nothing and follows no moves unless a GIF recording asked for touches', async () => {
     expect(touchTraceProps.onTouchMoveCapture).toBeUndefined();
     const { getByTestId } = await render(<View testID="root" {...touchTraceProps} />);
-    await fireEvent(getByTestId('root'), 'touchStartCapture', { nativeEvent: { pageX: 1, pageY: 2, timestamp: 3 } });
+    await fireEvent(getByTestId('root'), 'touchStartCapture', {
+      nativeEvent: { pageX: 1, pageY: 2, timestamp: 3 },
+    });
     expect(touchMarks.get()).toBe(NO_MARKS);
   });
 });

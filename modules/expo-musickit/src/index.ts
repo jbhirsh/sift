@@ -29,7 +29,10 @@ export async function loadLibraryPage(offset: number, limit: number): Promise<Mu
 }
 
 /** One page of library playlists. */
-export async function loadPlaylistsPage(offset: number, limit: number): Promise<MusicKitPlaylist[]> {
+export async function loadPlaylistsPage(
+  offset: number,
+  limit: number,
+): Promise<MusicKitPlaylist[]> {
   return ExpoMusicKit.loadPlaylistsPage(offset, limit);
 }
 
@@ -88,7 +91,11 @@ export async function createEmptyPlaylist(name: string): Promise<string> {
  * at a time), then any created here within the last `recentSeconds` that the
  * library doesn't list yet.
  */
-export async function findPlaylistsByName(name: string, recentSeconds: number, pageSize: number): Promise<string[]> {
+export async function findPlaylistsByName(
+  name: string,
+  recentSeconds: number,
+  pageSize: number,
+): Promise<string[]> {
   return ExpoMusicKit.findPlaylistsByName(name, recentSeconds, pageSize);
 }
 
@@ -125,7 +132,11 @@ export async function shazamOffset(previewURL: string): Promise<number | null> {
   return ExpoMusicKit.shazamOffset(previewURL);
 }
 
-export async function resolveArtworkURL(trackID: string, width: number, height: number): Promise<string | null> {
+export async function resolveArtworkURL(
+  trackID: string,
+  width: number,
+  height: number,
+): Promise<string | null> {
   return ExpoMusicKit.resolveArtworkURL(trackID, width, height);
 }
 

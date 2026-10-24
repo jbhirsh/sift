@@ -51,9 +51,10 @@ function scrubData(data: Data, depth = 0): Data {
   const out: Data = {};
   for (const [key, value] of Object.entries(data)) {
     if (QUERY_KEYS.has(key)) continue;
-    out[key] = URL_KEYS.has(key) && typeof value === 'string'
-      ? scrubText(stripUrlQuery(value))
-      : scrubValue(value, depth);
+    out[key] =
+      URL_KEYS.has(key) && typeof value === 'string'
+        ? scrubText(stripUrlQuery(value))
+        : scrubValue(value, depth);
   }
   return out;
 }
@@ -92,7 +93,9 @@ export function scrubEvent<E extends ScrubbableEvent>(event: E): E {
   if (event.exception?.values) {
     out.exception = {
       ...event.exception,
-      values: event.exception.values.map((v) => (v.value != null ? { ...v, value: scrubText(v.value) } : v)),
+      values: event.exception.values.map((v) =>
+        v.value != null ? { ...v, value: scrubText(v.value) } : v,
+      ),
     };
   }
   if (event.breadcrumbs) out.breadcrumbs = event.breadcrumbs.map(scrubBreadcrumb);

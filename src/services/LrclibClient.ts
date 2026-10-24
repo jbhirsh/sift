@@ -13,9 +13,7 @@ const DEFAULT_GAP_MS = 250;
 const DURATION_TOLERANCE_SECONDS = 3;
 
 export type LyricsLookup =
-  | { status: 'synced'; lyrics: string }
-  | { status: 'instrumental' }
-  | { status: 'not-found' };
+  { status: 'synced'; lyrics: string } | { status: 'instrumental' } | { status: 'not-found' };
 
 interface LrclibRecord {
   duration: number;
@@ -141,7 +139,9 @@ export function createLrclibClient(options: LrclibClientOptions = {}): LrclibCli
     const candidates = (Array.isArray(body) ? body : [])
       .filter(isRecord)
       .filter((r) => Math.abs(r.duration - track.duration) <= DURATION_TOLERANCE_SECONDS)
-      .sort((a, b) => Math.abs(a.duration - track.duration) - Math.abs(b.duration - track.duration));
+      .sort(
+        (a, b) => Math.abs(a.duration - track.duration) - Math.abs(b.duration - track.duration),
+      );
     const synced = candidates.find((r) => r.syncedLyrics)?.syncedLyrics;
     if (synced) return { status: 'synced', lyrics: synced };
     if (candidates.some((r) => r.instrumental)) return { status: 'instrumental' };

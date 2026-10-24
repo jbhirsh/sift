@@ -12,7 +12,13 @@ jest.mock('../../src/services/ChorusFinder', () => ({
 }));
 
 const track = (id: string, duration = 200): Track => ({
-  id, name: id, artist: 'A', album: 'B', duration, playCount: 0, dateAdded: '',
+  id,
+  name: id,
+  artist: 'A',
+  album: 'B',
+  duration,
+  playCount: 0,
+  dateAdded: '',
 });
 const [t1, t2, t3] = [track('t1'), track('t2'), track('t3')];
 
@@ -53,7 +59,9 @@ describe('useChorusStart', () => {
     await rerender({});
     expect(mockForgetFailures).toHaveBeenCalledTimes(1);
     expect(mockFind.mock.calls.map((c) => c[0].id)).toEqual(['t1', 't2', 't3']);
-    expect(mockForgetFailures.mock.invocationCallOrder[0]).toBeLessThan(mockFind.mock.invocationCallOrder[0]);
+    expect(mockForgetFailures.mock.invocationCallOrder[0]).toBeLessThan(
+      mockFind.mock.invocationCallOrder[0],
+    );
   });
 
   it('skips missing upcoming cards', async () => {
@@ -64,7 +72,10 @@ describe('useChorusStart', () => {
   });
 
   it.each([
-    ['the setting is off', { startAtChorus: false, provider: 'apple-music' as const, songCacheGeneration: 0 }],
+    [
+      'the setting is off',
+      { startAtChorus: false, provider: 'apple-music' as const, songCacheGeneration: 0 },
+    ],
   ])('is disabled, prefetches nothing and starts at 0 when %s', async (_, state) => {
     mockSift.state = state;
     const { result } = await renderHook(() => useChorusStart(previewOffset));
@@ -88,7 +99,9 @@ describe('useChorusStart', () => {
       const { result } = await renderHook(() => useChorusStart(previewOffset));
       mockFind.mockReturnValue(new Promise(() => {}));
       let position: number | undefined;
-      void result.current.startPositionFor(track('slow', 300)).then((p) => { position = p; });
+      void result.current.startPositionFor(track('slow', 300)).then((p) => {
+        position = p;
+      });
       await act(async () => {
         await jest.advanceTimersByTimeAsync(CHORUS_WAIT_MS - 1);
       });

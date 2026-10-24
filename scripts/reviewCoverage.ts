@@ -25,11 +25,24 @@
 // grep pattern or a heredoc that mentions `git diff` reads nothing.
 
 /** Lockfiles and binaries may be skipped, as the prompt allows. */
-const SKIPPABLE = /(^|\/)(package-lock\.json|yarn\.lock|Podfile\.lock)$|\.(png|jpe?g|gif|webp|ico|pdf|svg|ttf|otf)$/i;
+const SKIPPABLE =
+  /(^|\/)(package-lock\.json|yarn\.lock|Podfile\.lock)$|\.(png|jpe?g|gif|webp|ico|pdf|svg|ttf|otf)$/i;
 /** Flags that leave the diff out of the output, or cut it down. */
 const NO_DIFF_FLAGS = new Set([
-  '-s', '--no-patch', '--quiet', '--stat', '--numstat', '--shortstat', '--name-only', '--name-status',
-  '--summary', '--raw', '--check', '--dirstat', '--compact-summary', '--exit-code',
+  '-s',
+  '--no-patch',
+  '--quiet',
+  '--stat',
+  '--numstat',
+  '--shortstat',
+  '--name-only',
+  '--name-status',
+  '--summary',
+  '--raw',
+  '--check',
+  '--dirstat',
+  '--compact-summary',
+  '--exit-code',
 ]);
 const NO_DIFF_PREFIXES = ['--stat=', '--dirstat=', '--output=', '--format=', '--pretty=', '-U0'];
 /** Shell syntax that makes a command more than one plain command. */
@@ -94,7 +107,8 @@ function filesReadBy(words: string[], files: string[]): string[] {
     return rest.some((w) => w.startsWith('--name') || w === '--stat') ? [] : files;
   }
   if (tool !== 'git' || (sub !== 'diff' && sub !== 'show')) return [];
-  if (rest.some((w) => NO_DIFF_FLAGS.has(w) || NO_DIFF_PREFIXES.some((p) => w.startsWith(p)))) return [];
+  if (rest.some((w) => NO_DIFF_FLAGS.has(w) || NO_DIFF_PREFIXES.some((p) => w.startsWith(p))))
+    return [];
   const dashes = rest.indexOf('--');
   const args = dashes === -1 ? rest : rest.slice(0, dashes);
   const paths = dashes === -1 ? [] : rest.slice(dashes + 1);
@@ -102,7 +116,9 @@ function filesReadBy(words: string[], files: string[]): string[] {
   if (sub === 'show') {
     // Only `git show <rev>:<path>`: plain `git show HEAD` on a pull
     // request's merge commit prints no diff at all.
-    const shown = revisions.filter((w) => w.startsWith('HEAD:')).map((w) => w.slice('HEAD:'.length));
+    const shown = revisions
+      .filter((w) => w.startsWith('HEAD:'))
+      .map((w) => w.slice('HEAD:'.length));
     return files.filter((f) => shown.includes(f));
   }
   // The PR's diff and nothing else: origin/main to HEAD, three dots or two,
@@ -112,7 +128,9 @@ function filesReadBy(words: string[], files: string[]): string[] {
   if (paths.length === 0) return files;
   // A magic pathspec (`:!x`, an exclude) names no file, so reads nothing.
   const named = paths.map((p) => p.replace(/^\.\//, '').replace(/\/+$/, ''));
-  return files.filter((f) => named.some((p) => p === '' || p === '.' || f === p || f.startsWith(`${p}/`)));
+  return files.filter((f) =>
+    named.some((p) => p === '' || p === '.' || f === p || f.startsWith(`${p}/`)),
+  );
 }
 
 /** Path relative to the repo, for a Read of an absolute path inside it. */
@@ -131,7 +149,8 @@ function readPath(call: ToolCall, part: boolean): string | null {
 /** The changed files the review never read, in the order given. */
 export function unreadFiles(changed: string[], calls: ToolCall[], repoDir: string): string[] {
   const needed = filesToRead(changed);
-  const paths = (part: boolean) => calls.map((c) => readPath(c, part)).filter((p): p is string => p !== null);
+  const paths = (part: boolean) =>
+    calls.map((c) => readPath(c, part)).filter((p): p is string => p !== null);
   // A saved full output too long for one Read is read in parts.
   const opened = new Set(paths(true));
   const read = new Set(paths(false).map((p) => relative(p, repoDir)));
@@ -163,8 +182,16 @@ export function toolCalls(execution: unknown): ToolCall[] {
     }
     if (!node || typeof node !== 'object') return;
     const o = node as Record<string, unknown>;
-    if (o.type === 'tool_use' && typeof o.name === 'string' && o.input && typeof o.input === 'object') {
-      uses.push({ id: String(o.id ?? ''), call: { name: o.name, input: o.input as Record<string, unknown> } });
+    if (
+      o.type === 'tool_use' &&
+      typeof o.name === 'string' &&
+      o.input &&
+      typeof o.input === 'object'
+    ) {
+      uses.push({
+        id: String(o.id ?? ''),
+        call: { name: o.name, input: o.input as Record<string, unknown> },
+      });
     } else if (o.type === 'tool_result' && typeof o.tool_use_id === 'string') {
       results.set(o.tool_use_id, { text: resultText(o.content), failed: o.is_error === true });
     }
@@ -174,7 +201,9 @@ export function toolCalls(execution: unknown): ToolCall[] {
   return uses.map(({ id, call }) => {
     const result = results.get(id);
     // No result at all: cancelled before it ran.
-    return result ? { ...call, result: result.text, failed: result.failed } : { ...call, failed: true };
+    return result
+      ? { ...call, result: result.text, failed: result.failed }
+      : { ...call, failed: true };
   });
 }
 
@@ -182,9 +211,11 @@ function resultText(content: unknown): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
     return content
-      .map((part) => (part && typeof part === 'object' && typeof (part as { text?: unknown }).text === 'string'
-        ? (part as { text: string }).text
-        : ''))
+      .map((part) =>
+        part && typeof part === 'object' && typeof (part as { text?: unknown }).text === 'string'
+          ? (part as { text: string }).text
+          : '',
+      )
       .join('\n');
   }
   return '';

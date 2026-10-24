@@ -33,7 +33,12 @@ export default function SessionStatRow({
     { count: kept, label: 'kept', symbolName: 'checkmark.circle.fill', color: COLORS.keep },
     { count: removed, label: 'removed', symbolName: 'xmark.circle.fill', color: COLORS.remove },
     { count: skipped, label: 'skipped', symbolName: 'arrow.right.circle', color: COLORS.skip },
-    { count: remaining, label: 'remaining', symbolName: 'music.note.list', color: colors.textSecondary },
+    {
+      count: remaining,
+      label: 'remaining',
+      symbolName: 'music.note.list',
+      color: colors.textSecondary,
+    },
   ];
 
   return (

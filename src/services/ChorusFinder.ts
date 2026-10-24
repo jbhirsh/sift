@@ -106,7 +106,11 @@ export class ChorusFinder {
    * The chorus start for a track. Never rejects: the estimate is the floor.
    * `urgent` marks the card on screen, whose lookup jumps the queue.
    */
-  find(track: Track, previewOffset?: PreviewOffsetLookup, { urgent = false } = {}): Promise<ChorusStart> {
+  find(
+    track: Track,
+    previewOffset?: PreviewOffsetLookup,
+    { urgent = false } = {},
+  ): Promise<ChorusStart> {
     if (urgent) this.deps.prioritize(track.id);
     const pending = this.inFlight.get(track.id);
     if (pending) return pending;
@@ -138,7 +142,11 @@ export class ChorusFinder {
       }
     } catch (err) {
       failedForNow = true;
-      Sentry.addBreadcrumb({ category: 'chorus', message: `Lyrics lookup failed: ${err}`, level: 'info' });
+      Sentry.addBreadcrumb({
+        category: 'chorus',
+        message: `Lyrics lookup failed: ${err}`,
+        level: 'info',
+      });
     }
 
     if (!result && previewOffset) {
@@ -149,7 +157,11 @@ export class ChorusFinder {
         }
       } catch (err) {
         failedForNow = true;
-        Sentry.addBreadcrumb({ category: 'chorus', message: `Preview match failed: ${err}`, level: 'info' });
+        Sentry.addBreadcrumb({
+          category: 'chorus',
+          message: `Preview match failed: ${err}`,
+          level: 'info',
+        });
       }
     }
 
@@ -180,7 +192,11 @@ export class ChorusFinder {
         if (entry) cache.set(...entry);
       }
     } catch (err) {
-      Sentry.addBreadcrumb({ category: 'chorus', message: `Chorus cache unreadable: ${err}`, level: 'warning' });
+      Sentry.addBreadcrumb({
+        category: 'chorus',
+        message: `Chorus cache unreadable: ${err}`,
+        level: 'warning',
+      });
     }
     return cache;
   }
@@ -193,9 +209,18 @@ export class ChorusFinder {
       if (cache.size <= MAX_CACHE_ENTRIES) break;
       cache.delete(id);
     }
-    const rows: CacheRow[] = [...cache].map(([id, e]) => [id, e.position, SOURCE_CODES[e.source], e.duration]);
+    const rows: CacheRow[] = [...cache].map(([id, e]) => [
+      id,
+      e.position,
+      SOURCE_CODES[e.source],
+      e.duration,
+    ]);
     this.deps.storage.setItem(CHORUS_CACHE_KEY, JSON.stringify(rows)).catch((err: unknown) => {
-      Sentry.addBreadcrumb({ category: 'chorus', message: `Chorus cache write failed: ${err}`, level: 'warning' });
+      Sentry.addBreadcrumb({
+        category: 'chorus',
+        message: `Chorus cache write failed: ${err}`,
+        level: 'warning',
+      });
     });
   }
 }

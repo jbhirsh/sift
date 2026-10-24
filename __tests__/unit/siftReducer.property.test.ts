@@ -8,35 +8,74 @@ import type { Track } from '../../src/types';
 // mid-save, exit-path races) were unanticipated sequences.
 
 const track = (i: number): Track => ({
-  id: `t${i}`, name: `Track ${i}`, artist: 'Artist', album: 'Album',
-  duration: 200, playCount: (i * 7) % 13, dateAdded: `2020-01-${String((i % 28) + 1).padStart(2, '0')}T00:00:00.000Z`,
+  id: `t${i}`,
+  name: `Track ${i}`,
+  artist: 'Artist',
+  album: 'Album',
+  duration: 200,
+  playCount: (i * 7) % 13,
+  dateAdded: `2020-01-${String((i % 28) + 1).padStart(2, '0')}T00:00:00.000Z`,
 });
 
 // Track lists with unique ids, as the providers return them.
-const trackList = fc.uniqueArray(fc.integer({ min: 0, max: 40 }), { minLength: 1, maxLength: 12 }).map((ids) => ids.map(track));
+const trackList = fc
+  .uniqueArray(fc.integer({ min: 0, max: 40 }), { minLength: 1, maxLength: 12 })
+  .map((ids) => ids.map(track));
 
 const action = fc.oneof(
-  fc.tuple(fc.constantFrom('keep', 'remove', 'skip'), fc.nat()).map(([decision, at]) => ({ type: 'DECIDE' as const, decision, at })),
+  fc
+    .tuple(fc.constantFrom('keep', 'remove', 'skip'), fc.nat())
+    .map(([decision, at]) => ({ type: 'DECIDE' as const, decision, at })),
   fc.constant({ type: 'FINISH' as const }),
   fc.constant({ type: 'CONTINUE_SIFTING' as const }),
-  fc.constantFrom('least-played', 'most-played', 'oldest', 'newest').map((sortOrder) => ({ type: 'SET_SORT_ORDER' as const, sortOrder })),
+  fc
+    .constantFrom('least-played', 'most-played', 'oldest', 'newest')
+    .map((sortOrder) => ({ type: 'SET_SORT_ORDER' as const, sortOrder })),
   trackList.map((tracks) => ({ type: 'LOAD_TRACKS' as const, tracks })),
-  fc.integer({ min: 0, max: 40 }).map((i) => ({ type: 'RESTORE_TRACK' as const, trackId: `t${i}` })),
-  fc.integer({ min: 0, max: 40 }).map((i) => ({ type: 'ADD_REMOVAL_ERROR' as const, error: `Track ${i}`, failedRemovalId: `t${i}` })),
+  fc
+    .integer({ min: 0, max: 40 })
+    .map((i) => ({ type: 'RESTORE_TRACK' as const, trackId: `t${i}` })),
+  fc.integer({ min: 0, max: 40 }).map((i) => ({
+    type: 'ADD_REMOVAL_ERROR' as const,
+    error: `Track ${i}`,
+    failedRemovalId: `t${i}`,
+  })),
   fc.constant({ type: 'UNDO_LAST' as const }),
-  fc.tuple(fc.integer({ min: 0, max: 40 }), fc.constantFrom('keep', 'remove', 'skip')).map(([i, decision]) => ({ type: 'REVISE' as const, trackId: `t${i}`, decision })),
-  fc.tuple(fc.integer({ min: 0, max: 40 }), fc.nat()).map(([i, at]) => ({ type: 'PENDING_SENT' as const, trackId: `t${i}`, at })),
+  fc
+    .tuple(fc.integer({ min: 0, max: 40 }), fc.constantFrom('keep', 'remove', 'skip'))
+    .map(([i, decision]) => ({ type: 'REVISE' as const, trackId: `t${i}`, decision })),
+  fc
+    .tuple(fc.integer({ min: 0, max: 40 }), fc.nat())
+    .map(([i, at]) => ({ type: 'PENDING_SENT' as const, trackId: `t${i}`, at })),
   fc.constant({ type: 'START_FRESH' as const }),
   fc.constant({ type: 'RESET_TO_SETUP' as const }),
 );
 
 const start = (tracks: Track[]): SiftState => ({
-  phase: 'sifting', provider: 'apple-music', source: { type: 'library' }, activeSource: { type: 'library' },
-  tracks, cursor: 0, kept: [], removed: [], skipped: [], sortOrder: 'least-played',
-  loadProgress: 1, loadMessage: '', loadError: null, playbackPosition: 0, isPlaying: false,
-  removalErrors: [], failedRemovalIds: [], connectionStatus: 'connected',
-  skipFiltering: false, startAtChorus: false, pending: null,
-  playbackFailedId: null, songCacheWarming: false, songCacheGeneration: 0,
+  phase: 'sifting',
+  provider: 'apple-music',
+  source: { type: 'library' },
+  activeSource: { type: 'library' },
+  tracks,
+  cursor: 0,
+  kept: [],
+  removed: [],
+  skipped: [],
+  sortOrder: 'least-played',
+  loadProgress: 1,
+  loadMessage: '',
+  loadError: null,
+  playbackPosition: 0,
+  isPlaying: false,
+  removalErrors: [],
+  failedRemovalIds: [],
+  connectionStatus: 'connected',
+  skipFiltering: false,
+  startAtChorus: false,
+  pending: null,
+  playbackFailedId: null,
+  songCacheWarming: false,
+  songCacheGeneration: 0,
   filter: { maxPlays: null, addedYearsAgo: null },
 });
 
@@ -80,15 +119,21 @@ describe('siftReducer properties (#61)', () => {
 
   test('re-sorting never moves a decided card', () => {
     fc.assert(
-      fc.property(trackList, fc.nat(), fc.constantFrom('most-played', 'oldest', 'newest'), (tracks, n, sortOrder) => {
-        let state = start(tracks);
-        const decisions = n % (tracks.length + 1);
-        for (let i = 0; i < decisions; i++) state = siftReducer(state, { type: 'DECIDE', decision: 'skip' });
-        const before = ids(state.tracks.slice(0, state.cursor));
-        state = siftReducer(state, { type: 'SET_SORT_ORDER', sortOrder });
-        expect(ids(state.tracks.slice(0, state.cursor))).toEqual(before);
-        expect(new Set(ids(state.tracks))).toEqual(new Set(ids(tracks)));
-      }),
+      fc.property(
+        trackList,
+        fc.nat(),
+        fc.constantFrom('most-played', 'oldest', 'newest'),
+        (tracks, n, sortOrder) => {
+          let state = start(tracks);
+          const decisions = n % (tracks.length + 1);
+          for (let i = 0; i < decisions; i++)
+            state = siftReducer(state, { type: 'DECIDE', decision: 'skip' });
+          const before = ids(state.tracks.slice(0, state.cursor));
+          state = siftReducer(state, { type: 'SET_SORT_ORDER', sortOrder });
+          expect(ids(state.tracks.slice(0, state.cursor))).toEqual(before);
+          expect(new Set(ids(state.tracks))).toEqual(new Set(ids(tracks)));
+        },
+      ),
     );
   });
 
@@ -97,7 +142,8 @@ describe('siftReducer properties (#61)', () => {
       fc.property(trackList, fc.nat(), (tracks, n) => {
         let state = start(tracks);
         const decisions = n % tracks.length;
-        for (let i = 0; i < decisions; i++) state = siftReducer(state, { type: 'DECIDE', decision: 'keep' });
+        for (let i = 0; i < decisions; i++)
+          state = siftReducer(state, { type: 'DECIDE', decision: 'keep' });
         const cursor = state.cursor;
         state = siftReducer(siftReducer(state, { type: 'FINISH' }), { type: 'CONTINUE_SIFTING' });
         expect(state.phase).toBe('sifting');

@@ -2,7 +2,11 @@ import * as Sentry from '@sentry/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MusicProvider } from '../types';
 import type { MusicProviderService } from './MusicProviderInterface';
-import { collectedRemovalIds, collectsRemovals, deletionCandidates } from '../utils/libraryRemovals';
+import {
+  collectedRemovalIds,
+  collectsRemovals,
+  deletionCandidates,
+} from '../utils/libraryRemovals';
 import { loadHistory } from './RemovalHistoryStore';
 import { trace } from './trace';
 
@@ -32,10 +36,14 @@ let shown = false;
 async function storedReported(): Promise<Record<string, string[]>> {
   // Anything but an object of lists reads as none (Object.entries of a
   // number or string has no lists; of null, it throws: callers catch).
-  const parsed = JSON.parse((await AsyncStorage.getItem(REPORTED_KEY)) ?? '{}') as Record<string, unknown>;
+  const parsed = JSON.parse((await AsyncStorage.getItem(REPORTED_KEY)) ?? '{}') as Record<
+    string,
+    unknown
+  >;
   const lists: Record<string, string[]> = {};
   for (const [provider, ids] of Object.entries(parsed)) {
-    if (Array.isArray(ids)) lists[provider] = ids.filter((id): id is string => typeof id === 'string');
+    if (Array.isArray(ids))
+      lists[provider] = ids.filter((id): id is string => typeof id === 'string');
   }
   return lists;
 }
@@ -47,7 +55,9 @@ async function lookNow(service: MusicProviderService, provider: MusicProvider): 
     // Silent without library access: this never asks for it.
     if (!(await service.isAuthorized())) return nothing;
     const history = await loadHistory();
-    const reported = new Set((await storedReported().catch((): Record<string, string[]> => ({})))[provider] ?? []);
+    const reported = new Set(
+      (await storedReported().catch((): Record<string, string[]> => ({})))[provider] ?? [],
+    );
     const candidates = deletionCandidates(history, provider).filter((t) => !reported.has(t.id));
     if (candidates.length === 0) return nothing;
     const deleted = await service.deletedFromLibrary(candidates);
@@ -67,7 +77,10 @@ async function lookNow(service: MusicProviderService, provider: MusicProvider): 
  * until a Setup shows it (markDeletedInMusicShown), then 0. 0 without
  * library access or when the look fails. Never rejects.
  */
-export async function deletedInMusicCount(service: MusicProviderService, provider: MusicProvider): Promise<number> {
+export async function deletedInMusicCount(
+  service: MusicProviderService,
+  provider: MusicProvider,
+): Promise<number> {
   look ??= lookNow(service, provider);
   const result = await look;
   return shown ? 0 : result.deleted.length;
@@ -85,7 +98,9 @@ export async function markDeletedInMusicShown(): Promise<void> {
   try {
     const lists = await storedReported().catch((): Record<string, string[]> => ({}));
     // Only songs still collected: a restored one's records are gone.
-    const ids = [...new Set([...(lists[provider] ?? []), ...deleted])].filter((id) => collected.has(id));
+    const ids = [...new Set([...(lists[provider] ?? []), ...deleted])].filter((id) =>
+      collected.has(id),
+    );
     await AsyncStorage.setItem(REPORTED_KEY, JSON.stringify({ ...lists, [provider]: ids }));
   } catch (err) {
     Sentry.captureException(err, { tags: { flow: 'deleted-in-music' } });

@@ -9,11 +9,7 @@ import {
 } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  runOnJS,
-} from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, runOnJS } from 'react-native-reanimated';
 import { useSift } from '../context/SiftContext';
 import { useTheme } from '../theme/ThemeContext';
 import { useMusicProvider } from '../hooks/useMusicProvider';
@@ -94,16 +90,23 @@ export default function PlayerControls() {
     if (!currentTrack || state.isPlaying || state.playbackPosition !== 0) return;
     if (pendingStartRef.current === currentTrack.id) return;
     playFromStart(currentTrack);
-  }, [state.songCacheGeneration, state.isPlaying, state.playbackPosition, currentTrack, playFromStart]);
+  }, [
+    state.songCacheGeneration,
+    state.isPlaying,
+    state.playbackPosition,
+    currentTrack,
+    playFromStart,
+  ]);
 
   // Pause music when PlayerControls unmounts (session paused/done)
   useEffect(() => {
-    return () => { pause(); };
+    return () => {
+      pause();
+    };
   }, [pause]);
 
-  const playFailed = currentTrack != null
-    && state.playbackFailedId === currentTrack.id
-    && !state.songCacheWarming;
+  const playFailed =
+    currentTrack != null && state.playbackFailedId === currentTrack.id && !state.songCacheWarming;
 
   // VoiceOver hears it too: the row appears without any focus change.
   useEffect(() => {
@@ -182,7 +185,12 @@ export default function PlayerControls() {
             resume is still caching songs: it retries when that's done.) */}
         {currentTrack != null && playFailed && (
           <View style={styles.failedRow} testID="playback-failed">
-            <SymbolView name="exclamationmark.triangle.fill" size={14} tintColor={colors.skipText} accessibilityElementsHidden />
+            <SymbolView
+              name="exclamationmark.triangle.fill"
+              size={14}
+              tintColor={colors.skipText}
+              accessibilityElementsHidden
+            />
             <Text style={[styles.failedText, { color: colors.textSecondary }]} numberOfLines={2}>
               Can{'\u2019'}t play this song.
             </Text>
@@ -226,7 +234,9 @@ export default function PlayerControls() {
                 }}
               >
                 <View style={[styles.sliderTrack, { backgroundColor: colors.textTertiary }]}>
-                  <Animated.View style={[styles.sliderFill, { backgroundColor: colors.accent }, fillStyle]} />
+                  <Animated.View
+                    style={[styles.sliderFill, { backgroundColor: colors.accent }, fillStyle]}
+                  />
                 </View>
                 <Animated.View style={[styles.sliderThumb, thumbStyle]} />
               </View>
@@ -256,7 +266,11 @@ export default function PlayerControls() {
             accessibilityRole="button"
             accessibilityLabel={state.isPlaying ? 'Pause' : 'Play'}
           >
-            <SymbolView name={state.isPlaying ? 'pause.fill' : 'play.fill'} size={28} tintColor={colors.text} />
+            <SymbolView
+              name={state.isPlaying ? 'pause.fill' : 'play.fill'}
+              size={28}
+              tintColor={colors.text}
+            />
           </TouchableOpacity>
 
           <TouchableOpacity

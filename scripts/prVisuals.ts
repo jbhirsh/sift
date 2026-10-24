@@ -15,8 +15,7 @@
 // It only knows the paths above: UI that changes through a hook, a service or
 // app.json isn't caught, nor is a reference-style markdown image
 // (![alt][ref]). Reviewers cover those.
-const UI_FILE =
-  /^(src\/App\.tsx|src\/(components|screens|theme)\/.+\.tsx?|assets\/.+)$/;
+const UI_FILE = /^(src\/App\.tsx|src\/(components|screens|theme)\/.+\.tsx?|assets\/.+)$/;
 
 // Markdown or HTML images (GIFs included), HTML video, and the bare
 // user-attachments URL GitHub inserts for a video dropped into the editor.
@@ -55,9 +54,7 @@ function withoutComments(text: string): string {
 // as in GitHub's renderer: a `<!--` quoted in backticks is text, not the start
 // of a comment that would hide the rest of the description.
 export function visibleText(body: string | undefined): string {
-  return withoutComments(
-    (body ?? '').replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, ''),
-  );
+  return withoutComments((body ?? '').replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]*`/g, ''));
 }
 
 export function checkPrVisuals({
@@ -71,7 +68,8 @@ export function checkPrVisuals({
   if (ui.length === 0) return { ok: true, reason: 'no UI files changed' };
   const text = visibleText(body);
   if (OPT_OUT.test(text)) return { ok: true, reason: 'marked "No visible UI change"' };
-  if (VISUAL.some((re) => re.test(text))) return { ok: true, reason: 'description shows the change' };
+  if (VISUAL.some((re) => re.test(text)))
+    return { ok: true, reason: 'description shows the change' };
   return { ok: false, ui };
 }
 

@@ -6,28 +6,28 @@ describe('sortTracks', () => {
   test('least-played sorts ascending by playCount', () => {
     const sorted = sortTracks(MOCK_TRACKS, 'least-played');
     expect(sorted[0].name).toBe('Do I Wanna Know?'); // playCount 5
-    expect(sorted[1].name).toBe('Electric Feel');    // playCount 42
-    expect(sorted[2].name).toBe('Midnight City');    // playCount 87
+    expect(sorted[1].name).toBe('Electric Feel'); // playCount 42
+    expect(sorted[2].name).toBe('Midnight City'); // playCount 87
   });
 
   test('most-played sorts descending by playCount', () => {
     const sorted = sortTracks(MOCK_TRACKS, 'most-played');
-    expect(sorted[0].name).toBe('Midnight City');    // playCount 87
-    expect(sorted[1].name).toBe('Electric Feel');    // playCount 42
+    expect(sorted[0].name).toBe('Midnight City'); // playCount 87
+    expect(sorted[1].name).toBe('Electric Feel'); // playCount 42
     expect(sorted[2].name).toBe('Do I Wanna Know?'); // playCount 5
   });
 
   test('oldest sorts ascending by dateAdded', () => {
     const sorted = sortTracks(MOCK_TRACKS, 'oldest');
     expect(sorted[0].name).toBe('Do I Wanna Know?'); // 2019-06-08
-    expect(sorted[1].name).toBe('Electric Feel');    // 2020-01-26
-    expect(sorted[2].name).toBe('Midnight City');    // 2020-09-13
+    expect(sorted[1].name).toBe('Electric Feel'); // 2020-01-26
+    expect(sorted[2].name).toBe('Midnight City'); // 2020-09-13
   });
 
   test('newest sorts descending by dateAdded', () => {
     const sorted = sortTracks(MOCK_TRACKS, 'newest');
-    expect(sorted[0].name).toBe('Midnight City');    // 2020-09-13
-    expect(sorted[1].name).toBe('Electric Feel');    // 2020-01-26
+    expect(sorted[0].name).toBe('Midnight City'); // 2020-09-13
+    expect(sorted[1].name).toBe('Electric Feel'); // 2020-01-26
     expect(sorted[2].name).toBe('Do I Wanna Know?'); // 2019-06-08
   });
 
@@ -58,7 +58,12 @@ describe('sortTracks', () => {
       expect(sorted[0].name).toBe('Do I Wanna Know?');
       expect(sorted[1].name).toBe('Electric Feel');
       expect(sorted[2].name).toBe('Midnight City');
-      expect(sorted.slice(3).map((t) => t.id).sort()).toEqual(['no-date', 'no-date-2']);
+      expect(
+        sorted
+          .slice(3)
+          .map((t) => t.id)
+          .sort(),
+      ).toEqual(['no-date', 'no-date-2']);
     });
 
     test('newest also puts tracks without a date last', () => {
@@ -78,8 +83,20 @@ describe('sortTracks', () => {
 });
 
 describe('Artist and Album sorts (#176)', () => {
-  const song = (name: string, artist: string, album: string, trackNumber?: number, discNumber?: number): Track => ({
-    id: `${artist}/${album}/${name}`, name, artist, album, duration: 200, playCount: 0, dateAdded: '',
+  const song = (
+    name: string,
+    artist: string,
+    album: string,
+    trackNumber?: number,
+    discNumber?: number,
+  ): Track => ({
+    id: `${artist}/${album}/${name}`,
+    name,
+    artist,
+    album,
+    duration: 200,
+    playCount: 0,
+    dateAdded: '',
     ...(trackNumber !== undefined && { trackNumber }),
     ...(discNumber !== undefined && { discNumber }),
   });
@@ -104,7 +121,12 @@ describe('Artist and Album sorts (#176)', () => {
       song('Levitating', 'Dua Lipa', 'Future Nostalgia', 5),
     ];
     expect(names(sortTracks(tracks, 'artist'))).toEqual([
-      'Levitating', 'vampire', 'drivers license', 'good 4 u', 'Blinding Lights', 'Save Your Tears',
+      'Levitating',
+      'vampire',
+      'drivers license',
+      'good 4 u',
+      'Blinding Lights',
+      'Save Your Tears',
     ]);
   });
 
@@ -118,7 +140,14 @@ describe('Artist and Album sorts (#176)', () => {
       song('Intro', 'X', 'The Album', 1),
       song('Song', 'Y', 'Abbey Road', 7),
     ];
-    expect(names(sortTracks(tracks, 'album'))).toEqual(['Song', 'Intro', 'Zulu', 'Bravo', 'Yankee', 'Alpha']);
+    expect(names(sortTracks(tracks, 'album'))).toEqual([
+      'Song',
+      'Intro',
+      'Zulu',
+      'Bravo',
+      'Yankee',
+      'Alpha',
+    ]);
   });
 
   test('album order: disc, then track; songs without a number after the numbered, by title', () => {
@@ -131,10 +160,17 @@ describe('Artist and Album sorts (#176)', () => {
       song('Xray', 'A', 'Live', 2, 1),
     ];
     // Disc 1 (none given counts as 1): tracks 2, 2 (tie: by title), 10; then disc 2; then no number.
-    expect(names(sortTracks(tracks, 'album'))).toEqual(['Xray', 'Zulu', 'Yankee', 'Alpha', 'No number a', 'No number b']);
+    expect(names(sortTracks(tracks, 'album'))).toEqual([
+      'Xray',
+      'Zulu',
+      'Yankee',
+      'Alpha',
+      'No number a',
+      'No number b',
+    ]);
   });
 
-  test('a guest credit doesn\'t split an album or move a song away from its artist', () => {
+  test("a guest credit doesn't split an album or move a song away from its artist", () => {
     const tracks = [
       song('Need to Know', 'Doja Cat', 'Planet Her', 6),
       song('Kiss Me More', 'Doja Cat feat. SZA', 'Planet Her', 3),
@@ -142,8 +178,20 @@ describe('Artist and Album sorts (#176)', () => {
       song('Say So', 'Doja Cat', 'Hot Pink', 11),
       song('Levitating', 'Dua Lipa (feat. DaBaby)', 'Future Nostalgia', 5),
     ];
-    expect(names(sortTracks(tracks, 'album'))).toEqual(['Levitating', 'Say So', 'Woman', 'Kiss Me More', 'Need to Know']);
-    expect(names(sortTracks(tracks, 'artist'))).toEqual(['Say So', 'Woman', 'Kiss Me More', 'Need to Know', 'Levitating']);
+    expect(names(sortTracks(tracks, 'album'))).toEqual([
+      'Levitating',
+      'Say So',
+      'Woman',
+      'Kiss Me More',
+      'Need to Know',
+    ]);
+    expect(names(sortTracks(tracks, 'artist'))).toEqual([
+      'Say So',
+      'Woman',
+      'Kiss Me More',
+      'Need to Know',
+      'Levitating',
+    ]);
   });
 
   test.each([
@@ -162,7 +210,11 @@ describe('Artist and Album sorts (#176)', () => {
   });
 
   test('songs with no artist or album go last', () => {
-    const tracks = [song('No artist', '', 'Album'), song('Named', 'Zed', 'Album'), song('Blank', '  ', 'Album')];
+    const tracks = [
+      song('No artist', '', 'Album'),
+      song('Named', 'Zed', 'Album'),
+      song('Blank', '  ', 'Album'),
+    ];
     expect(names(sortTracks(tracks, 'artist'))).toEqual(['Named', 'Blank', 'No artist']);
     const albums = [song('No album', 'A', ''), song('Has album', 'B', 'Zzz')];
     expect(names(sortTracks(albums, 'album'))).toEqual(['Has album', 'No album']);

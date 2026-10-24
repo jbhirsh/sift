@@ -91,10 +91,19 @@ describe('isSiftSource', () => {
     ['null', null],
     ['an unknown type', { type: 'album' }],
     ['a playlist without a playlist', { type: 'playlist' }],
-    ['a playlist with a numeric id', { type: 'playlist', playlist: { ...playlistSource.playlist, id: 1 } }],
+    [
+      'a playlist with a numeric id',
+      { type: 'playlist', playlist: { ...playlistSource.playlist, id: 1 } },
+    ],
     ['a playlist with no name', { type: 'playlist', playlist: { id: 'p1', trackCount: 1 } }],
-    ['a playlist with a string trackCount', { type: 'playlist', playlist: { ...playlistSource.playlist, trackCount: '4' } }],
-    ['a playlist with a null artworkURL', { type: 'playlist', playlist: { ...playlistSource.playlist, artworkURL: null } }],
+    [
+      'a playlist with a string trackCount',
+      { type: 'playlist', playlist: { ...playlistSource.playlist, trackCount: '4' } },
+    ],
+    [
+      'a playlist with a null artworkURL',
+      { type: 'playlist', playlist: { ...playlistSource.playlist, artworkURL: null } },
+    ],
   ])('rejects %s', (_label, value) => {
     expect(isSiftSource(value)).toBe(false);
   });
@@ -103,8 +112,12 @@ describe('isSiftSource', () => {
 describe('isRemovalRecord', () => {
   test('accepts a well-formed record for each source type', () => {
     expect(isRemovalRecord(stored(record))).toBe(true);
-    expect(isRemovalRecord(stored({ ...record, source: playlistSource, provider: 'apple-music' }))).toBe(true);
-    expect(isRemovalRecord(stored({ ...record, source: playlistSource, collected: true }))).toBe(true);
+    expect(
+      isRemovalRecord(stored({ ...record, source: playlistSource, provider: 'apple-music' })),
+    ).toBe(true);
+    expect(isRemovalRecord(stored({ ...record, source: playlistSource, collected: true }))).toBe(
+      true,
+    );
   });
 
   test('tolerates drift in fields the app never reads from history', () => {
@@ -130,7 +143,10 @@ describe('isRemovalRecord', () => {
     ['a source with no type', { ...record, source: {} }],
     ['an unknown source type', { ...record, source: { type: 'album' } }],
     ['a playlist source without a playlist', { ...record, source: { type: 'playlist' } }],
-    ['a playlist source with no id', { ...record, source: { type: 'playlist', playlist: { name: 'Mix' } } }],
+    [
+      'a playlist source with no id',
+      { ...record, source: { type: 'playlist', playlist: { name: 'Mix' } } },
+    ],
     ['a non-boolean collected', { ...record, source: playlistSource, collected: 'yes' }],
   ])('rejects %s', (_label, value) => {
     expect(isRemovalRecord(value)).toBe(false);
@@ -176,8 +192,12 @@ describe('isSiftSession', () => {
   test('accepts a session still carrying the old "- Sifted" fields, whatever they hold', () => {
     // pendingKeeps and siftedPlaylistId went with the automatic "- Sifted"
     // playlist; a bad value in one no longer costs the whole session.
-    expect(isSiftSession(stored({ ...session, pendingKeeps: [track], siftedPlaylistId: 'sifted-1' }))).toBe(true);
-    expect(isSiftSession(stored({ ...session, pendingKeeps: 'x', siftedPlaylistId: 7 }))).toBe(true);
+    expect(
+      isSiftSession(stored({ ...session, pendingKeeps: [track], siftedPlaylistId: 'sifted-1' })),
+    ).toBe(true);
+    expect(isSiftSession(stored({ ...session, pendingKeeps: 'x', siftedPlaylistId: 7 }))).toBe(
+      true,
+    );
   });
 
   test.each([
@@ -207,12 +227,14 @@ describe('isSiftSession', () => {
 });
 
 describe('legacyPendingKeeps', () => {
-  test('the usable tracks of an old session\'s pendingKeeps', () => {
+  test("the usable tracks of an old session's pendingKeeps", () => {
     const other = { ...track, id: 't2' };
-    expect(legacyPendingKeeps({ ...session, pendingKeeps: [track, {}, other, { ...track, id: 3 }] })).toEqual([track, other]);
+    expect(
+      legacyPendingKeeps({ ...session, pendingKeeps: [track, {}, other, { ...track, id: 3 }] }),
+    ).toEqual([track, other]);
   });
 
-  test('none for a session without them, or one where they aren\'t a list', () => {
+  test("none for a session without them, or one where they aren't a list", () => {
     expect(legacyPendingKeeps(session)).toEqual([]);
     expect(legacyPendingKeeps({ ...session, pendingKeeps: 'x' })).toEqual([]);
     expect(legacyPendingKeeps(null)).toEqual([]);
@@ -241,7 +263,7 @@ describe('savedBeforeKeepsRemembered', () => {
     expect(savedBeforeKeepsRemembered({ ...session, siftedPlaylistId: null })).toBe(true);
   });
 
-  test('not one without them, or anything that isn\'t a session object', () => {
+  test("not one without them, or anything that isn't a session object", () => {
     expect(savedBeforeKeepsRemembered(session)).toBe(false);
     expect(savedBeforeKeepsRemembered(null)).toBe(false);
     expect(savedBeforeKeepsRemembered([{ pendingKeeps: [] }])).toBe(false);

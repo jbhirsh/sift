@@ -70,7 +70,10 @@ function Marks({ inModal }: { inModal: boolean }) {
       {marks.trail.map((dot) => (
         <View
           key={`${dot.at}-${dot.x}-${dot.y}`}
-          style={[styles.dot, { left: dot.x - DOT / 2, top: dot.y - DOT / 2, opacity: dotOpacity(dot, now) }]}
+          style={[
+            styles.dot,
+            { left: dot.x - DOT / 2, top: dot.y - DOT / 2, opacity: dotOpacity(dot, now) },
+          ]}
         />
       ))}
       {marks.press && press && (

@@ -1,6 +1,14 @@
 import {
-  cardSize, DRAG_THRESHOLD, FLING_MIN_DISTANCE, FLING_VELOCITY, flyOffDistance, MAX_CARD_ASPECT, MAX_CARD_WIDTH, MIN_FLY_OFF,
-  PHONE_MAX_AREA_WIDTH, swipeDecision,
+  cardSize,
+  DRAG_THRESHOLD,
+  FLING_MIN_DISTANCE,
+  FLING_VELOCITY,
+  flyOffDistance,
+  MAX_CARD_ASPECT,
+  MAX_CARD_WIDTH,
+  MIN_FLY_OFF,
+  PHONE_MAX_AREA_WIDTH,
+  swipeDecision,
 } from '../../src/utils/cardLayout';
 
 describe('cardSize (#149)', () => {
@@ -25,7 +33,7 @@ describe('cardSize (#149)', () => {
     expect(cardSize(440, 300)).toEqual({ width: 440, height: 300 });
   });
 
-  test('just past a phone\'s width, the iPad limits apply', () => {
+  test("just past a phone's width, the iPad limits apply", () => {
     expect(cardSize(441, 300)).toEqual({ width: 300, height: 300 });
     expect(cardSize(500, 900)).toEqual({ width: 500, height: 650 });
   });

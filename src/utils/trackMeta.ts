@@ -1,7 +1,17 @@
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTHS_LONG = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
 export interface TrackMeta {
@@ -35,7 +45,13 @@ export function formatTrackMeta(
   const label: string[] = [];
   if (countKnown) {
     text.push(playCount > 0 ? `Played ${playCount}×` : 'Never played');
-    label.push(playCount === 1 ? 'Played once' : playCount > 0 ? `Played ${playCount} times` : 'Never played');
+    label.push(
+      playCount === 1
+        ? 'Played once'
+        : playCount > 0
+          ? `Played ${playCount} times`
+          : 'Never played',
+    );
   }
   if (date) {
     text.push(`Added ${MONTHS[date.getMonth()]} ${date.getFullYear()}`);

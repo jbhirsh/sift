@@ -16,7 +16,9 @@ type GateState = 'ready' | 'resetting' | { error: string };
  * flow fails at once and its screenshot names the cause.
  */
 export default function ResetGate({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<GateState>(() => (resetRequested && !resetDone ? 'resetting' : 'ready'));
+  const [state, setState] = useState<GateState>(() =>
+    resetRequested && !resetDone ? 'resetting' : 'ready',
+  );
   useEffect(() => {
     if (state !== 'resetting') return;
     resetAppData().then(

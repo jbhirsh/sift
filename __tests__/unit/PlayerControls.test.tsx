@@ -19,7 +19,13 @@ jest.mock('react-native-reanimated', () => ({
   },
   useSharedValue: (val: number) => {
     // Mirrors Reanimated's SharedValue surface: .value plus get()/set().
-    const sv = { value: val, get: () => sv.value, set: (v: number) => { sv.value = v; } };
+    const sv = {
+      value: val,
+      get: () => sv.value,
+      set: (v: number) => {
+        sv.value = v;
+      },
+    };
     return sv;
   },
   useAnimatedStyle: (fn: () => unknown) => fn(),
@@ -60,11 +66,16 @@ jest.mock('react-native-gesture-handler', () => ({
 let mockShowTouches = false;
 const mockFollowTouch = jest.fn();
 const mockLiftTouch = jest.fn();
-jest.mock('../../src/services/touchOverlay', () => Object.defineProperties({}, {
-  showTouches: { get: () => mockShowTouches },
-  followTouch: { value: (x: number, y: number) => mockFollowTouch(x, y) },
-  liftTouch: { value: (x: number, y: number) => mockLiftTouch(x, y) },
-}));
+jest.mock('../../src/services/touchOverlay', () =>
+  Object.defineProperties(
+    {},
+    {
+      showTouches: { get: () => mockShowTouches },
+      followTouch: { value: (x: number, y: number) => mockFollowTouch(x, y) },
+      liftTouch: { value: (x: number, y: number) => mockLiftTouch(x, y) },
+    },
+  ),
+);
 
 const mockPlay = jest.fn().mockResolvedValue(undefined);
 const mockPause = jest.fn().mockResolvedValue(undefined);
@@ -85,8 +96,13 @@ jest.mock('../../src/hooks/useMusicProvider', () => ({
 }));
 
 const mockTrack: Track = {
-  id: '1', name: 'Track A', artist: 'Artist A', album: 'Album A',
-  duration: 200, playCount: 10, dateAdded: '2020-01-01T00:00:00.000Z',
+  id: '1',
+  name: 'Track A',
+  artist: 'Artist A',
+  album: 'Album A',
+  duration: 200,
+  playCount: 10,
+  dateAdded: '2020-01-01T00:00:00.000Z',
 };
 
 const mockState = {
@@ -119,9 +135,14 @@ jest.mock('../../src/theme/ThemeContext', () => ({
   useTheme: () => ({
     isDark: false,
     colors: {
-      text: '#000', textSecondary: '#666', textTertiary: '#999',
-      accent: '#007AFF', quaternary: 'rgba(0,0,0,0.04)',
-      background: '#FFF', surface: '#F2F2F7', separator: 'rgba(0,0,0,0.1)',
+      text: '#000',
+      textSecondary: '#666',
+      textTertiary: '#999',
+      accent: '#007AFF',
+      quaternary: 'rgba(0,0,0,0.04)',
+      background: '#FFF',
+      surface: '#F2F2F7',
+      separator: 'rgba(0,0,0,0.1)',
     },
     glass: { tint: 'light', borderColor: 'rgba(255,255,255,0.5)' },
     gradientColors: () => ['#F2F2F7', '#FFFFFF'] as [string, string],
@@ -142,7 +163,7 @@ describe('PlayerControls', () => {
     mockState.songCacheGeneration = 0;
   });
 
-  describe('a song that won\'t play', () => {
+  describe("a song that won't play", () => {
     test('says so in place of the seek bar, offers Try Again, and tells VoiceOver', async () => {
       const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility');
       mockState.playbackPosition = 0;
@@ -287,9 +308,7 @@ describe('PlayerControls', () => {
     // Find slider container and trigger layout to set sliderWidth > 0
     const views = container.queryAll((v) => v.type === 'View');
     // The slider container is the View with onLayout prop
-    const sliderContainer = views.find(
-      (v: { props: { onLayout?: unknown } }) => v.props.onLayout,
-    );
+    const sliderContainer = views.find((v: { props: { onLayout?: unknown } }) => v.props.onLayout);
     if (sliderContainer) {
       await fireEvent(sliderContainer, 'layout', {
         nativeEvent: { layout: { width: 300, height: 30, x: 0, y: 0 } },
@@ -303,9 +322,7 @@ describe('PlayerControls', () => {
   test('pan gesture seeks to position after layout', async () => {
     const { container } = await render(<PlayerControls />);
     const views = container.queryAll((v) => v.type === 'View');
-    const sliderContainer = views.find(
-      (v: { props: { onLayout?: unknown } }) => v.props.onLayout,
-    );
+    const sliderContainer = views.find((v: { props: { onLayout?: unknown } }) => v.props.onLayout);
     if (sliderContainer) {
       await fireEvent(sliderContainer, 'layout', {
         nativeEvent: { layout: { width: 300, height: 30, x: 0, y: 0 } },
@@ -316,7 +333,7 @@ describe('PlayerControls', () => {
     expect(mockSeek).toHaveBeenCalled();
   });
 
-  test('a GIF recording\'s drawn ring follows a scrub and lets go with it; nothing otherwise', async () => {
+  test("a GIF recording's drawn ring follows a scrub and lets go with it; nothing otherwise", async () => {
     // The gesture's worklets take the switch as it was when it was built.
     await render(<PlayerControls />);
     panOnUpdate?.({ x: 100, absoluteX: 120, absoluteY: 600 });

@@ -36,7 +36,7 @@ describe('haptics', () => {
     expect(mockImpact).toHaveBeenCalledWith('light');
   });
 
-  test('a device that can\'t do it fails quietly', async () => {
+  test("a device that can't do it fails quietly", async () => {
     mockImpact.mockImplementationOnce(() => Promise.reject(new Error('no taptic engine')));
     mockSelection.mockImplementationOnce(() => Promise.reject(new Error('no taptic engine')));
     expect(() => {

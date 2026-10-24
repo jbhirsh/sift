@@ -31,28 +31,31 @@ export function useReviseDecision(
     latest.current = state;
   });
 
-  return useCallback(async (track: Track, decision: Decision): Promise<boolean> => {
-    const now = latest.current;
-    const current = decisionFor(track.id, now);
-    if (current == null) return false;
-    if (current === decision) return true;
-    const held = now.pending;
-    if (held?.trackId === track.id && !wasSent(held)) {
+  return useCallback(
+    async (track: Track, decision: Decision): Promise<boolean> => {
+      const now = latest.current;
+      const current = decisionFor(track.id, now);
+      if (current == null) return false;
+      if (current === decision) return true;
+      const held = now.pending;
+      if (held?.trackId === track.id && !wasSent(held)) {
+        dispatch({ type: 'REVISE', trackId: track.id, decision });
+        return true;
+      }
+      if (current === 'remove' && !(await restoreTrack(track))) return false;
+      if (current === 'keep' && !(await unkeepTrack(track))) return false;
+      // The held decision this replaces already went out: clear it first, so
+      // REVISE doesn't rewrite it into one that looks unsent and goes out
+      // again (or brings Undo back).
+      const sentHeld = latest.current.pending;
+      if (sentHeld?.trackId === track.id) {
+        dispatch({ type: 'PENDING_SENT', trackId: sentHeld.trackId, at: sentHeld.at });
+      }
       dispatch({ type: 'REVISE', trackId: track.id, decision });
+      lastSentAt = Math.max(Date.now(), lastSentAt + 1);
+      send({ trackId: track.id, decision, at: lastSentAt });
       return true;
-    }
-    if (current === 'remove' && !(await restoreTrack(track))) return false;
-    if (current === 'keep' && !(await unkeepTrack(track))) return false;
-    // The held decision this replaces already went out: clear it first, so
-    // REVISE doesn't rewrite it into one that looks unsent and goes out
-    // again (or brings Undo back).
-    const sentHeld = latest.current.pending;
-    if (sentHeld?.trackId === track.id) {
-      dispatch({ type: 'PENDING_SENT', trackId: sentHeld.trackId, at: sentHeld.at });
-    }
-    dispatch({ type: 'REVISE', trackId: track.id, decision });
-    lastSentAt = Math.max(Date.now(), lastSentAt + 1);
-    send({ trackId: track.id, decision, at: lastSentAt });
-    return true;
-  }, [dispatch, restoreTrack, unkeepTrack, send]);
+    },
+    [dispatch, restoreTrack, unkeepTrack, send],
+  );
 }

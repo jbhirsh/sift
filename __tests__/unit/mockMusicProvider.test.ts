@@ -42,10 +42,12 @@ describe('MockMusicProvider', () => {
     }
   });
 
-  test('every library song has its album\'s cover, from Apple\'s artwork server', async () => {
+  test("every library song has its album's cover, from Apple's artwork server", async () => {
     const tracks = await flushAsync(provider.loadLibrary());
     for (const track of tracks) {
-      expect(track.artworkURL).toMatch(/^https:\/\/is1-ssl\.mzstatic\.com\/image\/thumb\/.+\/1000x1000bb\.jpg$/);
+      expect(track.artworkURL).toMatch(
+        /^https:\/\/is1-ssl\.mzstatic\.com\/image\/thumb\/.+\/1000x1000bb\.jpg$/,
+      );
     }
     // Two songs off one album share its cover.
     const sour = tracks.filter((track) => track.album === 'SOUR');
@@ -107,14 +109,19 @@ describe('MockMusicProvider', () => {
     expect(first).toMatch(/^mock-created-\d+$/);
     expect(second).toMatch(/^mock-created-\d+$/);
     expect(second).not.toBe(first);
-    await expect(flushAsync(provider.findPlaylists('Test Playlist'))).resolves.toEqual([first, second]);
+    await expect(flushAsync(provider.findPlaylists('Test Playlist'))).resolves.toEqual([
+      first,
+      second,
+    ]);
     // Like the stateless library listing, loadPlaylists never shows them.
     const listed = await flushAsync(provider.loadPlaylists());
     expect(listed.map((p) => p.id)).not.toContain(first);
   });
 
   test('findPlaylists lists the seeded playlists by exact name', async () => {
-    await expect(flushAsync(provider.findPlaylists('Road Trip - Sifted'))).resolves.toEqual(['playlist-4']);
+    await expect(flushAsync(provider.findPlaylists('Road Trip - Sifted'))).resolves.toEqual([
+      'playlist-4',
+    ]);
     await expect(flushAsync(provider.findPlaylists('Road Trip'))).resolves.toEqual(['playlist-3']);
     await expect(flushAsync(provider.findPlaylists('Nope - Sifted'))).resolves.toEqual([]);
   });
@@ -191,9 +198,15 @@ describe('MockMusicProvider', () => {
 
   test('"Long Drive" holds every song and takes SLOW_PLAYLIST_LOAD_MS to load, for Loading\'s Cancel (#177)', async () => {
     const playlists = await flushAsync(provider.loadPlaylists());
-    expect(playlists.find((p) => p.id === 'playlist-5')).toEqual({ id: 'playlist-5', name: 'Long Drive', trackCount: 10 });
+    expect(playlists.find((p) => p.id === 'playlist-5')).toEqual({
+      id: 'playlist-5',
+      name: 'Long Drive',
+      trackCount: 10,
+    });
     let tracks: { id: string }[] | undefined;
-    void provider.loadPlaylistTracks('playlist-5').then((t) => { tracks = t; });
+    void provider.loadPlaylistTracks('playlist-5').then((t) => {
+      tracks = t;
+    });
     await jest.advanceTimersByTimeAsync(SLOW_PLAYLIST_LOAD_MS - 1);
     expect(tracks).toBeUndefined();
     await jest.advanceTimersByTimeAsync(1);
@@ -409,7 +422,7 @@ describe('MockMusicProvider failure injection (EXPO_PUBLIC_MOCK_FAIL_ADDS / _REM
     await expect(second.addToPlaylist('p1', ['t4'])).resolves.toBeUndefined();
   });
 
-  test('adds into a playlist made this launch are never injected; they don\'t use up the failures', async () => {
+  test("adds into a playlist made this launch are never injected; they don't use up the failures", async () => {
     process.env[ENV_KEY] = '1';
     const Fresh = freshMockClass();
     const provider = new Fresh();
@@ -437,7 +450,10 @@ describe('MockMusicProvider failure injection (EXPO_PUBLIC_MOCK_FAIL_ADDS / _REM
     // Apple Music, a removed song is in "Sift — Removed".
     await expect(provider.removalLanded({ type: 'library' }, 't2')).resolves.toBe(true);
     await expect(provider.removalLanded({ type: 'library' }, 't1')).resolves.toBe(false);
-    const playlist = { type: 'playlist' as const, playlist: { id: 'p1', name: 'P', trackCount: 1 } };
+    const playlist = {
+      type: 'playlist' as const,
+      playlist: { id: 'p1', name: 'P', trackCount: 1 },
+    };
     await expect(provider.removalLanded(playlist, 't2')).resolves.toBe(true);
     await expect(provider.removalLanded(playlist, 't1')).resolves.toBe(false);
     // removeFromPlaylist is deliberately never injected (see the mock's
@@ -468,11 +484,20 @@ describe('MockMusicProvider failure injection (EXPO_PUBLIC_MOCK_FAIL_ADDS / _REM
 
 describe('MockMusicProvider: songs deleted in Music (#183, SiftDeletedInMusic)', () => {
   const song = (id: string) => ({
-    id, name: id, artist: 'Artist', album: 'Album', duration: 200, playCount: 0, dateAdded: '2020-01-01T00:00:00Z',
+    id,
+    name: id,
+    artist: 'Artist',
+    album: 'Album',
+    duration: 200,
+    playCount: 0,
+    dateAdded: '2020-01-01T00:00:00Z',
   });
 
   /** A fresh mock module, as an E2E build launched with these arguments sees it. */
-  function launchedWith(args: Record<string, unknown>, tracing = true): typeof import('../../src/services/MockMusicProvider') {
+  function launchedWith(
+    args: Record<string, unknown>,
+    tracing = true,
+  ): typeof import('../../src/services/MockMusicProvider') {
     let mod: typeof import('../../src/services/MockMusicProvider') | undefined;
     jest.isolateModules(() => {
       jest.doMock('react-native/Libraries/Settings/Settings', () => ({
@@ -491,11 +516,13 @@ describe('MockMusicProvider: songs deleted in Music (#183, SiftDeletedInMusic)',
     await expect(new Mock().deletedFromLibrary([song('mock-1')])).resolves.toEqual([]);
   });
 
-  test('launched with it, every song an earlier launch collected is; one collected this launch isn\'t', async () => {
+  test("launched with it, every song an earlier launch collected is; one collected this launch isn't", async () => {
     const { MockMusicProvider: Mock } = launchedWith({ SiftDeletedInMusic: 'true' });
     const mock = new Mock();
     await mock.removeFromLibrary(['mock-2']);
-    await expect(mock.deletedFromLibrary([song('mock-1'), song('mock-2')])).resolves.toEqual(['mock-1']);
+    await expect(mock.deletedFromLibrary([song('mock-1'), song('mock-2')])).resolves.toEqual([
+      'mock-1',
+    ]);
   });
 
   test('only the E2E build reads it', async () => {

@@ -114,9 +114,7 @@ describe('useResolvedArtwork', () => {
     const secondPromise = new Promise<string | null>(() => {
       /* never resolves — the second track stays pending */
     });
-    mockResolveArtworkURL
-      .mockReturnValueOnce(firstPromise)
-      .mockReturnValueOnce(secondPromise);
+    mockResolveArtworkURL.mockReturnValueOnce(firstPromise).mockReturnValueOnce(secondPromise);
 
     const { result, rerender } = await renderHook(
       ({ id }: { id: string }) => useResolvedArtwork(id, undefined),
@@ -154,7 +152,7 @@ describe('useResolvedArtwork', () => {
     expect(mockResolveArtworkURL).toHaveBeenCalledWith('track-empty', 600, 600);
   });
 
-  it('a new retry key looks again for artwork that wasn\'t there; the same key doesn\'t', async () => {
+  it("a new retry key looks again for artwork that wasn't there; the same key doesn't", async () => {
     mockResolveArtworkURL.mockResolvedValueOnce(null).mockResolvedValue('file:///art.jpg');
     const { result, rerender } = await renderHook(
       ({ retryKey }: { retryKey: number }) => useResolvedArtwork('track-9', undefined, retryKey),

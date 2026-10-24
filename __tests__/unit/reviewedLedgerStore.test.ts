@@ -40,7 +40,10 @@ describe('ReviewedLedgerStore', () => {
     // The first keep is written at once; the two behind it go together.
     expect(setItem).toHaveBeenCalledTimes(2);
     expect(JSON.parse(setItem.mock.calls[0][1])).toEqual({ 'apple-music:library': ['a'] });
-    expect(JSON.parse(setItem.mock.calls[1][1])).toEqual({ 'apple-music:library': ['a', 'b'], other: ['c'] });
+    expect(JSON.parse(setItem.mock.calls[1][1])).toEqual({
+      'apple-music:library': ['a', 'b'],
+      other: ['c'],
+    });
     // A later keep starts a new write on top of the stored ledger.
     await markReviewed('apple-music:library', 'd');
     await expect(loadReviewedIds('apple-music:library')).resolves.toEqual(new Set(['a', 'b', 'd']));
@@ -49,12 +52,16 @@ describe('ReviewedLedgerStore', () => {
   test('a keep that arrives mid-write is written by a follow-up write', async () => {
     let release: (() => void) | undefined;
     setItem.mockImplementationOnce(async (key: string, value: string) => {
-      await new Promise<void>((resolve) => { release = resolve; });
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
       return AsyncStorage.setItem(key, value);
     });
     const first = markReviewed('k', 'a');
     // Let the first flush reach its write.
-    await new Promise<void>((resolve) => { setImmediate(() => resolve()); });
+    await new Promise<void>((resolve) => {
+      setImmediate(() => resolve());
+    });
     const second = markReviewed('k', 'b');
     release?.();
     await Promise.all([first, second]);
@@ -64,11 +71,15 @@ describe('ReviewedLedgerStore', () => {
   test('a keep not yet written still counts for a load', async () => {
     let release: (() => void) | undefined;
     setItem.mockImplementationOnce(async (key: string, value: string) => {
-      await new Promise<void>((resolve) => { release = resolve; });
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
       return AsyncStorage.setItem(key, value);
     });
     const first = markReviewed('k', 'a');
-    await new Promise<void>((resolve) => { setImmediate(() => resolve()); });
+    await new Promise<void>((resolve) => {
+      setImmediate(() => resolve());
+    });
     const second = markReviewed('k', 'b');
     // 'a' is being written, 'b' is waiting: both are already reviewed.
     await expect(loadReviewedIds('k')).resolves.toEqual(new Set(['a', 'b']));
@@ -79,7 +90,9 @@ describe('ReviewedLedgerStore', () => {
   test('an unparseable ledger is reported and started over, not written around forever', async () => {
     await AsyncStorage.setItem(KEY, '{"cut short');
     await markReviewed('k', 'a');
-    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(SyntaxError), { tags: { flow: 'reviewed-ledger-reset' } });
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(SyntaxError), {
+      tags: { flow: 'reviewed-ledger-reset' },
+    });
     await expect(loadReviewedIds('k')).resolves.toEqual(new Set(['a']));
   });
 
@@ -89,13 +102,17 @@ describe('ReviewedLedgerStore', () => {
     getItem.mockRejectedValueOnce(new Error('disk'));
     await expect(markReviewed('k', 'b')).resolves.toBeUndefined();
     expect(setItem).not.toHaveBeenCalled();
-    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'reviewed-ledger-save' } });
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'reviewed-ledger-save' },
+    });
   });
 
   test('a failed load reads as empty and is reported', async () => {
     getItem.mockRejectedValueOnce(new Error('disk'));
     await expect(loadReviewedIds('k')).resolves.toEqual(new Set());
-    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), { tags: { flow: 'reviewed-ledger-load' } });
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'reviewed-ledger-load' },
+    });
   });
 
   describe('taking a keep back (a changed decision)', () => {
@@ -110,11 +127,15 @@ describe('ReviewedLedgerStore', () => {
     test('a keep taken back before it was written is never written', async () => {
       let release: (() => void) | undefined;
       setItem.mockImplementationOnce(async (key: string, value: string) => {
-        await new Promise<void>((resolve) => { release = resolve; });
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
         return AsyncStorage.setItem(key, value);
       });
       const first = markReviewed('k', 'a');
-      await new Promise<void>((resolve) => { setImmediate(() => resolve()); });
+      await new Promise<void>((resolve) => {
+        setImmediate(() => resolve());
+      });
       const second = markReviewed('k', 'b');
       const third = unmarkReviewed('k', 'b');
       await expect(loadReviewedIds('k')).resolves.toEqual(new Set(['a']));
@@ -122,18 +143,24 @@ describe('ReviewedLedgerStore', () => {
       await Promise.all([first, second, third]);
       await expect(loadReviewedIds('k')).resolves.toEqual(new Set(['a']));
       // No write ever held it.
-      expect(setItem.mock.calls.map((call) => JSON.parse(call[1]))).not.toContainEqual({ k: ['a', 'b'] });
+      expect(setItem.mock.calls.map((call) => JSON.parse(call[1]))).not.toContainEqual({
+        k: ['a', 'b'],
+      });
       expect(JSON.parse(setItem.mock.calls.at(-1)?.[1] ?? '{}')).toEqual({ k: ['a'] });
     });
 
     test('taken back while it is being written: it comes out right after', async () => {
       let release: (() => void) | undefined;
       setItem.mockImplementationOnce(async (key: string, value: string) => {
-        await new Promise<void>((resolve) => { release = resolve; });
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
         return AsyncStorage.setItem(key, value);
       });
       const first = markReviewed('k', 'a');
-      await new Promise<void>((resolve) => { setImmediate(() => resolve()); });
+      await new Promise<void>((resolve) => {
+        setImmediate(() => resolve());
+      });
       const second = unmarkReviewed('k', 'a');
       await expect(loadReviewedIds('k')).resolves.toEqual(new Set());
       release?.();
@@ -157,7 +184,7 @@ describe('ReviewedLedgerStore', () => {
     });
   });
 
-  test('remembers this launch\'s taken-back keeps per source until kept again', async () => {
+  test("remembers this launch's taken-back keeps per source until kept again", async () => {
     await markReviewed('tb', 'a');
     await unmarkReviewed('tb', 'a');
     expect([...takenBack('tb')]).toEqual(['a']);
@@ -170,13 +197,17 @@ describe('ReviewedLedgerStore', () => {
     await markReviewed('st', 'a');
     let release: (() => void) | undefined;
     setItem.mockImplementationOnce(async (key: string, value: string) => {
-      await new Promise<void>((resolve) => { release = resolve; });
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
       return AsyncStorage.setItem(key, value);
     });
     const waiting = markReviewed('st', 'b');
     await expect(storedReviewedIds('st')).resolves.toEqual(new Set(['a']));
     await expect(loadReviewedIds('st')).resolves.toEqual(new Set(['a', 'b']));
-    await new Promise<void>((resolve) => { setImmediate(() => resolve()); });
+    await new Promise<void>((resolve) => {
+      setImmediate(() => resolve());
+    });
     release?.();
     await waiting;
     await expect(storedReviewedIds('st')).resolves.toEqual(new Set(['a', 'b']));

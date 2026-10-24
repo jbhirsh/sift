@@ -44,7 +44,20 @@ const TIME_TAG = /\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g;
 // Enhanced LRC's per-word timing: "<00:12.34>word".
 const WORD_TAG = /<\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?>/g;
 // Common words a title shares with lyrics by chance ("For You", "The One").
-const STOP_WORDS = new Set(['the', 'and', 'you', 'for', 'but', 'with', 'your', 'are', 'not', 'all', 'that', 'this']);
+const STOP_WORDS = new Set([
+  'the',
+  'and',
+  'you',
+  'for',
+  'but',
+  'with',
+  'your',
+  'are',
+  'not',
+  'all',
+  'that',
+  'this',
+]);
 const OFFSET_TAG = /^\s*\[offset:\s*([+-]?\d+)\s*\]/im;
 const HAS_WORD = /[\p{L}\p{N}]/u;
 

@@ -21,7 +21,8 @@ const track: Track = {
 };
 
 // Title line repeats at 50 s and 90 s: the title rule finds 50 s.
-const SYNCED = '[00:30.00]verse\n[00:50.00]sing my song\n[01:10.00]verse two\n[01:30.00]sing my song';
+const SYNCED =
+  '[00:30.00]verse\n[00:50.00]sing my song\n[01:10.00]verse two\n[01:30.00]sing my song';
 
 function makeStorage(initial: Record<string, string> = {}) {
   const data = new Map(Object.entries(initial));
@@ -54,17 +55,26 @@ describe('ChorusFinder', () => {
   });
 
   it('remembers the estimate when the lyrics have no chorus and there is no preview', async () => {
-    const { finder, storage } = makeFinder(() => Promise.resolve({ status: 'synced', lyrics: '[00:30.00]once' }));
+    const { finder, storage } = makeFinder(() =>
+      Promise.resolve({ status: 'synced', lyrics: '[00:30.00]once' }),
+    );
     await expect(finder.find(track)).resolves.toEqual({ position: 40, source: 'estimate' });
     await flush();
-    expect(JSON.parse(storage.data.get(CHORUS_CACHE_KEY) ?? 'null')).toEqual([['t1', 40, 'e', 200]]);
+    expect(JSON.parse(storage.data.get(CHORUS_CACHE_KEY) ?? 'null')).toEqual([
+      ['t1', 40, 'e', 200],
+    ]);
     expect(Sentry.addBreadcrumb).not.toHaveBeenCalled();
   });
 
   it('falls back to the preview offset when the lyrics have no chorus', async () => {
-    const { finder } = makeFinder(() => Promise.resolve({ status: 'synced', lyrics: '[00:30.00]once' }));
+    const { finder } = makeFinder(() =>
+      Promise.resolve({ status: 'synced', lyrics: '[00:30.00]once' }),
+    );
     const previewOffset = jest.fn().mockResolvedValue(61.25);
-    await expect(finder.find(track, previewOffset)).resolves.toEqual({ position: 61.25, source: 'preview' });
+    await expect(finder.find(track, previewOffset)).resolves.toEqual({
+      position: 61.25,
+      source: 'preview',
+    });
     expect(previewOffset).toHaveBeenCalledWith('t1');
   });
 
@@ -80,23 +90,39 @@ describe('ChorusFinder', () => {
     ['not found', { status: 'not-found' }],
   ])('uses the preview offset for %s tracks', async (_, lookup) => {
     const { finder } = makeFinder(() => Promise.resolve(lookup));
-    await expect(finder.find(track, () => Promise.resolve(42))).resolves.toEqual({ position: 42, source: 'preview' });
+    await expect(finder.find(track, () => Promise.resolve(42))).resolves.toEqual({
+      position: 42,
+      source: 'preview',
+    });
   });
 
   it('falls back to the estimate when the preview offset is unusable or missing', async () => {
     const { finder } = makeFinder(() => Promise.resolve({ status: 'not-found' }));
-    await expect(finder.find(track, () => Promise.resolve(0))).resolves.toEqual({ position: 40, source: 'estimate' });
-    await expect(finder.find({ ...track, id: 't2' }, () => Promise.resolve(null))).resolves.toEqual({
+    await expect(finder.find(track, () => Promise.resolve(0))).resolves.toEqual({
       position: 40,
       source: 'estimate',
     });
-    await expect(finder.find({ ...track, id: 't3' })).resolves.toEqual({ position: 40, source: 'estimate' });
+    await expect(finder.find({ ...track, id: 't2' }, () => Promise.resolve(null))).resolves.toEqual(
+      {
+        position: 40,
+        source: 'estimate',
+      },
+    );
+    await expect(finder.find({ ...track, id: 't3' })).resolves.toEqual({
+      position: 40,
+      source: 'estimate',
+    });
   });
 
   it('keeps an estimate reached because the preview match failed for this session only', async () => {
-    const { finder, storage, lookupLyrics, deps } = makeFinder(() => Promise.resolve({ status: 'not-found' }));
+    const { finder, storage, lookupLyrics, deps } = makeFinder(() =>
+      Promise.resolve({ status: 'not-found' }),
+    );
     const failing = jest.fn().mockRejectedValue(new Error('shazam down'));
-    await expect(finder.find(track, failing)).resolves.toEqual({ position: 40, source: 'estimate' });
+    await expect(finder.find(track, failing)).resolves.toEqual({
+      position: 40,
+      source: 'estimate',
+    });
     expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
       category: 'chorus',
       message: 'Preview match failed: Error: shazam down',
@@ -113,8 +139,14 @@ describe('ChorusFinder', () => {
 
   it('forgetFailures lets a lookup that failed try again, but keeps what was found', async () => {
     const { finder, lookupLyrics } = makeFinder(() => Promise.resolve({ status: 'not-found' }));
-    const preview = jest.fn().mockRejectedValueOnce(new Error('not cached yet')).mockResolvedValue(42);
-    await expect(finder.find(track, preview)).resolves.toEqual({ position: 40, source: 'estimate' });
+    const preview = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('not cached yet'))
+      .mockResolvedValue(42);
+    await expect(finder.find(track, preview)).resolves.toEqual({
+      position: 40,
+      source: 'estimate',
+    });
     finder.forgetFailures();
     await expect(finder.find(track, preview)).resolves.toEqual({ position: 42, source: 'preview' });
     expect(preview).toHaveBeenCalledTimes(2);
@@ -126,29 +158,42 @@ describe('ChorusFinder', () => {
 
   it('still uses the preview when LRCLIB is unreachable', async () => {
     const { finder, storage } = makeFinder(() => Promise.reject(new Error('offline')));
-    await expect(finder.find(track, () => Promise.resolve(42))).resolves.toEqual({ position: 42, source: 'preview' });
+    await expect(finder.find(track, () => Promise.resolve(42))).resolves.toEqual({
+      position: 42,
+      source: 'preview',
+    });
     await flush();
-    expect(JSON.parse(storage.data.get(CHORUS_CACHE_KEY) ?? 'null')).toEqual([['t1', 42, 'p', 200]]);
+    expect(JSON.parse(storage.data.get(CHORUS_CACHE_KEY) ?? 'null')).toEqual([
+      ['t1', 42, 'p', 200],
+    ]);
   });
 
   it('caches results, so a track is looked up once', async () => {
-    const { finder, lookupLyrics, storage } = makeFinder(() => Promise.resolve({ status: 'synced', lyrics: SYNCED }));
+    const { finder, lookupLyrics, storage } = makeFinder(() =>
+      Promise.resolve({ status: 'synced', lyrics: SYNCED }),
+    );
     await finder.find(track);
     await finder.find(track);
     expect(lookupLyrics).toHaveBeenCalledTimes(1);
     await flush();
-    expect(JSON.parse(storage.data.get(CHORUS_CACHE_KEY) ?? 'null')).toEqual([['t1', 49.5, 'l', 200]]);
+    expect(JSON.parse(storage.data.get(CHORUS_CACHE_KEY) ?? 'null')).toEqual([
+      ['t1', 49.5, 'l', 200],
+    ]);
   });
 
   it('caches estimates reached with LRCLIB answering', async () => {
     const { finder, storage } = makeFinder(() => Promise.resolve({ status: 'not-found' }));
     await finder.find(track);
     await flush();
-    expect(JSON.parse(storage.data.get(CHORUS_CACHE_KEY) ?? 'null')).toEqual([['t1', 40, 'e', 200]]);
+    expect(JSON.parse(storage.data.get(CHORUS_CACHE_KEY) ?? 'null')).toEqual([
+      ['t1', 40, 'e', 200],
+    ]);
   });
 
   it('keeps an estimate reached because LRCLIB was unreachable for this session only', async () => {
-    const { finder, lookupLyrics, storage, deps } = makeFinder(() => Promise.reject(new Error('offline')));
+    const { finder, lookupLyrics, storage, deps } = makeFinder(() =>
+      Promise.reject(new Error('offline')),
+    );
     await expect(finder.find(track)).resolves.toEqual({ position: 40, source: 'estimate' });
     expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
       category: 'chorus',
@@ -171,7 +216,9 @@ describe('ChorusFinder', () => {
   });
 
   it('moves an urgent lookup to the front of the queue', async () => {
-    const { finder, prioritize } = makeFinder(() => Promise.resolve({ status: 'synced', lyrics: SYNCED }));
+    const { finder, prioritize } = makeFinder(() =>
+      Promise.resolve({ status: 'synced', lyrics: SYNCED }),
+    );
     await finder.find(track);
     expect(prioritize).not.toHaveBeenCalled();
     await finder.find({ ...track, id: 't9' }, undefined, { urgent: true });
@@ -180,7 +227,12 @@ describe('ChorusFinder', () => {
 
   it('shares one lookup between concurrent requests for a track', async () => {
     let resolve: (l: LyricsLookup) => void = () => {};
-    const { finder, lookupLyrics } = makeFinder(() => new Promise((r) => { resolve = r; }));
+    const { finder, lookupLyrics } = makeFinder(
+      () =>
+        new Promise((r) => {
+          resolve = r;
+        }),
+    );
     const a = finder.find(track);
     const b = finder.find(track);
     await flush();
@@ -194,7 +246,10 @@ describe('ChorusFinder', () => {
 
   it('reads results stored by an earlier launch', async () => {
     const storage = makeStorage({ [CHORUS_CACHE_KEY]: JSON.stringify([['t1', 33, 'p', 200]]) });
-    const { finder, lookupLyrics } = makeFinder(() => Promise.resolve({ status: 'not-found' }), storage);
+    const { finder, lookupLyrics } = makeFinder(
+      () => Promise.resolve({ status: 'not-found' }),
+      storage,
+    );
     await expect(finder.find(track)).resolves.toEqual({ position: 33, source: 'preview' });
     await finder.find({ ...track, id: 't2' });
     expect(lookupLyrics).toHaveBeenCalledTimes(1);
@@ -204,7 +259,10 @@ describe('ChorusFinder', () => {
 
   it('looks a track up again when its duration changed', async () => {
     const storage = makeStorage({ [CHORUS_CACHE_KEY]: JSON.stringify([['t1', 33, 'p', 150]]) });
-    const { finder, lookupLyrics } = makeFinder(() => Promise.resolve({ status: 'synced', lyrics: SYNCED }), storage);
+    const { finder, lookupLyrics } = makeFinder(
+      () => Promise.resolve({ status: 'synced', lyrics: SYNCED }),
+      storage,
+    );
     await expect(finder.find(track)).resolves.toEqual({ position: 49.5, source: 'lyrics' });
     expect(lookupLyrics).toHaveBeenCalledTimes(1);
   });
@@ -233,18 +291,33 @@ describe('ChorusFinder', () => {
     // JSON can't hold Infinity, so build that row's text by hand.
     const rows = JSON.stringify([badRow, ['ok', 10, 'e', 200]]).replace('"INF"', '1e999');
     const storage = makeStorage({ [CHORUS_CACHE_KEY]: rows });
-    const { finder, lookupLyrics } = makeFinder(() => Promise.resolve({ status: 'not-found' }), storage);
-    await expect(finder.find({ ...track, id: 'ok' })).resolves.toEqual({ position: 10, source: 'estimate' });
+    const { finder, lookupLyrics } = makeFinder(
+      () => Promise.resolve({ status: 'not-found' }),
+      storage,
+    );
+    await expect(finder.find({ ...track, id: 'ok' })).resolves.toEqual({
+      position: 10,
+      source: 'estimate',
+    });
     expect(lookupLyrics).not.toHaveBeenCalled();
-    await expect(finder.find({ ...track, id: 'bad' })).resolves.toEqual({ position: 40, source: 'estimate' });
+    await expect(finder.find({ ...track, id: 'bad' })).resolves.toEqual({
+      position: 40,
+      source: 'estimate',
+    });
     expect(lookupLyrics).toHaveBeenCalledTimes(1);
     expect(Sentry.addBreadcrumb).not.toHaveBeenCalled();
   });
 
   it('reads a numeric stored id as the string id it was saved for', async () => {
     const storage = makeStorage({ [CHORUS_CACHE_KEY]: JSON.stringify([[7, 12, 'l', 200]]) });
-    const { finder, lookupLyrics } = makeFinder(() => Promise.resolve({ status: 'not-found' }), storage);
-    await expect(finder.find({ ...track, id: '7' })).resolves.toEqual({ position: 12, source: 'lyrics' });
+    const { finder, lookupLyrics } = makeFinder(
+      () => Promise.resolve({ status: 'not-found' }),
+      storage,
+    );
+    await expect(finder.find({ ...track, id: '7' })).resolves.toEqual({
+      position: 12,
+      source: 'lyrics',
+    });
     expect(lookupLyrics).not.toHaveBeenCalled();
   });
 
@@ -252,10 +325,17 @@ describe('ChorusFinder', () => {
     ['corrupt JSON', '{oops'],
     ['a non-array', '{}'],
   ])('starts from an empty cache when the stored cache is %s', async (_, json) => {
-    const { finder } = makeFinder(() => Promise.resolve({ status: 'not-found' }), makeStorage({ [CHORUS_CACHE_KEY]: json }));
+    const { finder } = makeFinder(
+      () => Promise.resolve({ status: 'not-found' }),
+      makeStorage({ [CHORUS_CACHE_KEY]: json }),
+    );
     await expect(finder.find(track)).resolves.toEqual({ position: 40, source: 'estimate' });
     expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
-      expect.objectContaining({ category: 'chorus', level: 'warning', message: expect.stringMatching(/^Chorus cache unreadable: /) }),
+      expect.objectContaining({
+        category: 'chorus',
+        level: 'warning',
+        message: expect.stringMatching(/^Chorus cache unreadable: /),
+      }),
     );
   });
 
@@ -266,7 +346,10 @@ describe('ChorusFinder', () => {
   });
 
   it('moves a re-resolved track to the newest end, so others are trimmed first', async () => {
-    const rows = [['t1', 1, 'e', 150], ...Array.from({ length: MAX_CACHE_ENTRIES - 1 }, (_, i) => [`old${i}`, 1, 'e', 200])];
+    const rows = [
+      ['t1', 1, 'e', 150],
+      ...Array.from({ length: MAX_CACHE_ENTRIES - 1 }, (_, i) => [`old${i}`, 1, 'e', 200]),
+    ];
     const storage = makeStorage({ [CHORUS_CACHE_KEY]: JSON.stringify(rows) });
     const { finder } = makeFinder(() => Promise.resolve({ status: 'not-found' }), storage);
     await finder.find(track); // duration 200 ≠ 150: re-resolved
@@ -303,11 +386,15 @@ describe('ChorusFinder', () => {
   });
 
   it('defaults to LRCLIB and AsyncStorage', async () => {
-    const mockFetch = jest.fn().mockResolvedValue({ status: 404, ok: false, json: () => Promise.resolve(null) });
+    const mockFetch = jest
+      .fn()
+      .mockResolvedValue({ status: 404, ok: false, json: () => Promise.resolve(null) });
     const original = globalThis.fetch;
     globalThis.fetch = mockFetch;
     try {
-      await expect(chorusFinder.find({ ...track, id: 'default' }, undefined, { urgent: true })).resolves.toEqual({ position: 40, source: 'estimate' });
+      await expect(
+        chorusFinder.find({ ...track, id: 'default' }, undefined, { urgent: true }),
+      ).resolves.toEqual({ position: 40, source: 'estimate' });
       expect(mockFetch.mock.calls[0][0]).toContain('https://lrclib.net/api/get?');
       await flush();
       expect(AsyncStorage.setItem).toHaveBeenCalledWith(CHORUS_CACHE_KEY, expect.any(String));

@@ -70,7 +70,9 @@ describe('checkPrVisuals', () => {
 
   it('passes a UI change ticked "No visible UI change"', () => {
     expect(checkPrVisuals({ files: ui, body: '- [x] No visible UI change' }).ok).toBe(true);
-    expect(checkPrVisuals({ files: ui, body: '* [X] No visible UI change (refactor)' }).ok).toBe(true);
+    expect(checkPrVisuals({ files: ui, body: '* [X] No visible UI change (refactor)' }).ok).toBe(
+      true,
+    );
   });
 
   it('fails the untouched template, whose example sits in a comment', () => {

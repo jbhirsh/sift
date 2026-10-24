@@ -134,7 +134,7 @@ export const FONTS = {
 // Glass material definitions — blur intensity + tint overlay
 export const GLASS = {
   thin: { intensity: 20, tintOpacity: 0.05 },
-  regular: { intensity: 40, tintOpacity: 0.10 },
+  regular: { intensity: 40, tintOpacity: 0.1 },
   thick: { intensity: 80, tintOpacity: 0.18 },
 } as const;
 
