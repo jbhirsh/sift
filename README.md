@@ -123,4 +123,4 @@ A `Makefile` mirrors these (`make test`, `make lint`, `make typecheck`, `make ch
 
 ## CI/CD
 
-Every PR runs lint, typecheck, dependency rules and unit tests (with coverage) on Ubuntu, plus secret scanning, SAST and mutation testing. The Maestro iOS E2E job and accessibility audit (macOS) run on every PR that can affect the app. Dependabot keeps npm and Actions dependencies current. All changes reach `main` via PR; see `CLAUDE.md` for the full list of required checks.
+Every PR runs lint, typecheck, dependency rules and unit tests (with coverage) on Ubuntu, plus secret scanning, SAST and mutation testing of the lines it changes. The Maestro iOS E2E job and accessibility audit (macOS) run on every PR that can affect the app. Dependabot keeps npm and Actions dependencies current. All changes reach `main` via PR; see `CLAUDE.md` for the full list of required checks.

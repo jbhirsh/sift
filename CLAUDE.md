@@ -46,7 +46,7 @@ no-op when `$CI` is set. CI re-runs everything.
 |-------|--------------|-------|-------------|
 | Unit tests (`make test`) | Reducers, utils, hooks, services | Seconds | Every push + CI |
 | E2E tests (`make test-e2e`) | Full app flows | Minutes | PR time (Maestro flows in `.maestro/`) |
-| Mutation tests (`make test-mutation`) | Assertion depth of unit tests (Stryker) | Minutes–hour | PR time (changed files, incremental) + weekly full sweep (`mutation.yml`) |
+| Mutation tests (`make test-mutation`) | Assertion depth of unit tests (Stryker) | Minutes–hour | PR time (changed lines, incremental) + weekly full sweep (`mutation.yml`) |
 
 **Test coverage requirements:**
 - Every new reducer action, service function, or utility must have a unit test in `__tests__/unit/`.
@@ -426,11 +426,16 @@ Makefile                Dev commands (test, lint, typecheck, check)
   (empty today).
 - Security/quality gates run per PR and sweep weekly (Mon 06:00 UTC):
   `gitleaks.yml` (secret scanning), `semgrep.yml` (SAST, `--config auto`), and
-  `mutation.yml` (Stryker), alongside the weekly Dependabot bumps. PR mutation
-  runs are incremental: they reuse the PR's last results (or the last weekly
-  sweep's, from the Actions cache) and re-test only mutants whose code or
-  tests changed. The weekly sweep tests everything and refreshes that
-  baseline.
+  `mutation.yml` (Stryker), alongside the weekly Dependabot bumps. A PR's
+  mutation run mutates only the lines it adds or changes (one
+  `file:first-last` entry per block from `git diff -U0` against the merge
+  base; a file new to the branch whole: `scripts/mutation-scope.mjs`, rules
+  in `scripts/mutationScope.ts`), and the per-file 80% gate
+  (`scripts/check-mutation-threshold.mjs`) scores those lines alone; a file
+  with nothing scorable in them passes. PR mutation runs are incremental:
+  they reuse the PR's last results (or the last weekly sweep's, from the
+  Actions cache) and re-test only mutants whose code or tests changed. The
+  weekly sweep tests every file whole and refreshes that baseline.
 - **The weekly audit** (`weekly-audit.yml`, the same Monday slot, or by hand)
   runs what needs the whole repository at once: knip (`knip.jsonc`: unused
   files, exports and dependencies), jscpd (`.jscpd.json`: duplicated blocks),

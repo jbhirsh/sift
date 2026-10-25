@@ -5,8 +5,10 @@ name: Mutation Testing
 # can't see.
 #
 # Two placements:
-#   - Pull requests: mutate only the in-scope files the PR touched. Fast,
-#     targeted feedback on exactly the code under review.
+#   - Pull requests: mutate only the lines the PR added or changed in the
+#     in-scope files it touched (a file new to the branch whole). Fast,
+#     targeted feedback on exactly the code under review, however many
+#     files a PR touches.
 #   - Weekly schedule (+ manual dispatch): full sweep as a drift sensor,
 #     catching erosion from changes that didn't trip the PR-scoped run.
 #
@@ -19,9 +21,11 @@ name: Mutation Testing
 #
 # Gate: stryker.config.json sets thresholds.break=80 (a global floor), and
 # scripts/check-mutation-threshold.mjs enforces the stricter per-file bar —
-# EVERY mutated file must score >= 80%. MockMusicProvider.ts is excluded from
-# the mutate scope (fixture-heavy scaffolding; its survivors are seed-data
-# strings), so it is neither mutated nor gated.
+# EVERY mutated file must score >= 80%. On a PR it scores only the lines the
+# run mutated, so a file's score is its changed lines' (nothing there to
+# score is a pass). MockMusicProvider.ts is excluded from the mutate scope
+# (fixture-heavy scaffolding; its survivors are seed-data strings), so it is
+# neither mutated nor gated.
 #
 # The PR path filter lives in the `changes` job rather than an
 # `on.pull_request.paths` trigger filter, so this check reports on EVERY PR and
@@ -68,6 +72,8 @@ jobs:
               - 'package-lock.json'
               - '.github/workflows/mutation.yml'
               - 'scripts/check-mutation-threshold.mjs'
+              - 'scripts/mutation-scope.mjs'
+              - 'scripts/mutationScope.ts'
 
   mutation:
     name: Mutation Tests (Stryker)
@@ -92,18 +98,19 @@ jobs:
 
       - run: npm ci
 
-      # On PRs, narrow mutation to changed files that are inside the
-      # configured mutation scope. SYNC POINT: `--mutate` REPLACES the
-      # `mutate` array in stryker.config.json (no merge), so that array is
-      # the source of truth and the pathspec + grep filters below are a
-      # duplicate of it that must be updated in the same commit as any
-      # change to the config's include/exclude entries — otherwise PR runs
-      # and the weekly sweep silently diverge in scope.
-      # --diff-filter=d drops deletions: a removed file must not be passed
-      # to --mutate. If the workflow triggered but no mutable source changed
-      # (config/test/mock/workflow edits, pure deletions), fall back to a
-      # fast smoke scope over the small utils so the Stryker wiring itself
-      # is still validated at PR time, not just weekly.
+      # On PRs, narrow mutation to the lines the PR added or changed in the
+      # files inside the configured mutation scope: scripts/mutation-scope.mjs
+      # names each changed block as `file:first-last` (git diff -U0 against
+      # the merge base), a file new to the branch whole, and leaves out
+      # deleted files and files that only lost lines. Mutating whole files
+      # made a PR touching many of them outrun the job. SYNC POINT:
+      # `--mutate` REPLACES the `mutate` array in stryker.config.json (no
+      # merge), so that array is the source of truth; isMutable in
+      # scripts/mutationScope.ts mirrors it and a unit test pins it. If the
+      # workflow triggered but no mutable source changed (config/test/mock/
+      # workflow edits, pure deletions), fall back to a fast smoke scope over
+      # the small utils so the Stryker wiring itself is still validated at
+      # PR time, not just weekly.
       - name: Determine mutation scope
         id: scope
         if: github.event_name == 'pull_request'
@@ -113,17 +120,12 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          # The files stryker.config.json mutates: .tsx only in context.
-          CHANGED=$(git diff --name-only --diff-filter=d "origin/${BASE_REF}"...HEAD -- \
-              src/context src/services src/utils src/hooks \
-            | grep -E '^(src/context/.*\.tsx?|src/(services|utils|hooks)/.*\.ts)$' \
-            | grep -Ev '(/index\.ts$|MusicProviderInterface\.ts$|mockData\.ts$|MockMusicProvider\.ts$)' \
-            || true)
+          CHANGED=$(node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mutation-scope.mjs "origin/${BASE_REF}")
           if [ -z "$CHANGED" ]; then
-            echo "No mutable files changed — running utils smoke scope to validate the Stryker setup."
+            echo "No mutable lines changed — running utils smoke scope to validate the Stryker setup."
             echo "mutate=src/utils/formatTime.ts,src/utils/sorting.ts,src/utils/trackIdentity.ts" >> "$GITHUB_OUTPUT"
           else
-            echo "Mutating changed files:"; echo "$CHANGED"
+            echo "Mutating the changed lines:"; echo "$CHANGED"
             echo "mutate=$(echo "$CHANGED" | paste -sd, -)" >> "$GITHUB_OUTPUT"
           fi
 
@@ -140,7 +142,7 @@ jobs:
             stryker-incremental-pr-${{ github.event.pull_request.number }}-
             stryker-incremental-main-
 
-      - name: Run Stryker (changed files, incremental)
+      - name: Run Stryker (changed lines, incremental)
         if: github.event_name == 'pull_request'
         env:
           MUTATE_SCOPE: ${{ steps.scope.outputs.mutate }}
@@ -164,11 +166,16 @@ jobs:
 
       # Per-file gate: Stryker's break only enforces the global aggregate, so
       # this fails the build if any individual mutated file is below 80% even
-      # when the overall score passes. Runs after a successful Stryker run;
-      # the report upload below is always() so a gate failure is still
-      # diagnosable from the artifact.
+      # when the overall score passes. On a PR, MUTATE_SCOPE limits it to the
+      # files and lines the run mutated: the incremental report also carries
+      # the baseline's results for everything else, which this PR didn't
+      # change. (Empty on a sweep, which scores every file whole.) Runs after
+      # a successful Stryker run; the report upload below is always() so a
+      # gate failure is still diagnosable from the artifact.
       - name: Enforce per-file mutation threshold
-        run: node scripts/check-mutation-threshold.mjs
+        env:
+          MUTATE_SCOPE: ${{ steps.scope.outputs.mutate }}
+        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-mutation-threshold.mjs
 
       # always(): when thresholds.break ratchets up, a breaking Stryker run
       # exits nonzero after writing the report — that report is exactly what's
