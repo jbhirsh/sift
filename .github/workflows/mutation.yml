@@ -1,62 +1,29 @@
 name: Mutation Testing
 
-# Assertion-depth sensor: Stryker mutates the reducer, services, utils, and
-# hooks and checks how many mutants the unit tests kill — gaps line coverage
-# can't see.
+# Assertion-depth sensor: Stryker mutates the reducer, services, utils and
+# hooks and checks how many mutants the unit tests kill, gaps line coverage
+# can't see. It runs from the shared tooling in jbhirsh/ci: what runs and
+# why is in its mutation/action.yml (pull requests) and
+# .github/workflows/mutation-sweep.yml (the monthly sweep); this app's
+# settings are the `mutation` key of .github/ci.json.
 #
-# Two placements:
-#   - Pull requests: mutate only the lines the PR added or changed in the
-#     in-scope files it touched (a file new to the branch whole). Fast,
-#     targeted feedback on exactly the code under review, however many
-#     files a PR touches. A PR with no such line runs a small smoke scope
-#     if it changes the Stryker setup, and skips Stryker otherwise.
-#   - Monthly schedule (06:00 UTC on the 1st, + manual dispatch): full
-#     sweep as a drift sensor, catching erosion from changes that didn't
-#     trip the PR-scoped run (a helper, test data or a dependency changing
-#     what untouched code's tests check). Once a month is enough now that
-#     PR runs mutate only their changed lines: the sweep is for that drift
-#     and for refreshing the baseline PR runs reuse. As one job it outgrew
-#     the 120-minute limit (20 minutes in September, 117 on October 19), and
-#     a run cut off saves nothing, so it runs as shards: `sweep-plan` splits
-#     the in-scope files into SWEEP_SHARDS groups of near-equal weight,
-#     `sweep` tests each group in its own job, and `sweep-merge` merges
-#     their results, applies the per-file gate to the whole and saves it as
-#     the baseline (scripts/mutation-sweep.mjs, rules in
-#     scripts/mutationSweep.ts).
+#   - Pull requests: the lines the PR changed, gated on stryker.config.json's
+#     `break` and on every mutated file scoring 80% on its changed lines
+#     (`perFileThreshold`). A PR with nothing to mutate skips Stryker's
+#     steps, and the job still reports (Mutation Tests (Stryker) is a
+#     required check: keep its name, CLAUDE.md "Required status checks").
+#   - Monthly (06:00 UTC on the 1st, + manual): the full sweep in 8
+#     parallel shards, every file gated whole, saved as the baseline PR runs
+#     start from.
 #
-# PR runs are incremental: Stryker reuses the results of the PR's previous
-# push, or of the latest monthly sweep on main for a PR's first push, and
-# re-tests only mutants whose code or covering tests changed. Its change
-# detection can miss an indirect change (a config or mock edit), which the
-# monthly sweep catches: its shards start from no results, so every mutant
-# is tested, and the merged results become the baseline PRs start from,
-# saved only when every shard finished (a partial baseline would send PRs
-# to re-test the missing shard's files). GitHub evicts a cache unused for
-# seven days, so after a quiet week a PR may find no baseline; it then just
-# tests its changed lines afresh.
-#
-# Every Stryker run here uses scripts/stryker-jest-runner.mjs as Jest's
-# runner (stryker.config.json): a mutant's run loads only the test files
-# holding its covering tests, not every test file that imports the mutated
-# file, which halved the time a mutant takes (scripts/strykerTestFiles.ts).
-#
-# Gate: stryker.config.json sets thresholds.break=80 (a global floor), and
-# scripts/check-mutation-threshold.mjs enforces the stricter per-file bar —
-# EVERY mutated file must score >= 80%. On a PR it scores only the lines the
-# run mutated, so a file's score is its changed lines' (nothing there to
-# score is a pass). A sweep shard runs with no threshold (one part's score
-# says nothing about the whole); the merge job gates every file of the
-# merged results. MockMusicProvider.ts is excluded from the mutate scope
-# (fixture-heavy scaffolding; its survivors are seed-data strings), so it is
-# neither mutated nor gated.
-#
-# The PR path filter lives in the `changes` job rather than an
-# `on.pull_request.paths` trigger filter, so this check reports on EVERY PR and
-# can be marked required in a branch rule (a trigger-filtered workflow never
-# reports on non-matching PRs, leaving a required check pending forever). On
-# PRs with no relevant change the `mutation` job is skipped by its `if:`, which
-# satisfies a required check.
+# Every Stryker run uses scripts/stryker-jest-runner.mjs as Jest's runner
+# (stryker.config.json): a mutant's run loads only the test files holding
+# its covering tests (scripts/strykerTestFiles.ts). NODE_OPTIONS
+# (`nodeOptions` in .github/ci.json) lets Stryker's runner processes load it,
+# as it imports a .ts module and package.json has no "type".
 on:
+  # No trigger-level `paths:` filter: a filtered-out workflow never reports,
+  # and the required check hangs at "Expected".
   pull_request:
     branches: [main]
   schedule:
@@ -73,321 +40,19 @@ concurrency:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
-jobs:
-  changes:
-    name: Detect mutation-relevant changes
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-    outputs:
-      relevant: ${{ steps.filter.outputs.relevant }}
-    steps:
-      - uses: dorny/paths-filter@v4
-        id: filter
-        with:
-          filters: |
-            relevant:
-              - 'src/**'
-              - '__tests__/**'
-              - '__mocks__/**'
-              - 'stryker.config.json'
-              - 'jest.config.js'
-              - 'package.json'
-              - 'package-lock.json'
-              - '.github/workflows/mutation.yml'
-              - 'scripts/check-mutation-threshold.mjs'
-              - 'scripts/mutation-scope.mjs'
-              - 'scripts/mutationScope.ts'
-              - 'scripts/stryker-jest-runner.mjs'
-              - 'scripts/strykerTestFiles.ts'
-              - 'scripts/mutation-sweep.mjs'
-              - 'scripts/mutationSweep.ts'
-              - 'patches/**'
-              - 'babel.config.*'
+permissions:
+  contents: read
 
-  # Pull requests only. Its name is a required check: keep it (CLAUDE.md,
-  # "Required status checks"). The monthly sweep runs as the sweep-* jobs.
+jobs:
   mutation:
     name: Mutation Tests (Stryker)
-    needs: changes
-    # Fail-safe: a change-detection error runs the mutation job rather than
-    # skipping it (skipped reads as passing); `!cancelled()` keeps a failed
-    # `changes` from skipping it.
-    if: ${{ !cancelled() && github.event_name == 'pull_request' && (needs.changes.result == 'failure' || needs.changes.outputs.relevant == 'true') }}
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 120
-
     steps:
-      - uses: actions/checkout@v7
-        with:
-          # Full history so PR runs can diff against the base branch.
-          fetch-depth: 0
+      - uses: jbhirsh/ci/mutation@main
 
-      # No npm cache here: the scope needs only Node, and setup-node's npm
-      # cache expects an install to fill it. The setup-node below, run only
-      # with something to mutate, brings the cache with the install.
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-
-      # On PRs, narrow mutation to the lines the PR added or changed in the
-      # files inside the configured mutation scope: scripts/mutation-scope.mjs
-      # names each changed block as `file:first-last` (git diff -U0 against
-      # the merge base), a file new to the branch whole, and leaves out
-      # deleted files and files that only lost lines. Mutating whole files
-      # made a PR touching many of them outrun the job. SYNC POINT:
-      # `--mutate` REPLACES the `mutate` array in stryker.config.json (no
-      # merge), so that array is the source of truth; isMutable in
-      # scripts/mutationScope.ts mirrors it and a unit test pins it. If no
-      # mutable source changed, the script prints a smoke scope over three
-      # small utils files only when the PR changes the Stryker setup (its
-      # config, Jest's, the dependencies, this workflow, the mutation
-      # scripts: wiringChanged in scripts/mutationScope.ts), so the setup is
-      # still validated at PR time; otherwise it prints nothing and every
-      # step below is skipped (a screen, a test or the docs changing costs
-      # no install and no dry run). The job itself always runs and reports,
-      # as Mutation Tests (Stryker) is a required check.
-      - name: Determine mutation scope
-        id: scope
-        # Context values enter as env vars, not ${{ }} splices inside `run:`,
-        # so the shell treats them as data — PR-controlled filenames (and, for
-        # defense-in-depth, the base ref) must never be parsed as script text.
-        env:
-          BASE_REF: ${{ github.base_ref }}
-        run: |
-          SCOPE=$(node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mutation-scope.mjs "origin/${BASE_REF}")
-          if [ -z "$SCOPE" ]; then
-            echo "No mutable lines and nothing in the Stryker setup changed: skipping Stryker."
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "Mutating:"; echo "$SCOPE"
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            echo "mutate=$(echo "$SCOPE" | paste -sd, -)" >> "$GITHUB_OUTPUT"
-          fi
-
-      - uses: actions/setup-node@v7
-        if: steps.scope.outputs.run == 'true'
-        with:
-          node-version: 24
-          cache: npm
-
-      - run: npm ci
-        if: steps.scope.outputs.run == 'true'
-
-      # The incremental baseline: this PR's last run, else main's last
-      # sweep. Caches saved on main are readable from PRs; a PR's own are
-      # visible to that PR alone.
-      - name: Restore incremental results
-        if: steps.scope.outputs.run == 'true'
-        uses: actions/cache/restore@v6
-        with:
-          path: reports/stryker-incremental.json
-          key: stryker-incremental-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            stryker-incremental-pr-${{ github.event.pull_request.number }}-
-            stryker-incremental-main-
-
-      # NODE_OPTIONS: Stryker's test runner processes load the Jest runner,
-      # which imports a .ts module (package.json has no "type").
-      - name: Run Stryker (changed lines, incremental)
-        if: steps.scope.outputs.run == 'true'
-        env:
-          MUTATE_SCOPE: ${{ steps.scope.outputs.mutate }}
-          NODE_OPTIONS: --disable-warning=MODULE_TYPELESS_PACKAGE_JSON
-        run: npx stryker run --incremental --mutate "$MUTATE_SCOPE"
-
-      # Saved even when the per-file gate below fails: the results are still
-      # right, and the next push only re-tests what it changes. Not after a
-      # cancel, which may leave only the restored, older file behind.
-      - name: Save incremental results
-        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' && hashFiles('reports/stryker-incremental.json') != '' }}
-        uses: actions/cache/save@v6
-        with:
-          path: reports/stryker-incremental.json
-          key: stryker-incremental-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
-
-      # Per-file gate: Stryker's break only enforces the global aggregate, so
-      # this fails the build if any individual mutated file is below 80% even
-      # when the overall score passes. On a PR, MUTATE_SCOPE limits it to the
-      # files and lines the run mutated: the incremental report also carries
-      # the baseline's results for everything else, which this PR didn't
-      # change. (The sweep's merge job scores every file whole.) Runs after
-      # a successful Stryker run; the report upload below is always() so a
-      # gate failure is still diagnosable from the artifact.
-      - name: Enforce per-file mutation threshold
-        if: steps.scope.outputs.run == 'true'
-        env:
-          MUTATE_SCOPE: ${{ steps.scope.outputs.mutate }}
-        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-mutation-threshold.mjs
-
-      # always(): when thresholds.break ratchets up, a breaking Stryker run
-      # exits nonzero after writing the report — that report is exactly what's
-      # needed to diagnose the failure, so upload it anyway. warn (not error):
-      # if the runner kills Stryker at timeout-minutes, no report exists and
-      # an upload error would only mask the timeout as a secondary failure.
-      - name: Upload mutation report
-        if: always() && steps.scope.outputs.run == 'true'
-        uses: actions/upload-artifact@v7
-        with:
-          name: mutation-report
-          path: reports/mutation
-          if-no-files-found: warn
-          retention-days: 30
-
-  # The monthly sweep, part 1: split the mutate scope into shards. main's
-  # last results are restored only to weigh each file (its mutants and the
-  # tests covering them); no shard starts from them, as a sweep re-tests
-  # everything.
-  sweep-plan:
-    name: Mutation sweep plan
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    outputs:
-      matrix: ${{ steps.plan.outputs.matrix }}
-      count: ${{ steps.plan.outputs.count }}
-    steps:
-      - uses: actions/checkout@v7
-
-      # No npm ci: the plan reads only git, the config and the results.
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-
-      - name: Restore main's last results (for weights only)
-        uses: actions/cache/restore@v6
-        with:
-          path: reports/stryker-incremental.json
-          key: stryker-incremental-main-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: stryker-incremental-main-
-
-      # 8 shards. One file goes whole to one shard, and
-      # src/context/SiftContext.tsx alone is about 29% of the work, so its
-      # shard is the longest whatever the count: more shards only shorten
-      # the others. At the October 19 sweep's pace (117 minutes in one job,
-      # before the Jest runner halved it) that is about 34 minutes for
-      # SiftContext's shard and 12 for each of the others, well inside the
-      # limit with room to grow.
-      - name: Split the mutate scope
-        id: plan
-        env:
-          SWEEP_SHARDS: 8
-        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mutation-sweep.mjs plan "$SWEEP_SHARDS" reports/stryker-incremental.json
-
-  # Part 2: each shard mutates its files from no results. fail-fast is off
-  # so one failing shard doesn't cancel the rest, whose results still show
-  # where the files stand.
   sweep:
-    name: Mutation sweep ${{ matrix.shard }}
-    needs: sweep-plan
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.sweep-plan.outputs.matrix) }}
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-
-      - run: npm ci
-
-      # The repository's config without its break threshold: a shard's
-      # score is one part's, and the merge job gates the whole.
-      - name: Write the shard's config
-        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mutation-sweep.mjs config reports/stryker-shard.config.json
-
-      # --mutate replaces the config's globs with the shard's files. With no
-      # results restored, --incremental tests every mutant and writes them.
-      - name: Run Stryker (shard)
-        id: stryker
-        env:
-          MUTATE_SCOPE: ${{ matrix.mutate }}
-          NODE_OPTIONS: --disable-warning=MODULE_TYPELESS_PACKAGE_JSON
-        run: npx stryker run reports/stryker-shard.config.json --incremental --mutate "$MUTATE_SCOPE"
-
-      # Only a finished run's results: the merge must count a shard that was
-      # cut short as missing.
-      - name: Upload the shard's results
-        if: steps.stryker.outcome == 'success'
-        uses: actions/upload-artifact@v7
-        with:
-          name: stryker-sweep-results-${{ matrix.shard }}
-          path: reports/stryker-incremental.json
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Upload the shard's mutation report
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: mutation-report-${{ matrix.shard }}
-          path: reports/mutation
-          if-no-files-found: warn
-          retention-days: 30
-
-  # Part 3: merge the shards' results, gate every file of the whole, and
-  # save it as main's baseline when every shard reported. It runs when some
-  # shards failed too (not when the run was cancelled): the merge then
-  # shows the partial counts and fails, leaving the baseline as it was.
-  sweep-merge:
     name: Mutation sweep
-    needs: [sweep-plan, sweep]
-    if: ${{ !cancelled() && needs.sweep-plan.result == 'success' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-
-      # One directory per shard that finished. None finishing is the merge
-      # script's to report, so a download with nothing to fetch can't stop it.
-      - name: Download the shards' results
-        continue-on-error: true
-        uses: actions/download-artifact@v7
-        with:
-          pattern: stryker-sweep-results-*
-          path: shards
-
-      - name: Merge the shards
-        id: merge
-        env:
-          SHARDS: ${{ needs.sweep-plan.outputs.count }}
-        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mutation-sweep.mjs merge shards "$SHARDS" reports/stryker-incremental.json
-
-      # always(): a complete sweep with a file under the bar is still main's
-      # latest results, and PR runs should start from them. A manual run on
-      # another branch saves nothing: only main's caches reach PRs.
-      - name: Save main's baseline
-        if: always() && steps.merge.outputs.complete == 'true' && github.ref == 'refs/heads/main'
-        uses: actions/cache/save@v6
-        with:
-          path: reports/stryker-incremental.json
-          key: stryker-incremental-main-${{ github.run_id }}-${{ github.run_attempt }}
-
-      # The per-file gate over the merged results: every file whole.
-      - name: Enforce per-file mutation threshold
-        if: always() && steps.merge.outputs.complete == 'true'
-        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-mutation-threshold.mjs reports/stryker-incremental.json
-
-      - name: Upload the merged results
-        if: always() && steps.merge.outputs.complete == 'true'
-        uses: actions/upload-artifact@v7
-        with:
-          name: mutation-results
-          path: reports/stryker-incremental.json
-          retention-days: 30
+    if: github.event_name != 'pull_request'
+    uses: jbhirsh/ci/.github/workflows/mutation-sweep.yml@main

@@ -1,0 +1,24 @@
+{
+  "mutation": {
+    "wiring": [
+      "stryker.conf.*",
+      "stryker.config.*",
+      "jest.config*",
+      "jest.setup*",
+      "babel.config.*",
+      ".babelrc*",
+      "__tests__/helpers/*.setup.ts",
+      "package.json",
+      "package-lock.json",
+      "patches/**",
+      ".github/workflows/mutation.yml",
+      "scripts/stryker-jest-runner.mjs",
+      "scripts/strykerTestFiles.ts",
+      "__tests__/unit/strykerTestFiles.test.ts"
+    ],
+    "smoke": ["src/utils/formatTime.ts", "src/utils/sorting.ts", "src/utils/trackIdentity.ts"],
+    "perFileThreshold": 80,
+    "nodeOptions": "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON",
+    "sweep": { "shards": 8, "timeoutMinutes": 120 }
+  }
+}
