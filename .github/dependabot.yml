@@ -84,6 +84,10 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "@types/jest"
         update-types: ["version-update:semver-major"]
+      # The Stryker runner (scripts/stryker-jest-runner.mjs) subclasses
+      # jest-runner and runs inside Jest 29; it moves with the Jest family.
+      - dependency-name: "jest-runner"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
