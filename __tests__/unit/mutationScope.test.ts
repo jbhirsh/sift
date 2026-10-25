@@ -6,9 +6,12 @@ import {
   isMutable,
   mutateEntries,
   parseScope,
+  prScope,
   relativeName,
   score,
   scopeEntries,
+  SMOKE_SCOPE,
+  wiringChanged,
   type LineRange,
   type MutationReport,
   type ReportMutant,
@@ -337,5 +340,112 @@ describe('failures', () => {
         80,
       ),
     ).toEqual([{ file: 'low.ts', score: 79.99 }]);
+  });
+});
+
+describe('wiringChanged', () => {
+  it.each([
+    'stryker.config.json',
+    'stryker.conf.js',
+    'jest.config.js',
+    'jest.setup.ts',
+    'babel.config.js',
+    '.babelrc',
+    '__tests__/helpers/clock.setup.ts',
+    'package.json',
+    'package-lock.json',
+    'patches/@stryker-mutator+jest-runner+10.0.0.patch',
+    '.github/workflows/mutation.yml',
+    'scripts/mutation-scope.mjs',
+    'scripts/mutationScope.ts',
+    'scripts/check-mutation-threshold.mjs',
+    'scripts/stryker-jest-runner.mjs',
+    'scripts/strykerTestFiles.ts',
+    'scripts/mutation-sweep.mjs',
+    'scripts/mutationSweep.ts',
+    '__tests__/unit/mutationScope.test.ts',
+    '__tests__/unit/strykerTestFiles.test.ts',
+    '__tests__/unit/mutationSweep.test.ts',
+  ])('counts %s as the Stryker setup', (file) => {
+    expect(wiringChanged([file])).toBe(true);
+  });
+
+  it.each([
+    'src/screens/SiftScreen.tsx',
+    'src/utils/sorting.ts',
+    '__tests__/unit/sorting.test.ts',
+    '__tests__/helpers/renderWithProviders.tsx',
+    '__mocks__/expo-musickit.ts',
+    'docs/screenshots/setup.png',
+    'README.md',
+    'CLAUDE.md',
+    '.github/workflows/ci.yml',
+    'scripts/pr-gifs.mjs',
+    'src/package.json',
+    'my-stryker.config.json',
+  ])("doesn't count %s", (file) => {
+    expect(wiringChanged([file])).toBe(false);
+  });
+
+  it('counts a list holding any setup file', () => {
+    expect(wiringChanged(['README.md', 'package.json'])).toBe(true);
+    expect(wiringChanged([])).toBe(false);
+  });
+
+  it('lists every file of the repository jest.config.js loads', () => {
+    // jest.config.js is CommonJS; read its setup file lists as text.
+    const config = readFileSync('jest.config.js', 'utf8');
+    const lists = [...config.matchAll(/setupFiles(?:AfterEnv)?:\s*\[([^\]]*)\]/g)];
+    const local = lists.flatMap(([, list]) =>
+      [...list.matchAll(/'<rootDir>\/([^']+)'/g)].map(([, file]) => file),
+    );
+    expect(local.length).toBeGreaterThan(0);
+    for (const file of local) expect([file, wiringChanged([file])]).toEqual([file, true]);
+  });
+});
+
+describe('prScope', () => {
+  const rangesOf = (): LineRange[] => [[3, 5]];
+
+  it('mutates the changed lines when there are any', () => {
+    expect(
+      prScope(
+        ['src/utils/sorting.ts', 'package.json'],
+        ['src/utils/sorting.ts', 'package.json'],
+        rangesOf,
+      ),
+    ).toEqual(['src/utils/sorting.ts:3-5']);
+  });
+
+  it('runs the smoke scope when only the setup changed', () => {
+    expect(prScope(['package.json'], ['package.json'], rangesOf)).toEqual(SMOKE_SCOPE);
+  });
+
+  it('counts a deleted setup file, which only `touched` names', () => {
+    expect(prScope([], ['patches/old.patch'], rangesOf)).toEqual(SMOKE_SCOPE);
+  });
+
+  it('runs nothing when neither mutable code nor the setup changed', () => {
+    expect(
+      prScope(
+        ['src/screens/SiftScreen.tsx', 'README.md'],
+        ['src/screens/SiftScreen.tsx', 'README.md'],
+        rangesOf,
+      ),
+    ).toEqual([]);
+  });
+
+  it('runs nothing for a mutable file that only lost lines and no setup change', () => {
+    expect(prScope(['src/utils/sorting.ts'], ['src/utils/sorting.ts'], () => [])).toEqual([]);
+  });
+
+  it('hands out a copy of the smoke scope', () => {
+    const scope = prScope([], ['package.json'], rangesOf);
+    scope.push('x');
+    expect(SMOKE_SCOPE).toHaveLength(3);
+  });
+
+  it('smoke-tests files the mutate globs take', () => {
+    expect(SMOKE_SCOPE.filter(isMutable)).toEqual(SMOKE_SCOPE);
   });
 });

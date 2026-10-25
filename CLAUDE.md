@@ -436,7 +436,13 @@ Makefile                Dev commands (test, lint, typecheck, check)
   against the merge base; a file new to the branch whole:
   `scripts/mutation-scope.mjs`, rules in `scripts/mutationScope.ts`), and
   the per-file 80% gate (`scripts/check-mutation-threshold.mjs`) scores
-  those lines alone; a file with nothing scorable in them passes. PR
+  those lines alone; a file with nothing scorable in them passes. A PR
+  with no mutable line runs a smoke scope (three small utils files) only
+  if it changes the Stryker setup (its config, Jest's, the dependencies,
+  `mutation.yml`, the mutation scripts and their tests: `wiringChanged`
+  in `scripts/mutationScope.ts`); otherwise the job skips its Stryker
+  steps and still reports, so a screen, test or docs change costs no
+  install or dry run. PR
   mutation runs are incremental:
   they reuse the PR's last results (or the last monthly sweep's, from the
   Actions cache) and re-test only mutants whose code or tests changed. The

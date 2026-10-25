@@ -8,7 +8,8 @@ name: Mutation Testing
 #   - Pull requests: mutate only the lines the PR added or changed in the
 #     in-scope files it touched (a file new to the branch whole). Fast,
 #     targeted feedback on exactly the code under review, however many
-#     files a PR touches.
+#     files a PR touches. A PR with no such line runs a small smoke scope
+#     if it changes the Stryker setup, and skips Stryker otherwise.
 #   - Monthly schedule (06:00 UTC on the 1st, + manual dispatch): full
 #     sweep as a drift sensor, catching erosion from changes that didn't
 #     trip the PR-scoped run (a helper, test data or a dependency changing
@@ -101,6 +102,10 @@ jobs:
               - 'scripts/mutationScope.ts'
               - 'scripts/stryker-jest-runner.mjs'
               - 'scripts/strykerTestFiles.ts'
+              - 'scripts/mutation-sweep.mjs'
+              - 'scripts/mutationSweep.ts'
+              - 'patches/**'
+              - 'babel.config.*'
 
   # Pull requests only. Its name is a required check: keep it (CLAUDE.md,
   # "Required status checks"). The monthly sweep runs as the sweep-* jobs.
@@ -120,12 +125,12 @@ jobs:
           # Full history so PR runs can diff against the base branch.
           fetch-depth: 0
 
+      # No npm cache here: the scope needs only Node, and setup-node's npm
+      # cache expects an install to fill it. The setup-node below, run only
+      # with something to mutate, brings the cache with the install.
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: npm
-
-      - run: npm ci
 
       # On PRs, narrow mutation to the lines the PR added or changed in the
       # files inside the configured mutation scope: scripts/mutation-scope.mjs
@@ -135,11 +140,15 @@ jobs:
       # made a PR touching many of them outrun the job. SYNC POINT:
       # `--mutate` REPLACES the `mutate` array in stryker.config.json (no
       # merge), so that array is the source of truth; isMutable in
-      # scripts/mutationScope.ts mirrors it and a unit test pins it. If the
-      # workflow triggered but no mutable source changed (config/test/mock/
-      # workflow edits, pure deletions), fall back to a fast smoke scope over
-      # the small utils so the Stryker wiring itself is still validated at
-      # PR time, not just monthly.
+      # scripts/mutationScope.ts mirrors it and a unit test pins it. If no
+      # mutable source changed, the script prints a smoke scope over three
+      # small utils files only when the PR changes the Stryker setup (its
+      # config, Jest's, the dependencies, this workflow, the mutation
+      # scripts: wiringChanged in scripts/mutationScope.ts), so the setup is
+      # still validated at PR time; otherwise it prints nothing and every
+      # step below is skipped (a screen, a test or the docs changing costs
+      # no install and no dry run). The job itself always runs and reports,
+      # as Mutation Tests (Stryker) is a required check.
       - name: Determine mutation scope
         id: scope
         # Context values enter as env vars, not ${{ }} splices inside `run:`,
@@ -148,19 +157,30 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          CHANGED=$(node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mutation-scope.mjs "origin/${BASE_REF}")
-          if [ -z "$CHANGED" ]; then
-            echo "No mutable lines changed — running utils smoke scope to validate the Stryker setup."
-            echo "mutate=src/utils/formatTime.ts,src/utils/sorting.ts,src/utils/trackIdentity.ts" >> "$GITHUB_OUTPUT"
+          SCOPE=$(node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/mutation-scope.mjs "origin/${BASE_REF}")
+          if [ -z "$SCOPE" ]; then
+            echo "No mutable lines and nothing in the Stryker setup changed: skipping Stryker."
+            echo "run=false" >> "$GITHUB_OUTPUT"
           else
-            echo "Mutating the changed lines:"; echo "$CHANGED"
-            echo "mutate=$(echo "$CHANGED" | paste -sd, -)" >> "$GITHUB_OUTPUT"
+            echo "Mutating:"; echo "$SCOPE"
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "mutate=$(echo "$SCOPE" | paste -sd, -)" >> "$GITHUB_OUTPUT"
           fi
+
+      - uses: actions/setup-node@v7
+        if: steps.scope.outputs.run == 'true'
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+        if: steps.scope.outputs.run == 'true'
 
       # The incremental baseline: this PR's last run, else main's last
       # sweep. Caches saved on main are readable from PRs; a PR's own are
       # visible to that PR alone.
       - name: Restore incremental results
+        if: steps.scope.outputs.run == 'true'
         uses: actions/cache/restore@v6
         with:
           path: reports/stryker-incremental.json
@@ -172,6 +192,7 @@ jobs:
       # NODE_OPTIONS: Stryker's test runner processes load the Jest runner,
       # which imports a .ts module (package.json has no "type").
       - name: Run Stryker (changed lines, incremental)
+        if: steps.scope.outputs.run == 'true'
         env:
           MUTATE_SCOPE: ${{ steps.scope.outputs.mutate }}
           NODE_OPTIONS: --disable-warning=MODULE_TYPELESS_PACKAGE_JSON
@@ -181,7 +202,7 @@ jobs:
       # right, and the next push only re-tests what it changes. Not after a
       # cancel, which may leave only the restored, older file behind.
       - name: Save incremental results
-        if: ${{ !cancelled() && hashFiles('reports/stryker-incremental.json') != '' }}
+        if: ${{ !cancelled() && steps.scope.outputs.run == 'true' && hashFiles('reports/stryker-incremental.json') != '' }}
         uses: actions/cache/save@v6
         with:
           path: reports/stryker-incremental.json
@@ -196,6 +217,7 @@ jobs:
       # a successful Stryker run; the report upload below is always() so a
       # gate failure is still diagnosable from the artifact.
       - name: Enforce per-file mutation threshold
+        if: steps.scope.outputs.run == 'true'
         env:
           MUTATE_SCOPE: ${{ steps.scope.outputs.mutate }}
         run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-mutation-threshold.mjs
@@ -206,7 +228,7 @@ jobs:
       # if the runner kills Stryker at timeout-minutes, no report exists and
       # an upload error would only mask the timeout as a secondary failure.
       - name: Upload mutation report
-        if: always()
+        if: always() && steps.scope.outputs.run == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: mutation-report

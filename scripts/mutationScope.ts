@@ -1,6 +1,7 @@
 // Rules for the PR mutation run (.github/workflows/mutation.yml): which code
 // it mutates (scripts/mutation-scope.mjs prints the `--mutate` entries) and
-// what the per-file gate scores (scripts/check-mutation-threshold.mjs).
+// what the per-file gate scores (scripts/check-mutation-threshold.mjs), and
+// whether a PR with no mutable change runs Stryker at all.
 // Typed and unit-tested (__tests__/unit/mutationScope.test.ts); this file
 // imports nothing from Node, so it typechecks under the app's tsconfig.
 //
@@ -71,6 +72,61 @@ export function scopeEntries(
   rangesOf: (file: string) => LineRange[] | null,
 ): string[] {
   return changed.filter(isMutable).flatMap((file) => mutateEntries(file, rangesOf(file)));
+}
+
+// When a PR changes no mutable line, there is nothing of its own to
+// mutate, but a change to the Stryker setup could still break the sweep
+// and every later PR run, so it gets a small smoke run over three short
+// utils files. Anything else (a screen, a test, an image, the docs) skips
+// Stryker: the install and dry run alone took minutes and held up bot PRs
+// that change only pictures or docs. The workflow still reports the
+// required check, as only its Stryker steps are skipped.
+//
+// The setup is Stryker's config, Jest's (jest.config.js and what it loads
+// from the repository: its setup files, Babel's config), the dependencies
+// (package.json, the lockfile, patches/), the workflow, and the scripts
+// that scope, run, split and gate the runs, with their tests.
+// __tests__/unit/mutationScope.test.ts checks that every local file
+// jest.config.js loads is listed.
+const WIRING = [
+  /^stryker\.conf(ig)?\.[^/]+$/,
+  /^jest\.(config|setup)[^/]*$/,
+  /^babel\.config\.[^/]+$/,
+  /^\.babelrc[^/]*$/,
+  /^__tests__\/helpers\/[^/]*\.setup\.ts$/,
+  /^package(-lock)?\.json$/,
+  /^patches\//,
+  /^\.github\/workflows\/mutation\.yml$/,
+  /^scripts\/(mutation-scope\.mjs|mutationScope\.ts|check-mutation-threshold\.mjs)$/,
+  /^scripts\/(stryker-jest-runner\.mjs|strykerTestFiles\.ts|mutation-sweep\.mjs|mutationSweep\.ts)$/,
+  /^__tests__\/unit\/(mutationScope|strykerTestFiles|mutationSweep)\.test\.ts$/,
+];
+
+/** The smoke run's --mutate entries: three short utils files. */
+export const SMOKE_SCOPE = [
+  'src/utils/formatTime.ts',
+  'src/utils/sorting.ts',
+  'src/utils/trackIdentity.ts',
+];
+
+/** Whether any of `files` (repository-relative) is part of the Stryker setup. */
+export function wiringChanged(files: readonly string[]): boolean {
+  return files.some((file) => WIRING.some((re) => re.test(file)));
+}
+
+/**
+ * The PR run's --mutate entries: its changed lines (`scopeEntries`), else
+ * the smoke scope when `touched` (every file the PR changes, deletions
+ * included) changes the Stryker setup, else none: Stryker doesn't run.
+ */
+export function prScope(
+  changed: string[],
+  touched: readonly string[],
+  rangesOf: (file: string) => LineRange[] | null,
+): string[] {
+  const entries = scopeEntries(changed, rangesOf);
+  if (entries.length > 0) return entries;
+  return wiringChanged(touched) ? [...SMOKE_SCOPE] : [];
 }
 
 /** A path as the scope names it: relative to `cwd`, with forward slashes. */
