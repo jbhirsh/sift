@@ -28,7 +28,7 @@ module.exports = {
   modulePathIgnorePatterns: ['<rootDir>/\\.stryker-tmp/'],
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
-    // The logic behind the PR visuals and native bridge checks.
+    // The logic behind the scripts' CLIs (the native bridge check, …).
     'scripts/*.ts',
     '!src/types/**',
     '!src/**/index.ts',
