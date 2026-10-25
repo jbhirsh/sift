@@ -28,7 +28,7 @@ export type LineRange = [first: number, last: number];
 // mirror it: the context's .ts and .tsx, the services', utils' and hooks'
 // .ts, less the barrels, the interface, the mock data and the mock
 // provider. Change them in the same commit as the config's entries, or PR
-// runs and the weekly sweep silently diverge in scope.
+// runs and the monthly sweep silently diverge in scope.
 // __tests__/unit/mutationScope.test.ts pins the config's array.
 const MUTABLE = /^(src\/context\/.*\.tsx?|src\/(services|utils|hooks)\/.*\.ts)$/;
 const NOT_MUTATED =
@@ -134,7 +134,7 @@ export interface FileScore {
 /**
  * Each scored file's mutation score, lowest first, files without a score
  * last. With a `scope` (a PR run), only the files it names count, each
- * scored on its named lines; without one (the weekly sweep), every file
+ * scored on its named lines; without one (the monthly sweep), every file
  * counts whole.
  */
 export function fileScores(

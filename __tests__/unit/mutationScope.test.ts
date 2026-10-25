@@ -294,7 +294,7 @@ describe('fileScores', () => {
     },
   };
 
-  it('scores every file whole without a scope (the weekly sweep), lowest first', () => {
+  it('scores every file whole without a scope (the monthly sweep), lowest first', () => {
     expect(fileScores(report, null, CWD)).toEqual([
       { file: 'src/utils/carried.ts', score: 0 },
       { file: 'src/utils/typesOnly.ts', score: 0 },

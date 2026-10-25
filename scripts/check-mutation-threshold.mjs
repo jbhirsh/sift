@@ -7,7 +7,7 @@
 //
 // Run after `stryker run` (which must emit the json reporter to
 // reports/mutation/mutation.json — see stryker.config.json). Used by the
-// mutation.yml workflow on both the PR-scoped run and the weekly full sweep.
+// mutation.yml workflow on both the PR-scoped run and the monthly full sweep.
 // On a PR, MUTATE_SCOPE holds the run's --mutate entries, and only the files
 // and lines they name are scored: a file's score is then its changed lines'
 // alone, and the results Stryker's incremental mode carries over from the

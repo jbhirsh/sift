@@ -9,15 +9,21 @@ name: Mutation Testing
 #     in-scope files it touched (a file new to the branch whole). Fast,
 #     targeted feedback on exactly the code under review, however many
 #     files a PR touches.
-#   - Weekly schedule (+ manual dispatch): full sweep as a drift sensor,
-#     catching erosion from changes that didn't trip the PR-scoped run.
+#   - Monthly schedule (06:00 UTC on the 1st, + manual dispatch): full
+#     sweep as a drift sensor, catching erosion from changes that didn't
+#     trip the PR-scoped run (a helper, test data or a dependency changing
+#     what untouched code's tests check). Once a month is enough now that
+#     PR runs mutate only their changed lines: the sweep is for that drift
+#     and for refreshing the baseline PR runs reuse.
 #
 # PR runs are incremental: Stryker reuses the results of the PR's previous
-# push, or of the latest weekly sweep on main for a PR's first push, and
+# push, or of the latest monthly sweep on main for a PR's first push, and
 # re-tests only mutants whose code or covering tests changed. Its change
 # detection can miss an indirect change (a config or mock edit), which the
-# weekly sweep catches: that run tests every mutant (--force) and saves the
-# baseline PRs start from.
+# monthly sweep catches: that run tests every mutant (--force) and saves the
+# baseline PRs start from. GitHub evicts a cache unused for seven days, so
+# after a quiet week a PR may find no baseline; it then just tests its
+# changed lines afresh.
 #
 # Gate: stryker.config.json sets thresholds.break=80 (a global floor), and
 # scripts/check-mutation-threshold.mjs enforces the stricter per-file bar —
@@ -37,7 +43,10 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    - cron: '0 6 * * 1'
+    # 06:00 UTC on the 1st. Not "the first Monday": GitHub's cron ORs the
+    # day-of-month and day-of-week fields, so '0 6 1-7 * 1' would run on
+    # every Monday as well as the 1st to the 7th.
+    - cron: '0 6 1 * *'
   workflow_dispatch:
 
 concurrency:
@@ -110,7 +119,7 @@ jobs:
       # workflow triggered but no mutable source changed (config/test/mock/
       # workflow edits, pure deletions), fall back to a fast smoke scope over
       # the small utils so the Stryker wiring itself is still validated at
-      # PR time, not just weekly.
+      # PR time, not just monthly.
       - name: Determine mutation scope
         id: scope
         if: github.event_name == 'pull_request'

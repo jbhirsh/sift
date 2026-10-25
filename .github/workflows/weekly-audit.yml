@@ -12,8 +12,9 @@
 #   - Architecture graph: dependency-cruiser's whole module graph, as an
 #     artifact (its rules gate every PR in ci.yml; this is the picture).
 #
-# Monday 06:00 UTC, the shared sweep slot (mutation.yml, gitleaks, semgrep),
-# plus manual dispatch. Not a PR gate, so it is free to filter or skip.
+# Monday 06:00 UTC, the shared sweep slot (gitleaks, semgrep; mutation.yml
+# sweeps monthly, at 06:00 on the 1st), plus manual dispatch. Not a PR
+# gate, so it is free to filter or skip.
 name: Weekly audit
 
 on:
