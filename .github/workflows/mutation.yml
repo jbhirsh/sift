@@ -358,7 +358,7 @@ jobs:
       # script's to report, so a download with nothing to fetch can't stop it.
       - name: Download the shards' results
         continue-on-error: true
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: stryker-sweep-results-*
           path: shards
