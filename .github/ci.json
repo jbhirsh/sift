@@ -37,5 +37,8 @@
     ],
     "notUi": [],
     "advice": "Add before/after simulator screenshots to the description (a GIF when the change affects motion or interaction: swipes, animations, sheets opening), or tick \"No visible UI change\" in the template. Editing the description re-runs this check."
+  },
+  "audit": {
+    "graph": ["src"]
   }
 }
