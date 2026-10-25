@@ -6,8 +6,16 @@
 // any individual file is below THRESHOLD.
 //
 // Run after `stryker run` (which must emit the json reporter to
-// reports/mutation/mutation.json — see stryker.config.json). Used by the
-// mutation.yml workflow on both the PR-scoped run and the weekly full sweep.
+// reports/mutation/mutation.json — see stryker.config.json), or with the
+// path of another report in the same format as its argument: the monthly
+// sweep's merge job passes the shards' merged results
+// (reports/stryker-incremental.json, scripts/mutation-sweep.mjs). Used by
+// the mutation.yml workflow on both the PR-scoped run and the sweep.
+// On a PR, MUTATE_SCOPE holds the run's --mutate entries, and only the files
+// and lines they name are scored: a file's score is then its changed lines'
+// alone, and the results Stryker's incremental mode carries over from the
+// baseline don't count. A file with nothing scorable there has no score and
+// passes. The rules live in mutationScope.ts, typed and unit-tested.
 //
 // MockMusicProvider.ts is excluded from the mutate scope in
 // stryker.config.json — it is fixture-heavy dev scaffolding whose surviving
@@ -19,9 +27,10 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import process from 'node:process';
+import { failures, fileScores, parseScope } from './mutationScope.ts';
 
 const THRESHOLD = 80;
-const reportPath = join('reports', 'mutation', 'mutation.json');
+const reportPath = process.argv[2] ?? join('reports', 'mutation', 'mutation.json');
 
 const out = (line) => process.stdout.write(`${line}\n`);
 const err = (line) => process.stderr.write(`${line}\n`);
@@ -32,38 +41,25 @@ if (!existsSync(reportPath)) {
 }
 
 const report = JSON.parse(readFileSync(reportPath, 'utf8'));
-const files = report.files || {};
-const rows = [];
-const failures = [];
+const cwd = process.cwd();
+const scope = process.env.MUTATE_SCOPE ? parseScope(process.env.MUTATE_SCOPE, cwd) : null;
+const scores = fileScores(report, scope, cwd);
+const failed = failures(scores, THRESHOLD);
+const where = scope ? 'in its changed lines ' : '';
 
-for (const [file, data] of Object.entries(files)) {
-  const mutants = data.mutants || [];
-  const killed = mutants.filter((m) => m.status === 'Killed').length;
-  const timeout = mutants.filter((m) => m.status === 'Timeout').length;
-  const survived = mutants.filter((m) => m.status === 'Survived').length;
-  const noCoverage = mutants.filter((m) => m.status === 'NoCoverage').length;
-  const detected = killed + timeout;
-  const total = detected + survived + noCoverage;
-  if (total === 0) continue; // nothing scorable (e.g. only compile-error mutants)
-  const score = (detected / total) * 100;
-  rows.push({ file, score });
-  if (score < THRESHOLD) {
-    failures.push({ file, score });
-  }
+for (const { file, score } of scores) {
+  if (score === null) out(`  [none] nothing scorable ${where}— ${file}`);
+  else out(`  [${score < THRESHOLD ? 'FAIL' : 'ok'}] ${score.toFixed(2)}%  ${file}`);
 }
 
-rows.sort((a, b) => a.score - b.score);
-for (const { file, score } of rows) {
-  out(`  [${score < THRESHOLD ? 'FAIL' : 'ok'}] ${score.toFixed(2)}%  ${file}`);
-}
-
-if (failures.length > 0) {
-  err(`\nMutation score below ${THRESHOLD}% for ${failures.length} file(s):`);
-  for (const { file, score } of failures) {
+if (failed.length > 0) {
+  err(`\nMutation score below ${THRESHOLD}% for ${failed.length} file(s):`);
+  for (const { file, score } of failed) {
     err(`  - ${file}: ${score.toFixed(2)}%`);
   }
   err('\nWrite tests that kill the surviving mutants (see the HTML report) to clear the bar.');
   process.exit(1);
 }
 
-out(`\nAll ${rows.length} mutated file(s) >= ${THRESHOLD}% mutation score.`);
+const scored = scores.filter(({ score }) => score !== null).length;
+out(`\nAll ${scored} scored file(s) >= ${THRESHOLD}% mutation score.`);

@@ -46,7 +46,7 @@ no-op when `$CI` is set. CI re-runs everything.
 |-------|--------------|-------|-------------|
 | Unit tests (`make test`) | Reducers, utils, hooks, services | Seconds | Every push + CI |
 | E2E tests (`make test-e2e`) | Full app flows | Minutes | PR time (Maestro flows in `.maestro/`) |
-| Mutation tests (`make test-mutation`) | Assertion depth of unit tests (Stryker) | Minutes–hour | PR time (changed files, incremental) + weekly full sweep (`mutation.yml`) |
+| Mutation tests (`make test-mutation`) | Assertion depth of unit tests (Stryker) | Minutes–hour | PR time (changed lines, incremental) + monthly full sweep (`mutation.yml`) |
 
 **Test coverage requirements:**
 - Every new reducer action, service function, or utility must have a unit test in `__tests__/unit/`.
@@ -425,12 +425,45 @@ Makefile                Dev commands (test, lint, typecheck, check)
   copy, so any build output the checkout holds goes in `.fingerprintignore`
   (empty today).
 - Security/quality gates run per PR and sweep weekly (Mon 06:00 UTC):
-  `gitleaks.yml` (secret scanning), `semgrep.yml` (SAST, `--config auto`), and
-  `mutation.yml` (Stryker), alongside the weekly Dependabot bumps. PR mutation
-  runs are incremental: they reuse the PR's last results (or the last weekly
-  sweep's, from the Actions cache) and re-test only mutants whose code or
-  tests changed. The weekly sweep tests everything and refreshes that
-  baseline.
+  `gitleaks.yml` (secret scanning) and `semgrep.yml` (SAST, `--config auto`),
+  alongside the weekly Dependabot bumps. `mutation.yml` (Stryker) runs per PR
+  and sweeps monthly (06:00 UTC on the 1st; one cron entry, since GitHub ORs
+  the day-of-month and day-of-week fields, so "first Monday" can't be
+  written): with PR runs mutating only their changed lines, the sweep is
+  for drift from helpers, test data and dependencies, and for refreshing
+  the baseline PR runs reuse. A PR's mutation run mutates only the lines it
+  adds or changes (one `file:first-last` entry per block from `git diff -U0`
+  against the merge base; a file new to the branch whole:
+  `scripts/mutation-scope.mjs`, rules in `scripts/mutationScope.ts`), and
+  the per-file 80% gate (`scripts/check-mutation-threshold.mjs`) scores
+  those lines alone; a file with nothing scorable in them passes. A PR
+  with no mutable line runs a smoke scope (three small utils files) only
+  if it changes the Stryker setup (its config, Jest's, the dependencies,
+  `mutation.yml`, the mutation scripts and their tests: `wiringChanged`
+  in `scripts/mutationScope.ts`); otherwise the job skips its Stryker
+  steps and still reports, so a screen, test or docs change costs no
+  install or dry run. PR
+  mutation runs are incremental:
+  they reuse the PR's last results (or the last monthly sweep's, from the
+  Actions cache) and re-test only mutants whose code or tests changed. The
+  monthly sweep tests every file whole and refreshes that baseline. As one
+  job it outgrew the 120-minute limit (117 minutes on October 19, doubling
+  weekly), so it runs in shards (`scripts/mutation-sweep.mjs`, rules in
+  `scripts/mutationSweep.ts`): `Mutation sweep plan` splits the in-scope
+  files into 8 groups of near-equal weight (each file's mutants plus the
+  tests covering them in main's last results, else its line count), each
+  `Mutation sweep <n>` job tests one group from scratch with no break
+  threshold, and `Mutation sweep` merges their results (renumbering the
+  tests, which each shard numbers its own way), applies the per-file gate
+  to every file and saves the whole as the baseline only when every shard
+  reported.
+  Every Stryker run loads, for each mutant, only the test files holding its
+  covering tests (`scripts/stryker-jest-runner.mjs`, Jest's runner in
+  `stryker.config.json`; rules in `scripts/strykerTestFiles.ts`). Stryker's
+  own Jest runner loads every test file that imports the mutated file,
+  most of which hold none of them: about half of a mutant's time, and a
+  cost that grows with both the code mutated and the tests, which is why
+  the sweep's time doubled week on week.
 - **The weekly audit** (`weekly-audit.yml`, the same Monday slot, or by hand)
   runs what needs the whole repository at once: knip (`knip.jsonc`: unused
   files, exports and dependencies), jscpd (`.jscpd.json`: duplicated blocks),

@@ -11,8 +11,8 @@ test-watch:
 	npx jest --watch
 
 # Run mutation tests (Stryker) on reducer, services, utils, and hooks.
-# Slow — not part of `make check`. CI (mutation.yml) mutates changed files
-# on every PR and does a full sweep weekly.
+# Slow — not part of `make check`. CI (mutation.yml) mutates the changed
+# lines on every PR and does a full sweep monthly.
 test-mutation:
 	npx stryker run
 
