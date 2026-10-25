@@ -19,6 +19,12 @@
     "smoke": ["src/utils/formatTime.ts", "src/utils/sorting.ts", "src/utils/trackIdentity.ts"],
     "perFileThreshold": 80,
     "nodeOptions": "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON",
-    "sweep": { "shards": 8, "timeoutMinutes": 120 }
+    "sweep": {
+      "shards": 8,
+      "timeoutMinutes": 120
+    }
+  },
+  "semgrep": {
+    "paths": ["src", "__tests__", "modules", "index.ts"]
   }
 }
