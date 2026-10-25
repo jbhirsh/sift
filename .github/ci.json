@@ -56,5 +56,8 @@
       "scenariosInput": "gif_scenarios_from",
       "ringColor": "#E11D48"
     }
+  },
+  "review": {
+    "instructions": ".github/claude-review.md"
   }
 }
