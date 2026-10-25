@@ -17,6 +17,4 @@
   "ignoreIssues": {
     "modules/expo-musickit/src/index.ts": ["exports", "types"],
   },
-  // A system tool scripts/pr-gifs.mjs runs, not an npm package.
-  "ignoreBinaries": ["ffmpeg"],
 }

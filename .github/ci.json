@@ -43,5 +43,18 @@
   },
   "readme-screenshots": {
     "source": "the iOS Simulator shots CI's E2E job took (mock library)"
+  },
+  "gif": {
+    "source": "ci-videos",
+    "cellWidth": 260,
+    "videos": {
+      "workflow": "ci.yml",
+      "artifact": "ios-gif-videos",
+      "inputs": {
+        "gifs_only": "true"
+      },
+      "scenariosInput": "gif_scenarios_from",
+      "ringColor": "#E11D48"
+    }
   }
 }
