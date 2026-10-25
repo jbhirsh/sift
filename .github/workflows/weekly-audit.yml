@@ -1,16 +1,17 @@
 # The weekly audit: checks that need the whole repository at once, too slow
-# or too noisy to gate a PR (CLAUDE.md, "CI/CD"). Each category keeps one
-# tracking issue, labelled weekly-audit: opened when something turns up,
-# updated each week while it lasts, closed once a sweep comes back clean
-# (scripts/weekly-audit.mjs, rules in scripts/weeklyAudit.ts). Findings never
-# fail the run; a tool that breaks does.
+# or too noisy to gate a PR (CLAUDE.md, "CI/CD"). jbhirsh/ci's reusable
+# workflow runs them, each with this repo's own config. Each category keeps
+# one tracking issue, labelled weekly-audit: opened when something turns up,
+# updated each week while it lasts, closed once a sweep comes back clean.
+# Findings never fail the run; a tool that breaks does.
 #
 #   - Dead code: knip (knip.jsonc), unused files, exports and dependencies.
 #   - Duplicated code: jscpd (.jscpd.json).
 #   - Broken links: lychee over every markdown file, local files, images and
-#     #anchors included.
-#   - Architecture graph: dependency-cruiser's whole module graph, as an
-#     artifact (its rules gate every PR in ci.yml; this is the picture).
+#     #anchors included (.lycheeignore).
+#   - Architecture graph: dependency-cruiser's module graph of src/
+#     (`audit.graph` in .github/ci.json), as the architecture-graph artifact
+#     (its rules gate every PR in ci.yml; this is the picture).
 #
 # Monday 06:00 UTC, the shared sweep slot (gitleaks, semgrep; mutation.yml
 # sweeps monthly, at 06:00 on the 1st), plus manual dispatch. Not a PR
@@ -26,134 +27,12 @@ concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-
 permissions:
   contents: read
 
 jobs:
-  dead-code:
-    name: Dead code (knip)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+  audit:
+    uses: jbhirsh/ci/.github/workflows/audit.yml@main
     permissions:
       contents: read
       issues: write
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      # knip exits 1 when it finds something and 2 when it breaks.
-      - name: Run knip
-        run: |
-          mkdir -p reports
-          npx knip --reporter json > reports/knip.json || [ $? -eq 1 ]
-          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/weekly-audit.mjs knip reports/knip.json reports/findings.md
-      - name: Update the tracking issue
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/weekly-audit.mjs issue "Dead code (weekly audit)" reports/findings.md
-
-  duplicates:
-    name: Duplicated code (jscpd)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      issues: write
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - name: Run jscpd
-        run: |
-          npx jscpd
-          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/weekly-audit.mjs jscpd reports/jscpd/jscpd-report.json reports/findings.md
-      - name: Update the tracking issue
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/weekly-audit.mjs issue "Duplicated code (weekly audit)" reports/findings.md
-
-  links:
-    name: Broken links (lychee)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      issues: write
-    steps:
-      - uses: actions/checkout@v7
-      # The token keeps github.com links from hitting the anonymous rate
-      # limit. Exit code 2 is broken links, anything else non-zero a crash.
-      - name: Run lychee
-        id: lychee
-        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
-        with:
-          args: >-
-            --no-progress
-            --include-fragments
-            --root-dir ${{ github.workspace }}
-            './**/*.md'
-          output: reports/links.md
-          format: markdown
-          fail: false
-          token: ${{ github.token }}
-      - name: Collect findings
-        env:
-          EXIT_CODE: ${{ steps.lychee.outputs.exit_code }}
-        run: |
-          case "$EXIT_CODE" in
-            0) rm -f reports/findings.md ;;
-            2) { echo 'lychee found links in the docs that no longer lead anywhere: a dead URL, a missing file or image, or an `#anchor` the page lacks. Fix each, or add a pattern to `.lycheeignore` for one that only refuses scripts.'; echo; cat reports/links.md; } > reports/findings.md ;;
-            *) echo "::error::lychee failed (exit $EXIT_CODE)"; exit 1 ;;
-          esac
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-      - name: Update the tracking issue
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/weekly-audit.mjs issue "Broken links (weekly audit)" reports/findings.md
-
-  graph:
-    name: Architecture graph (dependency-cruiser)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - name: Install Graphviz
-        run: sudo apt-get update -q && sudo apt-get install -y -q graphviz
-      # archi: folders as nodes, the layering .dependency-cruiser.cjs
-      # enforces; the module graph and the HTML report list every file.
-      - name: Draw the graph
-        run: |
-          mkdir -p reports/architecture
-          npx depcruise src --output-type archi | dot -T svg > reports/architecture/layers.svg
-          npx depcruise src --output-type dot | dot -T svg > reports/architecture/modules.svg
-          npx depcruise src --output-type html > reports/architecture/report.html
-      - name: Upload the graph
-        id: upload
-        uses: actions/upload-artifact@v7
-        with:
-          name: architecture-graph
-          path: reports/architecture
-          retention-days: 30
-      - name: Link it from the summary
-        env:
-          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
-        run: |
-          echo "## Architecture graph" >> "$GITHUB_STEP_SUMMARY"
-          echo "Layers, every module, and dependency-cruiser's HTML report: [architecture-graph]($ARTIFACT_URL)" >> "$GITHUB_STEP_SUMMARY"

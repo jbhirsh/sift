@@ -6,7 +6,9 @@
   // loaded with require() by path, never imported by its package name.
   // expo-system-ui: Expo needs it for app.json's userInterfaceStyle on
   // Android only, and Sift is iOS-only (CLAUDE.md, "App Identity").
-  "ignoreDependencies": ["expo-musickit", "expo-system-ui"],
+  // jscpd: run by jbhirsh/ci's weekly audit from this repo's
+  // node_modules.
+  "ignoreDependencies": ["expo-musickit", "expo-system-ui", "jscpd"],
   // The native module's wrappers are required by path as one object
   // (AppleMusicProvider, useResolvedArtwork), which knip can't follow; the
   // native bridge check (scripts/check-native-bridge.mjs) holds them to the
