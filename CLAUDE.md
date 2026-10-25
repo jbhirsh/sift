@@ -441,6 +441,13 @@ Makefile                Dev commands (test, lint, typecheck, check)
   they reuse the PR's last results (or the last monthly sweep's, from the
   Actions cache) and re-test only mutants whose code or tests changed. The
   monthly sweep tests every file whole and refreshes that baseline.
+  Every Stryker run loads, for each mutant, only the test files holding its
+  covering tests (`scripts/stryker-jest-runner.mjs`, Jest's runner in
+  `stryker.config.json`; rules in `scripts/strykerTestFiles.ts`). Stryker's
+  own Jest runner loads every test file that imports the mutated file,
+  most of which hold none of them: about half of a mutant's time, and a
+  cost that grows with both the code mutated and the tests, which is why
+  the sweep's time doubled week on week.
 - **The weekly audit** (`weekly-audit.yml`, the same Monday slot, or by hand)
   runs what needs the whole repository at once: knip (`knip.jsonc`: unused
   files, exports and dependencies), jscpd (`.jscpd.json`: duplicated blocks),

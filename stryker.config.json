@@ -3,7 +3,10 @@
   "testRunner": "jest",
   "jest": {
     "projectType": "custom",
-    "configFile": "jest.config.js"
+    "configFile": "jest.config.js",
+    "config": {
+      "runner": "<rootDir>/scripts/stryker-jest-runner.mjs"
+    }
   },
   "coverageAnalysis": "perTest",
   "ignoreStatic": true,

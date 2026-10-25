@@ -25,6 +25,11 @@ name: Mutation Testing
 # after a quiet week a PR may find no baseline; it then just tests its
 # changed lines afresh.
 #
+# Every Stryker run here uses scripts/stryker-jest-runner.mjs as Jest's
+# runner (stryker.config.json): a mutant's run loads only the test files
+# holding its covering tests, not every test file that imports the mutated
+# file, which halved the time a mutant takes (scripts/strykerTestFiles.ts).
+#
 # Gate: stryker.config.json sets thresholds.break=80 (a global floor), and
 # scripts/check-mutation-threshold.mjs enforces the stricter per-file bar —
 # EVERY mutated file must score >= 80%. On a PR it scores only the lines the
@@ -83,6 +88,8 @@ jobs:
               - 'scripts/check-mutation-threshold.mjs'
               - 'scripts/mutation-scope.mjs'
               - 'scripts/mutationScope.ts'
+              - 'scripts/stryker-jest-runner.mjs'
+              - 'scripts/strykerTestFiles.ts'
 
   mutation:
     name: Mutation Tests (Stryker)
@@ -151,16 +158,21 @@ jobs:
             stryker-incremental-pr-${{ github.event.pull_request.number }}-
             stryker-incremental-main-
 
+      # NODE_OPTIONS: Stryker's test runner processes load the Jest runner,
+      # which imports a .ts module (package.json has no "type").
       - name: Run Stryker (changed lines, incremental)
         if: github.event_name == 'pull_request'
         env:
           MUTATE_SCOPE: ${{ steps.scope.outputs.mutate }}
+          NODE_OPTIONS: --disable-warning=MODULE_TYPELESS_PACKAGE_JSON
         run: npx stryker run --incremental --mutate "$MUTATE_SCOPE"
 
       # --force tests every mutant (no reuse) but still writes the results
       # file, which becomes the baseline PRs start from.
       - name: Run Stryker (full sweep)
         if: github.event_name != 'pull_request'
+        env:
+          NODE_OPTIONS: --disable-warning=MODULE_TYPELESS_PACKAGE_JSON
         run: npx stryker run --incremental --force
 
       # Saved even when the per-file gate below fails: the results are still
