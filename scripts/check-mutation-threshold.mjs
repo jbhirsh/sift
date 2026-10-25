@@ -6,8 +6,11 @@
 // any individual file is below THRESHOLD.
 //
 // Run after `stryker run` (which must emit the json reporter to
-// reports/mutation/mutation.json — see stryker.config.json). Used by the
-// mutation.yml workflow on both the PR-scoped run and the monthly full sweep.
+// reports/mutation/mutation.json — see stryker.config.json), or with the
+// path of another report in the same format as its argument: the monthly
+// sweep's merge job passes the shards' merged results
+// (reports/stryker-incremental.json, scripts/mutation-sweep.mjs). Used by
+// the mutation.yml workflow on both the PR-scoped run and the sweep.
 // On a PR, MUTATE_SCOPE holds the run's --mutate entries, and only the files
 // and lines they name are scored: a file's score is then its changed lines'
 // alone, and the results Stryker's incremental mode carries over from the
@@ -27,7 +30,7 @@ import process from 'node:process';
 import { failures, fileScores, parseScope } from './mutationScope.ts';
 
 const THRESHOLD = 80;
-const reportPath = join('reports', 'mutation', 'mutation.json');
+const reportPath = process.argv[2] ?? join('reports', 'mutation', 'mutation.json');
 
 const out = (line) => process.stdout.write(`${line}\n`);
 const err = (line) => process.stderr.write(`${line}\n`);

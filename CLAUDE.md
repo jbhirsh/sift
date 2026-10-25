@@ -440,7 +440,17 @@ Makefile                Dev commands (test, lint, typecheck, check)
   mutation runs are incremental:
   they reuse the PR's last results (or the last monthly sweep's, from the
   Actions cache) and re-test only mutants whose code or tests changed. The
-  monthly sweep tests every file whole and refreshes that baseline.
+  monthly sweep tests every file whole and refreshes that baseline. As one
+  job it outgrew the 120-minute limit (117 minutes on October 19, doubling
+  weekly), so it runs in shards (`scripts/mutation-sweep.mjs`, rules in
+  `scripts/mutationSweep.ts`): `Mutation sweep plan` splits the in-scope
+  files into 8 groups of near-equal weight (each file's mutants plus the
+  tests covering them in main's last results, else its line count), each
+  `Mutation sweep <n>` job tests one group from scratch with no break
+  threshold, and `Mutation sweep` merges their results (renumbering the
+  tests, which each shard numbers its own way), applies the per-file gate
+  to every file and saves the whole as the baseline only when every shard
+  reported.
   Every Stryker run loads, for each mutant, only the test files holding its
   covering tests (`scripts/stryker-jest-runner.mjs`, Jest's runner in
   `stryker.config.json`; rules in `scripts/strykerTestFiles.ts`). Stryker's
