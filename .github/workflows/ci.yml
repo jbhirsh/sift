@@ -51,21 +51,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Subject length, body, fixup and merge-commit rules (jbhirsh/ci).
       - name: Commit messages
-        # Subject length, body, fixup and merge-commit rules from CLAUDE.md.
         if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: .github/scripts/check-commits.sh
+        uses: jbhirsh/ci/commits@main
 
       # `every`: a file counts as code only if it matches every pattern, so
       # each `!` pattern excludes. (The default, `some`, lets '**' match
       # everything, which made the exclusions dead.) Excluded: docs, repo
       # config (the formatter's, the audits' and type coverage's included),
       # and tooling that can't change the app or this job: other
-      # workflows (ci.yml is this job; E2E reuses ios-build's app), the
-      # commit check, and scripts/ apart from the E2E job's runners (suite,
+      # workflows (ci.yml is this job; E2E reuses ios-build's app), CI
+      # helpers, and scripts/ apart from the E2E job's runners (suite,
       # audit, screenshots, GIFs).
       - uses: dorny/paths-filter@v4
         id: filter
