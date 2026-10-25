@@ -26,5 +26,16 @@
   },
   "semgrep": {
     "paths": ["src", "__tests__", "modules", "index.ts"]
+  },
+  "visuals": {
+    "ui": [
+      "src/App.tsx",
+      "src/components/**/*.{ts,tsx}",
+      "src/screens/**/*.{ts,tsx}",
+      "src/theme/**/*.{ts,tsx}",
+      "assets/**"
+    ],
+    "notUi": [],
+    "advice": "Add before/after simulator screenshots to the description (a GIF when the change affects motion or interaction: swipes, animations, sheets opening), or tick \"No visible UI change\" in the template. Editing the description re-runs this check."
   }
 }

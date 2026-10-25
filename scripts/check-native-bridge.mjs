@@ -3,7 +3,7 @@
 // unit-tested; Node 22.18+ runs it directly. Runs in CI (Lint, Typecheck &
 // Unit Test) and the pre-commit hook.
 //
-// ESM (.mjs) with explicit node: imports, like pr-visuals.mjs, so it lints
+// ESM (.mjs) with explicit node: imports, like the other CLIs here, so it lints
 // and runs without Node types in the app's tsconfig.
 import { readdirSync, readFileSync } from 'node:fs';
 import process from 'node:process';

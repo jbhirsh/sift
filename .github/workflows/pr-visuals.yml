@@ -1,12 +1,12 @@
 name: PR visuals
 
-# A PR that changes the UI must show it: scripts/pr-visuals.mjs (rules in
-# scripts/prVisuals.ts) fails when a screen, component, the root App, the theme
-# or an image asset changes and the description has no image, GIF or video and
-# no ticked "No visible UI change". It runs on description edits too, so adding
-# the pictures turns it green without a new push. Whether a change to motion
-# needs a GIF rather than a still is a judgment call that Claude Review makes
-# (claude-review.yml).
+# A PR that changes the UI must show it: jbhirsh/ci's visuals action fails
+# when a screen, component, the root App, the theme or an image asset (the
+# `visuals` globs in .github/ci.json) changes and the description has no
+# image, GIF or video and no ticked "No visible UI change". It runs on
+# description edits too, so adding the pictures turns it green without a new
+# push. Whether a change to motion needs a GIF rather than a still is a
+# judgment call that Claude Review makes (claude-review.yml).
 #
 # No trigger-level `paths:` filter: like every gating workflow here it reports
 # on every PR, so it can be a required check (CLAUDE.md).
@@ -20,9 +20,6 @@ concurrency:
   group: pr-visuals-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 permissions:
   contents: read
   pull-requests: read
@@ -33,25 +30,4 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v7
-
-      # Node 24 runs scripts/prVisuals.ts directly (built-in type stripping),
-      # so the check needs no npm install.
-      - uses: actions/setup-node@v7
-        with:
-          node-version: 24
-
-      - name: Check the description shows UI changes
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR: ${{ github.event.pull_request.number }}
-          # Passed through the environment, never interpolated into the script.
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: |
-          set -o pipefail
-          # The files API pages through large PRs, where `gh pr diff` gives up.
-          # The disabled warning is Node noting it inferred ESM for the .ts file
-          # (package.json declares no "type"); harmless, and only that code.
-          gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" \
-            --jq '.[].filename' \
-            | node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/pr-visuals.mjs
+      - uses: jbhirsh/ci/visuals@main
