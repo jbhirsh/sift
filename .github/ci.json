@@ -40,5 +40,8 @@
   },
   "audit": {
     "graph": ["src"]
+  },
+  "readme-screenshots": {
+    "source": "the iOS Simulator shots CI's E2E job took (mock library)"
   }
 }
