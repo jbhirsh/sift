@@ -72,10 +72,9 @@ Every commit message must:
 - Have a blank line then a body explaining *why*
 - End with the Co-Authored-By trailer
 
-CI's commit-message step (`.github/scripts/check-commits.sh`, in the
-`Lint, Typecheck & Unit Test` job) fails a PR on a subject over 72 chars,
-a missing body, a fixup/"oops" commit or a merge commit (history is
-linear: rebase, not merge).
+CI's commit-message step (jbhirsh/ci's `commits`, in the
+`Lint, Typecheck & Unit Test` job) enforces the shape; history is linear:
+rebase, not merge.
 
 ```
 Fix artwork fetch crashing on missing cache entry
@@ -380,10 +379,12 @@ Makefile                Dev commands (test, lint, typecheck, check)
   open in full; only lockfiles, generated files and images may be skimmed
   or skipped) and
   posts one summary comment per PR, updated on each push, saying what it
-  read; only its inline comments are merge blockers. Its tool calls are
-  then checked (`scripts/review-coverage.mjs`, rules in
-  `scripts/reviewCoverage.ts`): a changed file it never read goes back to
-  a second pass, and one still unread after that fails the check. The auto-fix workflow lives
+  read; only its inline comments are merge blockers. A changed file it
+  never read goes back to a second pass, and one still unread after that
+  fails the check. Both workflows call jbhirsh/ci's `review` and `autofix`
+  actions (how they work is in their `action.yml`); this repo's part is
+  `.github/claude-review.md` and the `review` and `autofix` keys of
+  `.github/ci.json`. The auto-fix workflow lives
   alongside it in `.github/workflows/claude-autofix.yml`. It acts only on
   bots' PRs (Dependabot's): it fixes review threads opened by Claude Review or
   the owner (two rounds per PR at most, once CI and Claude Review are both
@@ -431,32 +432,13 @@ Makefile                Dev commands (test, lint, typecheck, check)
   the day-of-month and day-of-week fields, so "first Monday" can't be
   written): with PR runs mutating only their changed lines, the sweep is
   for drift from helpers, test data and dependencies, and for refreshing
-  the baseline PR runs reuse. A PR's mutation run mutates only the lines it
-  adds or changes (one `file:first-last` entry per block from `git diff -U0`
-  against the merge base; a file new to the branch whole:
-  `scripts/mutation-scope.mjs`, rules in `scripts/mutationScope.ts`), and
-  the per-file 80% gate (`scripts/check-mutation-threshold.mjs`) scores
-  those lines alone; a file with nothing scorable in them passes. A PR
-  with no mutable line runs a smoke scope (three small utils files) only
-  if it changes the Stryker setup (its config, Jest's, the dependencies,
-  `mutation.yml`, the mutation scripts and their tests: `wiringChanged`
-  in `scripts/mutationScope.ts`); otherwise the job skips its Stryker
-  steps and still reports, so a screen, test or docs change costs no
-  install or dry run. PR
-  mutation runs are incremental:
-  they reuse the PR's last results (or the last monthly sweep's, from the
-  Actions cache) and re-test only mutants whose code or tests changed. The
-  monthly sweep tests every file whole and refreshes that baseline. As one
-  job it outgrew the 120-minute limit (117 minutes on October 19, doubling
-  weekly), so it runs in shards (`scripts/mutation-sweep.mjs`, rules in
-  `scripts/mutationSweep.ts`): `Mutation sweep plan` splits the in-scope
-  files into 8 groups of near-equal weight (each file's mutants plus the
-  tests covering them in main's last results, else its line count), each
-  `Mutation sweep <n>` job tests one group from scratch with no break
-  threshold, and `Mutation sweep` merges their results (renumbering the
-  tests, which each shard numbers its own way), applies the per-file gate
-  to every file and saves the whole as the baseline only when every shard
-  reported.
+  the baseline PR runs reuse. `mutation.yml` calls jbhirsh/ci's `mutation`
+  tool (PR runs) and its reusable sweep (8 parallel shards); their headers
+  say how a PR's changed lines are found, when Stryker is skipped, how
+  results are cached and how the shards are merged. This repo's settings
+  are the `mutation` key of `.github/ci.json`: the smoke scope, what counts
+  as Stryker's setup (`__tests__/unit/mutationWiring.test.ts` holds it to
+  Jest's config) and the per-file 80% gate.
   Every Stryker run loads, for each mutant, only the test files holding its
   covering tests (`scripts/stryker-jest-runner.mjs`, Jest's runner in
   `stryker.config.json`; rules in `scripts/strykerTestFiles.ts`). Stryker's
@@ -472,7 +454,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
   as an `architecture-graph` artifact (its rules already gate every PR). Each
   finding category keeps one issue labelled `weekly-audit` ("Dead code",
   "Duplicated code", "Broken links"), updated weekly and closed by the first
-  clean sweep (`scripts/weekly-audit.mjs`, rules in `scripts/weeklyAudit.ts`).
+  clean sweep (jbhirsh/ci's `audit` workflow).
   Findings never fail the run, a broken tool does. Run `npx knip` or
   `npx jscpd` locally to see the same; when knip is wrong about something
   (a file only a native build or a script reaches), say so in `knip.jsonc`.
@@ -486,8 +468,11 @@ Makefile                Dev commands (test, lint, typecheck, check)
   Every one of these reports on every PR. Never add a trigger-level
   `on.pull_request.paths` filter to a gating workflow: a filtered-out workflow
   never reports, and the required check hangs at "Expected". Path-filter
-  inside the workflow instead (see the `changes` job in `ios-build.yml` and
-  `mutation.yml`). A job skipped by its `if:` counts as passing.
+  inside the workflow instead (see the `changes` job in `ios-build.yml`). A
+  job skipped by its `if:` counts as passing. A new pull-request workflow
+  also goes in `claude-autofix.yml`'s trigger list, or in `.github/ci.json`'s
+  `autofix.exempt` with its reason; CI's autofix trigger check fails a PR
+  that does neither.
 - **E2E runner.** `scripts/run-e2e.sh` runs the whole Maestro suite in one
   session, then re-runs alone, on a fresh XCUITest driver, only the flows
   whose failure was a driver/transport error (so one driver death can't
@@ -528,6 +513,16 @@ Makefile                Dev commands (test, lint, typecheck, check)
   the app, whichever is wrong. No retry in a flow to cover one either (a
   second tap, a repeated step): it hides the failure instead of fixing it.
 
+- **CI tooling is shared** with fog-and-frontier and BoardGames in
+  [jbhirsh/ci](https://github.com/jbhirsh/ci), run from its `main` (no
+  version pin): mutation testing, Claude Review and autofix, PR GIFs, PR
+  visuals, the commit check, the weekly audit, the README screenshot bot,
+  Dependabot auto-merge and the secret and SAST scans. The workflows here
+  keep their triggers and job names (the required checks) and call it;
+  this repo's settings for each tool are its key in `.github/ci.json`, and
+  how a tool works is in its headers there. Change a tool in jbhirsh/ci
+  (cloned beside this repo as `../ci`), never by copying it back here.
+
 ---
 
 ## Workflow
@@ -542,8 +537,9 @@ Makefile                Dev commands (test, lint, typecheck, check)
   description (`.github/pull_request_template.md`): simulator screenshots for
   how things look, GIFs for how things move or respond (card swipes,
   animations, sheets and modals opening and closing, scrolling, multi-step
-  flows). The `PR visuals` check (`scripts/pr-visuals.mjs`, rules in
-  `scripts/prVisuals.ts`) fails a UI change with no picture unless "No
+  flows). The `PR visuals` check (jbhirsh/ci's `visuals`; what counts as UI
+  is the `visuals` key of `.github/ci.json`) fails a UI change with no
+  picture unless "No
   visible UI change" is ticked, and re-runs when the description is edited;
   Claude Review asks for a GIF when motion changes.
   - Screenshot: `xcrun simctl io booted screenshot after.png`. Without a
@@ -566,8 +562,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
     gesture handler owns (the card swipe, the seek bar) feeds the trail
     from its own pan (`followTouch`), since React Native's touch is
     cancelled once the pan takes over. Then
-    `node scripts/pr-gifs.mjs <pr>` (rules in `scripts/prGifs.ts`) does the
-    rest:
+    `node scripts/pr-gifs.mjs <pr>` (jbhirsh/ci's `gif` tool, set up by the
+    `gif` key of `.github/ci.json`) does the rest:
     1. It waits for the PR's run.
     2. It runs CI by hand on `main` with `gifs_only` and the PR's
        scenarios, for the "before".
@@ -591,9 +587,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
   `readme-screenshots.yml` takes the light Setup, Sift and Done shots its CI
   run's E2E job took (the `ios-screenshots` artifact; the status bar is
   pinned to 9:41, as in the GIFs), shrinks them to the README's 780 px, and replaces each
-  `docs/screenshots/` image where more than 0.5% of pixels differ
-  (`scripts/readme-screenshots.mjs`, rules in `scripts/readmeScreenshots.ts`;
-  ImageMagick). The changes go in one PR from `bot/readme-screenshots`,
+  `docs/screenshots/` image that differs visibly (jbhirsh/ci's
+  `readme-screenshots` tool). The changes go in one PR from `bot/readme-screenshots`,
   opened or updated, with auto-merge on (squash), its pictures linked by
   commit. A merge whose shots match the README closes an open one (its
   pictures are stale), and a merge with no shots (no E2E run) brings an open
