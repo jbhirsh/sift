@@ -75,7 +75,6 @@ jobs:
               - '!docs/**'
               - '!LICENSE'
               - '!.github/*'
-              - '!.github/scripts/**'
               - '!.github/workflows/!(ci|ios-build).yml'
               - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh)'
               - '!stryker.config.json'
