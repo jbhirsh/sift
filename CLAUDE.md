@@ -356,7 +356,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
   The Maestro iOS E2E job (macOS) also runs on every PR that can affect the
   app or the job, with `workflow_dispatch` available for manual runs. It
   skips PRs that only touch docs or repo tooling (other workflows, the
-  commit check, `scripts/` apart from its runners (`run-e2e.sh`,
+  CI helpers, `scripts/` apart from its runners (`run-e2e.sh`,
   `run-a11y-audit.sh`, `take-screenshots.sh`, `take-gifs.sh`,
   `build-simulator-app.sh`),
   `stryker.config.json`, and the formatter's, the weekly audit's and type
@@ -389,7 +389,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
   bots' PRs (Dependabot's): it fixes review threads opened by Claude Review or
   the owner (two rounds per PR at most, once CI and Claude Review are both
   green on the head) and, when an npm bump fails a check
-  (CI, iOS Build, Mutation Testing), mechanical breakage from the bump, one
+  (CI, iOS Build, Mutation Testing, Gitleaks, Semgrep), mechanical breakage
+  from the bump, one
   attempt per head and two per PR. When every fix would change behavior it
   comments and leaves the decision to the owner. A person's PR is left to its
   author.
