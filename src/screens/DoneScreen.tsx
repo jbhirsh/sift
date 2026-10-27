@@ -10,6 +10,7 @@ import {
   Linking,
   Share,
   findNodeHandle,
+  type HostInstance,
 } from 'react-native';
 import type { Track } from '../types';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -142,7 +143,7 @@ export default function DoneScreen() {
   // The share sheet, not just the clipboard (#173): to Notes, Messages or
   // a Mac, and Copy is still there. On iPad it opens from the button.
   // Closing it resolves; a sheet that fails to open has nothing to add.
-  const shareButtonRef = useRef<View>(null);
+  const shareButtonRef = useRef<HostInstance>(null);
   const shareRemovedList = useCallback(() => {
     const anchor = shareButtonRef.current ? findNodeHandle(shareButtonRef.current) : null;
     Share.share(

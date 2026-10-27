@@ -8,7 +8,6 @@ import {
   Platform,
   ActionSheetIOS,
   Alert,
-  InteractionManager,
   ScrollView,
 } from 'react-native';
 import { SymbolView } from 'expo-symbols';
@@ -359,11 +358,13 @@ export default function SetupScreen() {
     copy: { title: string; message: string; confirm: string },
     onConfirm: () => void,
   ) => {
-    // Present it only after the resume modal's dismiss transition has
-    // actually finished: setShowResumeModal(false) merely schedules the
-    // dismissal, and presenting a UIAlertController while the sheet is still
-    // animating out can land the alert behind it or drop it entirely.
-    InteractionManager.runAfterInteractions(() => {
+    // Present it on a later turn of the event loop, once React has committed
+    // the resume modal's dismissal: setShowResumeModal(false) merely
+    // schedules it, and presenting a UIAlertController in the same turn can
+    // land the alert behind the sheet or drop it entirely. (This was
+    // InteractionManager.runAfterInteractions, which React Native 0.88
+    // removed; by then it was only this setImmediate.)
+    setImmediate(() => {
       Alert.alert(copy.title, copy.message, [
         { text: 'Cancel', style: 'cancel' },
         { text: copy.confirm, style: 'destructive', onPress: onConfirm },

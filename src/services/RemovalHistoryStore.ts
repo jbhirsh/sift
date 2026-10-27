@@ -12,7 +12,9 @@ const historyFile = new File(Paths.document, HISTORY_NAME);
 
 async function writeHistory(records: RemovalRecord[]): Promise<void> {
   const next = new File(Paths.document, NEXT_NAME);
-  next.write(JSON.stringify(records));
+  // Awaited: write() returns a promise since expo-file-system 58, and the
+  // move must not start before the copy is complete.
+  await next.write(JSON.stringify(records));
   await next.move(new File(Paths.document, HISTORY_NAME), { overwrite: true });
 }
 

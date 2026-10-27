@@ -141,6 +141,38 @@ describe('logRemoval', () => {
       tags: { flow: 'removal-history-log' },
     });
   });
+
+  // expo-file-system 58 made File.write() asynchronous.
+  test('moves the copy over the history only once its write has finished', async () => {
+    mockExists.mockReturnValue(false);
+    let finishWrite: () => void = () => {};
+    mockWrite.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishWrite = resolve;
+        }),
+    );
+
+    const logged = logRemoval(record);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(mockWrite).toHaveBeenCalledTimes(1);
+    expect(mockMove).not.toHaveBeenCalled();
+
+    finishWrite();
+    await logged;
+    expect(mockMove).toHaveBeenCalledTimes(1);
+  });
+
+  test('a write that rejects is reported, and the history is not replaced', async () => {
+    mockExists.mockReturnValue(false);
+    mockWrite.mockRejectedValueOnce(new Error('disk full'));
+
+    await expect(logRemoval(record)).resolves.toBeUndefined();
+    expect(mockMove).not.toHaveBeenCalled();
+    expect(Sentry.captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { flow: 'removal-history-log' },
+    });
+  });
 });
 
 describe('removeFromHistory', () => {
