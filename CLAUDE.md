@@ -95,12 +95,13 @@ amend, rebase, or force-push `main`. Never use `--no-verify`.**
 - **TypeScript**: strict mode enabled. All new code must be typed.
   Type-checking runs on **TypeScript 7** (the native compiler), installed as
   `@typescript/native` (an npm alias of `typescript@7`). TS 7 ships no
-  JavaScript API, and typescript-eslint and dependency-cruiser load that API
-  via `require('typescript')`, so the `typescript` name is an alias of
-  `@typescript/typescript6` (the 6.0 API). Both install a `tsc` binary, so
-  never call bare `tsc`/`npx tsc`: use `npm run typecheck` / `make typecheck`,
-  which invoke TS 7 by path. Swap the alias back once typescript-eslint
-  supports TS 7.
+  JavaScript API, and typescript-eslint, dependency-cruiser and
+  type-coverage load that API via `require('typescript')`, so the
+  `typescript` name is an alias of `@typescript/typescript6` (the 6.0 API).
+  Both install a `tsc` binary, so never call bare `tsc`/`npx tsc`: use
+  `npm run typecheck` / `make typecheck`, which invoke TS 7 by path. Swap
+  the alias back once all three support TS 7 (none did in October 2026; the
+  Dependabot ignore on the typescript major quotes their errors).
 - **No `any` anywhere** in the app code (src, the native module's TypeScript,
   `scripts/*.ts`: `tsconfig.typecov.json`; tests aren't counted, their mocks
   are `any` by nature). `npm run typecov` (`type-coverage` at 100%, in CI and
