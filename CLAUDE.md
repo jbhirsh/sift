@@ -350,8 +350,9 @@ Makefile                Dev commands (test, lint, typecheck, check)
 ---
 
 ## CI/CD
-- CI runs in `.github/workflows/ci.yml` on GitHub-hosted runners: lint,
-  Prettier, typecheck, type coverage, dependency-cruiser, Jest with coverage and a production
+- CI runs in `.github/workflows/ci.yml` on GitHub-hosted runners: pins
+  (jbhirsh/ci's check that a version held below its major has a reason
+  beside it), lint, Prettier, typecheck, type coverage, dependency-cruiser, Jest with coverage and a production
   dependency audit on Ubuntu on every PR. The audit gates at critical, not
   high: Expo's build tooling carries high advisories only Expo can fix.
   The Maestro iOS E2E job (macOS) also runs on every PR that can affect the

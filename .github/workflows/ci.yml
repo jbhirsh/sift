@@ -136,6 +136,12 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: jbhirsh/ci/autofix/check-triggers@main
 
+      - name: Pins
+        # A version held below its major needs a reason beside it (jbhirsh/ci's
+        # pins/check.mjs says what counts; Expo's SDK is the reason for the
+        # versions it chooses, read from node_modules, hence after npm ci).
+        uses: jbhirsh/ci/pins@main
+
       # The package scripts, so a clean pre-commit hook means a clean CI.
       - name: Lint
         run: npm run lint
