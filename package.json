@@ -19,6 +19,10 @@
     "check": "npm run lint && npm run format:check && npm run typecheck && npm run typecov && npm run depcruise && npm run bridge && npm run test:coverage",
     "prepare": "git config core.hooksPath .githooks || true"
   },
+  "//pins": [
+    "@types/react: ~ keeps the types on React 19.2, the version Expo SDK 57 pins react to (19.2.3). @types/react 19.3 declares ViewTransition and addTransitionType, which React 19.2.3 doesn't export, so code using them would typecheck and get undefined at run time; expo-doctor flags 19.3 against the ~19.2.4 the SDK expects. Delete with the Expo SDK upgrade that moves react to 19.3.",
+    "test-renderer: ~ keeps it on 1.2, whose reconciler matches React 19.2. 1.3 bundles react-reconciler 0.34, which needs react ^19.3.0: on SDK 57's react 19.2.3 the tests still passed, but npm ci warns it is overriding that peer and npm ls reports react invalid. Delete with the Expo SDK upgrade that moves react to 19.3 (SDK 58's jest-expo uses test-renderer 1.3)."
+  ],
   "dependencies": {
     "@react-native-async-storage/async-storage": "^3.1.1",
     "@sentry/react-native": "~7.11.0",
@@ -71,7 +75,7 @@
     "sf-symbols-typescript": "^2.2.0",
     "test-renderer": "~1.2.0",
     "type-coverage": "^2.30.4",
-    "typescript": "npm:@typescript/typescript6@~6.0.2",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
     "typescript-eslint": "^8.72.0"
   },
   "expo": {
