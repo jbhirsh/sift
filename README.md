@@ -38,7 +38,7 @@ Settings: the optional **Start at chorus** switch (Apple Music).
 
 | Area | Choices |
 |------|---------|
-| Framework | Expo SDK 57, React Native 0.86, React 19 |
+| Framework | Expo SDK 58, React Native 0.88, React 19 |
 | Language | TypeScript (strict) |
 | Native | Swift + MusicKit (custom Expo module), Expo Modules API |
 | Animation | Reanimated 4 + Gesture Handler, worklets |
@@ -80,7 +80,7 @@ __tests__/
 
 ## Getting started
 
-**Requirements:** Node.js 22.13+ (or 24+), Xcode 26+ (for native iOS builds). Expo is bundled — no global CLI needed; use `npx expo`.
+**Requirements:** Node.js 22.13+ (or 24+), Xcode 26.4+ (for native iOS builds; Expo SDK 58 needs it). Expo is bundled — no global CLI needed; use `npx expo`.
 
 ```bash
 npm install                    # install dependencies

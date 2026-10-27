@@ -68,27 +68,18 @@ updates:
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "@sentry/react-native"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
-      # react is pinned exactly to the SDK's version, and test-renderer (the
-      # renderer under @testing-library/react-native 14) stays on the line
-      # matching that React minor: 1.3's reconciler needs react ^19.3.0 (npm
-      # ls reports react invalid with it). Both move in an SDK upgrade.
+      # jest-expo's required peer (since SDK 58), on the line of the
+      # react-native it mocks: jest-expo 58 wants ^0.88.0, so 0.89 waits for
+      # the SDK upgrade that moves react-native to it.
+      - dependency-name: "@react-native/jest-preset"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # react is pinned exactly to the SDK's version, and moves in an SDK
+      # upgrade.
       # NOTE: ignore rules also suppress Dependabot *security* fix PRs. Alerts
       # still appear under Security > Dependabot, but for these packages (and
       # any fix that only ships in an ignored major) the fix is manual —
       # usually via the next Expo SDK upgrade.
       - dependency-name: "react"
-      - dependency-name: "test-renderer"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
-      # jest-expo 57 is built on Jest 29 (babel-jest, jest-snapshot and
-      # @jest/globals ^29); Jest 30 waits for the jest-expo that adopts it.
-      - dependency-name: "jest"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "@types/jest"
-        update-types: ["version-update:semver-major"]
-      # The Stryker runner (scripts/stryker-jest-runner.mjs) subclasses
-      # jest-runner and runs inside Jest 29; it moves with the Jest family.
-      - dependency-name: "jest-runner"
-        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"

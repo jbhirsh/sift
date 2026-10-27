@@ -13,10 +13,9 @@
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import process from 'node:process';
-import jestRunner from 'jest-runner';
+import JestRunner from 'jest-runner';
 import { parseTestFileMap, recordTests, selectTests } from './strykerTestFiles.ts';
 
-const JestRunner = jestRunner.default;
 const MAP_FILE = '.stryker-test-files.json';
 
 // One map per process: the dry run's process builds it, the others read

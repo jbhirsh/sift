@@ -314,8 +314,9 @@ jobs:
   # PRs (the `code` filter in `check`; a skipped job counts as passing) and
   # pushes to main, which only build the app for the cache. Pinned to
   # macos-26 (not macos-latest) so a runner-image migration can't silently
-  # change simulator/Xcode behavior; bump deliberately (Expo SDK 57 needs
-  # Xcode 26; macos-15's default Xcode 16.4 cannot compile expo-modules-core).
+  # change simulator/Xcode behavior; bump deliberately (Expo SDK 58 needs
+  # Xcode 26.4 or later; macos-15's default Xcode 16.4 cannot compile
+  # expo-modules-core).
   e2e:
     name: E2E Tests (Maestro)
     needs: [check, build]

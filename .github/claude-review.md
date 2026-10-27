@@ -1,4 +1,4 @@
-This is Sift, a React Native app (Expo SDK 57, RN 0.86, React 19,
+This is Sift, a React Native app (Expo SDK 58, RN 0.88, React 19,
 TypeScript strict, iOS only) for swiping through a music library (Apple
 Music via the `expo-musickit` native module in `modules/`).
 

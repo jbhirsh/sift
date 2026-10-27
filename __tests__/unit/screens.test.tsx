@@ -928,13 +928,6 @@ describe('SetupScreen', () => {
     mockProvider.removeFromPlaylist.mockClear();
     mockProvider.loadPlaylists.mockClear();
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const { InteractionManager } = require('react-native');
-    const later = jest
-      .spyOn(InteractionManager, 'runAfterInteractions')
-      .mockImplementation((cb: unknown) => {
-        (cb as () => void)();
-        return { then: () => undefined, done: () => undefined, cancel: () => undefined };
-      });
     const { loadSession } = require('../../src/services/SessionStore');
     (loadSession as jest.Mock).mockResolvedValue(mixSession);
     const { getByTestId } = await renderWithProviders(<SetupScreen />);
@@ -962,20 +955,12 @@ describe('SetupScreen', () => {
     expect(mockProvider.loadPlaylists).not.toHaveBeenCalled();
     expect(mockProvider.removeFromPlaylist).not.toHaveBeenCalled();
     alertSpy.mockRestore();
-    later.mockRestore();
   });
 
   test("a playlist Start Over that can't clear the removal history keeps the sift and says so", async () => {
     (clearSession as jest.Mock).mockClear();
     (clearHistoryForSource as jest.Mock).mockResolvedValueOnce(false);
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const { InteractionManager } = require('react-native');
-    const later = jest
-      .spyOn(InteractionManager, 'runAfterInteractions')
-      .mockImplementation((cb: unknown) => {
-        (cb as () => void)();
-        return { then: () => undefined, done: () => undefined, cancel: () => undefined };
-      });
     const { loadSession } = require('../../src/services/SessionStore');
     (loadSession as jest.Mock).mockResolvedValue(mixSession);
     const { getByTestId } = await renderWithProviders(<SetupScreen />);
@@ -992,20 +977,12 @@ describe('SetupScreen', () => {
     );
     expect(clearSession).not.toHaveBeenCalled();
     alertSpy.mockRestore();
-    later.mockRestore();
   });
 
   test('a playlist Start Over with no decisions to lose still asks, and says removed songs stay collected', async () => {
     (clearHistoryForSource as jest.Mock).mockClear();
     (clearSession as jest.Mock).mockClear();
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const { InteractionManager } = require('react-native');
-    const later = jest
-      .spyOn(InteractionManager, 'runAfterInteractions')
-      .mockImplementation((cb: unknown) => {
-        (cb as () => void)();
-        return { then: () => undefined, done: () => undefined, cancel: () => undefined };
-      });
     const { loadSession } = require('../../src/services/SessionStore');
     (loadSession as jest.Mock).mockResolvedValue({ ...mixSession, cursor: 0, kept: [] });
     const { getByTestId } = await renderWithProviders(<SetupScreen />);
@@ -1028,7 +1005,6 @@ describe('SetupScreen', () => {
     expect(clearHistoryForSource).toHaveBeenCalledWith('p1');
     expect(clearSession).toHaveBeenCalled();
     alertSpy.mockRestore();
-    later.mockRestore();
   });
 
   test('with the sift still in memory, picking its source again resumes it, not the older copy Setup loaded', async () => {
@@ -1529,11 +1505,6 @@ describe('SetupScreen: Start Over and songs sifted before (#143)', () => {
       jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
         buttons?.find((b) => b.style === 'destructive')?.onPress?.();
       });
-      const { InteractionManager } = require('react-native');
-      jest.spyOn(InteractionManager, 'runAfterInteractions').mockImplementation((cb: unknown) => {
-        (cb as () => void)();
-        return { then: () => undefined, done: () => undefined, cancel: () => undefined };
-      });
       mockProvider.loadPlaylists.mockClear();
       await AsyncStorage.setItem(
         'sift_reviewed_ledger',
@@ -1568,11 +1539,6 @@ describe('SetupScreen: Start Over and songs sifted before (#143)', () => {
   ])('a library Start Over follows the switch (on: %s)', async (on, expected) => {
     jest.spyOn(Alert, 'alert').mockImplementation((_t, _m, buttons) => {
       buttons?.find((b) => b.style === 'destructive')?.onPress?.();
-    });
-    const { InteractionManager } = require('react-native');
-    jest.spyOn(InteractionManager, 'runAfterInteractions').mockImplementation((cb: unknown) => {
-      (cb as () => void)();
-      return { then: () => undefined, done: () => undefined, cancel: () => undefined };
     });
     await AsyncStorage.setItem(
       'sift_reviewed_ledger',
@@ -1932,7 +1898,7 @@ describe('DoneScreen', () => {
   });
 
   test("Open Music opens the Music app, and says so when it can't (#173)", async () => {
-    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(true);
+    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValueOnce(undefined);
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     try {
       const { getByTestId } = await renderWithProviders(<RemoveThenDone />, {
@@ -1956,7 +1922,9 @@ describe('DoneScreen', () => {
   });
 
   test('Share List shares the removed songs; a sheet that fails to open is no error (#173)', async () => {
-    const share = jest.spyOn(Share, 'share').mockResolvedValueOnce({ action: 'sharedAction' });
+    const share = jest
+      .spyOn(Share, 'share')
+      .mockResolvedValueOnce({ action: 'sharedAction', activityType: undefined });
     try {
       const { getByTestId } = await renderWithProviders(<RemoveThenDone />, {
         initialTracks: tracks,
