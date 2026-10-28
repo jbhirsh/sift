@@ -67,7 +67,6 @@
     ],
     "cannotRun": ["E2E (Maestro, on macOS)", "the iOS simulator build", "mutation testing"],
     "exempt": {
-      "Dependabot Auto-Merge": "Turns on auto-merge as a bot's PR opens: not a check, and nothing in it for a fix to answer.",
       "PR visuals": "Wants pictures in the PR description, which no code change gives (autofix skips its failure too).",
       "README screenshots": "Runs as a PR closes, when there's nothing left for autofix to do."
     }
