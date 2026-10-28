@@ -49,7 +49,7 @@ name: "GIF: swipe to keep, skip, undo"
 
 # Skip, by the button.
 - tapOn:
-    text: "Skip"
+    id: "action-skip"
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:

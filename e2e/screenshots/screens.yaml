@@ -45,7 +45,7 @@ name: "Screenshots"
 # A Keep, then a Skip. No Remove: the E2E build fails the launch's first
 # one, which would put an error on Sift and Done.
 - tapOn:
-    text: "Keep"
+    id: "action-keep"
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
@@ -56,7 +56,7 @@ name: "Screenshots"
 - waitForAnimationToEnd:
     timeout: 3000
 - tapOn:
-    text: "Skip"
+    id: "action-skip"
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:

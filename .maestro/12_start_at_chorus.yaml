@@ -64,7 +64,8 @@ name: "Start at Chorus Setting"
 # and resets the clock to 0:00, so reaching 0:13 within 8 s (the chorus can
 # take up to 2.5 s to resolve) means the song started mid-track: one played
 # from 0:00 couldn't get there in time.
-- tapOn: "Skip"
+- tapOn:
+    id: "action-skip"
 
 - extendedWaitUntil:
     visible:

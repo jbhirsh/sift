@@ -23,15 +23,18 @@ name: "Sift Decisions - Keep, Remove, Skip"
     timeout: 30000
 
 # Keep the first track
-- tapOn: "Keep"
+- tapOn:
+    id: "action-keep"
 - waitForAnimationToEnd
 
 # Remove the second track
-- tapOn: "Remove"
+- tapOn:
+    id: "action-remove"
 - waitForAnimationToEnd
 
 # Skip the third track
-- tapOn: "Skip"
+- tapOn:
+    id: "action-skip"
 - waitForAnimationToEnd
 
 # Verify stats updated — text format is "N label"

@@ -34,7 +34,7 @@ name: "Complete All Tracks"
     times: 10
     commands:
       - tapOn:
-          text: "Keep"
+          id: "action-keep"
           waitToSettleTimeoutMs: 500
       - waitForAnimationToEnd:
           timeout: 1500

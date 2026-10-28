@@ -51,7 +51,8 @@ name: "Playlist Sift Skips Kept Songs"
     id: "remaining-count"
     text: "4 left"
 
-- tapOn: "Keep"
+- tapOn:
+    id: "action-keep"
 - waitForAnimationToEnd
 
 - tapOn:

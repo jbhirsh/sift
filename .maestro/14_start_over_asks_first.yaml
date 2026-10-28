@@ -27,7 +27,8 @@ name: "Start Over Asks First"
       id: "card-track-name"
     timeout: 30000
 
-- tapOn: "Keep"
+- tapOn:
+    id: "action-keep"
 - waitForAnimationToEnd
 
 - tapOn:

@@ -25,10 +25,10 @@ name: "Change an Earlier Decision"
     timeout: 30000
 
 - tapOn:
-    text: "Skip"
+    id: "action-skip"
     waitToSettleTimeoutMs: 1000
 - tapOn:
-    text: "Skip"
+    id: "action-skip"
     waitToSettleTimeoutMs: 1000
 
 - extendedWaitUntil:

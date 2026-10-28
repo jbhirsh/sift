@@ -23,9 +23,11 @@ name: "Finish Early, Then Continue"
       id: "card-track-name"
     timeout: 30000
 
-- tapOn: "Keep"
+- tapOn:
+    id: "action-keep"
 - waitForAnimationToEnd
-- tapOn: "Skip"
+- tapOn:
+    id: "action-skip"
 - waitForAnimationToEnd
 
 - extendedWaitUntil:

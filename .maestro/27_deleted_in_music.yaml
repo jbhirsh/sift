@@ -32,7 +32,7 @@ name: "Setup Says How Many Songs Were Deleted in Music"
 
 # The playing song's seek bar keeps the screen from settling (flow 15).
 - tapOn:
-    text: "Remove"
+    id: "action-remove"
     waitToSettleTimeoutMs: 500
 
 - extendedWaitUntil:
@@ -42,7 +42,7 @@ name: "Setup Says How Many Songs Were Deleted in Music"
     timeout: 30000
 
 - tapOn:
-    text: "Remove"
+    id: "action-remove"
     waitToSettleTimeoutMs: 500
 
 - extendedWaitUntil:

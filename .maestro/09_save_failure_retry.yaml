@@ -89,7 +89,8 @@ name: "Save Failure Shows Retry, Retry Recovers"
       text: "Kiss Me More"
     timeout: 30000
 
-- tapOn: "Keep"
+- tapOn:
+    id: "action-keep"
 - waitForAnimationToEnd
 
 - tapOn:
@@ -119,9 +120,11 @@ name: "Save Failure Shows Retry, Retry Recovers"
       id: "card-track-name"
     timeout: 30000
 
-- tapOn: "Keep"
+- tapOn:
+    id: "action-keep"
 - waitForAnimationToEnd
-- tapOn: "Keep"
+- tapOn:
+    id: "action-keep"
 - waitForAnimationToEnd
 
 # Done again: a fresh button, not the earlier Retry.

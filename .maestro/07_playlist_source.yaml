@@ -59,7 +59,8 @@ name: "Playlist Source - Select and Sift"
 - assertVisible: "Remove"
 
 # Make a decision to verify the flow works
-- tapOn: "Keep"
+- tapOn:
+    id: "action-keep"
 - waitForAnimationToEnd
 
 - assertVisible:
@@ -67,9 +68,11 @@ name: "Playlist Source - Select and Sift"
     text: "1 kept"
 
 # ── Finish the playlist (Chill Vibes has 3 tracks) and reach Done ──
-- tapOn: "Keep"
+- tapOn:
+    id: "action-keep"
 - waitForAnimationToEnd
-- tapOn: "Keep"
+- tapOn:
+    id: "action-keep"
 - waitForAnimationToEnd
 
 - extendedWaitUntil:
