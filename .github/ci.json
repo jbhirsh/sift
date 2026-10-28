@@ -44,6 +44,13 @@
   "readme-screenshots": {
     "source": "the iOS Simulator shots CI's Screenshots and GIFs job took (mock library)"
   },
+  "visual-baselines": {
+    "folders": ["e2e/screenshots/baselines"],
+    "artifact": {
+      "workflow": "ci.yml",
+      "name": "ios-screenshots"
+    }
+  },
   "gif": {
     "source": "ci-videos",
     "cellWidth": 260,
@@ -65,7 +72,12 @@
       "`npm run check` (what CI's unit job runs: lint, format check, typecheck, type coverage, depcruise, the native bridge check, tests with coverage; `npm run format` rewrites what the format check flags)",
       "`npm audit --omit=dev --audit-level=critical`"
     ],
-    "cannotRun": ["E2E (Maestro, on macOS)", "the iOS simulator build", "mutation testing"],
+    "cannotRun": [
+      "E2E (Maestro, on macOS)",
+      "the iOS simulator build",
+      "visual regression (its screenshots come from the iOS Simulator)",
+      "mutation testing"
+    ],
     "exempt": {
       "PR visuals": "Wants pictures in the PR description, which no code change gives (autofix skips its failure too).",
       "README screenshots": "Runs as a PR closes, when there's nothing left for autofix to do."

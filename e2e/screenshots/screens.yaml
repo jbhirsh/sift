@@ -1,18 +1,22 @@
 appId: com.jessicahirsh.sift
 name: "Screenshots"
 ---
-# Not a test: CI's Screenshots and GIFs job runs this to photograph the main
-# screens on the iOS Simulator, once in light and once in dark, for PR
-# descriptions. A web export can't draw SF Symbols; this is the real app.
+# CI's Screenshots and GIFs job runs this to photograph the main screens on
+# the iOS Simulator, once in light and once in dark, for PR descriptions,
+# the README, and ci.yml's Visual regression job, which compares them with
+# e2e/screenshots/baselines. A web export can't draw SF Symbols; this is the
+# real app.
 # MODE (light or dark) comes from scripts/take-screenshots.sh, which
 # gathers the shots from Maestro's output folder (it refuses an absolute
 # path). Nothing here asserts more than it needs to reach the next screen.
-# On Sift the playing song's time keeps changing, so a wait for the screen
-# to settle there is capped at 3 s instead of its default 15.
+# A wait for a screen to settle is capped at 3 s instead of its default 15,
+# so something on it that never stops moving can't stall the job.
 - launchApp:
-    # A fresh start without a reinstall (services/e2eReset).
+    # A fresh start without a reinstall (services/e2eReset), and a song
+    # clock that stands still, so Sift shows the same time on every run.
     arguments:
       SiftResetState: "true"
+      SiftStillPlayback: "true"
 
 - extendedWaitUntil:
     visible:

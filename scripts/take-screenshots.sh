@@ -1,8 +1,9 @@
 #!/bin/bash
 # Photograph the main screens on the booted simulator, in light and dark,
-# for PR descriptions: e2e/screenshots/screens.yaml walks Setup, the sort
-# sheet, Sift, the decisions list, Settings and Done. A web export can't
-# draw SF Symbols; these are the real app as iOS renders it.
+# for PR descriptions, the README and the visual regression check
+# (ci.yml's Visual regression job): e2e/screenshots/screens.yaml walks
+# Setup, the sort sheet, Sift, the decisions list, Settings and Done. A web
+# export can't draw SF Symbols; these are the real app as iOS renders it.
 #
 # Usage: scripts/take-screenshots.sh [out-dir]   (default: screenshots)
 # Never fails: a missed screenshot is a warning, not a broken build.

@@ -243,6 +243,18 @@ function launchedDeletedInMusic(): boolean {
 }
 const deletedInMusic = tracing && launchedDeletedInMusic();
 
+// E2E only: launched with SiftStillPlayback ("true"), the playing song's
+// clock doesn't move, so the screenshots CI compares with their baselines
+// (e2e/screenshots) show the same time and seek bar on every run.
+function launchedStillPlayback(): boolean {
+  try {
+    return launchFlagOn(Settings.get('SiftStillPlayback'));
+  } catch {
+    return false;
+  }
+}
+const stillPlayback = tracing && launchedStillPlayback();
+
 function requestedFailures(raw: string | undefined): number {
   if (!raw) return 0;
   const parsed = Number.parseInt(raw, 10);
@@ -402,7 +414,7 @@ export class MockMusicProvider implements MusicProviderService {
 
   /** Compute the current position based on elapsed wall-clock time. */
   private computePosition(): number {
-    if (!this.playing) return this.position;
+    if (!this.playing || stillPlayback) return this.position;
     const elapsed = (Date.now() - this.playStartTime) / 1000;
     return Math.min(this.playStartPosition + elapsed, this.currentTrackDuration);
   }
