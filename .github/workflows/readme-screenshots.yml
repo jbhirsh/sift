@@ -1,5 +1,5 @@
 # Keeps the README's screenshots (docs/screenshots/setup, sift, done) up to
-# date. When a PR merges, its CI run's E2E job has already photographed the
+# date. When a PR merges, its CI run's screenshots job has already photographed the
 # app on the iOS Simulator with the mock library (scripts/take-screenshots.sh,
 # the ios-screenshots artifact), so this takes the three the README shows from
 # there: no macOS minutes of its own. Each is shrunk to the README's 780 px
@@ -7,7 +7,7 @@
 # actions replace each that looks different enough (over 0.5% of pixels) in
 # one bot PR from bot/readme-screenshots, opened or updated, with auto-merge
 # on, close an open one whose pictures are stale, or, when the merge brought
-# no shots (its E2E job didn't run), bring an open one up to date with main.
+# no shots (its screenshots job didn't run), bring an open one up to date with main.
 # Settings isn't refreshed: the README shows a crop of it, chosen by hand.
 #
 # Two jobs, so the token that can push never meets npm: `capture` downloads,
@@ -16,7 +16,7 @@
 #
 # Not a gate (no PR runs it), so the merged-only filter lives in the jobs:
 # merged PRs only, and never the bot's own (its run takes no screenshots: it
-# changes only docs/, which the E2E job skips).
+# changes only docs/, which the screenshots job skips).
 name: README screenshots
 
 on:
@@ -71,7 +71,7 @@ jobs:
         if: steps.shots.outputs.found == 'true'
         run: sudo apt-get update -q && sudo apt-get install -y -q imagemagick
 
-      # The E2E job's light shots (e2e/screenshots/screens.yaml) under the
+      # The screenshots job's light shots (e2e/screenshots/screens.yaml) under the
       # README's names, at its width. -strip drops the timestamps and colour
       # profile, so an unchanged screen comes out byte for byte the same.
       - name: Shrink them to the README's size

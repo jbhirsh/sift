@@ -57,7 +57,7 @@ no-op when `$CI` is set. CI re-runs everything.
   otherwise. A new screen gets one of those tests. Don't make a container
   that holds Maestro-targeted text `accessible`: it hides the text's testID
   from XCUITest.
-- The E2E job also runs Xcode's accessibility audit
+- CI's `Accessibility audit` job runs Xcode's accessibility audit
   (`e2e/a11y-audit`, `scripts/run-a11y-audit.sh`) on Setup, Sift, Settings
   and Done in light and dark: contrast, hit targets, clipped text, Dynamic
   Type, as iOS renders them. Any issue fails the job, as does a screen the
@@ -365,16 +365,18 @@ Makefile                Dev commands (test, lint, typecheck, check)
   `!` patterns exclude). Its app build is cached on
   the native fingerprint plus a hash of the bundle's inputs (`src/`,
   `index.ts`, `metro.config.js`, `package-lock.json`, `.env`, `assets/`;
-  tests and flows don't count), a key the Ubuntu job works out, so the
-  macOS job installs no packages unless it has to build. On a PR that
+  tests and flows don't count), a key the Ubuntu job works out and looks
+  up. Only the `Build iOS simulator app` job builds the app: whenever a PR
   changes native files (`modules/`, `app.json`, `eas.json`, the package
-  files, `ci.yml`, the build script) the `Build iOS simulator app` job, the
-  native code's compile gate, builds that app first, and E2E `needs:` it:
-  it waits, not started, then takes the build's artifact. On push to main
-  it builds and caches the app but skips the suite: only caches saved on
-  main can be restored by PRs. Maestro is cached by its latest release, and
-  after a failed suite the job skips the accessibility audit, screenshots
-  and GIFs (the run is red already).
+  files, `ci.yml`, the build script), as it's the native code's compile
+  gate, and otherwise whenever the app isn't cached (a JavaScript change;
+  on push to main, so PRs can restore it, as only caches saved on main
+  reach them). Three simulator jobs `needs:` it, waiting not started while
+  it builds, then run side by side, each setting up through
+  `.github/actions/simulator-app` (the app from the cache or the build's
+  artifact, Maestro cached by its latest release): `E2E Tests (Maestro)`
+  (the suite), `Accessibility audit`, and `Screenshots and GIFs`
+  (pictures, never a gate). None of them runs on push to main.
 - The Claude Code PR review runs in its own workflow,
   `.github/workflows/claude-review.yml` (job `Claude Review`, pull requests
   only), in parallel with CI rather than after it, so a red PR is reviewed
@@ -469,7 +471,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
   (from GitHub Actions, whichever workflow file they live in), so renaming a
   job's `name:` silently un-gates it. Update the rule in the same PR as any
   rename:
-  `Lint, Typecheck & Unit Test`, `E2E Tests (Maestro)`, `Claude Review`,
+  `Lint, Typecheck & Unit Test`, `E2E Tests (Maestro)`,
+  `Accessibility audit`, `Claude Review`,
   `Secret scan`, `SAST scan`, `Build iOS simulator app`,
   `Mutation Tests (Stryker)`, `PR visuals`.
   Every one of these reports on every PR. Never add a trigger-level
@@ -550,7 +553,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
   visible UI change" is ticked, and re-runs when the description is edited;
   Claude Review asks for a GIF when motion changes.
   - Screenshot: `xcrun simctl io booted screenshot after.png`. Without a
-    Mac, use the E2E job's: it photographs Setup, the sort sheet, Sift,
+    Mac, use CI's: the `Screenshots and GIFs` job photographs Setup, the sort sheet, Sift,
     the decisions list, Settings and Done in light and dark
     (`e2e/screenshots/screens.yaml`, `scripts/take-screenshots.sh`) and
     uploads them as the `ios-screenshots` artifact. Not a web export: it
@@ -563,7 +566,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
     argument, gets to where the GIF starts, then `startRecording: <name>`,
     the taps and swipes (with pauses to follow them by), `stopRecording`
     and `takeScreenshot: <name>-end`, which says every step ran. Add or
-    edit one for the motion a PR changes. The E2E job runs them all in one
+    edit one for the motion a PR changes. CI's `Screenshots and GIFs` job runs them all in one
     Maestro session (`scripts/take-gifs.sh`, artifact `ios-gif-videos`);
     one that stops early is set aside, never made into a GIF. A drag a
     gesture handler owns (the card swipe, the seek bar) feeds the trail
@@ -592,7 +595,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
     topic.
 - **The README's screenshots refresh themselves.** When a PR merges,
   `readme-screenshots.yml` takes the light Setup, Sift and Done shots its CI
-  run's E2E job took (the `ios-screenshots` artifact; the status bar is
+  run's `Screenshots and GIFs` job took (the `ios-screenshots` artifact; the status bar is
   pinned to 9:41, as in the GIFs), shrinks them to the README's 780 px, and replaces each
   `docs/screenshots/` image that differs visibly (jbhirsh/ci's
   `readme-screenshots` tool). The changes go in one PR from `bot/readme-screenshots`,

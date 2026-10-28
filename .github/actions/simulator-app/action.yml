@@ -1,0 +1,119 @@
+name: Simulator with the app
+description: >-
+  Boots an iPhone simulator and installs the E2E app on it, for ci.yml's
+  three simulator jobs (E2E, the accessibility audit, screenshots and GIFs).
+  Only the build job builds the app; this takes it from actions/cache, under
+  the key the check job works out, or from the build job's artifact when this
+  run built it and the cache isn't there yet. With `maestro`, it also puts
+  Maestro on the PATH, cached under its latest release.
+
+inputs:
+  app-key:
+    description: The app's cache key (the check job's app_key output)
+    required: true
+  maestro:
+    description: Also install Maestro (the audit doesn't use it)
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    # Booting takes 1.5-3 min, so it starts first and runs while Maestro and
+    # the app are fetched; the wait for it comes just before installing.
+    - name: Start booting the iOS Simulator
+      shell: bash
+      run: |
+        DEVICE=$(xcrun simctl list devices available -j | python3 -c "
+        import json, sys
+        devices = json.load(sys.stdin)['devices']
+        for runtime, devs in devices.items():
+            if 'iOS' in runtime:
+                for d in devs:
+                    if 'iPhone' in d['name']:
+                        print(d['udid'])
+                        sys.exit(0)
+        ")
+        echo "SIM_UDID=$DEVICE" >> "$GITHUB_ENV"
+        xcrun simctl boot "$DEVICE" 2>/dev/null || true
+
+    # Maestro's latest release, cached under its version: every run tests
+    # with the newest Maestro without downloading it each time (the install
+    # took about 4.5 minutes). The install script fetches exactly that
+    # version. If the release can't be looked up, it installs the latest
+    # uncached rather than file it under no version.
+    - name: Find Maestro's latest release
+      id: maestro
+      if: inputs.maestro == 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        tag=$(gh api repos/mobile-dev-inc/maestro/releases/latest --jq .tag_name || true)
+        echo "version=${tag#cli-}" >> "$GITHUB_OUTPUT"
+
+    - name: Restore Maestro
+      id: maestro-cache
+      if: inputs.maestro == 'true' && steps.maestro.outputs.version != ''
+      uses: actions/cache/restore@v6
+      with:
+        path: |
+          ~/.maestro/bin
+          ~/.maestro/lib
+        key: maestro-${{ runner.os }}-${{ runner.arch }}-${{ steps.maestro.outputs.version }}
+
+    # Prints the version so every run records which Maestro it tested with.
+    - name: Install Maestro
+      if: inputs.maestro == 'true'
+      shell: bash
+      env:
+        MAESTRO_VERSION: ${{ steps.maestro.outputs.version }}
+        CACHED: ${{ steps.maestro-cache.outputs.cache-hit }}
+      run: |
+        if [ "$CACHED" != true ]; then
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+        fi
+        echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+        "$HOME/.maestro/bin/maestro" --version
+
+    - name: Save Maestro
+      if: inputs.maestro == 'true' && steps.maestro.outputs.version != '' && steps.maestro-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      continue-on-error: true
+      with:
+        path: |
+          ~/.maestro/bin
+          ~/.maestro/lib
+        key: maestro-${{ runner.os }}-${{ runner.arch }}-${{ steps.maestro.outputs.version }}
+
+    - name: Restore the app
+      id: app-cache
+      uses: actions/cache/restore@v6
+      with:
+        path: build/e2e
+        key: ${{ inputs.app-key }}
+
+    # The build job saves the app to the cache; its artifact covers a save
+    # that didn't land (two runs racing for the same key).
+    - name: Take the build job's app
+      if: steps.app-cache.outputs.cache-hit != 'true'
+      uses: actions/download-artifact@v7
+      with:
+        name: sift-simulator-app
+        path: build
+
+    - name: Unpack the build job's app
+      if: steps.app-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p build/e2e
+        tar -xzf build/Sift-e2e.tar.gz -C build/e2e
+
+    # Attaching the XCUITest driver to a half-booted simulator is the main
+    # startup-flake source, so this blocks until SpringBoard is up.
+    - name: Wait for the iOS Simulator to finish booting
+      shell: bash
+      run: xcrun simctl bootstatus "$SIM_UDID" -b
+
+    - name: Install app on simulator
+      shell: bash
+      run: xcrun simctl install booted build/e2e/*.app
