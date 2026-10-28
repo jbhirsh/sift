@@ -1,7 +1,8 @@
 #!/bin/bash
 # Build the E2E simulator app (eas.json's e2e-simulator profile) as a
-# tarball with Sift.app at its root, for ios-build.yml's compile check and
-# ci.yml's E2E job (which unpacks it and installs build/e2e/*.app).
+# tarball with Sift.app at its root, for ci.yml's build job (the native
+# compile check) and its E2E job (which unpacks it and installs
+# build/e2e/*.app).
 #
 # With EXPO_TOKEN it builds with `eas build --local`. Without it (Dependabot's
 # runs get no Actions secrets, #178), or with SIFT_BUILD_WITHOUT_EXPO=1, it

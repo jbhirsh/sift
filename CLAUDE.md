@@ -365,10 +365,16 @@ Makefile                Dev commands (test, lint, typecheck, check)
   `!` patterns exclude). Its app build is cached on
   the native fingerprint plus a hash of the bundle's inputs (`src/`,
   `index.ts`, `metro.config.js`, `package-lock.json`, `.env`, `assets/`;
-  tests and flows don't count),
-  and on a native PR it waits for ios-build's identical build instead of
-  building in parallel. On push to main it builds and caches the app but
-  skips the suite: only caches saved on main can be restored by PRs.
+  tests and flows don't count), a key the Ubuntu job works out, so the
+  macOS job installs no packages unless it has to build. On a PR that
+  changes native files (`modules/`, `app.json`, `eas.json`, the package
+  files, `ci.yml`, the build script) the `Build iOS simulator app` job, the
+  native code's compile gate, builds that app first, and E2E `needs:` it:
+  it waits, not started, then takes the build's artifact. On push to main
+  it builds and caches the app but skips the suite: only caches saved on
+  main can be restored by PRs. Maestro is cached by its latest release, and
+  after a failed suite the job skips the accessibility audit, screenshots
+  and GIFs (the run is red already).
 - The Claude Code PR review runs in its own workflow,
   `.github/workflows/claude-review.yml` (job `Claude Review`, pull requests
   only), in parallel with CI rather than after it, so a red PR is reviewed
@@ -389,7 +395,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
   bots' PRs (Dependabot's): it fixes review threads opened by Claude Review or
   the owner (two rounds per PR at most, once CI and Claude Review are both
   green on the head) and, when an npm bump fails a check
-  (CI, iOS Build, Mutation Testing, Gitleaks, Semgrep), mechanical breakage
+  (CI, Mutation Testing, Gitleaks, Semgrep), mechanical breakage
   from the bump, one
   attempt per head and two per PR. When every fix would change behavior it
   comments and leaves the decision to the owner. A person's PR is left to its
@@ -400,10 +406,10 @@ Makefile                Dev commands (test, lint, typecheck, check)
   check a PR runs, Claude Review included, and require review threads to be
   resolved, or a bot PR merges past a failing or unreported gate. Bot PRs get
   no Actions secrets, so no `EXPO_TOKEN`: the simulator app
-  (`scripts/build-simulator-app.sh`, used by `ios-build.yml` and the E2E
-  job) then builds with `expo prebuild` + `xcodebuild` and no Expo or Apple
+  (`scripts/build-simulator-app.sh`, used by `ci.yml`'s build and E2E
+  jobs) then builds with `expo prebuild` + `xcodebuild` and no Expo or Apple
   login, so "Build iOS simulator app" really compiles on them too (#178).
-  Run `ios-build.yml` by hand with `without_expo_login` to check that path.
+  Run `ci.yml` by hand with `without_expo_login` to check that path.
 - **The phone build follows `main`.** `.github/workflows/preview-deploy.yml`
   runs on every push to `main`. It fingerprints the native layer
   (`runtimeVersion.policy: fingerprint` in `app.json`) and looks for an EAS
@@ -469,7 +475,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
   Every one of these reports on every PR. Never add a trigger-level
   `on.pull_request.paths` filter to a gating workflow: a filtered-out workflow
   never reports, and the required check hangs at "Expected". Path-filter
-  inside the workflow instead (see the `changes` job in `ios-build.yml`). A
+  inside the workflow instead (see the `changes` job in `ci.yml`). A
   job skipped by its `if:` counts as passing. A new pull-request workflow
   also goes in `claude-autofix.yml`'s trigger list, or in `.github/ci.json`'s
   `autofix.exempt` with its reason; CI's autofix trigger check fails a PR
