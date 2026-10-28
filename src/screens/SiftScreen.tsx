@@ -525,6 +525,7 @@ export default function SiftScreen() {
           symbolName="xmark.circle.fill"
           hideLabel={showUndo}
           label="Remove"
+          testID="action-remove"
           color={COLORS.remove}
           labelColor={colors.textSecondary}
           onPress={(event) => {
@@ -535,6 +536,7 @@ export default function SiftScreen() {
           symbolName="arrow.right.circle"
           hideLabel={showUndo}
           label="Skip"
+          testID="action-skip"
           color={COLORS.skip}
           labelColor={colors.textSecondary}
           onPress={(event) => {
@@ -545,6 +547,7 @@ export default function SiftScreen() {
           symbolName="checkmark.circle.fill"
           hideLabel={showUndo}
           label="Keep"
+          testID="action-keep"
           color={COLORS.keep}
           labelColor={colors.textSecondary}
           onPress={(event) => {
@@ -635,6 +638,7 @@ const statStyles = StyleSheet.create({
 function ActionButton({
   symbolName,
   label,
+  testID,
   color,
   labelColor,
   onPress,
@@ -642,6 +646,12 @@ function ActionButton({
 }: {
   symbolName: string;
   label: string;
+  /**
+   * What E2E flows tap. Not the label: on React Native 0.88 the printed
+   * label under the button is an element of its own, which a flow's text
+   * match finds first, and its centre sits where the Undo pill shows.
+   */
+  testID: string;
   color: string;
   labelColor: string;
   onPress: (event: GestureResponderEvent) => void;
@@ -652,6 +662,7 @@ function ActionButton({
     <TouchableOpacity
       onPress={onPress}
       style={actionStyles.wrapper}
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
     >

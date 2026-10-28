@@ -32,7 +32,7 @@ name: "Library Sift Skips Removed Songs"
     timeout: 30000
 
 - tapOn:
-    text: "Remove"
+    id: "action-remove"
     waitToSettleTimeoutMs: 500
 - waitForAnimationToEnd:
     timeout: 1500
@@ -44,7 +44,7 @@ name: "Library Sift Skips Removed Songs"
     timeout: 30000
 
 - tapOn:
-    text: "Remove"
+    id: "action-remove"
     waitToSettleTimeoutMs: 500
 - waitForAnimationToEnd:
     timeout: 1500
@@ -57,7 +57,7 @@ name: "Library Sift Skips Removed Songs"
     times: 8
     commands:
       - tapOn:
-          text: "Keep"
+          id: "action-keep"
           waitToSettleTimeoutMs: 500
       - waitForAnimationToEnd:
           timeout: 1500
@@ -119,7 +119,8 @@ name: "Library Sift Skips Removed Songs"
     id: "remaining-count"
     text: "9 left"
 
-- tapOn: "Skip"
+- tapOn:
+    id: "action-skip"
 - waitForAnimationToEnd
 
 - extendedWaitUntil:

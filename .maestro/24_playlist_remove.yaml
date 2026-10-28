@@ -51,7 +51,7 @@ name: "Remove and Restore in a Playlist Sift"
 
 # The launch's first removed song: its removal fails.
 - tapOn:
-    text: "Remove"
+    id: "action-remove"
     waitToSettleTimeoutMs: 500
 
 - extendedWaitUntil:
@@ -61,7 +61,7 @@ name: "Remove and Restore in a Playlist Sift"
     timeout: 10000
 
 - tapOn:
-    text: "Remove"
+    id: "action-remove"
     waitToSettleTimeoutMs: 500
 
 - extendedWaitUntil:

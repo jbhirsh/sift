@@ -32,7 +32,7 @@ name: "Undo a Remove"
 # settle, and the playing song's seek bar never does, so that wait is
 # capped. The Undo tap waits for the pill itself.
 - tapOn:
-    text: "Remove"
+    id: "action-remove"
     waitToSettleTimeoutMs: 500
 
 - tapOn:

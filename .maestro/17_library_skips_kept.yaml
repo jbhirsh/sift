@@ -27,9 +27,11 @@ name: "Library Sift Skips Kept Songs"
       id: "card-track-name"
     timeout: 30000
 
-- tapOn: "Keep"
+- tapOn:
+    id: "action-keep"
 - waitForAnimationToEnd
-- tapOn: "Keep"
+- tapOn:
+    id: "action-keep"
 - waitForAnimationToEnd
 
 - tapOn:

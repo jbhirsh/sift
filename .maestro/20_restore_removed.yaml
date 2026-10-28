@@ -25,7 +25,7 @@ name: "Restore a Removed Song on Done"
     timeout: 30000
 
 - tapOn:
-    text: "Remove"
+    id: "action-remove"
     waitToSettleTimeoutMs: 500
 
 - extendedWaitUntil:

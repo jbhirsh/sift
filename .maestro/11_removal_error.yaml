@@ -46,7 +46,8 @@ name: "Failed Removal Shows the Removal-Errors Warning"
     text: "Peaches"
 
 # Remove the first track — the injected failure fires here
-- tapOn: "Remove"
+- tapOn:
+    id: "action-remove"
 - waitForAnimationToEnd
 
 # The first library remove explains where removed songs go, and the failure
@@ -64,7 +65,8 @@ name: "Failed Removal Shows the Removal-Errors Warning"
 - repeat:
     times: 9
     commands:
-      - tapOn: "Keep"
+      - tapOn:
+          id: "action-keep"
       - waitForAnimationToEnd
 
 - extendedWaitUntil:

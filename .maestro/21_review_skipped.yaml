@@ -28,13 +28,13 @@ name: "Review Skipped Songs"
 # longer than the guard after a decision: no tap lands on a decision
 # still under way.
 - tapOn:
-    text: "Keep"
+    id: "action-keep"
     waitToSettleTimeoutMs: 1000
 - repeat:
     times: 9
     commands:
       - tapOn:
-          text: "Skip"
+          id: "action-skip"
           waitToSettleTimeoutMs: 1000
 
 - extendedWaitUntil:

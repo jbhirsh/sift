@@ -279,6 +279,14 @@ describe('SiftScreen', () => {
     expect(getByLabelText('Keep')).toBeTruthy();
   });
 
+  test('each action button carries the id the E2E flows tap', async () => {
+    // A flow taps by id, never by the printed label (SiftScreen ActionButton).
+    const { getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
+    expect(getByTestId('action-remove').props.accessibilityLabel).toBe('Remove');
+    expect(getByTestId('action-skip').props.accessibilityLabel).toBe('Skip');
+    expect(getByTestId('action-keep').props.accessibilityLabel).toBe('Keep');
+  });
+
   test('renders track info on interactive card', async () => {
     const { getByTestId } = await renderWithProviders(<SiftScreen />, { initialTracks: tracks });
     expect(getByTestId('card-track-name').props.children).toBe('Track A');
