@@ -1,7 +1,7 @@
 appId: com.jessicahirsh.sift
 name: "Screenshots"
 ---
-# Not a test: the E2E job runs this after the suite to photograph the main
+# Not a test: CI's Screenshots and GIFs job runs this to photograph the main
 # screens on the iOS Simulator, once in light and once in dark, for PR
 # descriptions. A web export can't draw SF Symbols; this is the real app.
 # MODE (light or dark) comes from scripts/take-screenshots.sh, which
