@@ -360,7 +360,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
   skips PRs that only touch docs or repo tooling (other workflows, the
   CI helpers, `scripts/` apart from its runners (`run-e2e.sh`,
   `run-a11y-audit.sh`, `take-screenshots.sh`, `take-gifs.sh`,
-  `build-simulator-app.sh`),
+  `build-simulator-app.sh`, `app-trace.sh`),
   `stryker.config.json`, and the formatter's, the weekly audit's and type
   coverage's config files;
   the `code` filter in `ci.yml`, with `predicate-quantifier: 'every'` so its
@@ -384,9 +384,12 @@ Makefile                Dev commands (test, lint, typecheck, check)
   `e2e/screenshots/baselines` (jbhirsh/ci's `visual-baselines`, set up by
   the `visual-baselines` key of `.github/ci.json`): a screen that changed,
   appeared or wasn't taken fails it, its shot and diff in the
-  `visual-diffs` artifact. The screenshots launch with `SiftStillPlayback`
-  (E2E build only), so the playing song's clock stands still and Sift
-  shows the same time on every run. A change that's meant: run
+  `visual-diffs` artifact. A screen that wasn't taken is a flow that
+  stopped: the `ios-screenshots` artifact holds Maestro's logs and the
+  app's trace (`trace.txt`, `scripts/app-trace.sh`, as the E2E job
+  records it), read as for a flaky E2E flow (below). The screenshots
+  launch with `SiftStillPlayback` (E2E build only), so the playing song's
+  clock stands still and Sift shows the same time on every run. A change that's meant: run
   `visual-baselines.yml` by hand on the PR's branch once its run has
   taken the screenshots; it commits that run's shots as the new baselines,
   then push again for the checks. Not yet a required check: it joins the

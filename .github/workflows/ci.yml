@@ -82,7 +82,7 @@ jobs:
               - '!LICENSE'
               - '!.github/*'
               - '!.github/workflows/!(ci).yml'
-              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh)'
+              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh|app-trace.sh)'
               - '!stryker.config.json'
               - '!.prettierrc.json'
               - '!.prettierignore'
@@ -338,20 +338,12 @@ jobs:
         with:
           app-key: ${{ needs.check.outputs.app_key }}
 
-      # The E2E trace (src/services/trace.ts): the test build writes a line
-      # to the system log for every touch, screen, app action and decision-
-      # guard check, and for any stall of the JavaScript thread, so a tap
-      # that did nothing says where it went. The lines are info level, which
-      # iOS keeps only in memory by default: persist them for React Native's
-      # subsystem, and stream them live for the whole suite as well.
+      # The E2E trace (src/services/trace.ts), recorded for the whole suite:
+      # every touch, screen, app action, decision-guard check and JavaScript
+      # stall, so a tap that did nothing says where it went
+      # (scripts/app-trace.sh).
       - name: Start recording the app's trace
-        run: |
-          mkdir -p maestro-results
-          xcrun simctl spawn booted log config --subsystem com.facebook.react.log --mode "level:info,persist:info" || true
-          nohup xcrun simctl spawn booted log stream --level info --style compact \
-            --predicate 'subsystem == "com.facebook.react.log" AND eventMessage CONTAINS "[sift-trace]"' \
-            > maestro-results/trace.txt 2> maestro-results/trace-stream.err &
-          echo $! > "$RUNNER_TEMP/trace-stream.pid"
+        run: scripts/app-trace.sh start maestro-results
 
       # Warm the app before the suite runs: a launch loads the baked JS
       # bundle and warms the dyld/simulator caches, cutting the cold-start
@@ -410,27 +402,10 @@ jobs:
           scripts/run-e2e.sh .maestro
 
       # Passing runs keep their trace too: it's the baseline a failure's is
-      # read against. If the live stream lost its tail, the persisted log
-      # fills it in. An empty trace is a warning (the trace itself broke),
-      # never a failure.
+      # read against.
       - name: Stop recording the trace
         if: ${{ !cancelled() }}
-        run: |
-          pid=$(cat "$RUNNER_TEMP/trace-stream.pid" 2>/dev/null || true)
-          if [ -n "$pid" ]; then kill -INT "$pid" 2>/dev/null || true; sleep 2; kill "$pid" 2>/dev/null || true; fi
-          xcrun simctl spawn booted log show --info --style compact --last 60m \
-            --predicate 'subsystem == "com.facebook.react.log" AND eventMessage CONTAINS "[sift-trace]"' \
-            > maestro-results/trace-persisted.txt 2>/dev/null || true
-          # Trace lines only: log's own header quotes the predicate.
-          streamed=$(grep -c '\[sift-trace\] #' maestro-results/trace.txt 2>/dev/null || true)
-          persisted=$(grep -c '\[sift-trace\] #' maestro-results/trace-persisted.txt 2>/dev/null || true)
-          echo "Trace lines: ${streamed:-0} streamed, ${persisted:-0} persisted"
-          if [ "${persisted:-0}" -gt "${streamed:-0}" ]; then
-            cp maestro-results/trace-persisted.txt maestro-results/trace.txt
-          fi
-          if [ "${streamed:-0}" -eq 0 ] && [ "${persisted:-0}" -eq 0 ]; then
-            echo "::warning::The app's E2E trace came out empty. See maestro-results/trace-stream.err."
-          fi
+        run: scripts/app-trace.sh stop maestro-results
 
       # Failure-only extras on top of run-e2e.sh's per-flow logs: where
       # Maestro wrote its own output, a simulator log tail, and a screenshot
@@ -548,9 +523,16 @@ jobs:
           app-key: ${{ needs.check.outputs.app_key }}
 
       # The main screens on the Simulator, light and dark, for PR
-      # descriptions (CLAUDE.md, "Show UI changes in the PR"): real SF
-      # Symbols and materials, which a web export can't draw. It never fails
-      # the job.
+      # descriptions (CLAUDE.md, "Show UI changes in the PR") and Visual
+      # regression: real SF Symbols and materials, which a web export can't
+      # draw. It never fails the job; a screen it missed fails Visual
+      # regression, and the app's trace, recorded around it as in the E2E
+      # job (scripts/app-trace.sh) and uploaded with the shots, says where
+      # its taps went.
+      - name: Start recording the app's trace
+        if: inputs.gifs_only != true
+        run: scripts/app-trace.sh start screenshots
+
       - name: Take screenshots
         if: inputs.gifs_only != true
         timeout-minutes: 10
@@ -561,6 +543,10 @@ jobs:
         run: |
           export PATH="$HOME/.maestro/bin:$PATH"
           scripts/take-screenshots.sh screenshots
+
+      - name: Stop recording the trace
+        if: ${{ !cancelled() && inputs.gifs_only != true }}
+        run: scripts/app-trace.sh stop screenshots
 
       - name: Upload screenshots
         if: ${{ !cancelled() && inputs.gifs_only != true }}
