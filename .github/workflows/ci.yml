@@ -525,8 +525,9 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # Pictures, not a gate: the screenshots for PR descriptions and the README
-  # (readme-screenshots.yml takes this run's ios-screenshots artifact), and
+  # Pictures, not a gate itself: the screenshots for PR descriptions, the
+  # README (readme-screenshots.yml takes this run's ios-screenshots artifact)
+  # and the Visual regression job below, which compares them, and
   # the GIF scenarios' videos (scripts/pr-gifs.mjs takes ios-gif-videos;
   # a gifs-only run by hand records only these).
   pictures:
@@ -612,3 +613,41 @@ jobs:
           path: gif-videos
           if-no-files-found: warn
           retention-days: 14
+
+  # The screenshots the pictures job took, compared with their baselines in
+  # e2e/screenshots/baselines (jbhirsh/ci's visual-baselines/compare; this
+  # app's settings are the `visual-baselines` key of .github/ci.json): a
+  # screen that changed, appeared or wasn't taken fails it, with each shot
+  # and its diff in the visual-diffs artifact. On Linux, as the comparing
+  # needs no Simulator. A change that's meant is written into the baselines
+  # by visual-baselines.yml, run by hand on the PR's branch. It runs whenever
+  # the pictures job ran, failed or not: a failed screenshot run fails it
+  # (screens missing, or no artifact), rather than skip it as a pass.
+  visual:
+    name: Visual regression
+    needs: [pictures]
+    if: ${{ !cancelled() && needs.pictures.result != 'skipped' && inputs.gifs_only != true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # pixelmatch and pngjs, which the comparison loads from the app.
+      - run: npm ci --ignore-scripts
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ios-screenshots
+          path: screenshots
+
+      - uses: jbhirsh/ci/visual-baselines/compare@main
+        with:
+          fresh: screenshots

@@ -1,0 +1,33 @@
+name: Update visual baselines
+
+# Run by hand, on a branch: rewrites the visual regression's baselines in
+# e2e/screenshots/baselines from the screenshots this commit's CI run took
+# on the iOS Simulator (its ios-screenshots artifact; ci.yml's Visual
+# regression job compares against them), and commits them to that branch.
+# jbhirsh/ci's visual-baselines/from-run does it; this app's settings are
+# the `visual-baselines` key of .github/ci.json. Wait for the run's
+# Screenshots and GIFs job first. The Actions token's push starts no
+# workflow, so push again afterwards for the PR's checks to run on the new
+# baselines.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  update:
+    name: Update visual baselines
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Reads the run's artifact, and pushes the new baselines to the branch.
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jbhirsh/ci/visual-baselines/from-run@main

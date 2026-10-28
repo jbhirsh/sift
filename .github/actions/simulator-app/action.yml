@@ -20,20 +20,40 @@ runs:
   steps:
     # Booting takes 1.5-3 min, so it starts first and runs while Maestro and
     # the app are fetched; the wait for it comes just before installing.
+    # Pinned to one model (SIM_MODEL), on the newest iOS runtime that has
+    # it: the visual regression compares screenshots pixel for pixel with
+    # baselines (e2e/screenshots/baselines), so the screen they come from
+    # can't change with the runner image's device list. When an image drops
+    # the model this fails and lists what it has: move to a newer one and
+    # rewrite the baselines (visual-baselines.yml).
     - name: Start booting the iOS Simulator
       shell: bash
+      env:
+        SIM_MODEL: iPhone 17 Pro
       run: |
-        DEVICE=$(xcrun simctl list devices available -j | python3 -c "
-        import json, sys
+        # Captured first, so the step stops when the model is missing (a
+        # process substitution's exit status would be lost).
+        FOUND=$(xcrun simctl list devices available -j | python3 -c "
+        import json, os, re, sys
+        model = os.environ['SIM_MODEL']
         devices = json.load(sys.stdin)['devices']
+        def version(runtime):
+            return [int(n) for n in re.findall(r'\d+', runtime.split('iOS')[-1])]
+        for runtime in sorted((r for r in devices if 'iOS' in r), key=version, reverse=True):
+            for d in devices[runtime]:
+                if d['name'] == model:
+                    print(d['udid'], runtime.rsplit('.', 1)[-1])
+                    sys.exit(0)
+        print('no', model, 'on this runner; it has:', file=sys.stderr)
         for runtime, devs in devices.items():
             if 'iOS' in runtime:
-                for d in devs:
-                    if 'iPhone' in d['name']:
-                        print(d['udid'])
-                        sys.exit(0)
+                print(' ', runtime.rsplit('.', 1)[-1] + ':', ', '.join(d['name'] for d in devs), file=sys.stderr)
+        sys.exit(1)
         ")
+        read -r DEVICE RUNTIME <<< "$FOUND"
         echo "SIM_UDID=$DEVICE" >> "$GITHUB_ENV"
+        echo "Simulator: $SIM_MODEL, $RUNTIME" >> "$GITHUB_STEP_SUMMARY"
+        echo "Booting $SIM_MODEL ($RUNTIME)"
         xcrun simctl boot "$DEVICE" 2>/dev/null || true
 
     # Maestro's latest release, cached under its version: every run tests
@@ -96,7 +116,7 @@ runs:
     # that didn't land (two runs racing for the same key).
     - name: Take the build job's app
       if: steps.app-cache.outputs.cache-hit != 'true'
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: sift-simulator-app
         path: build

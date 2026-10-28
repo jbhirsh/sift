@@ -379,6 +379,18 @@ Makefile                Dev commands (test, lint, typecheck, check)
   artifact, Maestro cached by its latest release): `E2E Tests (Maestro)`
   (the suite), `Accessibility audit`, and `Screenshots and GIFs`
   (pictures, never a gate). None of them runs on push to main.
+- **Visual regression.** `Visual regression` (Linux, after `Screenshots
+  and GIFs`) compares that job's screenshots with their baselines in
+  `e2e/screenshots/baselines` (jbhirsh/ci's `visual-baselines`, set up by
+  the `visual-baselines` key of `.github/ci.json`): a screen that changed,
+  appeared or wasn't taken fails it, its shot and diff in the
+  `visual-diffs` artifact. The screenshots launch with `SiftStillPlayback`
+  (E2E build only), so the playing song's clock stands still and Sift
+  shows the same time on every run. A change that's meant: run
+  `visual-baselines.yml` by hand on the PR's branch once its run has
+  taken the screenshots; it commits that run's shots as the new baselines,
+  then push again for the checks. Not yet a required check: it joins the
+  list below once it has proved stable.
 - The Claude Code PR review runs in its own workflow,
   `.github/workflows/claude-review.yml` (job `Claude Review`, pull requests
   only), in parallel with CI rather than after it, so a red PR is reviewed

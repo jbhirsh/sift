@@ -482,6 +482,24 @@ describe('MockMusicProvider failure injection (EXPO_PUBLIC_MOCK_FAIL_ADDS / _REM
   });
 });
 
+/** A fresh mock module, as an E2E build launched with these arguments sees it. */
+function launchedWith(
+  args: Record<string, unknown>,
+  tracing = true,
+): typeof import('../../src/services/MockMusicProvider') {
+  let mod: typeof import('../../src/services/MockMusicProvider') | undefined;
+  jest.isolateModules(() => {
+    jest.doMock('react-native/Libraries/Settings/Settings', () => ({
+      __esModule: true,
+      default: { get: (key: string) => args[key] },
+    }));
+    jest.doMock('../../src/services/trace', () => ({ tracing, trace: jest.fn() }));
+    mod = require('../../src/services/MockMusicProvider');
+  });
+  if (!mod) throw new Error('module did not load');
+  return mod;
+}
+
 describe('MockMusicProvider: songs deleted in Music (#183, SiftDeletedInMusic)', () => {
   const song = (id: string) => ({
     id,
@@ -492,24 +510,6 @@ describe('MockMusicProvider: songs deleted in Music (#183, SiftDeletedInMusic)',
     playCount: 0,
     dateAdded: '2020-01-01T00:00:00Z',
   });
-
-  /** A fresh mock module, as an E2E build launched with these arguments sees it. */
-  function launchedWith(
-    args: Record<string, unknown>,
-    tracing = true,
-  ): typeof import('../../src/services/MockMusicProvider') {
-    let mod: typeof import('../../src/services/MockMusicProvider') | undefined;
-    jest.isolateModules(() => {
-      jest.doMock('react-native/Libraries/Settings/Settings', () => ({
-        __esModule: true,
-        default: { get: (key: string) => args[key] },
-      }));
-      jest.doMock('../../src/services/trace', () => ({ tracing, trace: jest.fn() }));
-      mod = require('../../src/services/MockMusicProvider');
-    });
-    if (!mod) throw new Error('module did not load');
-    return mod;
-  }
 
   test('by default none of them is', async () => {
     const { MockMusicProvider: Mock } = launchedWith({});
@@ -528,5 +528,32 @@ describe('MockMusicProvider: songs deleted in Music (#183, SiftDeletedInMusic)',
   test('only the E2E build reads it', async () => {
     const { MockMusicProvider: Mock } = launchedWith({ SiftDeletedInMusic: 'true' }, false);
     await expect(new Mock().deletedFromLibrary([song('mock-1')])).resolves.toEqual([]);
+  });
+});
+
+describe('MockMusicProvider: a still clock for screenshots (SiftStillPlayback)', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  async function positionAfter(
+    mock: InstanceType<typeof import('../../src/services/MockMusicProvider').MockMusicProvider>,
+  ) {
+    jest.useFakeTimers({ now: 0 });
+    await mock.play('mock-1', 12);
+    jest.setSystemTime(5000);
+    return mock.getPlaybackState();
+  }
+
+  test('launched with it, the playing song stays where it started', async () => {
+    const { MockMusicProvider: Mock } = launchedWith({ SiftStillPlayback: 'true' });
+    await expect(positionAfter(new Mock())).resolves.toEqual({ position: 12, isPlaying: true });
+  });
+
+  test('without it, or outside the E2E build, the clock runs', async () => {
+    const { MockMusicProvider: Plain } = launchedWith({});
+    await expect(positionAfter(new Plain())).resolves.toEqual({ position: 17, isPlaying: true });
+    const { MockMusicProvider: Release } = launchedWith({ SiftStillPlayback: 'true' }, false);
+    await expect(positionAfter(new Release())).resolves.toEqual({ position: 17, isPlaying: true });
   });
 });
