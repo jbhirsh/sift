@@ -404,8 +404,10 @@ Makefile                Dev commands (test, lint, typecheck, check)
   attempt per head and two per PR. When every fix would change behavior it
   comments and leaves the decision to the owner. A person's PR is left to its
   author.
-- **Dependabot's npm PRs merge themselves.** `dependabot-merge.yml` turns on
-  auto-merge as each one opens, and the `main` rule does the gating: GitHub
+- **Dependabot's npm PRs merge themselves.** `claude-autofix.yml` turns on
+  auto-merge, once, when the first check on each one completes (jbhirsh/ci's
+  `autofix`; a workflow on the PR would show as a skipped check on every
+  other PR), and the `main` rule does the gating: GitHub
   merges only once every required check is green. So the rule must list every
   check a PR runs, Claude Review included, and require review threads to be
   resolved, or a bot PR merges past a failing or unreported gate. Bot PRs get
