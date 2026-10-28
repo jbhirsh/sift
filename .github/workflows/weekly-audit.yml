@@ -13,8 +13,8 @@
 #     (`audit.graph` in .github/ci.json), as the architecture-graph artifact
 #     (its rules gate every PR in ci.yml; this is the picture).
 #
-# Monday 06:00 UTC, the shared sweep slot (gitleaks, semgrep; mutation.yml
-# sweeps monthly, at 06:00 on the 1st), plus manual dispatch. Not a PR
+# Monday 06:00 UTC, the shared sweep slot (gitleaks, semgrep; mutation-sweep.yml
+# runs monthly, at 06:00 on the 1st), plus manual dispatch. Not a PR
 # gate, so it is free to filter or skip.
 name: Weekly audit
 
