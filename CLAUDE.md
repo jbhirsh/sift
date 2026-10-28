@@ -46,7 +46,7 @@ no-op when `$CI` is set. CI re-runs everything.
 |-------|--------------|-------|-------------|
 | Unit tests (`make test`) | Reducers, utils, hooks, services | Seconds | Every push + CI |
 | E2E tests (`make test-e2e`) | Full app flows | Minutes | PR time (Maestro flows in `.maestro/`) |
-| Mutation tests (`make test-mutation`) | Assertion depth of unit tests (Stryker) | Minutes–hour | PR time (changed lines, incremental) + monthly full sweep (`mutation.yml`) |
+| Mutation tests (`make test-mutation`) | Assertion depth of unit tests (Stryker) | Minutes–hour | PR time (changed lines, incremental) + monthly full sweep (`mutation-sweep.yml`) |
 
 **Test coverage requirements:**
 - Every new reducer action, service function, or utility must have a unit test in `__tests__/unit/`.
@@ -436,12 +436,13 @@ Makefile                Dev commands (test, lint, typecheck, check)
   (empty today).
 - Security/quality gates run per PR and sweep weekly (Mon 06:00 UTC):
   `gitleaks.yml` (secret scanning) and `semgrep.yml` (SAST, `--config auto`),
-  alongside the weekly Dependabot bumps. `mutation.yml` (Stryker) runs per PR
-  and sweeps monthly (06:00 UTC on the 1st; one cron entry, since GitHub ORs
+  alongside the weekly Dependabot bumps. Stryker runs per PR (`mutation.yml`)
+  and sweeps monthly (`mutation-sweep.yml`, a file of its own so PRs don't
+  list it as a skipped check; 06:00 UTC on the 1st; one cron entry, since GitHub ORs
   the day-of-month and day-of-week fields, so "first Monday" can't be
   written): with PR runs mutating only their changed lines, the sweep is
   for drift from helpers, test data and dependencies, and for refreshing
-  the baseline PR runs reuse. `mutation.yml` calls jbhirsh/ci's `mutation`
+  the baseline PR runs reuse. They call jbhirsh/ci's `mutation`
   tool (PR runs) and its reusable sweep (8 parallel shards); their headers
   say how a PR's changed lines are found, when Stryker is skipped, how
   results are cached and how the shards are merged. This repo's settings

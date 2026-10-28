@@ -1,7 +1,7 @@
 version: 2
 updates:
   # Pinned to the shared Monday 06:00 UTC sweep slot (gitleaks.yml,
-  # semgrep.yml; mutation.yml sweeps monthly, at 06:00 on the 1st) so all
+  # semgrep.yml; mutation-sweep.yml sweeps monthly, at 06:00 on the 1st) so all
   # weekly robot output — dependency bumps and scheduled scans alike — lands
   # together on Monday morning instead of at whatever time Dependabot's
   # default weekly window happens to fire.
