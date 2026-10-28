@@ -17,7 +17,7 @@ on:
     # run on the head is still going, so the last to finish must wake it.
     # CI's "Autofix triggers" step (jbhirsh/ci's autofix/check-triggers)
     # fails a PR that leaves one out or names a workflow that doesn't exist.
-    workflows: ["CI", "Claude Review", "iOS Build", "Mutation Testing", "Gitleaks", "Semgrep"]
+    workflows: ["CI", "Claude Review", "Mutation Testing", "Gitleaks", "Semgrep"]
     types: [completed]
 
 concurrency:
