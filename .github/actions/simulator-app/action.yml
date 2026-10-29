@@ -4,8 +4,9 @@ description: >-
   three simulator jobs (E2E, the accessibility audit, screenshots and GIFs).
   Only the build job builds the app; this takes it from actions/cache, under
   the key the check job works out, or from the build job's artifact when this
-  run built it and the cache isn't there yet. With `maestro`, it also puts
-  Maestro on the PATH, cached under its latest release.
+  run built it and the cache isn't there yet, then launches it once and
+  quits it, so the job's own launch isn't its first. With `maestro`, it also
+  puts Maestro on the PATH, cached under its latest release.
 
 inputs:
   app-key:
@@ -137,3 +138,37 @@ runs:
     - name: Install app on simulator
       shell: bash
       run: xcrun simctl install booted build/e2e/*.app
+
+    # One launch before the job's own, which then isn't the app's first on
+    # this simulator: a first launch loads the baked JS bundle and warms the
+    # dyld and simulator caches, and minutes after the runner booted it
+    # stalled JavaScript for seconds (on PR #211 a tap reached it 3.9 s late,
+    # then a 5 s stall, and the screenshot pass gave up on Setup). It waits
+    # for the app to say Setup is up (its E2E trace line, persisted here as
+    # scripts/app-trace.sh does) instead of a fixed sleep, up to a minute,
+    # then quits it. Best effort: a warm-up hiccup never fails the job, and
+    # each job's own launch resets or reinstalls the app.
+    - name: Warm up the app (its first launch, before the job's)
+      shell: bash
+      continue-on-error: true
+      run: |
+        xcrun simctl spawn booted log config --subsystem com.facebook.react.log \
+          --mode "level:info,persist:info" || true
+        xcrun simctl launch booted com.jessicahirsh.sift || true
+        start=$SECONDS
+        ready=""
+        while [ $((SECONDS - start)) -lt 60 ]; do
+          if xcrun simctl spawn booted log show --info --last 2m --style compact \
+            --predicate 'subsystem == "com.facebook.react.log" AND eventMessage CONTAINS "screen name=setup at=up"' 2>/dev/null \
+            | grep -q 'screen name=setup at=up'; then
+            ready=$((SECONDS - start))
+            break
+          fi
+          sleep 1
+        done
+        if [ -n "$ready" ]; then
+          echo "Setup was up within ${ready}s"
+        else
+          echo "::warning::The warm-up launch never reported Setup (no trace line in 60 s)."
+        fi
+        xcrun simctl terminate booted com.jessicahirsh.sift || true

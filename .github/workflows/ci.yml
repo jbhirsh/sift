@@ -355,39 +355,6 @@ jobs:
       - name: Start recording the app's trace
         run: scripts/app-trace.sh start maestro-results
 
-      # Warm the app before the suite runs: a launch loads the baked JS
-      # bundle and warms the dyld/simulator caches, cutting the cold-start
-      # latency the first flow would otherwise pay. It waits for the app to
-      # say Setup is up (its trace line, persisted by the step above) instead
-      # of a fixed 25 s sleep, up to a minute, then lets it settle 3 s more.
-      # This launch's lines lead trace.txt (their #1, #2... restart with flow
-      # 01's launch). Best effort: a warm-up hiccup must never fail the job,
-      # and the first flow's SiftResetState launch wipes any residual state.
-      - name: Warm up the app (prime caches before the suite)
-        timeout-minutes: 3
-        continue-on-error: true
-        run: |
-          xcrun simctl launch booted com.jessicahirsh.sift || true
-          start=$SECONDS
-          ready=""
-          while [ $((SECONDS - start)) -lt 60 ]; do
-            # The log store, not the stream's file: the stream may write in blocks.
-            if xcrun simctl spawn booted log show --info --last 2m --style compact \
-              --predicate 'subsystem == "com.facebook.react.log" AND eventMessage CONTAINS "screen name=setup at=up"' 2>/dev/null \
-              | grep -q 'screen name=setup at=up'; then
-              ready=$((SECONDS - start))
-              break
-            fi
-            sleep 1
-          done
-          if [ -n "$ready" ]; then
-            echo "Setup was up within ${ready}s"
-            sleep 3
-          else
-            echo "::warning::The warm-up launch never reported Setup (no trace line in 60 s)."
-          fi
-          xcrun simctl terminate booted com.jessicahirsh.sift || true
-
       - name: Run Maestro tests
         # A step timeout counts as a failure (not a cancellation), so the
         # diagnostics and artifact upload below still run. run-e2e.sh also
