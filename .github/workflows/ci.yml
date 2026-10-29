@@ -82,7 +82,7 @@ jobs:
               - '!LICENSE'
               - '!.github/*'
               - '!.github/workflows/!(ci).yml'
-              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh|app-trace.sh)'
+              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh|app-trace.sh|build-a11y-audit.sh)'
               - '!stryker.config.json'
               - '!.prettierrc.json'
               - '!.prettierignore'
@@ -304,6 +304,16 @@ jobs:
           path: build/e2e
           key: ${{ needs.check.outputs.app_key }}
 
+      # The accessibility audit's test bundle, built and cached here on a
+      # miss, so the audit job restores it instead of spending about 5
+      # minutes on it every run (a push to main that builds the app fills
+      # the cache PRs read).
+      # Not this job's check: an audit bundle that won't build fails the
+      # audit job, which builds it again.
+      - name: Cache the accessibility audit's test bundle
+        uses: ./.github/actions/a11y-audit-bundle
+        continue-on-error: true
+
   # The three simulator jobs below share their setup (a booted simulator,
   # the app from the build job, Maestro) through .github/actions/simulator-app
   # and run side by side once the app exists: the suite here, the
@@ -468,8 +478,9 @@ jobs:
     needs: [check, build]
     if: ${{ !cancelled() && needs.check.result == 'success' && needs.build.result != 'failure' && github.event_name != 'push' && inputs.gifs_only != true && (needs.check.outputs.code == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: macos-26
-    # About 5 min of setup + the audit's 10-min cap.
-    timeout-minutes: 20
+    # About 5 min of setup, the audit bundle (restored, or about 5 min to
+    # build on a miss) and the audit's 15-min cap.
+    timeout-minutes: 30
     permissions:
       contents: read
 
@@ -481,15 +492,20 @@ jobs:
           app-key: ${{ needs.check.outputs.app_key }}
           maestro: 'false'
 
+      - id: audit-bundle
+        uses: ./.github/actions/a11y-audit-bundle
+
       # Xcode's accessibility audit (#146) on Setup, Sift, Settings and Done,
       # light and dark: contrast, hit targets, clipped text, Dynamic Type,
       # descriptions and traits, as iOS renders them (the Jest scan only sees
       # props). Any issue, or a screen the pass never reached, fails the
       # job: each is an error annotation and a row in the step summary. A
-      # pass takes about 30 s.
+      # pass took about 40 s when this ran after the E2E suite; on a fresh
+      # runner, minutes after it booted, it takes 1 to 2 min (the whole
+      # machine is slower then), so the cap leaves room.
       - name: Accessibility audit
-        timeout-minutes: 10
-        run: scripts/run-a11y-audit.sh "$(ls -d build/e2e/*.app | head -1)"
+        timeout-minutes: 15
+        run: scripts/run-a11y-audit.sh "$(ls -d build/e2e/*.app | head -1)" "${{ steps.audit-bundle.outputs.dir }}"
 
       - name: Upload accessibility audit
         if: ${{ !cancelled() }}

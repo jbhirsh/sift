@@ -1,0 +1,49 @@
+name: Accessibility audit bundle
+description: >-
+  The accessibility audit's UI-test bundle (e2e/a11y-audit), from the cache
+  or built and saved: scripts/build-a11y-audit.sh generated the project and
+  compiled it in about 5 minutes on a fresh runner, every run, though it
+  depends only on e2e/a11y-audit, that script and Xcode, which make its key.
+  The build job runs this, so a push to main that builds the app fills the
+  cache PRs restore; the audit job runs it too, building only on a miss (a
+  PR that changes the audit, a runner image with a new Xcode, or an audit
+  change main hasn't rebuilt the app since).
+
+outputs:
+  dir:
+    description: The folder holding the bundle and its .xctestrun.
+    value: build/a11y-audit-bundle
+
+runs:
+  using: composite
+  steps:
+    # Xcode's version and build in the key: a bundle compiled by one Xcode
+    # isn't run by another.
+    - name: Audit bundle cache key
+      id: key
+      shell: bash
+      run: |
+        XCODE=$(xcodebuild -version | tr -s ' \n' '-' | sed 's/-$//')
+        echo "key=a11y-audit-${{ runner.os }}-${{ runner.arch }}-${XCODE}-${{ hashFiles('e2e/a11y-audit/**', 'scripts/build-a11y-audit.sh') }}" >> "$GITHUB_OUTPUT"
+
+    - name: Restore the audit bundle
+      id: restore
+      uses: actions/cache/restore@v6
+      with:
+        path: build/a11y-audit-bundle
+        key: ${{ steps.key.outputs.key }}
+
+    - name: Build the audit bundle
+      if: steps.restore.outputs.cache-hit != 'true'
+      shell: bash
+      run: scripts/build-a11y-audit.sh build/a11y-audit-bundle
+
+    # A save can lose a race with another run's under the same key; this
+    # run has its bundle either way.
+    - name: Save the audit bundle
+      if: steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      continue-on-error: true
+      with:
+        path: build/a11y-audit-bundle
+        key: ${{ steps.key.outputs.key }}
