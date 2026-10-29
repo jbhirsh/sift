@@ -379,7 +379,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
   reach them). Three simulator jobs `needs:` it, waiting not started while
   it builds, then run side by side, each setting up through
   `.github/actions/simulator-app` (the app from the cache or the build's
-  artifact, Maestro cached by its latest release): `E2E Tests (Maestro)`
+  artifact, launched once to warm it so the job's own launch isn't its
+  first, Maestro cached by its latest release): `E2E Tests (Maestro)`
   (the suite), `Accessibility audit`, and `Screenshots and GIFs`
   (pictures, never a gate). None of them runs on push to main.
 - **Visual regression.** `Visual regression` (Linux, after `Screenshots
