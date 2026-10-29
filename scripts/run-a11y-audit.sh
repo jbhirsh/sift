@@ -3,13 +3,16 @@
 # e2e-simulator app on the booted simulator, in light and dark appearance,
 # and reports each issue as a GitHub error annotation and in the step
 # summary. Any issue, or a screen never audited, fails the script.
-# Usage: scripts/run-a11y-audit.sh <path to Sift.app>
+# The audit's test bundle comes from <bundle dir> (CI restores it from the
+# cache, .github/actions/a11y-audit-bundle); without one there, it's built
+# first (scripts/build-a11y-audit.sh).
+# Usage: scripts/run-a11y-audit.sh <path to Sift.app> [<bundle dir>]
 set -euo pipefail
 
-APP_PATH=${1:?usage: run-a11y-audit.sh <path to .app>}
+APP_PATH=${1:?usage: run-a11y-audit.sh <path to .app> [<bundle dir>]}
+BUNDLE_DIR=${2:-build/a11y-audit-bundle}
 BUNDLE_ID=com.jessicahirsh.sift
 OUT_DIR=${A11Y_OUT_DIR:-a11y-audit}
-PROJECT_DIR=e2e/a11y-audit
 mkdir -p "$OUT_DIR"
 
 UDID=$(xcrun simctl list devices booted -j | python3 -c "
@@ -21,15 +24,11 @@ for devs in json.load(sys.stdin)['devices'].values():
 sys.exit('no booted simulator')
 ")
 
-command -v xcodegen >/dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install xcodegen
-(cd "$PROJECT_DIR" && xcodegen generate --quiet)
-
-xcodebuild build-for-testing \
-  -project "$PROJECT_DIR/SiftAccessibilityAudit.xcodeproj" \
-  -scheme SiftAccessibilityAudit \
-  -destination "id=$UDID" \
-  -derivedDataPath build/a11y-audit-dd \
-  -quiet
+XCTESTRUN=$(ls "$BUNDLE_DIR"/*.xctestrun 2>/dev/null | head -1 || true)
+if [ -z "$XCTESTRUN" ]; then
+  "$(dirname "$0")/build-a11y-audit.sh" "$BUNDLE_DIR"
+  XCTESTRUN=$(ls "$BUNDLE_DIR"/*.xctestrun | head -1)
+fi
 
 status=0
 for appearance in light dark; do
@@ -38,10 +37,8 @@ for appearance in light dark; do
   xcrun simctl uninstall "$UDID" "$BUNDLE_ID" || true
   xcrun simctl install "$UDID" "$APP_PATH"
   TEST_RUNNER_A11Y_APPEARANCE=$appearance xcodebuild test-without-building \
-    -project "$PROJECT_DIR/SiftAccessibilityAudit.xcodeproj" \
-    -scheme SiftAccessibilityAudit \
+    -xctestrun "$XCTESTRUN" \
     -destination "id=$UDID" \
-    -derivedDataPath build/a11y-audit-dd \
     > "$OUT_DIR/xcodebuild-$appearance.log" 2>&1 || {
       status=$?
       echo "::error title=Accessibility audit::The $appearance pass didn't finish (exit $status); see $OUT_DIR/xcodebuild-$appearance.log"

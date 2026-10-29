@@ -61,7 +61,10 @@ no-op when `$CI` is set. CI re-runs everything.
   (`e2e/a11y-audit`, `scripts/run-a11y-audit.sh`) on Setup, Sift, Settings
   and Done in light and dark: contrast, hit targets, clipped text, Dynamic
   Type, as iOS renders them. Any issue fails the job, as does a screen the
-  pass never reached.
+  pass never reached. Its test bundle (`scripts/build-a11y-audit.sh`) is
+  cached under `e2e/a11y-audit`, that script and Xcode's version
+  (`.github/actions/a11y-audit-bundle`): the build job fills the cache, and
+  the audit job builds it only on a miss.
 - Tests are written alongside the implementation, not after the commit.
 
 ---
@@ -360,7 +363,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
   skips PRs that only touch docs or repo tooling (other workflows, the
   CI helpers, `scripts/` apart from its runners (`run-e2e.sh`,
   `run-a11y-audit.sh`, `take-screenshots.sh`, `take-gifs.sh`,
-  `build-simulator-app.sh`, `app-trace.sh`),
+  `build-simulator-app.sh`, `app-trace.sh`, `build-a11y-audit.sh`),
   `stryker.config.json`, and the formatter's, the weekly audit's and type
   coverage's config files;
   the `code` filter in `ci.yml`, with `predicate-quantifier: 'every'` so its
