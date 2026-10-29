@@ -15,10 +15,10 @@ inputs:
   maestro:
     description: Also install Maestro (the audit doesn't use it)
     default: 'true'
-  load-log:
+  load-dir:
     description: >-
       Where to sample the machine's load for the rest of the job
-      (scripts/machine-load.sh): a file in the folder the job uploads
+      (scripts/machine-load.sh): the folder the job uploads
     required: true
 
 runs:
@@ -27,7 +27,7 @@ runs:
     # First, so the samples cover the simulator's boot too.
     - name: Start sampling the machine's load
       shell: bash
-      run: scripts/machine-load.sh "${{ inputs.load-log }}"
+      run: scripts/machine-load.sh "${{ inputs.load-dir }}"
 
     # Booting takes 1.5-3 min, so it starts first and runs while Maestro and
     # the app are fetched; the wait for it comes just before installing.
@@ -151,7 +151,7 @@ runs:
     # certificate work, 150k-190k log lines a minute, for the whole job. It
     # ran through the slow runs on PR #211, where a touch reached the app up
     # to 6.5 s late and a screenshot pass and an E2E flow failed; the load
-    # samples (machine-load.txt) show how much of the machine it took. Sift
+    # samples (machine-*.txt) show how much of the machine it took. Sift
     # uses no push notifications, so it's disabled (not restarted) and
     # stopped; the check after the warm-up says whether it stayed stopped.
     - name: Stop apsd, the simulator's push daemon

@@ -347,7 +347,7 @@ jobs:
       - uses: ./.github/actions/simulator-app
         with:
           app-key: ${{ needs.check.outputs.app_key }}
-          load-log: maestro-results/machine-load.txt
+          load-dir: maestro-results
 
       # The E2E trace (src/services/trace.ts), recorded for the whole suite:
       # every touch, screen, app action, decision-guard check and JavaScript
@@ -431,7 +431,7 @@ jobs:
           # ~/.maestro/tests (where some Maestro versions write screenshots and
           # view hierarchies regardless of --debug-output). run-e2e.sh always
           # writes a log per flow. A job that broke before the suite still
-          # uploads the machine's load (machine-load.txt, from the start of
+          # uploads the machine's load (machine-*.txt, from the start of
           # simulator-app), which is what such a run needs looked at; an
           # artifact with nothing at all fails loudly.
           path: |
@@ -461,7 +461,7 @@ jobs:
         with:
           app-key: ${{ needs.check.outputs.app_key }}
           maestro: 'false'
-          load-log: a11y-audit/machine-load.txt
+          load-dir: a11y-audit
 
       - id: audit-bundle
         uses: ./.github/actions/a11y-audit-bundle
@@ -474,9 +474,18 @@ jobs:
       # pass took about 40 s when this ran after the E2E suite; on a fresh
       # runner, minutes after it booted, it takes 1 to 2 min (the whole
       # machine is slower then), so the cap leaves room.
+      - name: Start recording the app's trace
+        run: scripts/app-trace.sh start a11y-audit
+
       - name: Accessibility audit
         timeout-minutes: 15
         run: scripts/run-a11y-audit.sh "$(ls -d build/e2e/*.app | head -1)" "${{ steps.audit-bundle.outputs.dir }}"
+
+      # The app's trace through both passes, uploaded with the audit: a pass
+      # that stopped before a screen says where its taps went.
+      - name: Stop recording the trace
+        if: ${{ !cancelled() }}
+        run: scripts/app-trace.sh stop a11y-audit
 
       - name: Upload accessibility audit
         if: ${{ !cancelled() }}
@@ -508,7 +517,7 @@ jobs:
       - uses: ./.github/actions/simulator-app
         with:
           app-key: ${{ needs.check.outputs.app_key }}
-          load-log: screenshots/machine-load.txt
+          load-dir: screenshots
 
       # The main screens on the Simulator, light and dark, for PR
       # descriptions (CLAUDE.md, "Show UI changes in the PR") and Visual
@@ -567,6 +576,13 @@ jobs:
 
       # Not when the PR's scenarios couldn't be fetched: main's own, under
       # the same names, would pass for its "before".
+      # The app's trace for the recordings too, uploaded with the videos
+      # (the GIF tool reads only <scenario>.mp4): a scenario that stops
+      # early says where its taps went.
+      - name: Start recording the app's trace for the GIFs
+        if: ${{ !cancelled() && steps.gif-scenarios.outcome != 'failure' }}
+        run: scripts/app-trace.sh start gif-videos
+
       - name: Record GIF videos
         if: ${{ !cancelled() && steps.gif-scenarios.outcome != 'failure' }}
         timeout-minutes: 10
@@ -578,6 +594,10 @@ jobs:
           export PATH="$HOME/.maestro/bin:$PATH"
           xcrun simctl ui booted appearance light
           scripts/take-gifs.sh gif-videos
+
+      - name: Stop recording the GIFs' trace
+        if: ${{ !cancelled() && steps.gif-scenarios.outcome != 'failure' }}
+        run: scripts/app-trace.sh stop gif-videos
 
       - name: Upload GIF videos
         if: ${{ !cancelled() }}
