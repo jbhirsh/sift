@@ -23,11 +23,15 @@ if [ -z "$dir" ] || { [ "$mode" != start ] && [ "$mode" != stop ]; }; then
 fi
 predicate='subsystem == "com.facebook.react.log" AND eventMessage CONTAINS "[sift-trace]"'
 pidfile="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/sift-trace-stream.pid"
+# When this recording began, so stop reads back only its own lines (a job
+# can record more than one: the screenshots, then the GIFs).
+startfile="${pidfile%.pid}.start"
 mkdir -p "$dir"
 
 if [ "$mode" = start ]; then
   xcrun simctl spawn booted log config --subsystem com.facebook.react.log \
     --mode "level:info,persist:info" || true
+  date '+%Y-%m-%d %H:%M:%S' > "$startfile"
   nohup xcrun simctl spawn booted log stream --level info --style compact \
     --predicate "$predicate" > "$dir/trace.txt" 2> "$dir/trace-stream.err" &
   echo $! > "$pidfile"
@@ -41,7 +45,9 @@ if [ -n "$pid" ]; then
   kill "$pid" 2>/dev/null || true
 fi
 rm -f "$pidfile"
-xcrun simctl spawn booted log show --info --style compact --last 60m \
+since=$(cat "$startfile" 2>/dev/null || true)
+if [ -n "$since" ]; then range=(--start "$since"); else range=(--last 60m); fi
+xcrun simctl spawn booted log show --info --style compact "${range[@]}" \
   --predicate "$predicate" > "$dir/trace-persisted.txt" 2>/dev/null || true
 # Trace lines only: log's own header quotes the predicate.
 streamed=$(grep -c '\[sift-trace\] #' "$dir/trace.txt" 2>/dev/null || true)

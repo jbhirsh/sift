@@ -384,7 +384,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
   first, Maestro cached by its latest release; apsd, the simulator's push
   daemon, stopped, as on CI it retries Apple's push servers in a tight loop
   that slowed every touch; and the machine's load sampled every 10 s into
-  `machine-load.txt` in the job's artifact, `scripts/machine-load.sh`):
+  `machine-load.txt` (the busiest processes), `machine-memory.txt` and
+  `machine-disk.txt` in the job's artifact, `scripts/machine-load.sh`):
   `E2E Tests (Maestro)` (the suite), `Accessibility audit`, and `Screenshots and GIFs`
   (pictures, never a gate). None of them runs on push to main.
 - **Visual regression.** `Visual regression` (Linux, after `Screenshots
@@ -546,7 +547,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
   `services/trace`, written only by the E2E build), Maestro's log, each
   command's result and the view hierarchy at the failure (`suite-debug/`),
   the system log for the app (`app-log.txt`), the machine's load
-  (`machine-load.txt`: the busiest processes every 10 s), the
+  (`machine-load.txt`: the busiest processes every 10 s;
+  `machine-memory.txt`, `machine-disk.txt`), the
   screenshots. A touch followed by no action,
   screen or guard line is a tap the app dropped; say where, then fix it. Then fix the flow (wait for the element with
   `extendedWaitUntil`, never assert right after an animated transition) or
