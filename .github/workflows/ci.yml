@@ -69,7 +69,7 @@ jobs:
       # and tooling that can't change the app or this job: other
       # workflows (ci.yml is this job), CI
       # helpers, and scripts/ apart from the simulator jobs' runners (suite,
-      # audit, screenshots, GIFs).
+      # audit, screenshots, GIFs) and what builds the app and its bundle.
       - uses: dorny/paths-filter@v4
         id: filter
         with:
@@ -82,7 +82,7 @@ jobs:
               - '!LICENSE'
               - '!.github/*'
               - '!.github/workflows/!(ci).yml'
-              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh|app-trace.sh|build-a11y-audit.sh|machine-load.sh|job-note.sh)'
+              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh|e2e-env.sh|bundle-js.sh|apply-js-bundle.sh|app-trace.sh|build-a11y-audit.sh|machine-load.sh|job-note.sh)'
               - '!stryker.config.json'
               - '!.prettierrc.json'
               - '!.prettierignore'
@@ -99,23 +99,20 @@ jobs:
 
       - run: npm ci
 
-      # The app's cache key, worked out here where node_modules already is,
-      # so the simulator jobs install nothing to look their app up. The
-      # native fingerprint, plus the bundle's inputs: src/, the entry point,
-      # the Metro config, the lockfile (a JavaScript-only package isn't in
-      # the native fingerprint, and a bump of one must rebuild, not test
-      # main's old bundle), .env (its EXPO_UNSTABLE_* flags change the
-      # bundle) and the bundled assets. Tests and Maestro flows aren't in the
-      # app, so a test-only change mustn't force a rebuild. Ubuntu's hash
+      # The native app's cache key, worked out here where node_modules
+      # already is, so the simulator jobs install nothing to look their app
+      # up: the native fingerprint alone. The JavaScript isn't in it: the
+      # bundle job bundles it for every run and the simulator jobs put it
+      # into the cached app (scripts/apply-js-bundle.sh), so a
+      # JavaScript-only change doesn't rebuild the app. Ubuntu's hash
       # needn't match a Mac's: this job makes the key both where the app is
       # saved and where it's looked up.
       - name: App cache key
         id: app-key
         run: |
           NATIVE=$(npx expo-updates fingerprint:generate --platform ios 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['hash'])")
-          SOURCE=$( (find src -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \) -print0; find assets -type f -print0; printf '%s\0' index.ts metro.config.js package-lock.json .env) | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
-          echo "key=sift-e2e-${NATIVE}-${SOURCE}" >> "$GITHUB_OUTPUT"
-          echo "App cache key: sift-e2e-${NATIVE}-${SOURCE}"
+          echo "key=sift-e2e-native-${NATIVE}" >> "$GITHUB_OUTPUT"
+          echo "App cache key: sift-e2e-native-${NATIVE}"
 
       # Whether the app is cached already, which decides whether the build
       # job builds. Linux and macOS file caches under the same version
@@ -216,13 +213,16 @@ jobs:
               - 'package-lock.json'
               - '.github/workflows/ci.yml'
               - 'scripts/build-simulator-app.sh'
+              - 'scripts/e2e-env.sh'
 
   # The only job that builds the app. It's the compile gate for the native
   # code (lint, typecheck and Jest never touch the Swift in
   # modules/expo-musickit, so this is the only check that proves it still
   # compiles; free on a public repo's macOS runners), so it builds whenever
-  # a PR changes native files, and otherwise whenever the app isn't cached
-  # (a JavaScript change; on main, so PRs can restore it). It saves the app
+  # a PR changes native files, and otherwise whenever the native app isn't
+  # cached (a new fingerprint; on main, so PRs can restore it). A
+  # JavaScript-only change doesn't build: the bundle job's JavaScript goes
+  # into the cached app instead. It saves the app
   # to the cache and as an artifact. The simulator jobs `needs:` this one,
   # so while it builds they wait, not started, and then they only restore.
   build:
@@ -314,11 +314,42 @@ jobs:
         uses: ./.github/actions/a11y-audit-bundle
         continue-on-error: true
 
+  # This commit's JavaScript, bundled as the app's Xcode build would
+  # (scripts/bundle-js.sh) in about a minute on Linux, beside the check job.
+  # Every simulator job puts it into the native app (scripts/apply-js-bundle.sh),
+  # cached or just built, so the app they test always runs this commit's
+  # JavaScript, and a JavaScript-only change never waits for a native build.
+  bundle:
+    name: Bundle the app's JavaScript
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: scripts/bundle-js.sh build/js
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sift-js-bundle
+          path: build/js
+          retention-days: 7
+
   # The three simulator jobs below share their setup (a booted simulator,
-  # the app from the build job, Maestro) through .github/actions/simulator-app
-  # and run side by side once the app exists: the suite here, the
-  # accessibility audit, and the screenshots and GIFs. Each `needs:` the
-  # build job, so while it builds they wait, not started. `!cancelled()`
+  # the native app with the bundle job's JavaScript in it, Maestro) through
+  # .github/actions/simulator-app and run side by side once both exist: the
+  # suite here, the accessibility audit, and the screenshots and GIFs. Each
+  # `needs:` the build and bundle jobs, so while they run they wait, not
+  # started. `!cancelled()`
   # because `build` is skipped on most PRs, which would otherwise skip them;
   # a failed build leaves no app to test. They skip docs- and tooling-only
   # PRs (the `code` filter in `check`; a skipped job counts as passing) and
@@ -329,7 +360,7 @@ jobs:
   # expo-modules-core).
   e2e:
     name: E2E Tests (Maestro)
-    needs: [check, build]
+    needs: [check, build, bundle]
     if: ${{ !cancelled() && needs.check.result == 'success' && needs.build.result != 'failure' && github.event_name != 'push' && inputs.gifs_only != true && (needs.check.outputs.code == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: macos-26
     # About 5 min of setup + the Maestro step's 40-min cap + the trace and
@@ -461,7 +492,7 @@ jobs:
   # it finds, where the screenshots and GIFs only make pictures.
   a11y:
     name: Accessibility audit
-    needs: [check, build]
+    needs: [check, build, bundle]
     if: ${{ !cancelled() && needs.check.result == 'success' && needs.build.result != 'failure' && github.event_name != 'push' && inputs.gifs_only != true && (needs.check.outputs.code == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: macos-26
     # About 5 min of setup, the audit bundle (restored, or about 5 min to
@@ -532,7 +563,7 @@ jobs:
   # a gifs-only run by hand records only these).
   pictures:
     name: Screenshots and GIFs
-    needs: [check, build]
+    needs: [check, build, bundle]
     if: ${{ !cancelled() && needs.check.result == 'success' && needs.build.result != 'failure' && github.event_name != 'push' && (needs.check.outputs.code == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: macos-26
     # About 5 min of setup + the screenshots' 10-min cap + the GIFs' 10.

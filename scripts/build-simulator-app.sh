@@ -8,7 +8,7 @@
 # runs get no Actions secrets, #178), or with SIFT_BUILD_WITHOUT_EXPO=1, it
 # builds the same app with no Expo or Apple login: expo prebuild, pod
 # install, then xcodebuild for the simulator, unsigned. The profile's env is
-# read from eas.json, so the two builds can't drift. Either way the Swift in
+# read from eas.json (scripts/e2e-env.sh), so the two builds can't drift. Either way the Swift in
 # modules/expo-musickit really compiles.
 #
 # Usage: scripts/build-simulator-app.sh [out.tar.gz]   (default: build/Sift-e2e.tar.gz)
@@ -28,21 +28,8 @@ fi
 
 echo "::notice::Building the simulator app without the Expo login (expo prebuild + xcodebuild)."
 
-# The e2e-simulator profile's env, as NUL-separated KEY=value pairs (no
-# shell quoting to get wrong), exported one by one.
-profile_env="$(mktemp)"
-node -e '
-  const env = require("./eas.json").build["e2e-simulator"].env ?? {};
-  for (const [key, value] of Object.entries(env)) {
-    if (!/^[A-Z_][A-Z0-9_]*$/.test(key)) throw new Error(`Unexpected env name in eas.json: ${key}`);
-    process.stdout.write(`${key}=${value}\0`);
-  }
-' > "$profile_env"
-while IFS= read -r -d '' pair; do
-  export "$pair"
-  echo "  ${pair%%=*}=${pair#*=}"
-done < "$profile_env"
-rm -f "$profile_env"
+# The e2e-simulator profile's env (scripts/e2e-env.sh).
+source scripts/e2e-env.sh
 
 npx expo prebuild --platform ios --clean --no-install
 (cd ios && pod install)

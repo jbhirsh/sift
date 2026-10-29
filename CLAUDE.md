@@ -363,30 +363,35 @@ Makefile                Dev commands (test, lint, typecheck, check)
   skips PRs that only touch docs or repo tooling (other workflows, the
   CI helpers, `scripts/` apart from its runners (`run-e2e.sh`,
   `run-a11y-audit.sh`, `take-screenshots.sh`, `take-gifs.sh`,
-  `build-simulator-app.sh`, `app-trace.sh`, `build-a11y-audit.sh`,
+  `build-simulator-app.sh`, `e2e-env.sh`, `bundle-js.sh`,
+  `apply-js-bundle.sh`, `app-trace.sh`, `build-a11y-audit.sh`,
   `machine-load.sh`, `job-note.sh`),
   `stryker.config.json`, and the formatter's, the weekly audit's and type
   coverage's config files;
   the `code` filter in `ci.yml`, with `predicate-quantifier: 'every'` so its
-  `!` patterns exclude). Its app build is cached on
-  the native fingerprint plus a hash of the bundle's inputs (`src/`,
-  `index.ts`, `metro.config.js`, `package-lock.json`, `.env`, `assets/`;
-  tests and flows don't count), a key the Ubuntu job works out and looks
-  up. Only the `Build iOS simulator app` job builds the app: whenever a PR
-  changes native files (`modules/`, `app.json`, `eas.json`, the package
-  files, `ci.yml`, the build script), as it's the native code's compile
-  gate, and otherwise whenever the app isn't cached (a JavaScript change;
+  `!` patterns exclude). Its native app is cached on the native
+  fingerprint alone, a key the Ubuntu job works out and looks up; the
+  JavaScript is bundled for every run by `Bundle the app's JavaScript`
+  (`scripts/bundle-js.sh`: `expo export:embed` and Hermes bytecode, as the
+  Xcode build does, in about a minute on Linux), and each simulator job
+  puts it into the cached app (`scripts/apply-js-bundle.sh`, which stops
+  if the bundle's Hermes bytecode version isn't the app's). Only the
+  `Build iOS simulator app` job builds the app: whenever a PR changes
+  native files (`modules/`, `app.json`, `eas.json`, the package files,
+  `ci.yml`, the build scripts), as it's the native code's compile gate,
+  and otherwise whenever the native app isn't cached (a new fingerprint;
   on push to main, so PRs can restore it, as only caches saved on main
-  reach them). Three simulator jobs `needs:` it, waiting not started while
-  it builds, then run side by side, each setting up through
+  reach them). A JavaScript-only change builds nothing. Three simulator
+  jobs `needs:` it and the bundle job, waiting not started while they
+  run (a failed bundle fails them, rather than skip them as a pass), then run side by side, each setting up through
   `.github/actions/simulator-app` (the app from the cache or the build's
-  artifact, launched once to warm it so the job's own launch isn't its
-  first, Maestro cached by its latest release; apsd, the simulator's push
-  daemon, stopped, as on CI it retries Apple's push servers in a tight loop
-  that slowed every touch; and the machine's load sampled every 10 s into
-  `machine-load.txt` (the busiest processes), `machine-memory.txt`,
-  `machine-disk.txt` and `machine-cpu.csv` in the job's artifact,
-  `scripts/machine-load.sh`):
+  artifact with the bundle put in, launched once to warm it so the job's
+  own launch isn't its first, Maestro cached by its latest release; apsd,
+  the simulator's push daemon, stopped, as on CI it retries Apple's push
+  servers in a tight loop that slowed every touch; and the machine's load
+  sampled every 10 s into `machine-load.txt` (the busiest processes),
+  `machine-memory.txt`, `machine-disk.txt` and `machine-cpu.csv` in the
+  job's artifact, `scripts/machine-load.sh`):
   `E2E Tests (Maestro)` (the suite), `Accessibility audit`, and `Screenshots and GIFs`
   (pictures, never a gate). None of them runs on push to main.
 - **Job summaries and reports.** Each simulator job ends with jbhirsh/ci's
