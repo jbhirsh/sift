@@ -364,7 +364,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
   CI helpers, `scripts/` apart from its runners (`run-e2e.sh`,
   `run-a11y-audit.sh`, `take-screenshots.sh`, `take-gifs.sh`,
   `build-simulator-app.sh`, `app-trace.sh`, `build-a11y-audit.sh`,
-  `machine-load.sh`),
+  `machine-load.sh`, `job-note.sh`),
   `stryker.config.json`, and the formatter's, the weekly audit's and type
   coverage's config files;
   the `code` filter in `ci.yml`, with `predicate-quantifier: 'every'` so its
@@ -384,10 +384,23 @@ Makefile                Dev commands (test, lint, typecheck, check)
   first, Maestro cached by its latest release; apsd, the simulator's push
   daemon, stopped, as on CI it retries Apple's push servers in a tight loop
   that slowed every touch; and the machine's load sampled every 10 s into
-  `machine-load.txt` (the busiest processes), `machine-memory.txt` and
-  `machine-disk.txt` in the job's artifact, `scripts/machine-load.sh`):
+  `machine-load.txt` (the busiest processes), `machine-memory.txt`,
+  `machine-disk.txt` and `machine-cpu.csv` in the job's artifact,
+  `scripts/machine-load.sh`):
   `E2E Tests (Maestro)` (the suite), `Accessibility audit`, and `Screenshots and GIFs`
   (pictures, never a gate). None of them runs on push to main.
+- **Job summaries and reports.** Each simulator job ends with jbhirsh/ci's
+  `job-summary`: its run summary gives the verdict and what needs attention
+  (failed or re-run flows, flaky ones, steps and flows slower than usual)
+  and links to the job's report, a page with every step and flow beside
+  the job's recent runs, the machine's CPU across the job
+  (`machine-cpu.csv`) and its notes (`job-notes.json`: the simulator,
+  runner image, Xcode, Maestro, the warm-up and apsd, which
+  `simulator-app` writes through `scripts/job-note.sh`). `job-reports.yml`
+  publishes the reports to the repository's Pages (the `job-reports`
+  branch) once CI finishes, from `main` only, as GitHub runs a
+  `workflow_run` workflow from the default branch. Read a slow or flaky
+  run's report before its logs.
 - **Visual regression.** `Visual regression` (Linux, after `Screenshots
   and GIFs`) compares that job's screenshots with their baselines in
   `e2e/screenshots/baselines` (jbhirsh/ci's `visual-baselines`, set up by

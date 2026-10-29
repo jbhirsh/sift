@@ -82,7 +82,7 @@ jobs:
               - '!LICENSE'
               - '!.github/*'
               - '!.github/workflows/!(ci).yml'
-              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh|app-trace.sh|build-a11y-audit.sh|machine-load.sh)'
+              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh|app-trace.sh|build-a11y-audit.sh|machine-load.sh|job-note.sh)'
               - '!stryker.config.json'
               - '!.prettierrc.json'
               - '!.prettierignore'
@@ -340,6 +340,8 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
+      # The job summary reads this run's steps and earlier runs.
+      actions: read
 
     steps:
       - uses: actions/checkout@v7
@@ -441,6 +443,20 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      # The job's summary and report (jbhirsh/ci's job-summary): its steps,
+      # flows (re-runs included) and the machine's CPU beside its recent
+      # runs, published on the repository's Pages by job-reports.yml once
+      # the run finishes.
+      - name: Job summary
+        if: ${{ !cancelled() }}
+        uses: jbhirsh/ci/job-summary@main
+        with:
+          job: E2E Tests (Maestro)
+          junit: maestro-results/*.xml
+          noun: flow
+          notes: maestro-results/job-notes.json
+          load: maestro-results/machine-cpu.csv
+
   # Xcode's accessibility audit, its own check: it fails the PR on an issue
   # it finds, where the screenshots and GIFs only make pictures.
   a11y:
@@ -453,6 +469,8 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+      # The job summary reads this run's steps and earlier runs.
+      actions: read
 
     steps:
       - uses: actions/checkout@v7
@@ -496,6 +514,17 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      # The job's summary and report (jbhirsh/ci's job-summary): its steps
+      # and the machine's CPU beside its recent runs, published on the
+      # repository's Pages by job-reports.yml once the run finishes.
+      - name: Job summary
+        if: ${{ !cancelled() }}
+        uses: jbhirsh/ci/job-summary@main
+        with:
+          job: Accessibility audit
+          notes: a11y-audit/job-notes.json
+          load: a11y-audit/machine-cpu.csv
+
   # Pictures, not a gate itself: the screenshots for PR descriptions, the
   # README (readme-screenshots.yml takes this run's ios-screenshots artifact)
   # and the Visual regression job below, which compares them, and
@@ -510,6 +539,8 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+      # The job summary reads this run's steps and earlier runs.
+      actions: read
 
     steps:
       - uses: actions/checkout@v7
@@ -607,6 +638,17 @@ jobs:
           path: gif-videos
           if-no-files-found: warn
           retention-days: 14
+
+      # The job's summary and report (jbhirsh/ci's job-summary): its steps
+      # and the machine's CPU beside its recent runs, published on the
+      # repository's Pages by job-reports.yml once the run finishes.
+      - name: Job summary
+        if: ${{ !cancelled() }}
+        uses: jbhirsh/ci/job-summary@main
+        with:
+          job: Screenshots and GIFs
+          notes: screenshots/job-notes.json
+          load: screenshots/machine-cpu.csv
 
   # The screenshots the pictures job took, compared with their baselines in
   # e2e/screenshots/baselines (jbhirsh/ci's visual-baselines/compare; this

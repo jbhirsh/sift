@@ -18,16 +18,25 @@ inputs:
   load-dir:
     description: >-
       Where to sample the machine's load for the rest of the job
-      (scripts/machine-load.sh): the folder the job uploads
+      (scripts/machine-load.sh) and keep its notes (job-notes.json,
+      scripts/job-note.sh), for the job summary: the folder the job uploads
     required: true
 
 runs:
   using: composite
   steps:
-    # First, so the samples cover the simulator's boot too.
+    # First, so the samples cover the simulator's boot too. The job's notes
+    # (scripts/job-note.sh) go beside the samples, for the job summary's
+    # report: the steps below add what they learn about the machine.
     - name: Start sampling the machine's load
       shell: bash
-      run: scripts/machine-load.sh "${{ inputs.load-dir }}"
+      env:
+        LOAD_DIR: ${{ inputs.load-dir }}
+      run: |
+        scripts/machine-load.sh "$LOAD_DIR"
+        echo "JOB_NOTES=$PWD/$LOAD_DIR/job-notes.json" >> "$GITHUB_ENV"
+        scripts/job-note.sh "$PWD/$LOAD_DIR/job-notes.json" Runner "${ImageOS:-?} ${ImageVersion:-}, $(sysctl -n hw.ncpu) cores"
+        scripts/job-note.sh "$PWD/$LOAD_DIR/job-notes.json" Xcode "$(xcodebuild -version 2>/dev/null | head -1)"
 
     # Booting takes 1.5-3 min, so it starts first and runs while Maestro and
     # the app are fetched; the wait for it comes just before installing.
@@ -64,6 +73,7 @@ runs:
         read -r DEVICE RUNTIME <<< "$FOUND"
         echo "SIM_UDID=$DEVICE" >> "$GITHUB_ENV"
         echo "Simulator: $SIM_MODEL, $RUNTIME" >> "$GITHUB_STEP_SUMMARY"
+        scripts/job-note.sh "$JOB_NOTES" Simulator "$SIM_MODEL, $(echo "$RUNTIME" | sed 's/^iOS-/iOS /; s/-/./g')"
         echo "Booting $SIM_MODEL ($RUNTIME)"
         xcrun simctl boot "$DEVICE" 2>/dev/null || true
 
@@ -104,7 +114,9 @@ runs:
           curl -Ls "https://get.maestro.mobile.dev" | bash
         fi
         echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
-        "$HOME/.maestro/bin/maestro" --version
+        version=$("$HOME/.maestro/bin/maestro" --version | tail -1)
+        echo "$version"
+        scripts/job-note.sh "$JOB_NOTES" Maestro "$version"
 
     - name: Save Maestro
       if: inputs.maestro == 'true' && steps.maestro.outputs.version != '' && steps.maestro-cache.outputs.cache-hit != 'true'
@@ -199,8 +211,10 @@ runs:
         done
         if [ -n "$ready" ]; then
           echo "Setup was up within ${ready}s"
+          scripts/job-note.sh "$JOB_NOTES" "Warm-up launch" "Setup up within ${ready} s"
         else
           echo "::warning::The warm-up launch never reported Setup (no trace line in 60 s)."
+          scripts/job-note.sh "$JOB_NOTES" "Warm-up launch" "Setup never reported in 60 s"
         fi
         xcrun simctl terminate booted com.jessicahirsh.sift || true
 
@@ -216,6 +230,7 @@ runs:
         line="apsd log lines: ${before} in the 20 s before it was stopped, ${after:-0} since (from $since)"
         echo "$line"
         echo "$line" >> "$GITHUB_STEP_SUMMARY"
+        scripts/job-note.sh "$JOB_NOTES" apsd "${before} log lines in the 20 s before it was stopped, ${after:-0} since"
         if [ "${after:-0}" -gt 100 ]; then
           echo "::warning::apsd is still logging (${after} lines since it was stopped): its reconnect loop may be back."
         fi
