@@ -101,18 +101,27 @@ jobs:
 
       # The native app's cache key, worked out here where node_modules
       # already is, so the simulator jobs install nothing to look their app
-      # up: the native fingerprint alone. The JavaScript isn't in it: the
-      # bundle job bundles it for every run and the simulator jobs put it
-      # into the cached app (scripts/apply-js-bundle.sh), so a
-      # JavaScript-only change doesn't rebuild the app. Ubuntu's hash
-      # needn't match a Mac's: this job makes the key both where the app is
-      # saved and where it's looked up.
+      # up: the native fingerprint, and the recipe that builds the app from
+      # it (the build scripts, and the build job with this file's env and
+      # defaults, as data: comments and other jobs don't count). A change
+      # to either misses the cache, so the build job builds and saves it
+      # and every simulator job, on the PR and on main after it, tests the
+      # app it makes. The JavaScript isn't in it: the bundle job bundles it
+      # for every PR and the simulator jobs put it into the cached app
+      # (scripts/apply-js-bundle.sh), so a JavaScript-only change doesn't
+      # rebuild the app. Ubuntu's hash needn't match a Mac's: this job makes
+      # the key both where the app is saved and where it's looked up. (yq is
+      # mikefarah's, on GitHub's Ubuntu images.)
       - name: App cache key
         id: app-key
         run: |
           NATIVE=$(npx expo-updates fingerprint:generate --platform ios 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['hash'])")
-          echo "key=sift-e2e-native-${NATIVE}" >> "$GITHUB_OUTPUT"
-          echo "App cache key: sift-e2e-native-${NATIVE}"
+          RECIPE=$({
+            cat scripts/build-simulator-app.sh scripts/e2e-env.sh
+            yq -o=json '{"env": .env, "defaults": .defaults, "build": .jobs.build}' .github/workflows/ci.yml
+          } | sha256sum | cut -c1-16)
+          echo "key=sift-e2e-native-${NATIVE}-build-${RECIPE}" >> "$GITHUB_OUTPUT"
+          echo "App cache key: sift-e2e-native-${NATIVE}-build-${RECIPE}"
 
       # Whether the app is cached already, which decides whether the build
       # job builds. Linux and macOS file caches under the same version
@@ -190,6 +199,9 @@ jobs:
   # for those. A step of its own job, not a trigger-level paths filter: a
   # filtered-out workflow never reports, which would leave the required
   # build check hanging at "Expected"; a job skipped by its `if:` passes it.
+  # ci.yml isn't one: the part of it that builds the app is in the app's
+  # cache key (the check job), so a change to that part misses the cache
+  # and builds, and a change elsewhere in it builds nothing.
   changes:
     name: Detect native changes
     if: github.event_name == 'pull_request'
@@ -211,7 +223,6 @@ jobs:
               - 'eas.json'
               - 'package.json'
               - 'package-lock.json'
-              - '.github/workflows/ci.yml'
               - 'scripts/build-simulator-app.sh'
               - 'scripts/e2e-env.sh'
 

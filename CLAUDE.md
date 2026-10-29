@@ -370,16 +370,20 @@ Makefile                Dev commands (test, lint, typecheck, check)
   coverage's config files;
   the `code` filter in `ci.yml`, with `predicate-quantifier: 'every'` so its
   `!` patterns exclude). Its native app is cached on the native
-  fingerprint alone, a key the Ubuntu job works out and looks up; the
-  JavaScript is bundled for every run by `Bundle the app's JavaScript`
+  fingerprint and the recipe that builds it (the build scripts, and the
+  build job with `ci.yml`'s `env` and `defaults`, as data), a key the
+  Ubuntu job works out and looks up; the
+  JavaScript is bundled for every PR and manual run by `Bundle the app's JavaScript`
   (`scripts/bundle-js.sh`: `expo export:embed` and Hermes bytecode, as the
   Xcode build does, in about a minute on Linux), and each simulator job
   puts it into the cached app (`scripts/apply-js-bundle.sh`, which stops
   if the bundle's Hermes bytecode version isn't the app's). Only the
   `Build iOS simulator app` job builds the app: whenever a PR changes
   native files (`modules/`, `app.json`, `eas.json`, the package files,
-  `ci.yml`, the build scripts), as it's the native code's compile gate,
-  and otherwise whenever the native app isn't cached (a new fingerprint;
+  the build scripts), as it's the native code's compile gate,
+  and otherwise whenever the native app isn't cached (a new fingerprint
+  or build recipe, so a change to the build job builds and a comment or
+  another job's edit in `ci.yml` doesn't;
   on push to main, so PRs can restore it, as only caches saved on main
   reach them). A JavaScript-only change builds nothing. Three simulator
   jobs `needs:` it and the bundle job, waiting not started while they
