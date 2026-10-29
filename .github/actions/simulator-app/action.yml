@@ -3,14 +3,16 @@ description: >-
   Boots an iPhone simulator and installs the E2E app on it, for ci.yml's
   three simulator jobs (E2E, the accessibility audit, screenshots and GIFs).
   Only the build job builds the app; this takes it from actions/cache, under
-  the key the check job works out, or from the build job's artifact when this
-  run built it and the cache isn't there yet, then launches it once and
-  quits it, so the job's own launch isn't its first. With `maestro`, it also
-  puts Maestro on the PATH, cached under its latest release.
+  the native key the check job works out, or from the build job's artifact
+  when this run built it and the cache isn't there yet, puts the bundle
+  job's JavaScript into it (scripts/apply-js-bundle.sh), then launches it
+  once and quits it, so the job's own launch isn't its first. With
+  `maestro`, it also puts Maestro on the PATH, cached under its latest
+  release.
 
 inputs:
   app-key:
-    description: The app's cache key (the check job's app_key output)
+    description: The native app's cache key (the check job's app_key output)
     required: true
   maestro:
     description: Also install Maestro (the audit doesn't use it)
@@ -150,6 +152,19 @@ runs:
       run: |
         mkdir -p build/e2e
         tar -xzf build/Sift-e2e.tar.gz -C build/e2e
+
+    # This commit's JavaScript (ci.yml's bundle job), in place of the one
+    # the cached app was built with: the app is cached by its native
+    # fingerprint alone, so a JavaScript-only change needs no native build.
+    - name: Take the bundle job's JavaScript
+      uses: actions/download-artifact@v7
+      with:
+        name: sift-js-bundle
+        path: build/js
+
+    - name: Put the JavaScript into the app
+      shell: bash
+      run: scripts/apply-js-bundle.sh "$(ls -d build/e2e/*.app | head -1)" build/js
 
     # Attaching the XCUITest driver to a half-booted simulator is the main
     # startup-flake source, so this blocks until SpringBoard is up.
