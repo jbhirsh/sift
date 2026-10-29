@@ -363,7 +363,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
   skips PRs that only touch docs or repo tooling (other workflows, the
   CI helpers, `scripts/` apart from its runners (`run-e2e.sh`,
   `run-a11y-audit.sh`, `take-screenshots.sh`, `take-gifs.sh`,
-  `build-simulator-app.sh`, `app-trace.sh`, `build-a11y-audit.sh`),
+  `build-simulator-app.sh`, `app-trace.sh`, `build-a11y-audit.sh`,
+  `machine-load.sh`),
   `stryker.config.json`, and the formatter's, the weekly audit's and type
   coverage's config files;
   the `code` filter in `ci.yml`, with `predicate-quantifier: 'every'` so its
@@ -380,8 +381,11 @@ Makefile                Dev commands (test, lint, typecheck, check)
   it builds, then run side by side, each setting up through
   `.github/actions/simulator-app` (the app from the cache or the build's
   artifact, launched once to warm it so the job's own launch isn't its
-  first, Maestro cached by its latest release): `E2E Tests (Maestro)`
-  (the suite), `Accessibility audit`, and `Screenshots and GIFs`
+  first, Maestro cached by its latest release; apsd, the simulator's push
+  daemon, stopped, as on CI it retries Apple's push servers in a tight loop
+  that slowed every touch; and the machine's load sampled every 10 s into
+  `machine-load.txt` in the job's artifact, `scripts/machine-load.sh`):
+  `E2E Tests (Maestro)` (the suite), `Accessibility audit`, and `Screenshots and GIFs`
   (pictures, never a gate). None of them runs on push to main.
 - **Visual regression.** `Visual regression` (Linux, after `Screenshots
   and GIFs`) compares that job's screenshots with their baselines in
@@ -541,7 +545,9 @@ Makefile                Dev commands (test, lint, typecheck, check)
   action, each decision-guard check and any JavaScript stall;
   `services/trace`, written only by the E2E build), Maestro's log, each
   command's result and the view hierarchy at the failure (`suite-debug/`),
-  the system log for the app (`app-log.txt`), the screenshots. A touch followed by no action,
+  the system log for the app (`app-log.txt`), the machine's load
+  (`machine-load.txt`: the busiest processes every 10 s), the
+  screenshots. A touch followed by no action,
   screen or guard line is a tap the app dropped; say where, then fix it. Then fix the flow (wait for the element with
   `extendedWaitUntil`, never assert right after an animated transition) or
   the app, whichever is wrong. No retry in a flow to cover one either (a

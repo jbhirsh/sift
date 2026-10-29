@@ -82,7 +82,7 @@ jobs:
               - '!LICENSE'
               - '!.github/*'
               - '!.github/workflows/!(ci).yml'
-              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh|app-trace.sh|build-a11y-audit.sh)'
+              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh|app-trace.sh|build-a11y-audit.sh|machine-load.sh)'
               - '!stryker.config.json'
               - '!.prettierrc.json'
               - '!.prettierignore'
@@ -347,6 +347,7 @@ jobs:
       - uses: ./.github/actions/simulator-app
         with:
           app-key: ${{ needs.check.outputs.app_key }}
+          load-log: maestro-results/machine-load.txt
 
       # The E2E trace (src/services/trace.ts), recorded for the whole suite:
       # every touch, screen, app action, decision-guard check and JavaScript
@@ -429,8 +430,10 @@ jobs:
           # Per-flow logs + JUnit + debug output from scripts/run-e2e.sh, plus
           # ~/.maestro/tests (where some Maestro versions write screenshots and
           # view hierarchies regardless of --debug-output). run-e2e.sh always
-          # writes a log per flow, so an empty artifact means the job broke
-          # before the suite ran — fail loudly rather than upload nothing.
+          # writes a log per flow. A job that broke before the suite still
+          # uploads the machine's load (machine-load.txt, from the start of
+          # simulator-app), which is what such a run needs looked at; an
+          # artifact with nothing at all fails loudly.
           path: |
             maestro-results
             ~/.maestro/tests
@@ -458,6 +461,7 @@ jobs:
         with:
           app-key: ${{ needs.check.outputs.app_key }}
           maestro: 'false'
+          load-log: a11y-audit/machine-load.txt
 
       - id: audit-bundle
         uses: ./.github/actions/a11y-audit-bundle
@@ -504,6 +508,7 @@ jobs:
       - uses: ./.github/actions/simulator-app
         with:
           app-key: ${{ needs.check.outputs.app_key }}
+          load-log: screenshots/machine-load.txt
 
       # The main screens on the Simulator, light and dark, for PR
       # descriptions (CLAUDE.md, "Show UI changes in the PR") and Visual
