@@ -15,10 +15,20 @@ inputs:
   maestro:
     description: Also install Maestro (the audit doesn't use it)
     default: 'true'
+  load-log:
+    description: >-
+      Where to sample the machine's load for the rest of the job
+      (scripts/machine-load.sh): a file in the folder the job uploads
+    required: true
 
 runs:
   using: composite
   steps:
+    # First, so the samples cover the simulator's boot too.
+    - name: Start sampling the machine's load
+      shell: bash
+      run: scripts/machine-load.sh "${{ inputs.load-log }}"
+
     # Booting takes 1.5-3 min, so it starts first and runs while Maestro and
     # the app are fetched; the wait for it comes just before installing.
     # Pinned to one model (SIM_MODEL), on the newest iOS runtime that has
@@ -135,6 +145,27 @@ runs:
       shell: bash
       run: xcrun simctl bootstatus "$SIM_UDID" -b
 
+    # apsd, the simulator's Apple Push Service daemon, holds the connection
+    # to Apple's push servers (APNs). On CI it can't, and retries with no
+    # backoff: about 35 connection attempts a second, each with keychain and
+    # certificate work, 150k-190k log lines a minute, for the whole job. It
+    # ran through the slow runs on PR #211, where a touch reached the app up
+    # to 6.5 s late and a screenshot pass and an E2E flow failed; the load
+    # samples (machine-load.txt) show how much of the machine it took. Sift
+    # uses no push notifications, so it's disabled (not restarted) and
+    # stopped; the check after the warm-up says whether it stayed stopped.
+    - name: Stop apsd, the simulator's push daemon
+      shell: bash
+      run: |
+        before=$(xcrun simctl spawn booted log show --last 20s --style compact \
+          --predicate 'process == "apsd"' 2>/dev/null | grep -c 'apsd\[' || true)
+        date '+%Y-%m-%d %H:%M:%S' > "$RUNNER_TEMP/apsd-stopped-at"
+        xcrun simctl spawn booted launchctl disable system/com.apple.apsd || true
+        xcrun simctl spawn booted launchctl bootout system/com.apple.apsd 2>/dev/null \
+          || xcrun simctl spawn booted launchctl kill SIGKILL system/com.apple.apsd || true
+        echo "apsd log lines in the 20 s before it was stopped: ${before:-0}"
+        echo "${before:-0}" > "$RUNNER_TEMP/apsd-before"
+
     - name: Install app on simulator
       shell: bash
       run: xcrun simctl install booted build/e2e/*.app
@@ -172,3 +203,19 @@ runs:
           echo "::warning::The warm-up launch never reported Setup (no trace line in 60 s)."
         fi
         xcrun simctl terminate booted com.jessicahirsh.sift || true
+
+    # Whether apsd stayed stopped through the install and warm-up, in the
+    # job's summary: a loop that came back is a warning, not a failure.
+    - name: Check apsd stayed stopped
+      shell: bash
+      run: |
+        since=$(cat "$RUNNER_TEMP/apsd-stopped-at" 2>/dev/null || true)
+        before=$(cat "$RUNNER_TEMP/apsd-before" 2>/dev/null || echo '?')
+        after=$(xcrun simctl spawn booted log show --start "$since" --style compact \
+          --predicate 'process == "apsd"' 2>/dev/null | grep -c 'apsd\[' || true)
+        line="apsd log lines: ${before} in the 20 s before it was stopped, ${after:-0} since (from $since)"
+        echo "$line"
+        echo "$line" >> "$GITHUB_STEP_SUMMARY"
+        if [ "${after:-0}" -gt 100 ]; then
+          echo "::warning::apsd is still logging (${after} lines since it was stopped): its reconnect loop may be back."
+        fi
