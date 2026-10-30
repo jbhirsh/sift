@@ -365,7 +365,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
   `run-a11y-audit.sh`, `take-screenshots.sh`, `take-gifs.sh`,
   `build-simulator-app.sh`, `e2e-env.sh`, `bundle-js.sh`,
   `apply-js-bundle.sh`, `app-trace.sh`, `build-a11y-audit.sh`,
-  `machine-load.sh`, `job-note.sh`),
+  `machine-load.sh`, `job-note.sh`, `simulator-device.sh`, `settle-simulator.sh`, `restore-simulator.sh`),
   `stryker.config.json`, and the formatter's, the weekly audit's and type
   coverage's config files;
   the `code` filter in `ci.yml`, with `predicate-quantifier: 'every'` so its
@@ -388,25 +388,51 @@ Makefile                Dev commands (test, lint, typecheck, check)
   reach them). A JavaScript-only change builds nothing. Three simulator
   jobs `needs:` it and the bundle job, waiting not started while they
   run (a failed bundle fails them, rather than skip them as a pass), then run side by side, each setting up through
-  `.github/actions/simulator-app` (the app from the cache or the build's
+  `.github/actions/simulator-app` (the simulator booted from a settled
+  snapshot when one is cached, below; the app from the cache or the build's
   artifact with the bundle put in, launched once to warm it so the job's
   own launch isn't its first, Maestro cached by its latest release;
-  apsd, the simulator's push daemon, stopped in both of its domains, as
-  on CI it retries Apple's push servers in a tight loop that slowed every
-  touch; and the machine's load
+  apsd, the simulator's push daemon, stopped in both of its domains after
+  every boot, as on CI it retries Apple's push servers in a tight loop
+  that slowed every touch; and the machine's load
   sampled every 10 s into `machine-load.txt` (the busiest processes),
   `machine-memory.txt`, `machine-disk.txt` and `machine-cpu.csv` in the
   job's artifact, `scripts/machine-load.sh`):
   `E2E Tests (Maestro)` (the suite), `Accessibility audit`, and `Screenshots and GIFs`
   (pictures, never a gate). None of them runs on push to main.
+- **The simulator boots settled.** A new simulator spends its first
+  minutes on first-boot chores (photo and media analysis, Health, Siri
+  suggestions, widgets, indexing), which drove the load average to
+  384-639 on #215 and timed out the accessibility audit. So the
+  `Settle a simulator snapshot` job (`simulator-snapshot`, macOS, not a
+  required check, never fails a run) boots a device of the jobs' model
+  and runtime that no app has ever run on, waits until it has settled
+  (10 minutes at least, then until the CPU stays under 25% busy for a
+  minute, 20 minutes at most: measured, never a fixed wait), shuts it
+  down and caches its data folder (tar and zstd,
+  `scripts/settle-simulator.sh`) under
+  `sim-settled-<version>-<runtime build>-<model>`, an exact key with no
+  restore-keys and no runner image in it (`scripts/simulator-device.sh`
+  names the device and the key for both sides; the version is the start
+  of `settle-simulator.sh`'s hash, so changing it makes a new one). It
+  runs on pushes to main, manual runs that aren't gifs-only and PRs with
+  simulator jobs, only when the key isn't cached; nothing `needs:` it, so a run that
+  misses boots fresh and a later run restores what it saved (a PR's save
+  reaches only that PR's runs; main's, every PR's). Each simulator job
+  restores it into its own device's data folder before booting
+  (`scripts/restore-simulator.sh`: the folder swapped while the device is
+  shut down, so a different UDID on a newer image still works; any
+  failure leaves the device to boot fresh). apsd's disable lives outside
+  the data folder, so it's still stopped after every boot.
 - **Job summaries and reports.** Each simulator job ends with jbhirsh/ci's
   `job-summary`: its run summary gives the verdict and what needs attention
   (failed or re-run flows, flaky ones, steps and flows slower than usual)
   and links to the job's report, a page with every step and flow beside
   the job's recent runs, the machine's CPU across the job
   (`machine-cpu.csv`) and its notes (`job-notes.json`: the simulator,
-  runner image, Xcode, Maestro, the warm-up, apsd and the busiest
-  processes after setup, which `simulator-app` writes through
+  runner image, Xcode, the simulator snapshot (restored, and how long it
+  took, or booted fresh), Maestro, the warm-up, apsd and
+  the busiest processes after setup, which `simulator-app` writes through
   `scripts/job-note.sh`). CI's last job, `reports` (jbhirsh/ci's
   `job-reports.yml`), publishes the reports to the repository's Pages (the
   `job-reports` branch) and keeps one comment on the PR with every

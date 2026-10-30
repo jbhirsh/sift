@@ -20,8 +20,9 @@
 # them, were the busiest things on the runner after setup (16% and 24% of
 # a core, of 3). ps and iostat read the kernel's counters directly.
 #
-#   scripts/machine-load.sh <dir>       returns at once; the samplers run on
-#   scripts/machine-load.sh --cpu-row   one machine-cpu.csv row, now
+#   scripts/machine-load.sh <dir>            returns at once; the samplers run on
+#   scripts/machine-load.sh --cpu-row [<s>]  one machine-cpu.csv row: the CPU
+#                                            over the next <s> seconds (1)
 #
 # Once started it can't fail the job: a sampler that won't start leaves
 # its error in its file.
@@ -29,10 +30,12 @@ set -uo pipefail
 
 # One row from iostat's second report (its first counts since boot), whose
 # last columns are the CPU's "us sy id" and the load average's "1m 5m 15m",
-# whatever disk columns come before them: busy is 100 less idle.
+# whatever disk columns come before them: busy is 100 less idle. The
+# report covers the given number of seconds (scripts/settle-simulator.sh
+# takes 5, so a moment's spike doesn't decide whether the CPU is quiet).
 cpu_row() {
   local row
-  row=$(iostat -c 2 -w 1 | tail -1 | awk '
+  row=$(iostat -c 2 -w "${1:-1}" | tail -1 | awk '
     NF >= 6 && $(NF - 3) ~ /^[0-9.]+$/ && $(NF - 2) ~ /^[0-9.]+$/ {
       printf "%s,%.1f", $(NF - 2), 100 - $(NF - 3)
     }')
@@ -41,7 +44,7 @@ cpu_row() {
 }
 
 if [ "${1:-}" = --cpu-row ]; then
-  cpu_row
+  cpu_row "${2:-1}"
   exit
 fi
 

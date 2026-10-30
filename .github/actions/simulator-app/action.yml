@@ -2,6 +2,9 @@ name: Simulator with the app
 description: >-
   Boots an iPhone simulator and installs the E2E app on it, for ci.yml's
   three simulator jobs (E2E, the accessibility audit, screenshots and GIFs).
+  The device boots from the settled snapshot ci.yml's simulator-snapshot
+  job caches, when there is one (scripts/restore-simulator.sh), so its
+  first-boot work is already done; otherwise it boots fresh.
   Only the build job builds the app; this takes it from actions/cache, under
   the native key the check job works out, or from the build job's artifact
   when this run built it and the cache isn't there yet, puts the bundle
@@ -40,44 +43,85 @@ runs:
         scripts/job-note.sh "$PWD/$LOAD_DIR/job-notes.json" Runner "${ImageOS:-?} ${ImageVersion:-}, $(sysctl -n hw.ncpu) cores"
         scripts/job-note.sh "$PWD/$LOAD_DIR/job-notes.json" Xcode "$(xcodebuild -version 2>/dev/null | head -1)"
 
-    # Booting takes 1.5-3 min, so it starts first and runs while Maestro and
-    # the app are fetched; the wait for it comes just before installing.
-    # Pinned to one model (SIM_MODEL), on the newest iOS runtime that has
-    # it: the visual regression compares screenshots pixel for pixel with
-    # baselines (e2e/screenshots/baselines), so the screen they come from
-    # can't change with the runner image's device list. When an image drops
-    # the model this fails and lists what it has: move to a newer one and
-    # rewrite the baselines (visual-baselines.yml).
+    # The model and runtime to boot, and the settled snapshot's cache key,
+    # from scripts/simulator-device.sh, which ci.yml's simulator-snapshot
+    # job reads too, so the snapshot it makes is the one looked up here.
+    # It stops the job when the runner has no such device, listing what it
+    # has (the script's header says why the model is pinned).
+    - name: Find the simulator
+      id: device
+      shell: bash
+      run: |
+        # Captured first, so the step stops when the model is missing.
+        FOUND=$(scripts/simulator-device.sh)
+        echo "$FOUND" >> "$GITHUB_ENV"
+        echo "$FOUND" >> "$GITHUB_OUTPUT"
+        model=$(sed -n 's/^SIM_MODEL=//p' <<< "$FOUND")
+        runtime=$(sed -n 's/^SIM_RUNTIME=//p' <<< "$FOUND")
+        build=$(sed -n 's/^SIM_RUNTIME_BUILD=//p' <<< "$FOUND")
+        echo "Simulator: $model, $runtime${build:+ ($build)}" >> "$GITHUB_STEP_SUMMARY"
+        scripts/job-note.sh "$JOB_NOTES" Simulator "$model, $runtime${build:+ ($build)}"
+        # The restore's time, download included, starts here.
+        echo "SNAPSHOT_FROM=$(date +%s)" >> "$GITHUB_ENV"
+
+    # A device that has already done its first-boot work (ci.yml's
+    # simulator-snapshot job, scripts/settle-simulator.sh): its data folder,
+    # restored into this runner's device before it boots, so the boot
+    # doesn't spend minutes on photo analysis, Health, Siri suggestions and
+    # indexing while the tests run. Exact key only (the runtime's build, the
+    # model and the snapshot's version): another device's data must never
+    # load into this one. On a miss, or anything going wrong, the device
+    # boots fresh as it always has.
+    - name: Restore the settled simulator
+      id: snapshot
+      if: steps.device.outputs.SIM_SNAPSHOT_KEY != ''
+      continue-on-error: true
+      uses: actions/cache/restore@v6
+      with:
+        path: ~/simulator-snapshot
+        key: ${{ steps.device.outputs.SIM_SNAPSHOT_KEY }}
+
+    # Booting takes 1.5-3 min fresh, less from the snapshot, so it starts
+    # here and runs while Maestro and the app are fetched; the wait for it
+    # comes just before installing. The snapshot goes in first, as the
+    # device must be shut down for it (scripts/restore-simulator.sh, which
+    # leaves the device to boot fresh if anything fails).
     - name: Start booting the iOS Simulator
       shell: bash
       env:
-        SIM_MODEL: iPhone 17 Pro
+        SNAPSHOT_HIT: ${{ steps.snapshot.outputs.cache-hit }}
+        SNAPSHOT_OUTCOME: ${{ steps.snapshot.outcome }}
       run: |
-        # Captured first, so the step stops when the model is missing (a
-        # process substitution's exit status would be lost).
-        FOUND=$(xcrun simctl list devices available -j | python3 -c "
-        import json, os, re, sys
-        model = os.environ['SIM_MODEL']
-        devices = json.load(sys.stdin)['devices']
-        def version(runtime):
-            return [int(n) for n in re.findall(r'\d+', runtime.split('iOS')[-1])]
-        for runtime in sorted((r for r in devices if 'iOS' in r), key=version, reverse=True):
-            for d in devices[runtime]:
-                if d['name'] == model:
-                    print(d['udid'], runtime.rsplit('.', 1)[-1])
-                    sys.exit(0)
-        print('no', model, 'on this runner; it has:', file=sys.stderr)
-        for runtime, devs in devices.items():
-            if 'iOS' in runtime:
-                print(' ', runtime.rsplit('.', 1)[-1] + ':', ', '.join(d['name'] for d in devs), file=sys.stderr)
-        sys.exit(1)
-        ")
-        read -r DEVICE RUNTIME <<< "$FOUND"
-        echo "SIM_UDID=$DEVICE" >> "$GITHUB_ENV"
-        echo "Simulator: $SIM_MODEL, $RUNTIME" >> "$GITHUB_STEP_SUMMARY"
-        scripts/job-note.sh "$JOB_NOTES" Simulator "$SIM_MODEL, $(echo "$RUNTIME" | sed 's/^iOS-/iOS /; s/-/./g')"
-        echo "Booting $SIM_MODEL ($RUNTIME)"
-        xcrun simctl boot "$DEVICE" 2>/dev/null || true
+        if [ -z "$SIM_SNAPSHOT_KEY" ]; then
+          note="none: no runtime build to key it on, booted fresh"
+        elif [ "$SNAPSHOT_OUTCOME" = failure ]; then
+          note="none: the cache didn't answer, booted fresh"
+        elif [ "$SNAPSHOT_HIT" != true ]; then
+          note="none: booted fresh ($SIM_SNAPSHOT_KEY isn't cached yet)"
+        elif why=$(scripts/restore-simulator.sh "$SIM_UDID" "$HOME/simulator-snapshot" 2>&1); then
+          restored=yes
+          how=$(cat "$HOME/simulator-snapshot/snapshot.txt" 2>/dev/null || true)
+          note="restored $SIM_SNAPSHOT_VERSION ($SIM_RUNTIME, $SIM_RUNTIME_BUILD) in $(( $(date +%s) - SNAPSHOT_FROM )) s${how:+; $how}"
+        else
+          note="failed to restore (${why##*Not restored: }): booted fresh"
+          echo "::warning::The settled simulator snapshot didn't restore (${why##*Not restored: }); booting fresh."
+        fi
+        # Its archive isn't needed once unpacked.
+        rm -rf "$HOME/simulator-snapshot"
+        echo "Booting $SIM_MODEL ($SIM_RUNTIME)"
+        # A snapshot the device won't boot from is erased, and it boots
+        # fresh instead.
+        if ! booting=$(xcrun simctl boot "$SIM_UDID" 2>&1) && [ -n "${restored:-}" ] \
+          && ! xcrun simctl list devices | grep -F "$SIM_UDID" | grep -q '(Booted)'; then
+          echo "::warning::The simulator didn't boot from the snapshot (${booting}); erasing it and booting fresh."
+          note="restored, but it wouldn't boot from it (${booting}): erased and booted fresh"
+          scripts/simulator-device.sh --shut-down "$SIM_UDID" || true
+          xcrun simctl erase "$SIM_UDID" || true
+          xcrun simctl boot "$SIM_UDID" 2>/dev/null || true
+        fi
+        echo "Simulator snapshot: $note"
+        echo "Simulator snapshot: $note" >> "$GITHUB_STEP_SUMMARY"
+        scripts/job-note.sh "$JOB_NOTES" "Simulator snapshot" "$note"
 
     # Maestro's latest release, cached under its version: every run tests
     # with the newest Maestro without downloading it each time (the install
@@ -180,8 +224,9 @@ runs:
     # to 6.5 s late and a screenshot pass and an E2E flow failed. Sift uses
     # no push notifications, so it's disabled (not restarted) and stopped in
     # both domains: it runs in user/foreground, and stopping only system's
-    # left it logging (#215). The check after the warm-up says whether it
-    # stayed stopped.
+    # left it logging (#215). The settled snapshot doesn't carry the
+    # disable, so this runs after every boot; the check after the warm-up
+    # says whether it stayed stopped.
     - name: Stop apsd, the simulator's push daemon
       shell: bash
       run: |
