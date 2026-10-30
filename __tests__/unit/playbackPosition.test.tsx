@@ -42,19 +42,9 @@ jest.mock('react-native-reanimated', () => ({
   FadeOut: { duration: () => undefined },
   runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
 }));
-jest.mock('react-native-gesture-handler', () => ({
-  GestureDetector: ({ children }: { children: React.ReactNode }) => children,
-  Gesture: {
-    Pan: () => ({
-      minDistance: () => ({
-        enabled: () => ({ onUpdate: () => ({ onEnd: () => ({ onFinalize: () => ({}) }) }) }),
-      }),
-      onUpdate: () => ({ onFinalize: () => ({}) }),
-    }),
-    Tap: () => ({ onEnd: () => ({}) }),
-    Race: () => ({}),
-  },
-}));
+jest.mock('react-native-gesture-handler', () =>
+  jest.requireActual('../helpers/gestureHandlerMock').gestureHandlerMock(),
+);
 jest.mock('@sentry/react-native', () => ({
   setTag: jest.fn(),
   setContext: jest.fn(),
