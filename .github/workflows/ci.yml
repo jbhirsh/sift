@@ -487,8 +487,7 @@ jobs:
 
       # The job's summary and report (jbhirsh/ci's job-summary): its steps,
       # flows (re-runs included) and the machine's CPU beside its recent
-      # runs, published on the repository's Pages by job-reports.yml once
-      # the run finishes.
+      # runs, published on the repository's Pages by the reports job.
       - name: Job summary
         if: ${{ !cancelled() }}
         uses: jbhirsh/ci/job-summary@main
@@ -558,7 +557,7 @@ jobs:
 
       # The job's summary and report (jbhirsh/ci's job-summary): its steps
       # and the machine's CPU beside its recent runs, published on the
-      # repository's Pages by job-reports.yml once the run finishes.
+      # repository's Pages by the reports job.
       - name: Job summary
         if: ${{ !cancelled() }}
         uses: jbhirsh/ci/job-summary@main
@@ -683,7 +682,7 @@ jobs:
 
       # The job's summary and report (jbhirsh/ci's job-summary): its steps
       # and the machine's CPU beside its recent runs, published on the
-      # repository's Pages by job-reports.yml once the run finishes.
+      # repository's Pages by the reports job.
       - name: Job summary
         if: ${{ !cancelled() }}
         uses: jbhirsh/ci/job-summary@main
@@ -729,3 +728,19 @@ jobs:
       - uses: jbhirsh/ci/visual-baselines/compare@main
         with:
           fresh: screenshots
+
+  # Publishes this run's job reports to the repository's Pages and keeps
+  # one comment on the PR with every simulator job's summary (jbhirsh/ci's
+  # job-reports.yml), once those jobs are done, failed or not. As part of
+  # the run, it runs from the PR's own branch, so a change to it shows on
+  # the PR that makes it (a workflow_run caller runs only from main). Not a
+  # required check; it never fails a run for a report. When the simulator
+  # jobs skip (a docs-only PR, a push to main), it finds nothing to report.
+  reports:
+    needs: [e2e, a11y, pictures]
+    if: ${{ !cancelled() && inputs.gifs_only != true }}
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    uses: jbhirsh/ci/.github/workflows/job-reports.yml@main
