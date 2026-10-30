@@ -406,11 +406,14 @@ Makefile                Dev commands (test, lint, typecheck, check)
   the job's recent runs, the machine's CPU across the job
   (`machine-cpu.csv`) and its notes (`job-notes.json`: the simulator,
   runner image, Xcode, Maestro, the warm-up, apsd and the busiest
-  processes after setup, which `simulator-app` writes through `scripts/job-note.sh`). `job-reports.yml`
-  publishes the reports to the repository's Pages (the `job-reports`
-  branch) once CI finishes, from `main` only, as GitHub runs a
-  `workflow_run` workflow from the default branch. Read a slow or flaky
-  run's report before its logs.
+  processes after setup, which `simulator-app` writes through
+  `scripts/job-note.sh`). CI's last job, `reports` (jbhirsh/ci's
+  `job-reports.yml`), publishes the reports to the repository's Pages (the
+  `job-reports` branch) and keeps one comment on the PR with every
+  simulator job's summary, updated after each run. It runs from the PR's
+  own branch, as part of the run, so a change to it shows on the PR that
+  makes it; it isn't a required check and never fails a run for a report.
+  Read a slow or flaky run's report before its logs.
 - **Visual regression.** `Visual regression` (Linux, after `Screenshots
   and GIFs`) compares that job's screenshots with their baselines in
   `e2e/screenshots/baselines` (jbhirsh/ci's `visual-baselines`, set up by
