@@ -404,8 +404,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
   and links to the job's report, a page with every step and flow beside
   the job's recent runs, the machine's CPU across the job
   (`machine-cpu.csv`) and its notes (`job-notes.json`: the simulator,
-  runner image, Xcode, Maestro, the warm-up and apsd, which
-  `simulator-app` writes through `scripts/job-note.sh`). `job-reports.yml`
+  runner image, Xcode, Maestro, the warm-up, apsd and the busiest
+  processes after setup, which `simulator-app` writes through `scripts/job-note.sh`). `job-reports.yml`
   publishes the reports to the repository's Pages (the `job-reports`
   branch) once CI finishes, from `main` only, as GitHub runs a
   `workflow_run` workflow from the default branch. Read a slow or flaky
