@@ -177,19 +177,26 @@ runs:
     # backoff: about 35 connection attempts a second, each with keychain and
     # certificate work, 150k-190k log lines a minute, for the whole job. It
     # ran through the slow runs on PR #211, where a touch reached the app up
-    # to 6.5 s late and a screenshot pass and an E2E flow failed; the load
-    # samples (machine-*.txt) show how much of the machine it took. Sift
-    # uses no push notifications, so it's disabled (not restarted) and
-    # stopped; the check after the warm-up says whether it stayed stopped.
+    # to 6.5 s late and a screenshot pass and an E2E flow failed. Sift uses
+    # no push notifications, so it's disabled (not restarted) and stopped in
+    # both domains: it runs in user/foreground, and stopping only system's
+    # left it logging (#215). The check after the warm-up says whether it
+    # stayed stopped.
     - name: Stop apsd, the simulator's push daemon
       shell: bash
       run: |
         before=$(xcrun simctl spawn booted log show --last 20s --style compact \
           --predicate 'process == "apsd"' 2>/dev/null | grep -c 'apsd\[' || true)
+        sim='xcrun simctl spawn booted launchctl'
+        for domain in user/foreground system; do
+          $sim disable "$domain/com.apple.apsd" >/dev/null 2>&1 || true
+          $sim bootout "$domain/com.apple.apsd" >/dev/null 2>&1 \
+            || $sim kill SIGKILL "$domain/com.apple.apsd" >/dev/null 2>&1 || true
+        done
+        # Once the stop has gone through: apsd logs thousands of lines a
+        # second while it runs, so a time taken before it would count the
+        # seconds spent getting to it as lines "since" it stopped.
         date '+%Y-%m-%d %H:%M:%S' > "$RUNNER_TEMP/apsd-stopped-at"
-        xcrun simctl spawn booted launchctl disable system/com.apple.apsd || true
-        xcrun simctl spawn booted launchctl bootout system/com.apple.apsd 2>/dev/null \
-          || xcrun simctl spawn booted launchctl kill SIGKILL system/com.apple.apsd || true
         echo "apsd log lines in the 20 s before it was stopped: ${before:-0}"
         echo "${before:-0}" > "$RUNNER_TEMP/apsd-before"
 
@@ -240,14 +247,26 @@ runs:
       run: |
         since=$(cat "$RUNNER_TEMP/apsd-stopped-at" 2>/dev/null || true)
         before=$(cat "$RUNNER_TEMP/apsd-before" 2>/dev/null || echo '?')
-        after=$(xcrun simctl spawn booted log show --start "$since" --style compact \
-          --predicate 'process == "apsd"' 2>/dev/null | grep -c 'apsd\[' || true)
-        line="apsd log lines: ${before} in the 20 s before it was stopped, ${after:-0} since (from $since)"
-        echo "$line"
-        echo "$line" >> "$GITHUB_STEP_SUMMARY"
-        scripts/job-note.sh "$JOB_NOTES" apsd "${before} log lines in the 20 s before it was stopped, ${after:-0} since"
-        if [ "${after:-0}" -gt 100 ]; then
-          echo "::warning::apsd is still logging (${after} lines since it was stopped): its reconnect loop may be back."
+        apsd_log() {
+          xcrun simctl spawn booted log show "$@" --style compact \
+            --predicate 'process == "apsd"' 2>/dev/null | grep 'apsd\[' || true
+        }
+        since_lines=$(apsd_log --start "$since")
+        after=$(printf '%s' "$since_lines" | grep -c . || true)
+        # Compact lines start with their time: the last one says when apsd
+        # was last heard from.
+        last=$(printf '%s' "$since_lines" | tail -1 | cut -c1-19)
+        # Whether the loop is back is what it does now, not since the stop.
+        recent=$(apsd_log --last 30s | grep -c . || true)
+        # The simulator's apsd runs from its runtime root; the Mac's own
+        # apsd isn't one of the simulator's and isn't counted.
+        running=$(pgrep -f 'RuntimeRoot/.*/apsd$' | tr '\n' ' ' || true)
+        note="${before} log lines in the 20 s before it was stopped, ${after:-0} since (last at ${last:-none}), ${recent:-0} in the last 30 s; running after the warm-up: ${running:-no}"
+        echo "apsd: $note (stopped at $since)"
+        echo "apsd: $note" >> "$GITHUB_STEP_SUMMARY"
+        scripts/job-note.sh "$JOB_NOTES" apsd "$note"
+        if [ "${recent:-0}" -gt 100 ]; then
+          echo "::warning::apsd is still logging (${recent} lines in the last 30 s): its reconnect loop is back."
         fi
 
     # What's busiest once the setup is done, with each process's path, so

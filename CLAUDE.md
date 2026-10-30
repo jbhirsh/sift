@@ -390,9 +390,10 @@ Makefile                Dev commands (test, lint, typecheck, check)
   run (a failed bundle fails them, rather than skip them as a pass), then run side by side, each setting up through
   `.github/actions/simulator-app` (the app from the cache or the build's
   artifact with the bundle put in, launched once to warm it so the job's
-  own launch isn't its first, Maestro cached by its latest release; apsd,
-  the simulator's push daemon, stopped, as on CI it retries Apple's push
-  servers in a tight loop that slowed every touch; and the machine's load
+  own launch isn't its first, Maestro cached by its latest release;
+  apsd, the simulator's push daemon, stopped in both of its domains, as
+  on CI it retries Apple's push servers in a tight loop that slowed every
+  touch; and the machine's load
   sampled every 10 s into `machine-load.txt` (the busiest processes),
   `machine-memory.txt`, `machine-disk.txt` and `machine-cpu.csv` in the
   job's artifact, `scripts/machine-load.sh`):
