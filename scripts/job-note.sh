@@ -2,8 +2,9 @@
 # Adds a label and its value to a job's notes: a JSON object of labels and
 # values that the job summary (jbhirsh/ci's job-summary, the simulator
 # jobs' last step) shows in its report's Environment section, beside the
-# machine's CPU. .github/actions/simulator-app notes the simulator, the
-# runner image, Xcode, Maestro, the warm-up and apsd as it goes.
+# machine's CPU. .github/actions/simulator-app notes the simulator and
+# its snapshot, the runner image, Xcode, Maestro, the warm-up and apsd as
+# it goes.
 #
 #   scripts/job-note.sh <file> <label> <value>
 #

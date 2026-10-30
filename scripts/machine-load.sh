@@ -1,10 +1,11 @@
 #!/bin/bash
 # Samples the runner's load for the rest of the job, every 10 s, into <dir>:
-#   machine-load.txt    load average, CPU use and the 15 busiest processes
-#                       (macOS top)
+#   machine-load.txt    the 15 busiest processes, each with its path (ps,
+#                       whose %CPU on macOS is a decaying average over about
+#                       a minute)
 #   machine-memory.txt  free, compressed and swapped memory, page-ins and
 #                       page-outs (vm_stat): a machine that's swapping looks
-#                       idle in top
+#                       idle in a process list
 #   machine-disk.txt    each disk's transfers per second and throughput
 #                       (iostat)
 #   machine-cpu.csv     time,load,busy rows (Unix seconds, the 1-minute load
@@ -13,39 +14,47 @@
 # CI's simulator jobs start it first (.github/actions/simulator-app) and
 # upload <dir> with their results, so a slow run says what the machine was
 # busy with. The simulator's own daemons (apsd, SpringBoard, the app) are
-# processes on the Mac, so they show in top too.
+# processes on the Mac, so they show in the list too.
 #
-#   scripts/machine-load.sh <dir>       returns at once; the samplers run on
-#   scripts/machine-load.sh --cpu-row   one machine-cpu.csv row, now
+# No top: on #215 the sampler's own top processes, and sysmond answering
+# them, were the busiest things on the runner after setup (16% and 24% of
+# a core, of 3). ps and iostat read the kernel's counters directly.
+#
+#   scripts/machine-load.sh <dir>            returns at once; the samplers run on
+#   scripts/machine-load.sh --cpu-row [<s>]  one machine-cpu.csv row: the CPU
+#                                            over the next <s> seconds (1)
 #
 # Once started it can't fail the job: a sampler that won't start leaves
 # its error in its file.
 set -uo pipefail
 
-# One row: the 1-minute load average from sysctl ("{ 2.31 2.10 1.98 }"),
-# and the CPU's busy share from top's second sample (its first counts
-# since boot): 100 less the idle share in "CPU usage: 12.5% user, 8.3%
-# sys, 79.2% idle".
+# One row from iostat's second report (its first counts since boot), whose
+# last columns are the CPU's "us sy id" and the load average's "1m 5m 15m",
+# whatever disk columns come before them: busy is 100 less idle. The
+# report covers the given number of seconds (scripts/settle-simulator.sh
+# takes 5, so a moment's spike doesn't decide whether the CPU is quiet).
 cpu_row() {
-  local load idle
-  load=$(sysctl -n vm.loadavg | awk '{ print $2 }')
-  idle=$(top -l 2 -s 1 -n 0 | awk '/^CPU usage/ { v = $7 } END { sub("%", "", v); print v }')
-  [ -n "$load" ] && [ -n "$idle" ] || return 1
-  awk -v t="$(date +%s)" -v l="$load" -v i="$idle" 'BEGIN { printf "%d,%s,%.1f\n", t, l, 100 - i }'
+  local row
+  row=$(iostat -c 2 -w "${1:-1}" | tail -1 | awk '
+    NF >= 6 && $(NF - 3) ~ /^[0-9.]+$/ && $(NF - 2) ~ /^[0-9.]+$/ {
+      printf "%s,%.1f", $(NF - 2), 100 - $(NF - 3)
+    }')
+  [ -n "$row" ] || return 1
+  echo "$(date +%s),$row"
 }
 
 if [ "${1:-}" = --cpu-row ]; then
-  cpu_row
+  cpu_row "${2:-1}"
   exit
 fi
 
 dir="${1:?usage: scripts/machine-load.sh <dir>}"
 mkdir -p "$dir"
-nohup top -l 0 -s 10 -o cpu -n 15 -stats pid,command,cpu,threads,mem \
+nohup bash -c 'while :; do date "+%H:%M:%S"; ps -Aro pcpu,pid,rss,comm | head -16; echo; sleep 10; done' \
   > "$dir/machine-load.txt" 2>&1 &
 nohup vm_stat 10 > "$dir/machine-memory.txt" 2>&1 &
 nohup iostat -w 10 > "$dir/machine-disk.txt" 2>&1 &
-# Each row takes top about a second, so this samples every 10 s or so.
+# Each row takes iostat a second, so this samples every 10 s or so.
 echo 'time,load,busy' > "$dir/machine-cpu.csv"
 nohup bash -c 'while :; do "$0" --cpu-row; sleep 9; done' "$0" \
   >> "$dir/machine-cpu.csv" 2>/dev/null &
