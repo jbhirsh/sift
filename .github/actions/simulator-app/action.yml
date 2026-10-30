@@ -249,3 +249,17 @@ runs:
         if [ "${after:-0}" -gt 100 ]; then
           echo "::warning::apsd is still logging (${after} lines since it was stopped): its reconnect loop may be back."
         fi
+
+    # What's busiest once the setup is done, with each process's path, so
+    # the report says whether a daemon left running is the simulator's or
+    # the Mac's (machine-load.txt has the same list every 10 s, in the
+    # artifact; this puts the one at the end of setup on the report).
+    - name: Note the busiest processes
+      shell: bash
+      continue-on-error: true
+      run: |
+        # The simulator's processes run from its runtime root: "sim:" for short.
+        busy=$(ps -Aro pcpu,comm | sed -n '2,7p' | sed 's#[^ ]*/.*RuntimeRoot#sim:#' \
+          | awk '{ cpu = $1; $1 = ""; sub(/^ /, ""); printf "%s%% %s; ", cpu, $0 }')
+        echo "Busiest after setup: ${busy%; }"
+        scripts/job-note.sh "$JOB_NOTES" "Busiest after setup" "${busy%; }"
