@@ -82,7 +82,7 @@ jobs:
               - '!LICENSE'
               - '!.github/*'
               - '!.github/workflows/!(ci).yml'
-              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh|e2e-env.sh|bundle-js.sh|apply-js-bundle.sh|app-trace.sh|build-a11y-audit.sh|machine-load.sh|job-note.sh)'
+              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh|e2e-env.sh|bundle-js.sh|apply-js-bundle.sh|app-trace.sh|build-a11y-audit.sh|machine-load.sh|job-note.sh|simulator-device.sh|settle-simulator.sh|restore-simulator.sh)'
               - '!stryker.config.json'
               - '!.prettierrc.json'
               - '!.prettierignore'
@@ -354,6 +354,94 @@ jobs:
           name: sift-js-bundle
           path: build/js
           retention-days: 7
+
+  # The settled simulator the three simulator jobs boot from
+  # (.github/actions/simulator-app restores it into its device before
+  # booting), made here when the cache has none for the runner's runtime
+  # and model: a new simulator's first-boot chores (photo and media
+  # analysis, Health, Siri suggestions, indexing) drove the load average to
+  # 384-639 on #215 and timed out the accessibility audit.
+  # scripts/simulator-device.sh names it, for this job and the simulator
+  # jobs alike (sim-settled-<version>-<runtime build>-<model>);
+  # scripts/settle-simulator.sh boots a device no app has run on, waits
+  # until it has settled (10 minutes at least, then until the CPU stays
+  # under 25% for a minute, 20 at most), shuts it down and archives its
+  # data folder. Nothing waits for it: on a miss the simulator jobs boot
+  # fresh as before, and the next run restores what this one saves (a
+  # PR's save only that PR's later runs; main's, every PR's). Not a
+  # required check, and it never fails a run: without a snapshot saved,
+  # the jobs just keep booting fresh. Not on a gifs-only run by hand, nor
+  # a PR that runs no simulator job.
+  simulator-snapshot:
+    name: Settle a simulator snapshot
+    needs: [check]
+    if: ${{ !cancelled() && inputs.gifs_only != true && (needs.check.outputs.code == 'true' || github.event_name != 'pull_request') }}
+    runs-on: macos-26
+    # Booting (about 3 min), settling (20 min at most), archiving and
+    # saving; the settle step's own cap comes first.
+    timeout-minutes: 40
+    continue-on-error: true
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Find the simulator
+        id: device
+        continue-on-error: true
+        run: scripts/simulator-device.sh | tee -a "$GITHUB_OUTPUT"
+
+      - name: Is the snapshot cached?
+        id: cached
+        if: steps.device.outputs.SIM_SNAPSHOT_KEY != ''
+        continue-on-error: true
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/simulator-snapshot
+          key: ${{ steps.device.outputs.SIM_SNAPSHOT_KEY }}
+          lookup-only: true
+
+      - name: Settle a fresh simulator
+        id: settle
+        if: steps.cached.outcome == 'success' && steps.cached.outputs.cache-hit != 'true'
+        timeout-minutes: 32
+        continue-on-error: true
+        env:
+          SIM_DEVICE_TYPE: ${{ steps.device.outputs.SIM_DEVICE_TYPE }}
+          SIM_RUNTIME_ID: ${{ steps.device.outputs.SIM_RUNTIME_ID }}
+        run: scripts/settle-simulator.sh "$HOME/simulator-snapshot"
+
+      - name: Save the snapshot
+        id: save
+        if: steps.settle.outcome == 'success'
+        continue-on-error: true
+        uses: actions/cache/save@v6
+        with:
+          path: ~/simulator-snapshot
+          key: ${{ steps.device.outputs.SIM_SNAPSHOT_KEY }}
+
+      - name: Summary
+        if: ${{ !cancelled() }}
+        env:
+          KEY: ${{ steps.device.outputs.SIM_SNAPSHOT_KEY }}
+          HIT: ${{ steps.cached.outputs.cache-hit }}
+          SETTLE: ${{ steps.settle.outcome }}
+          SAVE: ${{ steps.save.outcome }}
+        run: |
+          if [ -z "$KEY" ]; then
+            line="No snapshot key (no simulator found, or no runtime build): nothing made."
+          elif [ "$HIT" = true ]; then
+            line="$KEY is cached already: nothing to make."
+          elif [ "$SAVE" = success ]; then
+            line="Made and saved $KEY."
+          elif [ "$SETTLE" = success ]; then
+            line="Made $KEY but couldn't save it (another run may have saved it first)."
+          else
+            line="$KEY wasn't made (settle: ${SETTLE:-skipped}); the simulator jobs keep booting fresh."
+          fi
+          echo "$line"
+          echo "$line" >> "$GITHUB_STEP_SUMMARY"
 
   # The three simulator jobs below share their setup (a booted simulator,
   # the native app with the bundle job's JavaScript in it, Maestro) through
