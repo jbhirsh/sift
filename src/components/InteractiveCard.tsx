@@ -21,6 +21,14 @@ import { useTheme } from '../theme/ThemeContext';
 import { useResolvedArtwork } from '../hooks/useResolvedArtwork';
 import { thresholdHaptic } from '../services/haptics';
 import { followTouch, liftTouch, showTouches } from '../services/touchOverlay';
+import { trace, tracing } from '../services/trace';
+import type { TraceData } from '../utils/trace';
+
+// The E2E trace (services/trace) of what the card's pan saw of a touch, so a
+// swipe that decided nothing says whether the pan began, took over, and how
+// far and fast it ended: flow 19 lost a swipe on a starved runner with no
+// line to say which.
+const tracePan = (phase: string, data: TraceData) => trace(`pan-${phase}`, data);
 
 const CARD_ACTIONS = [
   { name: 'keep', label: 'Keep' },
@@ -73,6 +81,12 @@ export default function InteractiveCard({
   const panGesture = Gesture.Pan()
     .minDistance(10)
     .enabled(!disabled)
+    .onBegin((event) => {
+      if (tracing) runOnJS(tracePan)('begin', { x: Math.round(event.absoluteX) });
+    })
+    .onStart((event) => {
+      if (tracing) runOnJS(tracePan)('start', { dx: Math.round(event.translationX) });
+    })
     .onUpdate((event) => {
       // A PR GIF's drawn ring follows the swipe (services/touchOverlay).
       if (showTouches) runOnJS(followTouch)(event.absoluteX, event.absoluteY);
@@ -84,9 +98,17 @@ export default function InteractiveCard({
         runOnJS(thresholdHaptic)();
       }
     })
-    .onEnd((event) => {
+    .onEnd((event, success) => {
       pastThreshold.value = false;
       const decision = swipeDecision(event.translationX, event.velocityX);
+      if (tracing) {
+        runOnJS(tracePan)('end', {
+          dx: Math.round(event.translationX),
+          vx: Math.round(event.velocityX),
+          ok: success,
+          decision: decision ?? 'none',
+        });
+      }
       if (decision) {
         // Left where it is: it flies off from here.
         runOnJS(handleDecide)(decision);
@@ -95,7 +117,8 @@ export default function InteractiveCard({
       dragX.value = withSpring(0, { damping: 12, stiffness: 120 });
       dragY.value = withSpring(0, { damping: 12, stiffness: 120 });
     })
-    .onFinalize((event) => {
+    .onFinalize((event, success) => {
+      if (tracing) runOnJS(tracePan)('finalize', { ok: success });
       if (showTouches) runOnJS(liftTouch)(event.absoluteX, event.absoluteY);
     });
 

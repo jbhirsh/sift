@@ -69,7 +69,7 @@ jobs:
       # and tooling that can't change the app or this job: other
       # workflows (ci.yml is this job), CI
       # helpers, and scripts/ apart from the simulator jobs' runners (suite,
-      # audit, screenshots, GIFs).
+      # audit, screenshots, GIFs) and what builds the app and its bundle.
       - uses: dorny/paths-filter@v4
         id: filter
         with:
@@ -82,7 +82,7 @@ jobs:
               - '!LICENSE'
               - '!.github/*'
               - '!.github/workflows/!(ci).yml'
-              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh|app-trace.sh|build-a11y-audit.sh|machine-load.sh|job-note.sh)'
+              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh|e2e-env.sh|bundle-js.sh|apply-js-bundle.sh|app-trace.sh|build-a11y-audit.sh|machine-load.sh|job-note.sh|simulator-device.sh|settle-simulator.sh|restore-simulator.sh)'
               - '!stryker.config.json'
               - '!.prettierrc.json'
               - '!.prettierignore'
@@ -99,23 +99,29 @@ jobs:
 
       - run: npm ci
 
-      # The app's cache key, worked out here where node_modules already is,
-      # so the simulator jobs install nothing to look their app up. The
-      # native fingerprint, plus the bundle's inputs: src/, the entry point,
-      # the Metro config, the lockfile (a JavaScript-only package isn't in
-      # the native fingerprint, and a bump of one must rebuild, not test
-      # main's old bundle), .env (its EXPO_UNSTABLE_* flags change the
-      # bundle) and the bundled assets. Tests and Maestro flows aren't in the
-      # app, so a test-only change mustn't force a rebuild. Ubuntu's hash
-      # needn't match a Mac's: this job makes the key both where the app is
-      # saved and where it's looked up.
+      # The native app's cache key, worked out here where node_modules
+      # already is, so the simulator jobs install nothing to look their app
+      # up: the native fingerprint, and the recipe that builds the app from
+      # it (the build scripts, and the build job with this file's env and
+      # defaults, as data: comments and other jobs don't count). A change
+      # to either misses the cache, so the build job builds and saves it
+      # and every simulator job, on the PR and on main after it, tests the
+      # app it makes. The JavaScript isn't in it: the bundle job bundles it
+      # for every PR and the simulator jobs put it into the cached app
+      # (scripts/apply-js-bundle.sh), so a JavaScript-only change doesn't
+      # rebuild the app. Ubuntu's hash needn't match a Mac's: this job makes
+      # the key both where the app is saved and where it's looked up. (yq is
+      # mikefarah's, on GitHub's Ubuntu images.)
       - name: App cache key
         id: app-key
         run: |
           NATIVE=$(npx expo-updates fingerprint:generate --platform ios 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['hash'])")
-          SOURCE=$( (find src -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \) -print0; find assets -type f -print0; printf '%s\0' index.ts metro.config.js package-lock.json .env) | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
-          echo "key=sift-e2e-${NATIVE}-${SOURCE}" >> "$GITHUB_OUTPUT"
-          echo "App cache key: sift-e2e-${NATIVE}-${SOURCE}"
+          RECIPE=$({
+            cat scripts/build-simulator-app.sh scripts/e2e-env.sh
+            yq -o=json '{"env": .env, "defaults": .defaults, "build": .jobs.build}' .github/workflows/ci.yml
+          } | sha256sum | cut -c1-16)
+          echo "key=sift-e2e-native-${NATIVE}-build-${RECIPE}" >> "$GITHUB_OUTPUT"
+          echo "App cache key: sift-e2e-native-${NATIVE}-build-${RECIPE}"
 
       # Whether the app is cached already, which decides whether the build
       # job builds. Linux and macOS file caches under the same version
@@ -193,6 +199,9 @@ jobs:
   # for those. A step of its own job, not a trigger-level paths filter: a
   # filtered-out workflow never reports, which would leave the required
   # build check hanging at "Expected"; a job skipped by its `if:` passes it.
+  # ci.yml isn't one: the part of it that builds the app is in the app's
+  # cache key (the check job), so a change to that part misses the cache
+  # and builds, and a change elsewhere in it builds nothing.
   changes:
     name: Detect native changes
     if: github.event_name == 'pull_request'
@@ -214,15 +223,17 @@ jobs:
               - 'eas.json'
               - 'package.json'
               - 'package-lock.json'
-              - '.github/workflows/ci.yml'
               - 'scripts/build-simulator-app.sh'
+              - 'scripts/e2e-env.sh'
 
   # The only job that builds the app. It's the compile gate for the native
   # code (lint, typecheck and Jest never touch the Swift in
   # modules/expo-musickit, so this is the only check that proves it still
   # compiles; free on a public repo's macOS runners), so it builds whenever
-  # a PR changes native files, and otherwise whenever the app isn't cached
-  # (a JavaScript change; on main, so PRs can restore it). It saves the app
+  # a PR changes native files, and otherwise whenever the native app isn't
+  # cached (a new fingerprint; on main, so PRs can restore it). A
+  # JavaScript-only change doesn't build: the bundle job's JavaScript goes
+  # into the cached app instead. It saves the app
   # to the cache and as an artifact. The simulator jobs `needs:` this one,
   # so while it builds they wait, not started, and then they only restore.
   build:
@@ -314,11 +325,130 @@ jobs:
         uses: ./.github/actions/a11y-audit-bundle
         continue-on-error: true
 
+  # This commit's JavaScript, bundled as the app's Xcode build would
+  # (scripts/bundle-js.sh) in about a minute on Linux, beside the check job.
+  # Every simulator job puts it into the native app (scripts/apply-js-bundle.sh),
+  # cached or just built, so the app they test always runs this commit's
+  # JavaScript, and a JavaScript-only change never waits for a native build.
+  bundle:
+    name: Bundle the app's JavaScript
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: scripts/bundle-js.sh build/js
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sift-js-bundle
+          path: build/js
+          retention-days: 7
+
+  # The settled simulator the three simulator jobs boot from
+  # (.github/actions/simulator-app restores it into its device before
+  # booting), made here when the cache has none for the runner's runtime
+  # and model: a new simulator's first-boot chores (photo and media
+  # analysis, Health, Siri suggestions, indexing) drove the load average to
+  # 384-639 on #215 and timed out the accessibility audit.
+  # scripts/simulator-device.sh names it, for this job and the simulator
+  # jobs alike (sim-settled-<version>-<runtime build>-<model>);
+  # scripts/settle-simulator.sh boots a device no app has run on, waits
+  # until it has settled (10 minutes at least, then until the CPU stays
+  # under 25% for a minute, 20 at most), shuts it down and archives its
+  # data folder. Nothing waits for it: on a miss the simulator jobs boot
+  # fresh as before, and the next run restores what this one saves (a
+  # PR's save only that PR's later runs; main's, every PR's). Not a
+  # required check, and it never fails a run: without a snapshot saved,
+  # the jobs just keep booting fresh. Not on a gifs-only run by hand, nor
+  # a PR that runs no simulator job.
+  simulator-snapshot:
+    name: Settle a simulator snapshot
+    needs: [check]
+    if: ${{ !cancelled() && inputs.gifs_only != true && (needs.check.outputs.code == 'true' || github.event_name != 'pull_request') }}
+    runs-on: macos-26
+    # Booting (about 3 min), settling (20 min at most), archiving and
+    # saving; the settle step's own cap comes first.
+    timeout-minutes: 40
+    continue-on-error: true
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Find the simulator
+        id: device
+        continue-on-error: true
+        run: scripts/simulator-device.sh | tee -a "$GITHUB_OUTPUT"
+
+      - name: Is the snapshot cached?
+        id: cached
+        if: steps.device.outputs.SIM_SNAPSHOT_KEY != ''
+        continue-on-error: true
+        uses: actions/cache/restore@v6
+        with:
+          path: ~/simulator-snapshot
+          key: ${{ steps.device.outputs.SIM_SNAPSHOT_KEY }}
+          lookup-only: true
+
+      - name: Settle a fresh simulator
+        id: settle
+        if: steps.cached.outcome == 'success' && steps.cached.outputs.cache-hit != 'true'
+        timeout-minutes: 32
+        continue-on-error: true
+        env:
+          SIM_DEVICE_TYPE: ${{ steps.device.outputs.SIM_DEVICE_TYPE }}
+          SIM_RUNTIME_ID: ${{ steps.device.outputs.SIM_RUNTIME_ID }}
+        run: scripts/settle-simulator.sh "$HOME/simulator-snapshot"
+
+      - name: Save the snapshot
+        id: save
+        if: steps.settle.outcome == 'success'
+        continue-on-error: true
+        uses: actions/cache/save@v6
+        with:
+          path: ~/simulator-snapshot
+          key: ${{ steps.device.outputs.SIM_SNAPSHOT_KEY }}
+
+      - name: Summary
+        if: ${{ !cancelled() }}
+        env:
+          KEY: ${{ steps.device.outputs.SIM_SNAPSHOT_KEY }}
+          HIT: ${{ steps.cached.outputs.cache-hit }}
+          SETTLE: ${{ steps.settle.outcome }}
+          SAVE: ${{ steps.save.outcome }}
+        run: |
+          if [ -z "$KEY" ]; then
+            line="No snapshot key (no simulator found, or no runtime build): nothing made."
+          elif [ "$HIT" = true ]; then
+            line="$KEY is cached already: nothing to make."
+          elif [ "$SAVE" = success ]; then
+            line="Made and saved $KEY."
+          elif [ "$SETTLE" = success ]; then
+            line="Made $KEY but couldn't save it (another run may have saved it first)."
+          else
+            line="$KEY wasn't made (settle: ${SETTLE:-skipped}); the simulator jobs keep booting fresh."
+          fi
+          echo "$line"
+          echo "$line" >> "$GITHUB_STEP_SUMMARY"
+
   # The three simulator jobs below share their setup (a booted simulator,
-  # the app from the build job, Maestro) through .github/actions/simulator-app
-  # and run side by side once the app exists: the suite here, the
-  # accessibility audit, and the screenshots and GIFs. Each `needs:` the
-  # build job, so while it builds they wait, not started. `!cancelled()`
+  # the native app with the bundle job's JavaScript in it, Maestro) through
+  # .github/actions/simulator-app and run side by side once both exist: the
+  # suite here, the accessibility audit, and the screenshots and GIFs. Each
+  # `needs:` the build and bundle jobs, so while they run they wait, not
+  # started. `!cancelled()`
   # because `build` is skipped on most PRs, which would otherwise skip them;
   # a failed build leaves no app to test. They skip docs- and tooling-only
   # PRs (the `code` filter in `check`; a skipped job counts as passing) and
@@ -329,7 +459,7 @@ jobs:
   # expo-modules-core).
   e2e:
     name: E2E Tests (Maestro)
-    needs: [check, build]
+    needs: [check, build, bundle]
     if: ${{ !cancelled() && needs.check.result == 'success' && needs.build.result != 'failure' && github.event_name != 'push' && inputs.gifs_only != true && (needs.check.outputs.code == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: macos-26
     # About 5 min of setup + the Maestro step's 40-min cap + the trace and
@@ -445,8 +575,7 @@ jobs:
 
       # The job's summary and report (jbhirsh/ci's job-summary): its steps,
       # flows (re-runs included) and the machine's CPU beside its recent
-      # runs, published on the repository's Pages by job-reports.yml once
-      # the run finishes.
+      # runs, published on the repository's Pages by the reports job.
       - name: Job summary
         if: ${{ !cancelled() }}
         uses: jbhirsh/ci/job-summary@main
@@ -461,7 +590,7 @@ jobs:
   # it finds, where the screenshots and GIFs only make pictures.
   a11y:
     name: Accessibility audit
-    needs: [check, build]
+    needs: [check, build, bundle]
     if: ${{ !cancelled() && needs.check.result == 'success' && needs.build.result != 'failure' && github.event_name != 'push' && inputs.gifs_only != true && (needs.check.outputs.code == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: macos-26
     # About 5 min of setup, the audit bundle (restored, or about 5 min to
@@ -516,7 +645,7 @@ jobs:
 
       # The job's summary and report (jbhirsh/ci's job-summary): its steps
       # and the machine's CPU beside its recent runs, published on the
-      # repository's Pages by job-reports.yml once the run finishes.
+      # repository's Pages by the reports job.
       - name: Job summary
         if: ${{ !cancelled() }}
         uses: jbhirsh/ci/job-summary@main
@@ -532,7 +661,7 @@ jobs:
   # a gifs-only run by hand records only these).
   pictures:
     name: Screenshots and GIFs
-    needs: [check, build]
+    needs: [check, build, bundle]
     if: ${{ !cancelled() && needs.check.result == 'success' && needs.build.result != 'failure' && github.event_name != 'push' && (needs.check.outputs.code == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: macos-26
     # About 5 min of setup + the screenshots' 10-min cap + the GIFs' 10.
@@ -641,7 +770,7 @@ jobs:
 
       # The job's summary and report (jbhirsh/ci's job-summary): its steps
       # and the machine's CPU beside its recent runs, published on the
-      # repository's Pages by job-reports.yml once the run finishes.
+      # repository's Pages by the reports job.
       - name: Job summary
         if: ${{ !cancelled() }}
         uses: jbhirsh/ci/job-summary@main
@@ -687,3 +816,19 @@ jobs:
       - uses: jbhirsh/ci/visual-baselines/compare@main
         with:
           fresh: screenshots
+
+  # Publishes this run's job reports to the repository's Pages and keeps
+  # one comment on the PR with every simulator job's summary (jbhirsh/ci's
+  # job-reports.yml), once those jobs are done, failed or not. As part of
+  # the run, it runs from the PR's own branch, so a change to it shows on
+  # the PR that makes it (a workflow_run caller runs only from main). Not a
+  # required check; it never fails a run for a report. When the simulator
+  # jobs skip (a docs-only PR, a push to main), it finds nothing to report.
+  reports:
+    needs: [e2e, a11y, pictures]
+    if: ${{ !cancelled() && inputs.gifs_only != true }}
+    permissions:
+      contents: write
+      actions: read
+      pull-requests: write
+    uses: jbhirsh/ci/.github/workflows/job-reports.yml@main
