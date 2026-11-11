@@ -20,6 +20,12 @@ import {
 } from '../../src/services/ReviewedLedgerStore';
 import { Track } from '../../src/types';
 
+// React Native's index loads each component the first time it's read, and
+// TouchableOpacity brings Animated and the rest with it: read here, that
+// loading happens once as the file loads, not inside the first test's
+// 5-second timeout, where a busy machine made it run out.
+void [Text, TouchableOpacity];
+
 // Mock Sentry
 jest.mock('@sentry/react-native', () => ({
   setTag: jest.fn(),
