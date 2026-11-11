@@ -1,5 +1,5 @@
 {
-  "$comment": "Every Swift file and every function of the native module, with the one thing it asks MusicKit, ShazamKit or the player. Checked by scripts/check-native-bridge.mjs (CI, pre-commit). Adding an entry means adding native code, which needs a reinstall: put decisions in TypeScript (src/utils/musicKit.ts, AppleMusicProvider) instead. Budgets: raise one only with a reason in the PR.",
+  "$comment": "Every Swift file and every function of the native module, with the one thing it asks MusicKit, ShazamKit or the player. Checked by scripts/check-native-bridge.ts (CI, pre-commit). Adding an entry means adding native code, which needs a reinstall: put decisions in TypeScript (src/utils/musicKit.ts, AppleMusicProvider) instead. Budgets: raise one only with a reason in the PR.",
   "maxFunctionLines": 40,
   "maxFileLines": 560,
   "files": {

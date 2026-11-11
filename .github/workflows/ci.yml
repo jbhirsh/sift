@@ -177,7 +177,7 @@ jobs:
       - name: Native bridge
         # Keeps modules/expo-musickit thin: every native function is listed
         # in native-api.json, Swift and TypeScript surfaces match, and size
-        # budgets hold (scripts/nativeBridge.ts).
+        # budgets hold (scripts/check-native-bridge.ts).
         run: npm run bridge
 
       - name: Test with coverage

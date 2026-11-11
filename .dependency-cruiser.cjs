@@ -29,6 +29,14 @@
 module.exports = {
   forbidden: [
     {
+      name: 'app-has-no-node',
+      severity: 'error',
+      comment:
+        "The app runs in Hermes on a phone, which has none of Node's modules; only scripts/ and the tests run in Node. The tsconfig loads Node's types for those, so this rule, not the type-check, keeps them out of src/.",
+      from: { path: '^src/' },
+      to: { dependencyTypes: ['core'] },
+    },
+    {
       name: 'no-circular',
       severity: 'error',
       comment:

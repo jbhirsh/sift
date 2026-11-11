@@ -4,13 +4,8 @@
 // Jest's own setup is part of it, so every local file jest.config.js loads,
 // and the custom Jest runner Stryker uses, must be listed.
 
-// The app's tsconfig loads no Node types, so type the calls used here.
-const { readFileSync } = jest.requireActual<{
-  readFileSync: (path: string, encoding: 'utf8') => string;
-}>('fs');
-const { matchesGlob } = jest.requireActual<{
-  matchesGlob: (path: string, glob: string) => boolean;
-}>('path');
+import { readFileSync } from 'node:fs';
+import { matchesGlob } from 'node:path';
 
 function isStrings(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string');

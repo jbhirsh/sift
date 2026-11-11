@@ -1,14 +1,16 @@
 import {
   checkNativeBridge,
+  parseAllowlist,
   parseSwiftFunctions,
   parseWrapperExports,
+  main,
+  runNativeBridgeCheck,
   type BridgeAllowlist,
-} from '../../scripts/nativeBridge';
-
-// The app's tsconfig loads no Node types, so type the one fs call used here.
-const { readFileSync } = jest.requireActual<{
-  readFileSync: (path: string, encoding: 'utf8') => string;
-}>('fs');
+} from '../../scripts/check-native-bridge';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const swift = (body: string) =>
   `public class M: Module {\n  public func definition() -> ModuleDefinition {\n${body}\n  }\n}\n`;
@@ -217,22 +219,118 @@ describe('checkNativeBridge', () => {
       checkNativeBridge({ swiftFiles: files(twice), wrapper, allowlist: allow({ seek: 'x' }) }),
     ).toEqual(['seek is declared twice in the Swift module (line 4).']);
   });
+});
 
-  test('the real module passes', () => {
-    const { readdirSync } = jest.requireActual<{ readdirSync: (path: string) => string[] }>('fs');
-    const dir = 'modules/expo-musickit/ios';
-    const swiftFiles = Object.fromEntries(
-      readdirSync(dir)
-        .filter((name) => name.endsWith('.swift'))
-        .map((name) => [name, readFileSync(`${dir}/${name}`, 'utf8')]),
-    );
-    expect(Object.keys(swiftFiles)).toContain('ExpoMusicKitModule.swift');
+describe('runNativeBridgeCheck', () => {
+  const IOS = 'modules/expo-musickit/ios';
+  const ok = swift('    Function("seek") { }');
+  const allowlistText = JSON.stringify({ $comment: 'x', ...allow({ seek: 'Seeks.' }) });
+
+  /** A checkout holding these files (paths from its root). */
+  const checkout = (tree: Record<string, string>) => ({
+    read: (path: string) => {
+      const text = tree[path];
+      if (text === undefined) throw new Error(`no ${path}`);
+      return text;
+    },
+    list: (dir: string) =>
+      Object.keys(tree)
+        .filter((path) => path.startsWith(`${dir}/`))
+        .map((path) => path.slice(dir.length + 1)),
+  });
+
+  test('reads only the Swift files of the module, and passes', () => {
+    const io = checkout({
+      [`${IOS}/M.swift`]: ok,
+      [`${IOS}/Info.plist`]: 'not swift',
+      'modules/expo-musickit/src/index.ts': 'export function seek() {}\n',
+      'modules/expo-musickit/native-api.json': allowlistText,
+    });
+    expect(runNativeBridgeCheck(io)).toEqual({ lines: ['Native bridge: ok.'], ok: true });
+  });
+
+  test('prints each problem under a count, and fails', () => {
+    const io = checkout({
+      [`${IOS}/M.swift`]: ok,
+      'modules/expo-musickit/src/index.ts':
+        'export function seek() {}\nexport function pause() {}\n',
+      'modules/expo-musickit/native-api.json': JSON.stringify(
+        allow({ seek: 'Seeks.', play: 'Plays.' }),
+      ),
+    });
+    expect(runNativeBridgeCheck(io)).toEqual({
+      lines: [
+        'Native bridge: 2 problem(s)',
+        "  - native-api.json lists play, which the Swift module doesn't declare.",
+        "  - index.ts exports pause, which the Swift module doesn't declare.",
+      ],
+      ok: false,
+    });
+  });
+});
+
+describe('main', () => {
+  let written: string[];
+  beforeEach(() => {
+    written = [];
+    jest.spyOn(process.stdout, 'write').mockImplementation((text) => {
+      written.push(String(text));
+      return true;
+    });
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    process.exitCode = undefined;
+  });
+
+  test('passes on this checkout, leaving the exit code alone', () => {
+    main();
+    expect(written).toEqual(['Native bridge: ok.\n']);
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  test('reports each problem and exits 1 on a checkout that fails', () => {
+    const root = mkdtempSync(join(tmpdir(), 'bridge-'));
+    try {
+      cpSync('modules/expo-musickit', join(root, 'modules/expo-musickit'), { recursive: true });
+      const wrapper = join(root, 'modules/expo-musickit/src/index.ts');
+      writeFileSync(wrapper, `${readFileSync(wrapper, 'utf8')}\nexport function extra() {}\n`);
+      main(pathToFileURL(`${root}/`));
+      expect(written).toEqual([
+        'Native bridge: 1 problem(s)\n',
+        "  - index.ts exports extra, which the Swift module doesn't declare.\n",
+      ]);
+      expect(process.exitCode).toBe(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('parseAllowlist', () => {
+  test('keeps the four settings and drops the rest', () => {
     expect(
-      checkNativeBridge({
-        swiftFiles,
-        wrapper: readFileSync('modules/expo-musickit/src/index.ts', 'utf8'),
-        allowlist: JSON.parse(readFileSync('modules/expo-musickit/native-api.json', 'utf8')),
-      }),
-    ).toEqual([]);
+      parseAllowlist(JSON.stringify({ $comment: 'why', ...allow({ seek: 'Seeks.' }) })),
+    ).toEqual(allow({ seek: 'Seeks.' }));
+  });
+
+  test.each([
+    ['a list', '[]'],
+    ['null', 'null'],
+    ['a budget that is text', JSON.stringify({ ...allow({}), maxFunctionLines: '40' })],
+    ['a missing file budget', JSON.stringify({ ...allow({}), maxFileLines: undefined })],
+    ['files as a list', JSON.stringify({ ...allow({}), files: ['M.swift'] })],
+    [
+      'a function described by a number',
+      JSON.stringify(allow({ seek: 'x', play: 3 as unknown as string })),
+    ],
+  ])('throws, naming the file, on %s', (_what, text) => {
+    expect(() => parseAllowlist(text)).toThrow('modules/expo-musickit/native-api.json must hold');
+  });
+
+  test('throws, naming the file, on text that is not JSON', () => {
+    expect(() => parseAllowlist('{"maxFunctionLines": 40,')).toThrow(
+      'modules/expo-musickit/native-api.json is not JSON: SyntaxError',
+    );
   });
 });

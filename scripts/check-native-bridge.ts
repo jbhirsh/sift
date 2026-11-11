@@ -1,11 +1,17 @@
-// Rules for the "Native bridge" check (scripts/check-native-bridge.mjs). The
-// expo-musickit module is a thin bridge: each native function asks MusicKit,
-// ShazamKit or the player one thing, and every decision lives in TypeScript
-// so it ships with an EAS Update (CLAUDE.md). This check can't tell a
-// primitive from a policy, but it makes native growth impossible to miss:
-// a new native function needs an allowlist entry saying what it asks, the
-// Swift and TypeScript surfaces must match, and functions and the file stay
-// under a size budget.
+// `node scripts/check-native-bridge.ts` (npm run bridge): the "Native
+// bridge" check, run in CI (Lint, Typecheck & Unit Test) and the pre-commit
+// hook. The expo-musickit module is a thin bridge: each native function asks
+// MusicKit, ShazamKit or the player one thing, and every decision lives in
+// TypeScript so it ships with an EAS Update (CLAUDE.md). This check can't
+// tell a primitive from a policy, but it makes native growth impossible to
+// miss: a new native function needs an allowlist entry saying what it asks,
+// the Swift and TypeScript surfaces must match, and functions and the file
+// stay under a size budget.
+//
+// Node runs this file as it is (it strips the types), and the command line
+// is main(), run only when Node runs the file (import.meta.main), so Jest
+// imports and tests all of it.
+import { readdirSync, readFileSync } from 'node:fs';
 
 export interface BridgeAllowlist {
   /** Longest a native function body may be, in lines. */
@@ -171,3 +177,82 @@ export function checkNativeBridge(input: {
   }
   return problems;
 }
+
+const IOS_DIR = 'modules/expo-musickit/ios';
+const WRAPPER = 'modules/expo-musickit/src/index.ts';
+const ALLOWLIST = 'modules/expo-musickit/native-api.json';
+
+/**
+ * The check over the module as it is in this checkout, for the command
+ * line: reads its Swift files, the TypeScript wrapper and native-api.json
+ * through `io` (paths from the repo's root; `list` gives a folder's file
+ * names) and says what to print, and whether it passed.
+ */
+export function runNativeBridgeCheck(io: {
+  read: (path: string) => string;
+  list: (dir: string) => string[];
+}): { lines: string[]; ok: boolean } {
+  const swiftFiles = Object.fromEntries(
+    io
+      .list(IOS_DIR)
+      .filter((name) => name.endsWith('.swift'))
+      .map((name) => [name, io.read(`${IOS_DIR}/${name}`)]),
+  );
+  const problems = checkNativeBridge({
+    swiftFiles,
+    wrapper: io.read(WRAPPER),
+    allowlist: parseAllowlist(io.read(ALLOWLIST)),
+  });
+  if (problems.length === 0) return { lines: ['Native bridge: ok.'], ok: true };
+  return {
+    lines: [`Native bridge: ${problems.length} problem(s)`, ...problems.map((p) => `  - ${p}`)],
+    ok: false,
+  };
+}
+
+/** native-api.json read back; throws, naming the file, when it isn't JSON of that shape. */
+export function parseAllowlist(text: string): BridgeAllowlist {
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch (error) {
+    throw new Error(`${ALLOWLIST} is not JSON: ${String(error)}`, { cause: error });
+  }
+  if (
+    isRecord(value) &&
+    typeof value.maxFunctionLines === 'number' &&
+    typeof value.maxFileLines === 'number' &&
+    isStringRecord(value.files) &&
+    isStringRecord(value.functions)
+  ) {
+    const { maxFunctionLines, maxFileLines, files, functions } = value;
+    return { maxFunctionLines, maxFileLines, files, functions };
+  }
+  throw new Error(
+    `${ALLOWLIST} must hold maxFunctionLines and maxFileLines (numbers) and files and functions (text by name).`,
+  );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return isRecord(value) && Object.values(value).every((v) => typeof v === 'string');
+}
+
+/**
+ * The command line: the check over the checkout `root` (this one by
+ * default), its report on stdout, and exit code 1 when it fails.
+ */
+export function main(root: URL = new URL('../', import.meta.url)): void {
+  const at = (path: string) => new URL(path, root);
+  const { lines, ok } = runNativeBridgeCheck({
+    read: (path) => readFileSync(at(path), 'utf8'),
+    list: (dir) => readdirSync(at(dir)),
+  });
+  for (const line of lines) process.stdout.write(`${line}\n`);
+  if (!ok) process.exitCode = 1;
+}
+
+if (import.meta.main) main();

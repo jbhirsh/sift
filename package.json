@@ -15,7 +15,7 @@
     "typecov": "node --max-old-space-size=6144 node_modules/type-coverage/bin/type-coverage",
     "typecov:strict": "node --max-old-space-size=6144 node_modules/type-coverage/bin/type-coverage --strict --at-least 0",
     "depcruise": "depcruise src",
-    "bridge": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-bridge.mjs",
+    "bridge": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-native-bridge.ts",
     "check": "npm run lint && npm run format:check && npm run typecheck && npm run typecov && npm run depcruise && npm run bridge && npm run test:coverage",
     "prepare": "git config core.hooksPath .githooks || true"
   },
@@ -57,6 +57,7 @@
     "@stryker-mutator/jest-runner": "^10.1.1",
     "@testing-library/react-native": "^14.1.0",
     "@types/jest": "^30.0.0",
+    "@types/node": "^24.19.2",
     "@types/react": "~19.3.0",
     "@typescript/native": "npm:typescript@^7.0.2",
     "dependency-cruiser": "^18.7.2",
