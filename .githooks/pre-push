@@ -5,7 +5,7 @@
 # only build is the native iOS build, which runs in its own macOS CI job.
 #
 # No-op in CI (see pre-commit), and for a push of only the `screenshots`
-# branch: PR pictures (scripts/pr-gifs.mjs), no code to test.
+# branch: PR pictures (scripts/pr-gifs.ts), no code to test.
 [ -n "$CI" ] && exit 0
 
 pictures_only=

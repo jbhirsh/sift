@@ -617,7 +617,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
     gesture handler owns (the card swipe, the seek bar) feeds the trail
     from its own pan (`followTouch`), since React Native's touch is
     cancelled once the pan takes over. Then
-    `node scripts/pr-gifs.mjs <pr>` (jbhirsh/ci's `gif` tool, set up by the
+    `npm run pr-gifs -- <pr>` (jbhirsh/ci's `gif` tool, set up by the
     `gif` key of `.github/ci.json`) does the rest:
     1. It waits for the PR's run.
     2. It runs CI by hand on `main` with `gifs_only` and the PR's
