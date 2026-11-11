@@ -7,7 +7,7 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      # For a PR's "before" GIFs (scripts/pr-gifs.mjs): run on main with
+      # For a PR's "before" GIFs (scripts/pr-gifs.ts): run on main with
       # the PR's scenarios, recording only.
       gifs_only:
         description: Only record the GIF scenarios (no suite, audit or screenshots)
@@ -22,7 +22,7 @@ on:
         type: boolean
         default: false
 
-# A gifs-only run by hand (a PR's "before" GIFs, scripts/pr-gifs.mjs) gets
+# A gifs-only run by hand (a PR's "before" GIFs, scripts/pr-gifs.ts) gets
 # a group of its own: sharing main's, it would cancel main's push run (which
 # saves the app cache PRs reuse), be cancelled by the next merge, and cancel
 # another PR's GIF run.
@@ -535,7 +535,7 @@ jobs:
   # Pictures, not a gate itself: the screenshots for PR descriptions, the
   # README (readme-screenshots.yml takes this run's ios-screenshots artifact)
   # and the Visual regression job below, which compares them, and
-  # the GIF scenarios' videos (scripts/pr-gifs.mjs takes ios-gif-videos;
+  # the GIF scenarios' videos (scripts/pr-gifs.ts takes ios-gif-videos;
   # a gifs-only run by hand records only these).
   pictures:
     name: Screenshots and GIFs
@@ -594,7 +594,7 @@ jobs:
 
       # The GIF scenarios in e2e/gifs, recorded on the Simulator with the
       # touches drawn (components/TouchOverlay), as videos that
-      # scripts/pr-gifs.mjs turns into a PR's before/after GIFs. A run by
+      # scripts/pr-gifs.ts turns into a PR's before/after GIFs. A run by
       # hand on main can record another commit's scenarios (the PR's), for
       # its "before". It never fails the job.
       - name: Fetch the GIF scenarios to record

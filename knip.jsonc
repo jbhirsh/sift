@@ -1,7 +1,5 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  // Command-line tools run by hand or by workflows, not imported by anything.
-  "entry": ["scripts/*.mjs"],
   // Autolinked as a native module (package.json "expo.autolinking"), and
   // loaded with require() by path, never imported by its package name.
   // expo-system-ui: Expo needs it for app.json's userInterfaceStyle on

@@ -1,7 +1,7 @@
 appId: com.jessicahirsh.sift
 name: "GIF: swipe to keep, skip, undo"
 ---
-# A PR GIF (scripts/take-gifs.sh, scripts/pr-gifs.mjs). Not a test: it
+# A PR GIF (scripts/take-gifs.sh, scripts/pr-gifs.ts). Not a test: it
 # waits only as much as it needs to reach the next step. No fixed pause
 # between steps: playback's clock keeps the screen moving, so a
 # waitForAnimationToEnd always runs its whole timeout, and Maestro finding
