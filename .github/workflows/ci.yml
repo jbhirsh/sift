@@ -154,13 +154,20 @@ jobs:
         run: npm run typecheck
 
       # No `any` anywhere in the app code (src, the native module's
-      # TypeScript, scripts/*.ts: tsconfig.typecov.json): type-coverage must
-      # find every expression typed (package.json "typeCoverage"). Its strict
-      # figure, which also counts `as` casts, non-null assertions and `any`
-      # inside generics, goes in the summary for information only.
+      # TypeScript, scripts/*.ts: tsconfig.typecov.json; not the tests, whose
+      # mocks are `any` by nature): type-coverage must find every expression
+      # typed (package.json "typeCoverage"), including the ones TypeScript
+      # infers silently, such as an array narrowed by Array.isArray. A catch
+      # variable isn't counted (ignoreCatch), but strict TypeScript types it
+      # unknown, so it's narrowed all the same. Its strict figure, which also
+      # counts `as` casts, non-null assertions and `any` inside generics, goes
+      # in the summary for information only.
       - name: Type coverage
         run: |
-          npm run -s typecov
+          npm run -s typecov || {
+            echo "::error title=Type coverage::An expression is typed any. Give it its type where it enters: const x: unknown = JSON.parse(...) (or a response.json() or require() result), then narrow it; a process.env key goes in src/types/env.d.ts. npm run typecov lists each one."
+            exit 1
+          }
           strict=$(npm run -s typecov:strict | grep -o '[0-9.]*%' | tail -1)
           echo "Strict type coverage (information only): $strict" | tee -a "$GITHUB_STEP_SUMMARY"
 

@@ -5,6 +5,31 @@ import eslintComments from '@eslint-community/eslint-plugin-eslint-comments';
 import jsdoc from 'eslint-plugin-jsdoc';
 import prettier from 'eslint-config-prettier/flat';
 
+// Fails a type-coverage ignore comment, saying how to type the value instead.
+const noTypeCoverageIgnore = {
+  meta: {
+    type: 'problem',
+    schema: [],
+    messages: {
+      ignore:
+        'type-coverage ignore comments are not allowed: give the value its type where it enters ' +
+        '(const x: unknown = JSON.parse(...), then narrow it; a process.env key goes in ' +
+        'src/types/env.d.ts).',
+    },
+  },
+  create(context) {
+    return {
+      Program() {
+        for (const comment of context.sourceCode.getAllComments()) {
+          if (/type-coverage:ignore/i.test(comment.value)) {
+            context.report({ loc: comment.loc, messageId: 'ignore' });
+          }
+        }
+      },
+    };
+  },
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -48,6 +73,17 @@ export default tseslint.config(
       // @typescript-eslint/ban-ts-comment via tseslint's strict config.
       '@eslint-community/eslint-comments/no-use': 'error',
     },
+  },
+  {
+    // type-coverage counts every `any` (npm run typecov, at 100%), and its
+    // ignore comments would hide one where no review sees it. It checks only
+    // .ts and .tsx files (tsconfig.typecov.json) and skips none of them; a
+    // file it had to skip (generated code only) would go in package.json's
+    // typeCoverage.ignoreFiles, with its reason beside it in
+    // "//typeCoverage", as each pin's is in "//pins".
+    files: ['**/*.{ts,tsx}'],
+    plugins: { local: { rules: { 'no-type-coverage-ignore': noTypeCoverageIgnore } } },
+    rules: { 'local/no-type-coverage-ignore': 'error' },
   },
   {
     // CLAUDE.md: icons come from expo-symbols (SF Symbols) with
