@@ -26,22 +26,30 @@ module.exports = {
     '<rootDir>/\\.stryker-tmp/',
   ],
   modulePathIgnorePatterns: ['<rootDir>/\\.stryker-tmp/'],
+  // Every source file Jest can load, whether a test imports it or not: one
+  // no test reaches counts as 0% and fails the per-file gate below, rather
+  // than going unmeasured.
   collectCoverageFrom: [
+    'index.ts',
     'src/**/*.{ts,tsx}',
-    // The logic behind the scripts' CLIs (the native bridge check, …).
+    // The TypeScript side of the native module (the Swift is the bridge
+    // check's job).
+    'modules/expo-musickit/src/**/*.ts',
+    // The scripts: each is one file, its command line included, that Node
+    // runs as it is and the tests import.
     'scripts/*.ts',
+    // Only types: nothing in them runs.
     '!src/types/**',
-    '!src/**/index.ts',
     '!src/services/MusicProviderInterface.ts',
+    '!modules/expo-musickit/src/ExpoMusicKit.types.ts',
   ],
   // Per-file coverage enforcement (mirrors BoardGames' vite.config.ts
   // `coverage.thresholds.perFile: true, lines: 80`). A glob key applies the
   // threshold to EACH matched file individually rather than to the aggregate,
   // so a weak file can no longer hide behind well-covered ones the way it
-  // could under the previous `global` block. `collectCoverageFrom` above still
-  // decides which files are measured (types, barrels and MusicProviderInterface
-  // are excluded), and every measured file is a .ts
-  // or .tsx that this glob matches.
+  // could under the previous `global` block. `collectCoverageFrom` above
+  // decides which files are measured, and every measured file is a .ts or
+  // .tsx that this glob matches.
   coverageThreshold: {
     '**/*.{ts,tsx}': {
       lines: 80,
