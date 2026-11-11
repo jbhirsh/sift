@@ -345,7 +345,7 @@ Makefile                Dev commands (test, lint, typecheck, check)
   (`utils/musicKit`, `AppleMusicProvider`), so it ships with an EAS Update
   instead of a reinstall and is covered by Jest and Stryker. Add a primitive
   in Swift; put the policy in TypeScript. The "Native bridge" check
-  (`scripts/check-native-bridge.mjs`, in CI and pre-commit) holds this: every
+  (`scripts/check-native-bridge.ts`, in CI and pre-commit) holds this: every
   native function needs an entry in `modules/expo-musickit/native-api.json`
   saying the one thing it asks, the Swift and TypeScript surfaces must match,
   and functions and the file stay under the size budgets there.
