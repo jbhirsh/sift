@@ -15,6 +15,16 @@ import {
 import { markReviewed } from './ReviewedLedgerStore';
 import { rememberSiftedPlaylist } from './SiftedImport';
 
+// The saved session, so a killed app resumes where it was: SiftContext saves
+// it after every decision. The track list is stored once per list, in two
+// alternating slots, so a crash mid-write keeps the last record and its list
+// intact, and each save writes a compact record of ids. A pre-#150
+// `sift_session` blob still loads, and goes after the first compact save. A
+// session saved by the builds that filled "- Sifted" on a Keep (with
+// `pendingKeeps`/`siftedPlaylistId`) still loads: its sent keeps and the
+// ones that never reached "- Sifted" go to the reviewed ledger (not a keep
+// still held for Undo), and both fields are dropped.
+
 // The compact format (#150): the track list once, under its own key, and a
 // small record of ids per decision. See utils/sessionFormat.
 const STATE_KEY = 'sift_session_v2';

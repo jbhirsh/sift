@@ -1,5 +1,5 @@
 # The weekly audit: checks that need the whole repository at once, too slow
-# or too noisy to gate a PR (CLAUDE.md, "CI/CD"). jbhirsh/ci's reusable
+# or too noisy to gate a PR. jbhirsh/ci's reusable
 # workflow runs them, each with this repo's own config. Each category keeps
 # one tracking issue, labelled weekly-audit: opened when something turns up,
 # updated each week while it lasts, closed once a sweep comes back clean.

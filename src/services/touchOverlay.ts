@@ -92,7 +92,9 @@ export const touchMarks = createTouchMarkStore();
 
 /**
  * For a gesture handler's callbacks (via runOnJS, only when `showTouches`):
- * its pan carries the ring on where React Native's touch stopped.
+ * its pan carries the ring on where React Native's touch stopped. React
+ * Native cancels its touch once a pan takes over, so a drag a gesture
+ * handler owns (the card swipe, the seek bar) feeds the trail from here.
  */
 export function followTouch(x: number, y: number): void {
   touchMarks.follow(x, y, performance.now());

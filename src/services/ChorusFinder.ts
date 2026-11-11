@@ -18,7 +18,8 @@ import { lrclib, LyricsLookup } from './LrclibClient';
 // 2. preview:  where Apple Music's 30-second preview sits in the full track,
 //              found by ShazamKit on the device. Labels pick the preview to
 //              start at "the good part", so it is a strong hook proxy, and it
-//              works for instrumentals.
+//              works for instrumentals. Without the ShazamKit App Service
+//              (CONTRIBUTING.md, one-time setup) this step finds nothing.
 // 3. estimate: about a fifth of the way in (utils/chorus).
 //
 // Results are cached per track id in AsyncStorage, so each track is looked up

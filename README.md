@@ -1,8 +1,10 @@
 # Sift
 
-**Tinder for your music library.** Swipe through every track you own and decide, in a second each: **Keep**, **Skip**, or **Remove** — with instant playback so you actually hear what you're culling. Works with **Apple Music**.
+**Go through your whole music library, one song at a time.** Swipe through every track you own and decide, in a second each: **Keep**, **Skip**, or **Remove** — with instant playback so you actually hear what you're culling. Works with **Apple Music**, on iPhone and iPad (iOS only: MusicKit has no Android SDK).
 
 Sift is a production-quality React Native (Expo) app built in TypeScript, with a hand-written Swift/MusicKit native module, gesture-driven animations, offline session persistence, and a full CI pipeline.
+
+Its icon is a stack of song cards, the front one marked with Remove and Keep.
 
 ---
 
@@ -29,98 +31,35 @@ Settings: the optional **Start at chorus** switch (Apple Music).
 - **"Liquid glass" UI** — a reusable blur/material design system (`GlassCard`, `GlassBackground`) with centralized design tokens and automatic light/dark theming.
 - **Start at chorus** — an optional setting that starts each song at its most recognizable part. The chorus is found from timed lyrics ([LRCLIB](https://lrclib.net)): the block of lines a song repeats. When that fails, ShazamKit locates Apple Music's preview clip (which labels start at "the good part") inside the full track. Results are cached per song, and the next cards are resolved ahead of time so swiping stays instant.
 - **Crash-safe sessions** — all state lives in a single typed `useReducer`; sessions auto-save (debounced) to `AsyncStorage` after every decision and resume exactly where you left off.
+- **Undo, and second thoughts** — a decision waits a few seconds before it reaches Apple Music, so Undo takes it back, and the decisions list changes any earlier one.
+- **Nothing is deleted behind your back** — a Keep writes nothing to Apple Music, and a Remove only collects the song in "Sift — Removed" for you to delete in Music; Sift edits only the playlists it made.
 - **Observability** — Sentry is wired for errors and sampled tracing (5%), with breadcrumbs on user actions and provider calls. No session replay, profiling or default PII; breadcrumbs never name a track or playlist, and quoted names and URL queries are scrubbed from JavaScript events before they leave the device (`utils/sentryScrub`).
-- **Tested & CI-gated** — Jest unit tests (80% line coverage per file), mutation testing (Stryker) and Maestro E2E flows on an iOS simulator, with an Xcode accessibility audit, run on every PR via GitHub Actions.
 
 ---
 
-## Tech stack
+## Technologies, and what each gives it
 
-| Area | Choices |
+| Technology | What it gives Sift |
 |------|---------|
-| Framework | Expo SDK 58, React Native 0.88, React 19 |
-| Language | TypeScript (strict) |
-| Native | Swift + MusicKit (custom Expo module), Expo Modules API |
-| Animation | Reanimated 4 + Gesture Handler, worklets |
-| Storage | AsyncStorage |
-| State | `useReducer` + Context (no external state lib) |
-| Monitoring | Sentry (`@sentry/react-native`) |
-| Testing | Jest + React Native Testing Library, Maestro (E2E) |
-| CI/CD | GitHub Actions (GitHub-hosted: Ubuntu + macOS), Dependabot |
+| Expo SDK 58, React Native 0.88, React 19 | one TypeScript codebase for the iOS app, with JavaScript changes shipped to installed phones as EAS Updates |
+| TypeScript (strict, type-checked by TypeScript 7) | every value typed: type coverage is held at 100% |
+| Swift + MusicKit, Expo Modules API | Apple Music's library, playlists and player, through a thin native module |
+| Reanimated 4 + Gesture Handler | the swipe deck's gestures and animations, run on the UI thread |
+| AsyncStorage | the saved session, preferences and the record of kept and removed songs, on the device |
+| `useReducer` + Context | all state in one typed reducer, with no state library |
+| Sentry (`@sentry/react-native`) | crash and error reports, scrubbed of song and playlist names |
+| Jest + React Native Testing Library | unit and component tests, with 80% line coverage on every file |
+| Stryker | mutation testing, which checks the tests would fail if the code changed |
+| Maestro, Xcode's accessibility audit | end-to-end flows, screenshots and an accessibility pass on the iOS Simulator for every PR |
+| GitHub Actions (Ubuntu + macOS), Dependabot | CI on every PR, a preview build that follows `main`, and dependencies kept current |
 
 ---
 
 ## Architecture
 
-```
-src/
-  App.tsx               Phase router + settings modal + Sentry init
-  components/           Reusable UI (Button, GlassCard, InteractiveCard, PlayerControls,
-                        PlaylistPicker, DecisionsSheet, UndoPill, …)
-  screens/              SetupScreen, LoadingScreen, SiftScreen, DoneScreen, SettingsScreen
-  context/              SiftContext (useReducer state), MusicProviderContext
-  services/             MusicProviderInterface, AppleMusicProvider, MockMusicProvider,
-                        SessionStore, RemovalHistoryStore, ReviewedLedgerStore,
-                        PreferencesStore, ChorusFinder, LrclibClient
-  hooks/                useMusicProvider, usePendingDecision, useReviseDecision, …
-  theme/                Design tokens + ThemeContext (light/dark)
-  types/                Shared TypeScript types
-  utils/                Pure logic, one file per job (sorting, trackFilter, …)
-modules/
-  expo-musickit/        Custom Swift/MusicKit native module (Expo Modules API)
-__tests__/
-  unit/                 Jest unit tests
-  helpers/              Test render helpers
-.maestro/               Maestro E2E flows
-```
+- **`src/`, the app:** `App.tsx` switches screens by the sift's phase (setup, loading, sifting, done; no router); the one reducer holding all state (`context/`); the music services behind one interface, and the stores that keep the session, preferences and decisions on the device (`services/`); the hooks joining state to the services (`hooks/`); the screens and components; the design tokens and light and dark themes (`theme/`); and pure helpers (`utils/`).
+- **`modules/expo-musickit/`, the native module:** Swift asking MusicKit, ShazamKit or the player one thing per function, behind a TypeScript wrapper.
+- **`__tests__/`, `.maestro/` and `e2e/`:** the Jest suite, the Maestro flows, and the screenshot, GIF and accessibility-audit runs on the Simulator.
+- **`scripts/`:** the CI jobs' runners (the E2E suite, the audit, screenshots and GIFs) and the checks behind them.
 
-**Design principles:** state is a single typed reducer; navigation is phase-driven (no React Navigation); every music backend hides behind one interface; design values come only from `src/theme`.
-
----
-
-## Getting started
-
-**Requirements:** Node.js 22.13+ (or 24+), Xcode 26.4+ (for native iOS builds; Expo SDK 58 needs it). Expo is bundled — no global CLI needed; use `npx expo`.
-
-```bash
-npm install                    # install dependencies
-cp .env.example .env.local     # add your Sentry DSN (optional; app runs without it)
-npx expo run:ios               # first build — compiles the native MusicKit module
-npx expo start                 # subsequent launches
-```
-
-"Start at chorus" uses ShazamKit as a fallback, which needs the **ShazamKit** App Service enabled on the App ID (Apple Developer → Identifiers → `com.jessicahirsh.sift` → App Services). Without it the setting still works from lyrics and the estimate.
-
-**Installing on an iPhone:** every merge to `main` runs `.github/workflows/preview-deploy.yml`. JavaScript-only changes ship as an over-the-air update that the installed preview build downloads on launch and runs from the next cold launch (swipe Sift away and reopen it); changes to native code produce a new preview build instead, built on a GitHub macOS runner and uploaded to EAS, installed from its link on expo.dev. Preview builds install only on registered iPhones: register one with `npx eas-cli device:create` (open its link in Safari on the phone and install the profile), then run the Preview deploy workflow from the Actions tab with "Build a new preview app" ticked; the new build's ad hoc provisioning profile includes the phone. The phone also needs Developer Mode on (Settings → Privacy & Security), which iOS asks for on the first launch.
-
-Configuration lives in environment variables — see [`.env.example`](.env.example). `EXPO_PUBLIC_*` values are inlined by Expo at build time; real secrets go in the gitignored `.env.local`.
-
----
-
-## npm scripts
-
-| Command | What it does |
-|---------|--------------|
-| `npm start` | Start the Expo dev server |
-| `npm run ios` | Build & run on iOS (compiles native modules) |
-| `npm test` | Unit tests (Jest) |
-| `npm run test:coverage` | Unit tests with coverage (80% threshold) |
-| `npm run lint` | ESLint (the whole repo, as CI) |
-| `npm run typecheck` | TypeScript 7 type check (`@typescript/native`, `--noEmit`) |
-| `npm run bridge` | Native bridge check (`modules/expo-musickit` stays thin) |
-| `npm run check` | Lint + typecheck + layering + bridge + tests with coverage |
-
-A `Makefile` mirrors these (`make test`, `make lint`, `make typecheck`, `make check`) and adds native E2E targets (`make build-e2e`, `make test-e2e`).
-
----
-
-## Testing
-
-- **Unit** (`npm test`) — reducers, services, hooks, utils, and component rendering via React Native Testing Library; 80% line coverage is enforced per file, and Stryker measures how much the tests actually check.
-- **E2E** (`make test-e2e`) — Maestro flows in `.maestro/` cover the sift loop end to end (swipes, Undo, changing a decision, resume, Done, Restore, filters, playlist sources, settings) against a simulator build with a mock music provider.
-
----
-
-## CI/CD
-
-Every PR runs lint, typecheck, dependency rules and unit tests (with coverage) on Ubuntu, plus secret scanning, SAST and mutation testing of the lines it changes (a PR with none skips it unless it touches the mutation setup; a full mutation sweep runs monthly, split across parallel jobs). The Maestro iOS E2E job and accessibility audit (macOS) run on every PR that can affect the app. Dependabot keeps npm and Actions dependencies current. All changes reach `main` via PR; see `CLAUDE.md` for the full list of required checks.
+Working on it: [`CONTRIBUTING.md`](CONTRIBUTING.md).

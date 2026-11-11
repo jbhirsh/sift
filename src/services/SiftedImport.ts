@@ -8,6 +8,18 @@ import { TrackIndex } from '../utils/trackIdentity';
 import { markReviewed, storedReviewedIds, takenBack } from './ReviewedLedgerStore';
 import { loadPlaylistTracksOnce } from './playlistLoads';
 
+// Keeps from the builds that filled "<name> - Sifted" on every Keep come over
+// to the reviewed ledger once: the first time a playlist is picked or
+// loaded, the songs of it found (by song) in its "- Sifted" playlist go to
+// the ledger, and sift_sifted_imported records that it was looked at (a
+// failed look is tried again next time). It also looks in the "- Sifted"
+// playlist an old saved session named (its siftedPlaylistId), if that is
+// still in the library, so a renamed playlist's keeps still come over
+// (#179). The playlist's own songs come from a load shared with a sift's
+// load of it (services/playlistLoads), so Start Sifting during the look
+// fetches it once. Nothing fills "- Sifted" on a Keep any more; Done's "Save
+// kept songs as a playlist" does (useMusicProvider's saveKeptPlaylist).
+
 /** The ledger keys of the playlists already looked at, as a JSON array. */
 const IMPORTED_KEY = 'sift_sifted_imported';
 /**

@@ -2,11 +2,13 @@
 // bridge" check, run in CI (Lint, Typecheck & Unit Test) and the pre-commit
 // hook. The expo-musickit module is a thin bridge: each native function asks
 // MusicKit, ShazamKit or the player one thing, and every decision lives in
-// TypeScript so it ships with an EAS Update (CLAUDE.md). This check can't
-// tell a primitive from a policy, but it makes native growth impossible to
-// miss: a new native function needs an allowlist entry saying what it asks,
-// the Swift and TypeScript surfaces must match, and functions and the file
-// stay under a size budget.
+// TypeScript so it ships with an EAS Update and is covered by Jest and
+// Stryker (the decisions: defaults, lookup order, catalog id pairing,
+// batching, counting what landed, the "Sift — Removed" policy, which preview
+// to fingerprint). This check can't tell a primitive from a policy, but it
+// makes native growth impossible to miss: a new native function needs an
+// allowlist entry saying what it asks, the Swift and TypeScript surfaces
+// must match, and functions and the file stay under a size budget.
 //
 // Node runs this file as it is (it strips the types), and the command line
 // is main(), run only when Node runs the file (import.meta.main), so Jest

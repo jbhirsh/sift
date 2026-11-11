@@ -10,6 +10,14 @@ import {
 import { loadHistory } from './RemovalHistoryStore';
 import { trace } from './trace';
 
+// Once a launch, Setup says how many collected songs the user has since
+// deleted from their library in Music (#183), silent without library
+// access: a library song gone from "Sift — Removed" and not found in the
+// library (the provider's deletedFromLibrary; one only taken out of the
+// playlist is still in the library). The E2E mock counts every song an
+// earlier launch collected as deleted when launched with SiftDeletedInMusic
+// (flow 27).
+
 /**
  * The songs Setup has already said were deleted, by provider, as a JSON
  * object of id lists. Their removal records stay: a song can come back (a

@@ -64,7 +64,7 @@ export default tseslint.config(
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
-      // Enforce CLAUDE.md's "never suppress lint errors": ban every inline
+      // A lint error is fixed, never suppressed: ban every inline
       // eslint control comment (eslint-disable, disable-next-line,
       // eslint-enable, …) so suppressions can't hide in the code. The
       // sanctioned escape hatch is a file-scoped override in this config —
@@ -86,8 +86,8 @@ export default tseslint.config(
     rules: { 'local/no-type-coverage-ignore': 'error' },
   },
   {
-    // CLAUDE.md: icons come from expo-symbols (SF Symbols) with
-    // @expo/vector-icons as the fallback; don't add other icon packages.
+    // Icons come from expo-symbols (SF Symbols), with @expo/vector-icons as
+    // the one fallback; no other icon package.
     // Rejects any package import whose name mentions "icon", plus the common
     // icon libraries whose names don't. Local files (./, ../) are exempt, so
     // an IconButton component or the app icon asset stays importable.
@@ -111,7 +111,7 @@ export default tseslint.config(
               ],
               caseSensitive: false,
               message:
-                'Use expo-symbols (SymbolView), or @expo/vector-icons as the fallback; CLAUDE.md rules out other icon packages.',
+                'Use expo-symbols (SymbolView), or @expo/vector-icons as the fallback; no other icon package.',
             },
           ],
         },
@@ -141,7 +141,7 @@ export default tseslint.config(
   {
     // RNTL 14 made render, renderHook, rerender, unmount, fireEvent.* and act
     // async, and a missed `await` leaves a test that passes without checking
-    // anything (CLAUDE.md). no-floating-promises catches every un-awaited
+    // anything. no-floating-promises catches every un-awaited
     // promise, those included, so it needs type information for the tests.
     files: ['__tests__/**/*.{ts,tsx}'],
     languageOptions: {

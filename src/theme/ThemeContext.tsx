@@ -17,6 +17,11 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
+/**
+ * The theme for the device's color scheme, from the tokens in ./index: the
+ * light or dark colors, the glass material's tint and border, and each
+ * phase's gradient.
+ */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';

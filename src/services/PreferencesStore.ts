@@ -4,6 +4,12 @@ import { DEFAULT_PREFERENCES, PreferenceChanges, Preferences, TrackFilter } from
 import { ADDED_AGES, PLAY_LIMITS } from '../utils/trackFilter';
 import { isSortOrder } from '../utils/validators';
 
+// User settings, not session state: Start at chorus, and Setup's last sort
+// and Plays/Added choices (#175). They load at launch (APPLY_PREFERENCES,
+// applied only while Setup shows no sift: a sift in hand or loading when
+// they arrive keeps its own). RESUME_SESSION never touches the stored ones:
+// a resumed session brings its own sort without saving it, and Setup shows
+// that sort until the next launch or a new pick.
 const PREFERENCES_KEY = 'sift_preferences';
 
 /** A stored filter, each choice kept only if Setup still offers it. */

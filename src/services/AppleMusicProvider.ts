@@ -30,6 +30,22 @@ import {
 /** The native module's API, typed from its wrapper so the two can't drift. */
 type NativeMusicKit = typeof import('../../modules/expo-musickit/src/index');
 
+// Remove collects; it never deletes or edits the user's playlists. MusicKit
+// can't delete library songs and edits only playlists the app created, so
+// every Remove, from a library or a playlist sift, adds the song to "Sift —
+// Removed" (removeFromLibrary) for the user to delete from their library in
+// Music. Removed songs are left out of every later sift
+// (utils/libraryRemovals), Restore takes the song back out (restoreRemoved)
+// and forgets every record of it, and Start Over clears a playlist's other
+// records but never un-removes.
+//
+// Library writes run one at a time (utils/serialQueue): a native playlist
+// removal reads the playlist and writes it back, so two at once would undo
+// each other. A write that doesn't settle within WRITE_STALL_MS lets the
+// next one start and rejects for its caller with a QueueStallError (it may
+// still land); writesSettled resolves once every queued write has really
+// finished, giving up on one 2 minutes after it started.
+
 // How long a write that never settles holds up the next one.
 export const WRITE_STALL_MS = 30000;
 // How long a playlist created here counts when the library doesn't list it

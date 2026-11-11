@@ -2,7 +2,10 @@
 # review threads Claude Review or the owner left. jbhirsh/ci's autofix
 # action does it (autofix/action.yml there says how); this repo's part is
 # the trigger below and "autofix" in .github/ci.json (the commands a fix
-# must pass), read from main.
+# must pass), read from main. It also turns on auto-merge for Dependabot's
+# npm PRs, once, when the first check on each completes (a workflow on the
+# PR would show as a skipped check on every other PR); the main branch rule
+# does the gating, merging only once every required check is green.
 name: Claude Auto-Fix PR Comments
 
 on:
