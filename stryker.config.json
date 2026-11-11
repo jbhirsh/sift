@@ -5,7 +5,7 @@
     "projectType": "custom",
     "configFile": "jest.config.js",
     "config": {
-      "runner": "<rootDir>/scripts/stryker-jest-runner.mjs"
+      "runner": "<rootDir>/scripts/stryker-jest-runner.ts"
     }
   },
   "coverageAnalysis": "perTest",

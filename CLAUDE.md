@@ -491,8 +491,8 @@ Makefile                Dev commands (test, lint, typecheck, check)
   as Stryker's setup (`__tests__/unit/mutationWiring.test.ts` holds it to
   Jest's config) and the per-file 80% gate.
   Every Stryker run loads, for each mutant, only the test files holding its
-  covering tests (`scripts/stryker-jest-runner.mjs`, Jest's runner in
-  `stryker.config.json`; rules in `scripts/strykerTestFiles.ts`). Stryker's
+  covering tests (`scripts/stryker-jest-runner.ts`, Jest's runner in
+  `stryker.config.json`). Stryker's
   own Jest runner loads every test file that imports the mutated file,
   most of which hold none of them: about half of a mutant's time, and a
   cost that grows with both the code mutated and the tests, which is why
