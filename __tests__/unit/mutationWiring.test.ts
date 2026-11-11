@@ -44,8 +44,7 @@ describe('mutation wiring', () => {
       'babel.config.js',
       'package.json',
       'package-lock.json',
-      'scripts/stryker-jest-runner.mjs',
-      'scripts/strykerTestFiles.ts',
+      'scripts/stryker-jest-runner.ts',
     ]) {
       expect([file, listed(file)]).toEqual([file, true]);
     }

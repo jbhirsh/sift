@@ -14,11 +14,11 @@ name: Mutation Testing
 # monthly full sweep, the baseline these runs start from, is
 # mutation-sweep.yml.
 #
-# Every Stryker run uses scripts/stryker-jest-runner.mjs as Jest's runner
+# Every Stryker run uses scripts/stryker-jest-runner.ts as Jest's runner
 # (stryker.config.json): a mutant's run loads only the test files holding
-# its covering tests (scripts/strykerTestFiles.ts). NODE_OPTIONS
-# (`nodeOptions` in .github/ci.json) lets Stryker's runner processes load it,
-# as it imports a .ts module and package.json has no "type".
+# its covering tests. Node loads it as it is, stripping the types; NODE_OPTIONS
+# (`nodeOptions` in .github/ci.json) silences the warning Node gives for a
+# .ts module when package.json has no "type".
 on:
   # No trigger-level `paths:` filter: a filtered-out workflow never reports,
   # and the required check hangs at "Expected".

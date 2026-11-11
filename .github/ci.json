@@ -12,9 +12,8 @@
       "package-lock.json",
       "patches/**",
       ".github/workflows/mutation.yml",
-      "scripts/stryker-jest-runner.mjs",
-      "scripts/strykerTestFiles.ts",
-      "__tests__/unit/strykerTestFiles.test.ts"
+      "scripts/stryker-jest-runner.ts",
+      "__tests__/unit/strykerJestRunner.test.ts"
     ],
     "smoke": ["src/utils/formatTime.ts", "src/utils/sorting.ts", "src/utils/trackIdentity.ts"],
     "perFileThreshold": 80,
