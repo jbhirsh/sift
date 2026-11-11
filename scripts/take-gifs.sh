@@ -4,8 +4,8 @@
 # e2e/gifs/<name>.yaml gets the app to where its GIF begins, records the
 # steps with Maestro's startRecording (named <name>), then takes a
 # <name>-end screenshot to say every step ran. All of them run in one
-# Maestro session: restarting the driver per flow loses taps (CLAUDE.md,
-# "E2E runner"). Recording the real app keeps its SF Symbols, materials
+# Maestro session: restarting the driver per flow loses taps
+# (scripts/run-e2e.sh). Recording the real app keeps its SF Symbols, materials
 # and animations, at native resolution and real speed.
 #
 # Usage: scripts/take-gifs.sh [out-dir]   (default: gif-videos)

@@ -7,6 +7,13 @@ import type { PendingDecision, SiftSession } from '../types';
 import { ledgerKey } from '../utils/reviewedLedger';
 import { undoWindowMs } from '../utils/undoWindow';
 
+// Undo (#152): the latest decision is held in state.pending (saved with the
+// session) and reaches the music service only after the undo window, on the
+// next decision, or when the Sift screen goes away or the app goes to the
+// background. UNDO_LAST takes it back while it's held. A decision a killed
+// app was holding goes out on Resume or, when a new sift replaces that
+// session, through useSendSavedPending first.
+
 /**
  * How long Undo can take back the latest decision (#152): 5 s, except in
  * the E2E build, which lengthens it (utils/undoWindow).

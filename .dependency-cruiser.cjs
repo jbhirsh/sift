@@ -1,9 +1,9 @@
 /**
- * Architecture rules (dependency-cruiser). CLAUDE.md describes sift's layering
- * as prose — "utils are pure logic", "services implement MusicProviderInterface",
- * "all state lives in the SiftContext reducer", "design tokens are centralized
- * in the theme" — and the Claude review re-checks it per PR, but nothing failed
- * a build on a violation. These rules make the layering computational.
+ * Architecture rules (dependency-cruiser). sift's layering ("utils are pure
+ * logic", "services implement MusicProviderInterface", "all state lives in the
+ * SiftContext reducer", "design tokens are centralized in the theme") was once
+ * only prose the Claude review re-checked per PR, and nothing failed a build on
+ * a violation. These rules make the layering computational.
  *
  * The layers, leaf → top, as the code actually imports today:
  *
@@ -56,7 +56,7 @@ module.exports = {
       name: 'utils-pure',
       severity: 'error',
       comment:
-        'src/utils are pure helpers (CLAUDE.md: "pure logic — no device rendering"). They may reach only other utils and the type layer.',
+        'src/utils are pure helpers: pure logic, no device rendering. They may reach only other utils and the type layer.',
       from: { path: '^src/utils' },
       to: { path: '^src/', pathNot: '^src/(utils|types)/' },
     },

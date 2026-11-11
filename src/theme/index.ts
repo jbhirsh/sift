@@ -2,15 +2,15 @@ import { Platform } from 'react-native';
 
 // Spacing scale matching SwiftUI project
 export const SPACING = {
-  xs: 2,
-  sm: 4,
-  md: 6,
-  base: 8,
-  lg: 12,
-  xl: 16,
-  '2xl': 24,
-  '3xl': 32,
-  '4xl': 40,
+  xs: 2, // tight text spacing
+  sm: 4, // small internal spacing
+  md: 6, // card content
+  base: 8, // list item padding
+  lg: 12, // container padding
+  xl: 16, // card overlay padding
+  '2xl': 24, // page side margins
+  '3xl': 32, // large gaps
+  '4xl': 40, // page bottom padding
 } as const;
 
 // The floating settings gear (App.tsx): its size and how far below the top
@@ -40,10 +40,10 @@ export const UNDO_PILL = {
 
 // Corner radius scale
 export const RADIUS = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
+  sm: 8, // thumbnails, list items
+  md: 12, // form containers
+  lg: 16, // summary boxes
+  xl: 20, // the main interactive cards
 } as const;
 
 // Semantic colors (iOS system equivalents). keep/remove/skip are for fills
@@ -98,6 +98,7 @@ export const COLORS = {
 
 // Shadow presets
 export const SHADOWS = {
+  // Background cards.
   subtle: {
     shadowColor: '#000',
     shadowOpacity: 0.04,
@@ -105,6 +106,7 @@ export const SHADOWS = {
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
+  // Interactive cards.
   prominent: {
     shadowColor: '#000',
     shadowOpacity: 0.08,
@@ -112,6 +114,7 @@ export const SHADOWS = {
     shadowOffset: { width: 0, height: 8 },
     elevation: 8,
   },
+  // Action buttons.
   button: {
     shadowColor: '#000',
     shadowOpacity: 0.06,
@@ -123,19 +126,20 @@ export const SHADOWS = {
 
 // Typography helpers
 export const FONTS = {
+  // Hero and brand text (rounded on iOS).
   brand: Platform.select({
     ios: { fontFamily: '.AppleSystemUIFontRounded-Bold' },
     default: { fontWeight: 'bold' as const },
   }),
-  headline: { fontWeight: '600' as const },
-  body: { fontWeight: '400' as const },
+  headline: { fontWeight: '600' as const }, // section titles
+  body: { fontWeight: '400' as const }, // default text
 } as const;
 
 // Glass material definitions — blur intensity + tint overlay
 export const GLASS = {
-  thin: { intensity: 20, tintOpacity: 0.05 },
-  regular: { intensity: 40, tintOpacity: 0.1 },
-  thick: { intensity: 80, tintOpacity: 0.18 },
+  thin: { intensity: 20, tintOpacity: 0.05 }, // subtle overlays
+  regular: { intensity: 40, tintOpacity: 0.1 }, // standard glass cards
+  thick: { intensity: 80, tintOpacity: 0.18 }, // heavy backgrounds
 } as const;
 
 // Background gradients per app phase

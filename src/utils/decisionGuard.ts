@@ -11,7 +11,10 @@
  * that decision's state and never decides the same card twice. Only a
  * decision that may land on a card nobody has seen yet waits (a Skip); a
  * Keep or Remove is turned away instead. No timers: a timer is what runs
- * late after a stall.
+ * late after a stall. Every way to decide on the Sift screen, and Finish,
+ * Undo, Back and the decisions list, asks the guard when pressed, and no
+ * button is disabled for it: after a stall, queued taps would run before
+ * the button came back.
  */
 type PressVerdict = { verdict: 'go' } | { verdict: 'wait' } | { verdict: 'busy'; sinceMs: number };
 

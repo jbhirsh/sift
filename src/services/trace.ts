@@ -7,7 +7,7 @@ import {
   type TraceMode,
 } from '../utils/trace';
 
-// The E2E trace (CLAUDE.md, "A flaky E2E flow is a bug"): in the E2E build
+// The E2E trace, read first when a flow fails or flakes: in the E2E build
 // each event is a line in the iOS system log, which CI records for the whole
 // suite (maestro-results/trace.txt), so a tap that did nothing says where it
 // went. React Native writes console.info there (os_log, subsystem

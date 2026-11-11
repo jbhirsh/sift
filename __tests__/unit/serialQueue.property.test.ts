@@ -2,8 +2,8 @@ import fc from 'fast-check';
 import { createSerialQueue } from '../../src/utils/serialQueue';
 
 // Property-based test: a native playlist removal reads the playlist and
-// writes it back, so two writes at once would undo each other (CLAUDE.md,
-// "Library writes run one at a time"). Whatever mix of quick, slow and
+// writes it back, so two writes at once would undo each other, and
+// AppleMusicProvider runs every library write through this queue. Whatever mix of quick, slow and
 // failing jobs is queued, each starts only after the one before it has
 // settled, in the order queued, and every caller gets its own job's result.
 

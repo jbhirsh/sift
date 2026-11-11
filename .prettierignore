@@ -17,7 +17,7 @@ android/
 .expo/
 .claude/
 
-# Frozen copies of every saved session shape: never edited (CLAUDE.md).
+# Frozen copies of every saved session shape: never edited, never reformatted.
 __tests__/fixtures/sessions/
 
 # Part of the native fingerprint (app.json, eas.json): a reformat would

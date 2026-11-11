@@ -9,7 +9,7 @@ name: PR visuals
 # judgment call that Claude Review makes (claude-review.yml).
 #
 # No trigger-level `paths:` filter: like every gating workflow here it reports
-# on every PR, so it can be a required check (CLAUDE.md).
+# on every PR, so it can be a required check.
 on:
   pull_request:
     branches: [main]

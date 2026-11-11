@@ -11,8 +11,9 @@ import { trace, tracing } from './trace';
 // SiftResetState launch argument instead, and the app clears what it saves
 // before anything reads it: AsyncStorage (sessions, preferences, the
 // reviewed ledger, the chorus cache) and the documents folder (removal
-// history). Only the E2E build reads the argument; a real build never
-// clears anything.
+// history). Caches (images, network) aren't cleared, so later flows load
+// artwork faster; no assertion depends on them. Only the E2E build reads
+// the argument; a real build never clears anything.
 
 function launchedWithReset(): boolean {
   try {

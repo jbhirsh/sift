@@ -3,7 +3,7 @@
   // Autolinked as a native module (package.json "expo.autolinking"), and
   // loaded with require() by path, never imported by its package name.
   // expo-system-ui: Expo needs it for app.json's userInterfaceStyle on
-  // Android only, and Sift is iOS-only (CLAUDE.md, "App Identity").
+  // Android only, and Sift is iOS-only (MusicKit has no Android SDK).
   // jscpd, pixelmatch, pngjs: run by jbhirsh/ci's actions from this repo's
   // node_modules (the weekly audit's jscpd; the README screenshot
   // comparison's pixelmatch and pngjs).

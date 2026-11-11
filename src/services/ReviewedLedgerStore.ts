@@ -7,6 +7,16 @@ import {
   type ReviewedLedger,
 } from '../utils/reviewedLedger';
 
+// The reviewed ledger (#143). A Keep leaves the song where it is and writes
+// nothing to Apple Music, for a library or a playlist sift alike: this
+// records the kept ids per source (utils/reviewedLedger's ledgerKey, one
+// entry per playlist), and later sifts of that source leave them out.
+// Setup's "Include songs I've already sifted" switch, shown when the
+// selected source has kept songs, brings them back (skipFiltering, for
+// Start Sifting and Start Over); removed songs stay out either way. Skips
+// aren't recorded. A sent keep changed in the decisions list leaves the
+// ledger (unmarkReviewed), and a song restored on Done counts as kept, so
+// it's recorded as one.
 const LEDGER_KEY = 'sift_reviewed_ledger';
 
 // Keeps waiting to be written, by source key. A keep only adds to this and

@@ -558,7 +558,7 @@ jobs:
           load-dir: screenshots
 
       # The main screens on the Simulator, light and dark, for PR
-      # descriptions (CLAUDE.md, "Show UI changes in the PR") and Visual
+      # descriptions (PR visuals says how to use them) and Visual
       # regression: real SF Symbols and materials, which a web export can't
       # draw. It never fails the job; a screen it missed fails Visual
       # regression, and the app's trace, recorded around it as in the E2E

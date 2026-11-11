@@ -724,11 +724,16 @@ export function useMusicProvider() {
    * Done's "Save kept songs as a playlist": every song remembered as kept
    * from the playlist being sifted (the reviewed ledger, so every sift of it
    * so far, not just this one) and still in it goes into "<name> - Sifted".
-   * The playlist is made, empty, when there isn't one by that name, so its
-   * id is known before any add; then only the songs not in it yet are added.
-   * A song Music can't add is counted, not retried forever. Rejects when a
-   * write fails or times out: the songs that landed stay, and saving again
-   * adds only the rest.
+   * It finds that playlist with the provider's lookup (findPlaylists, which
+   * trusts one made this launch before the library lists it), preferring one
+   * an earlier save made. The playlist is made, empty, when there isn't one
+   * by that name, so its id is known before any add; then only the songs not
+   * in it yet are added, KEPT_SAVE_BATCH at a time through the serial write
+   * queue. Before reading anything it waits for earlier writes to finish
+   * (writesSettled), and after KEPT_SAVE_SETTLE_MS says Music is still
+   * finishing. One save runs at a time, launch-wide. A song Music can't add
+   * is counted, not retried forever. Rejects when a write fails or times
+   * out: the songs that landed stay, and saving again adds only the rest.
    */
   const saveKeptPlaylist = useCallback((): Promise<KeptSaveResult> => {
     const source = state.activeSource ?? state.source;

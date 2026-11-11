@@ -10,7 +10,7 @@ name: Mutation Testing
 # stryker.config.json's `break` and on every mutated file scoring 80% on its
 # changed lines (`perFileThreshold`). A PR with nothing to mutate skips
 # Stryker's steps, and the job still reports (Mutation Tests (Stryker) is a
-# required check: keep its name, CLAUDE.md "Required status checks"). The
+# required check: the branch rule names it, so keep its name). The
 # monthly full sweep, the baseline these runs start from, is
 # mutation-sweep.yml.
 #
