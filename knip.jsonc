@@ -3,11 +3,4 @@
   // Run by jbhirsh/ci's actions from this repo's node_modules (the weekly
   // audit's jscpd; the screenshot comparisons' pixelmatch and pngjs).
   "ignoreDependencies": ["jscpd", "pixelmatch", "pngjs"],
-  // The native module's wrappers are required by path as one object
-  // (AppleMusicProvider, useResolvedArtwork), which knip can't follow; the
-  // native bridge check (scripts/check-native-bridge.ts) holds them to the
-  // Swift module instead.
-  "ignoreIssues": {
-    "modules/expo-musickit/src/index.ts": ["exports", "types"],
-  },
 }
