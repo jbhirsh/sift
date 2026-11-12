@@ -1,11 +1,8 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  // expo-system-ui: Expo needs it for app.json's userInterfaceStyle on
-  // Android only, and Sift is iOS-only (MusicKit has no Android SDK).
-  // jscpd, pixelmatch, pngjs: run by jbhirsh/ci's actions from this repo's
-  // node_modules (the weekly audit's jscpd; the README screenshot
-  // comparison's pixelmatch and pngjs).
-  "ignoreDependencies": ["expo-system-ui", "jscpd", "pixelmatch", "pngjs"],
+  // Run by jbhirsh/ci's actions from this repo's node_modules (the weekly
+  // audit's jscpd; the screenshot comparisons' pixelmatch and pngjs).
+  "ignoreDependencies": ["jscpd", "pixelmatch", "pngjs"],
   // The native module's wrappers are required by path as one object
   // (AppleMusicProvider, useResolvedArtwork), which knip can't follow; the
   // native bridge check (scripts/check-native-bridge.ts) holds them to the
