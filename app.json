@@ -4,6 +4,7 @@
     "slug": "sift-i1bgkl6kqg81gghgshzcr",
     "scheme": "sift",
     "version": "1.0.0",
+    "platforms": ["ios"],
     "runtimeVersion": {
       "policy": "fingerprint"
     },
@@ -109,9 +110,6 @@
         }
       ]
     ],
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
     "extra": {
       "eas": {
         "projectId": "73ef36df-9686-4e09-b562-8012148bc937"
