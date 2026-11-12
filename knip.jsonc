@@ -1,6 +1,3 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  // Run by jbhirsh/ci's screenshot comparisons from this repo's
-  // node_modules.
-  "ignoreDependencies": ["pixelmatch", "pngjs"],
 }
