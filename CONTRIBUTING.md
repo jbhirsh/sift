@@ -34,7 +34,7 @@ in-memory mock library.
 | `make build-e2e`, then `make test-e2e`      | the E2E simulator build, then the Maestro suite on a booted simulator                        |
 | `make test-mutation`                        | Stryker over the whole mutation scope (slow; `npx stryker run --mutate <file>` while iterating) |
 | `make doctor`                               | Expo Doctor (needs the network; CI runs it as advice)                                        |
-| `npx knip` / `npx jscpd`                    | what the weekly audit reports: dead code / duplicated code                                   |
+| `npx knip` / `npm run jscpd`                | what the weekly audit reports: dead code / duplicated code                                   |
 | `npm run pr-gifs -- <PR>`                   | a PR's before/after GIFs, hosted on the `screenshots` branch                                 |
 
 The git hooks run lint, Prettier on the staged files, the type-check, the layering rules and the

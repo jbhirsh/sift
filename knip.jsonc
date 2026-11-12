@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  // Run by jbhirsh/ci's actions from this repo's node_modules (the weekly
-  // audit's jscpd; the screenshot comparisons' pixelmatch and pngjs).
-  "ignoreDependencies": ["jscpd", "pixelmatch", "pngjs"],
+  // Run by jbhirsh/ci's screenshot comparisons from this repo's
+  // node_modules.
+  "ignoreDependencies": ["pixelmatch", "pngjs"],
 }
