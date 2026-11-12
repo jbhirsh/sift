@@ -27,8 +27,15 @@ import {
   type RawTrack,
 } from '../utils/musicKit';
 
+// Type-only, which knip follows (`typeof import()` it doesn't): the module
+// itself loads lazily below, as loading it outside a dev build throws. knip
+// counts every export of the wrapper as used through it, so what holds that
+// API to the Swift module is the native bridge check
+// (scripts/check-native-bridge.ts), not knip.
+import type * as MusicKitModule from '../../modules/expo-musickit/src/index';
+
 /** The native module's API, typed from its wrapper so the two can't drift. */
-type NativeMusicKit = typeof import('../../modules/expo-musickit/src/index');
+type NativeMusicKit = typeof MusicKitModule;
 
 // Remove collects; it never deletes or edits the user's playlists. MusicKit
 // can't delete library songs and edits only playlists the app created, so

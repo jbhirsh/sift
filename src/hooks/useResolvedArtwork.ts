@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Platform } from 'react-native';
+import type * as MusicKitModule from '../../modules/expo-musickit/src/index';
 
 type ResolveArtworkFn = (trackID: string, w: number, h: number) => Promise<string | null>;
 
@@ -7,7 +8,7 @@ let resolveNative: ResolveArtworkFn | null = null;
 
 if (Platform.OS === 'ios') {
   try {
-    const mod: typeof import('../../modules/expo-musickit/src/index') = require('../../modules/expo-musickit/src/index');
+    const mod: typeof MusicKitModule = require('../../modules/expo-musickit/src/index');
     resolveNative = mod.resolveArtworkURL;
   } catch {
     /* native module not available (e.g. Expo Go) */
