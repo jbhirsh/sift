@@ -189,6 +189,11 @@ jobs:
       - name: Test with coverage
         run: npx jest --coverage
 
+      # Fails a source file the coverage run above didn't measure, unless
+      # .github/ci.json's unmeasured.files gives its reason (jbhirsh/ci#35).
+      - name: Unmeasured source files
+        uses: jbhirsh/ci/unmeasured@main
+
       - name: Expo Doctor
         run: npx expo-doctor@latest
         continue-on-error: true
