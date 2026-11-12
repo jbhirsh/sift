@@ -88,16 +88,7 @@ jobs:
             fi
           done
 
-      # pixelmatch and pngjs, which the comparison imports from here.
-      - uses: actions/setup-node@v7
-        if: steps.shots.outputs.found == 'true'
-        with:
-          node-version: 24
-          cache: npm
-
-      - if: steps.shots.outputs.found == 'true'
-        run: npm ci --ignore-scripts
-
+      # It installs its own pixelmatch and pngjs: no npm install here.
       - id: compare
         if: steps.shots.outputs.found == 'true'
         uses: jbhirsh/ci/readme-screenshots/compare@main
