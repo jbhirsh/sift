@@ -30,7 +30,7 @@ in-memory mock library.
 | `make format`                               | Prettier rewrites the tree (CI only checks it)                                               |
 | `make typecheck` / `npm run typecov`        | TypeScript 7 / type coverage at 100% (`npm run typecov:strict` also counts `as` casts)       |
 | `npm run depcruise`                         | the import layering rules (`.dependency-cruiser.cjs`)                                        |
-| `make check`                                | the unit job's lint, format check, typecheck, type coverage, depcruise, bridge check and tests with coverage (not its commit, pins, autofix-trigger, Expo Doctor or audit steps) |
+| `make check`                                | the unit job's lint, format check, typecheck, type coverage, depcruise, bridge check and tests with coverage (not its commit, pins, autofix-trigger, unmeasured, Expo Doctor or audit steps) |
 | `make build-e2e`, then `make test-e2e`      | the E2E simulator build, then the Maestro suite on a booted simulator                        |
 | `make test-mutation`                        | Stryker over the whole mutation scope (slow; `npx stryker run --mutate <file>` while iterating) |
 | `make doctor`                               | Expo Doctor (needs the network; CI runs it as advice)                                        |
@@ -79,7 +79,7 @@ The `main` branch rule requires these jobs by name, and each reports on every PR
 
 | Check                         | Workflow           | What it runs                                                                                                       |
 | ----------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| `Lint, Typecheck & Unit Test` | `ci.yml`           | commit messages, pins, autofix triggers, lint, Prettier, typecheck, type coverage, layering, the native bridge, Jest with coverage, `npm audit --omit=dev` (critical) |
+| `Lint, Typecheck & Unit Test` | `ci.yml`           | commit messages, pins, autofix triggers, lint, Prettier, typecheck, type coverage, layering, the native bridge, Jest with coverage, unmeasured source files, `npm audit --omit=dev` (critical) |
 | `Build iOS simulator app`     | `ci.yml`           | the E2E app: the native code's compile gate when a PR changes native files, and otherwise built when it isn't cached |
 | `E2E Tests (Maestro)`         | `ci.yml`           | the Maestro suite on the Simulator                                                                                 |
 | `Accessibility audit`         | `ci.yml`           | Xcode's accessibility audit                                                                                        |
