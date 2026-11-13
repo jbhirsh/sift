@@ -1,4 +1,5 @@
 import React from 'react';
+import { FlatList, Modal, Switch, TouchableOpacity, View } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -31,20 +32,9 @@ jest.mock('react-native-reanimated', () => ({
   runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
-jest.mock('react-native-gesture-handler', () => ({
-  GestureHandlerRootView: ({ children }: { children: React.ReactNode }) => children,
-  GestureDetector: ({ children }: { children: React.ReactNode }) => children,
-  Gesture: {
-    Pan: () => ({
-      minDistance: () => ({
-        enabled: () => ({ onUpdate: () => ({ onEnd: () => ({ onFinalize: () => ({}) }) }) }),
-      }),
-      onUpdate: () => ({ onFinalize: () => ({}) }),
-    }),
-    Tap: () => ({ onEnd: () => ({}) }),
-    Race: () => ({}),
-  },
-}));
+jest.mock('react-native-gesture-handler', () =>
+  jest.requireActual('../helpers/gestureHandlerMock').gestureHandlerMock(),
+);
 
 jest.mock('@sentry/react-native', () => ({
   init: jest.fn(),
@@ -125,6 +115,13 @@ import App from '../../src/App';
 import * as Sentry from '@sentry/react-native';
 import { scrubBreadcrumb, scrubEvent } from '../../src/utils/sentryScrub';
 import { a11yViolations } from '../helpers/a11yScan';
+
+// React Native's index loads each component the first time it's read, and
+// TouchableOpacity and Modal bring Animated and the rest with them: on a cold
+// Jest cache the first test to render Setup spent 2-3 s of its 5-second timeout
+// loading them. Read here, that loading happens once as the file loads, inside
+// no test's timeout.
+void [View, TouchableOpacity, Modal, Switch, FlatList];
 
 // Captured at import, before any beforeEach clears the mock: App configures
 // Sentry once, at module load.

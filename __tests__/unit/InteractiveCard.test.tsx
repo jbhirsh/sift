@@ -30,41 +30,62 @@ jest.mock('react-native-reanimated', () => ({
   runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
-// Capture gesture callbacks so we can invoke them in tests
-type GestureCallback = (event: Record<string, unknown>) => void;
+// Capture gesture callbacks so we can invoke them in tests. The builder takes
+// its calls in any order, as Gesture.Pan()'s does.
+type GestureCallback = (event: Record<string, unknown>, success?: boolean) => void;
+let panOnBegin: GestureCallback | undefined;
+let panOnStart: GestureCallback | undefined;
 let panOnUpdate: GestureCallback | undefined;
 let panOnEnd: GestureCallback | undefined;
 let panOnFinalize: GestureCallback | undefined;
 let panEnabled: boolean | undefined;
 
-jest.mock('react-native-gesture-handler', () => ({
-  GestureDetector: ({ children }: { children: React.ReactNode }) => children,
-  Gesture: {
-    Pan: () => ({
-      minDistance: () => ({
-        enabled: (enabled: boolean) => {
-          panEnabled = enabled;
-          return {
-            onUpdate: (fn: GestureCallback) => {
-              panOnUpdate = fn;
-              return {
-                onEnd: (fn: GestureCallback) => {
-                  panOnEnd = fn;
-                  return {
-                    onFinalize: (fn: GestureCallback) => {
-                      panOnFinalize = fn;
-                      return {};
-                    },
-                  };
-                },
-              };
-            },
-          };
-        },
-      }),
-    }),
-  },
-}));
+jest.mock('react-native-gesture-handler', () => {
+  const pan = {
+    minDistance: () => pan,
+    enabled: (enabled: boolean) => {
+      panEnabled = enabled;
+      return pan;
+    },
+    onBegin: (fn: GestureCallback) => {
+      panOnBegin = fn;
+      return pan;
+    },
+    onStart: (fn: GestureCallback) => {
+      panOnStart = fn;
+      return pan;
+    },
+    onUpdate: (fn: GestureCallback) => {
+      panOnUpdate = fn;
+      return pan;
+    },
+    onEnd: (fn: GestureCallback) => {
+      panOnEnd = fn;
+      return pan;
+    },
+    onFinalize: (fn: GestureCallback) => {
+      panOnFinalize = fn;
+      return pan;
+    },
+  };
+  return {
+    GestureDetector: ({ children }: { children: React.ReactNode }) => children,
+    Gesture: { Pan: () => pan },
+  };
+});
+
+// Whether this is the E2E build, which writes trace lines: a switch here.
+let mockTracing = false;
+const mockTrace = jest.fn();
+jest.mock('../../src/services/trace', () =>
+  Object.defineProperties(
+    {},
+    {
+      tracing: { get: () => mockTracing },
+      trace: { value: (event: string, data?: unknown) => mockTrace(event, data) },
+    },
+  ),
+);
 
 jest.mock('../../src/services/haptics', () => ({ thresholdHaptic: jest.fn() }));
 
@@ -248,6 +269,47 @@ describe('InteractiveCard', () => {
     onDecide.mockClear();
     panOnEnd?.({ translationX: 40, velocityX: 200 });
     expect(onDecide).not.toHaveBeenCalled();
+  });
+
+  test('the E2E build traces what the pan saw: began, took over, how it ended', async () => {
+    mockTracing = true;
+    mockTrace.mockClear();
+    try {
+      const onDecide = jest.fn();
+      await renderCard(mockTrack, onDecide);
+      panOnBegin?.({ absoluteX: 201.4 });
+      panOnStart?.({ translationX: 12.6 });
+      panOnEnd?.({ translationX: 160.2, velocityX: 402.7 }, true);
+      panOnFinalize?.({ absoluteX: 361, absoluteY: 569 }, true);
+      expect(mockTrace.mock.calls).toEqual([
+        ['pan-begin', { x: 201 }],
+        ['pan-start', { dx: 13 }],
+        ['pan-end', { dx: 160, vx: 403, ok: true, decision: 'keep' }],
+        ['pan-finalize', { ok: true }],
+      ]);
+      expect(onDecide).toHaveBeenCalledWith('keep');
+      // A pan that ends short decides nothing, and says so.
+      mockTrace.mockClear();
+      panOnEnd?.({ translationX: 13, velocityX: 0 }, false);
+      expect(mockTrace).toHaveBeenCalledWith('pan-end', {
+        dx: 13,
+        vx: 0,
+        ok: false,
+        decision: 'none',
+      });
+    } finally {
+      mockTracing = false;
+    }
+  });
+
+  test('a build without the trace writes no pan lines', async () => {
+    mockTrace.mockClear();
+    await renderCard();
+    panOnBegin?.({ absoluteX: 200 });
+    panOnStart?.({ translationX: 12 });
+    panOnEnd?.({ translationX: 160, velocityX: 400 }, true);
+    panOnFinalize?.({ absoluteX: 360, absoluteY: 569 }, true);
+    expect(mockTrace).not.toHaveBeenCalled();
   });
 
   test('crossing the threshold ticks once each way', async () => {

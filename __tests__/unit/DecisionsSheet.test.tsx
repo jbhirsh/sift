@@ -1,8 +1,16 @@
 import React from 'react';
+import { ActivityIndicator, FlatList, Modal, Text, TouchableOpacity } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import DecisionsSheet from '../../src/components/DecisionsSheet';
 import { a11yViolations } from '../helpers/a11yScan';
 import type { Decision, Track } from '../../src/types';
+
+// React Native's index loads each component the first time it's read, and
+// TouchableOpacity and Modal bring Animated and the rest with them: on a cold
+// Jest cache the first render took nearly 4 s of the first test's 5-second
+// timeout. Read here, that loading happens once as the file loads, inside no
+// test's timeout.
+void [Text, TouchableOpacity, FlatList, Modal, ActivityIndicator];
 
 jest.mock('../../src/theme/ThemeContext', () => ({
   useTheme: () => ({

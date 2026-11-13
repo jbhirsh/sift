@@ -55,8 +55,9 @@ compares its screenshots of the main screens with their baselines in `e2e/screen
 **When a simulator job fails or flakes,** its run summary gives the verdict and what needs
 attention (failed or re-run flows, flaky ones, steps and flows slower than usual) and links to its
 report: every step and flow beside the job's recent runs, the machine's CPU across the job, and
-its notes (the simulator, runner image, Xcode, Maestro, the warm-up). Read it before the logs. The
-E2E job's `maestro-results` artifact then holds:
+its notes (the simulator, runner image, Xcode, whether the simulator booted from the settled
+snapshot, Maestro, the warm-up, apsd and the busiest processes after setup). Read it before the
+logs. The E2E job's `maestro-results` artifact then holds:
 
 - `trace.txt`, the app's trace (E2E build only): every touch with where it landed and how late
   JavaScript saw it, every screen and sheet (when it started rendering, when React committed it,
@@ -71,7 +72,8 @@ E2E job's `maestro-results` artifact then holds:
 diff in the `visual-diffs` artifact. A screen that wasn't taken is a flow that stopped: the
 `ios-screenshots` artifact holds Maestro's logs and the app's trace, read as for a failed E2E flow.
 For a change that's meant, run `visual-baselines.yml` by hand on the PR's branch once its run has
-taken the screenshots; it commits them as the new baselines, then push again for the checks.
+taken the screenshots; it commits them as the new baselines, then approve the checks its push
+starts on the PR.
 
 ## Required checks
 
