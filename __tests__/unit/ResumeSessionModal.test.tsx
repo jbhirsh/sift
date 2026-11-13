@@ -1,8 +1,15 @@
 import React from 'react';
+import { Modal, Text } from 'react-native';
 import { render, fireEvent, within } from '@testing-library/react-native';
 import ResumeSessionModal from '../../src/components/ResumeSessionModal';
 import { a11yViolations } from '../helpers/a11yScan';
 import { SiftSession } from '../../src/types';
+
+// React Native's index loads each component the first time it's read, and Modal
+// brings ScrollView, Animated and the rest with it: on a cold Jest cache the
+// first render took 3-5 s of the first test's 5-second timeout. Read here, that
+// loading happens once as the file loads, inside no test's timeout.
+void [Text, Modal];
 
 jest.mock('expo-symbols', () => ({
   SymbolView: 'SymbolView',

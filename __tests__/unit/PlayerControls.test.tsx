@@ -1,5 +1,5 @@
 import React from 'react';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, Text, TouchableOpacity, View } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 import { Track } from '../../src/types';
 
@@ -150,6 +150,12 @@ jest.mock('../../src/theme/ThemeContext', () => ({
 }));
 
 import PlayerControls from '../../src/components/PlayerControls';
+
+// React Native's index loads each component the first time it's read, and
+// TouchableOpacity brings Animated and the rest with it: on a cold Jest cache
+// the first render took 2.5-3.5 s of the first test's 5-second timeout. Read
+// here, that loading happens once as the file loads, inside no test's timeout.
+void [View, Text, TouchableOpacity];
 
 describe('PlayerControls', () => {
   beforeEach(() => {
