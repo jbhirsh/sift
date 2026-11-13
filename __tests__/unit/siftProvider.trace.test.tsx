@@ -20,6 +20,15 @@ jest.mock('@sentry/react-native', () => ({
 
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
 
+// React Native's index loads each component the first time it's read, and the
+// music provider tries to load expo-musickit on the first render, which first
+// loads the whole expo package (expo-asset reads Image): on a cold Jest cache
+// that ran the first test past its 5-second timeout on a busy machine. Imported
+// and read here, that loading happens once as the file loads, inside no test's
+// timeout.
+import 'expo';
+void [TouchableOpacity];
+
 const seenDispatches = new Set<unknown>();
 
 function Buttons() {
