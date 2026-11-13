@@ -5,6 +5,15 @@ import { ErrorBoundary } from '../../src/components/ErrorBoundary';
 import { ThemeProvider } from '../../src/theme/ThemeContext';
 import { SiftProvider, useSift } from '../../src/context/SiftContext';
 
+// React Native's index loads each component the first time it's read, and the
+// music provider tries to load expo-musickit the first time a test renders it,
+// which first loads the whole expo package (expo-asset reads Image): on a cold
+// Jest cache Restart's test spent 1.5-2 s of its 5-second timeout on that.
+// Imported and read here, that loading happens once as the file loads, inside
+// no test's timeout.
+import 'expo';
+void [Text, Pressable];
+
 jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
   __esModule: true,
   default: jest.fn().mockReturnValue('light'),

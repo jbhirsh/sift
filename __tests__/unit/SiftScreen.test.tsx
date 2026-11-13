@@ -1,5 +1,5 @@
 import React from 'react';
-import { Dimensions, Text } from 'react-native';
+import { Dimensions, FlatList, Modal, Text } from 'react-native';
 import { fireEvent, act } from '@testing-library/react-native';
 
 jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
@@ -41,19 +41,9 @@ jest.mock('react-native-reanimated', () => ({
   runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
 }));
 
-jest.mock('react-native-gesture-handler', () => ({
-  GestureDetector: ({ children }: { children: React.ReactNode }) => children,
-  Gesture: {
-    Pan: () => ({
-      minDistance: () => ({
-        enabled: () => ({ onUpdate: () => ({ onEnd: () => ({ onFinalize: () => ({}) }) }) }),
-      }),
-      onUpdate: () => ({ onFinalize: () => ({}) }),
-    }),
-    Tap: () => ({ onEnd: () => ({}) }),
-    Race: () => ({}),
-  },
-}));
+jest.mock('react-native-gesture-handler', () =>
+  jest.requireActual('../helpers/gestureHandlerMock').gestureHandlerMock(),
+);
 
 jest.mock('@sentry/react-native', () => ({
   setTag: jest.fn(),
@@ -192,6 +182,13 @@ import { flyOffDistance } from '../../src/utils/cardLayout';
 import { decisionHaptic, undoHaptic } from '../../src/services/haptics';
 import * as Sentry from '@sentry/react-native';
 import { markReviewed } from '../../src/services/ReviewedLedgerStore';
+
+// React Native's index loads each component the first time it's read: on a
+// cold Jest cache, the first test to open the decisions sheet spent 1.5 s of
+// its 5-second timeout loading Modal and FlatList. Read here, that loading
+// happens once as the file loads, inside no test's timeout. (The
+// InteractiveCard mock above reads TouchableOpacity, Text and View already.)
+void [FlatList, Modal];
 
 // A press whose finger lifted at `timestamp` (the touch's own clock, which
 // performance.now() shares: helpers/clock.setup.ts), however late JavaScript
