@@ -72,6 +72,9 @@ changing the module.
     before the logs (`CONTRIBUTING.md` says what each holds). In `trace.txt`, a touch followed by
     no action, screen or guard line is a tap the app dropped: say where, then fix the flow or the
     app, whichever is wrong.
+- **PR pictures never go on the `screenshots` branch**: the PR template says where they come
+  from. A GIF comes from pushing a flow in `e2e/gifs/`, which CI records and
+  `pr-gif-attach.yml` attaches; don't run PR GIFs by hand except as the fallback.
 
 ## Conventions
 

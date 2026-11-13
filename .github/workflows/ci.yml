@@ -7,8 +7,9 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      # For a PR's "before" GIFs (scripts/pr-gifs.ts): run on main with
-      # the PR's scenarios, recording only.
+      # For a PR's "before" GIFs (pr-gif-attach.yml, pr-gif.yml by hand,
+      # or a local scripts/pr-gifs.ts): run on main with the PR's scenarios,
+      # recording only.
       gifs_only:
         description: Only record the GIF scenarios (no suite, audit or screenshots)
         type: boolean
@@ -22,10 +23,10 @@ on:
         type: boolean
         default: false
 
-# A gifs-only run by hand (a PR's "before" GIFs, scripts/pr-gifs.ts) gets
-# a group of its own: sharing main's, it would cancel main's push run (which
-# saves the app cache PRs reuse), be cancelled by the next merge, and cancel
-# another PR's GIF run.
+# A gifs-only run (a PR's "before" GIFs, started by pr-gif-attach.yml,
+# pr-gif.yml or scripts/pr-gifs.ts) gets a group of its own: sharing main's,
+# it would cancel main's push run (which saves the app cache PRs reuse), be
+# cancelled by the next merge, and cancel another PR's GIF run.
 concurrency:
   group: ${{ github.workflow }}-${{ inputs.gifs_only == true && format('gifs-{0}', github.run_id) || github.ref }}
   cancel-in-progress: true
@@ -666,11 +667,12 @@ jobs:
           notes: a11y-audit/job-notes.json
           load: a11y-audit/machine-cpu.csv
 
-  # Pictures, not a gate itself: the screenshots for PR descriptions, the
-  # README (readme-screenshots.yml takes this run's ios-screenshots artifact)
-  # and the Visual regression job below, which compares them, and
-  # the GIF scenarios' videos (scripts/pr-gifs.ts takes ios-gif-videos;
-  # a gifs-only run by hand records only these).
+  # Pictures, not a gate itself: the screenshots for the visual baselines
+  # (the Visual regression job below compares them, and visual-baselines.yml
+  # commits them) and the README (readme-screenshots.yml takes this run's
+  # ios-screenshots artifact), and the GIF scenarios' videos
+  # (pr-gif-attach.yml, pr-gif.yml and scripts/pr-gifs.ts take
+  # ios-gif-videos; a gifs-only run records only these).
   pictures:
     name: Screenshots and GIFs
     needs: [check, build, bundle]
@@ -728,9 +730,10 @@ jobs:
 
       # The GIF scenarios in e2e/gifs, recorded on the Simulator with the
       # touches drawn (components/TouchOverlay), as videos that
-      # scripts/pr-gifs.ts turns into a PR's before/after GIFs. A run by
-      # hand on main can record another commit's scenarios (the PR's), for
-      # its "before". It never fails the job.
+      # pr-gif-attach.yml (or pr-gif.yml, or scripts/pr-gifs.ts) turns into
+      # a PR's before/after GIFs. A gifs-only run on main can record another
+      # commit's scenarios (the PR's), for its "before". It never fails the
+      # job.
       - name: Fetch the GIF scenarios to record
         id: gif-scenarios
         if: inputs.gif_scenarios_from != '' && inputs.gif_scenarios_from != null

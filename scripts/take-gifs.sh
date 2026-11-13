@@ -1,6 +1,7 @@
 #!/bin/bash
 # Record each GIF scenario in e2e/gifs on the booted simulator, as a video
-# for a PR's GIFs (scripts/pr-gifs.ts turns them into GIFs). Each
+# for a PR's GIFs (pr-gif-attach.yml turns a PR's into GIFs on its own;
+# pr-gif.yml or scripts/pr-gifs.ts, by hand). Each
 # e2e/gifs/<name>.yaml gets the app to where its GIF begins, records the
 # steps with Maestro's startRecording (named <name>), then takes a
 # <name>-end screenshot to say every step ran. All of them run in one
