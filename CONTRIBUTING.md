@@ -71,7 +71,8 @@ E2E job's `maestro-results` artifact then holds:
 diff in the `visual-diffs` artifact. A screen that wasn't taken is a flow that stopped: the
 `ios-screenshots` artifact holds Maestro's logs and the app's trace, read as for a failed E2E flow.
 For a change that's meant, run `visual-baselines.yml` by hand on the PR's branch once its run has
-taken the screenshots; it commits them as the new baselines, then push again for the checks.
+taken the screenshots; it commits them as the new baselines, then approve the checks its push
+starts on the PR.
 
 ## Required checks
 
