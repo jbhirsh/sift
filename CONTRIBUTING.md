@@ -35,7 +35,7 @@ in-memory mock library.
 | `make test-mutation`                        | Stryker over the whole mutation scope (slow; `npx stryker run --mutate <file>` while iterating) |
 | `make doctor`                               | Expo Doctor (needs the network; CI runs it as advice)                                        |
 | `npx knip` / `npm run jscpd`                | what the weekly audit reports: dead code / duplicated code                                   |
-| `npm run pr-gifs -- <PR>`                   | a PR's before/after GIFs, hosted on the `screenshots` branch                                 |
+| `npm run pr-gifs -- <PR> --out <dir>`       | a PR's before/after GIFs into a folder, unattached (a push that changes a flow in `e2e/gifs/` attaches them on its own) |
 
 The git hooks run lint, Prettier on the staged files, the type-check, the layering rules and the
 native bridge check on commit, and the unit tests under coverage on push (not for a push of only
@@ -87,7 +87,7 @@ The `main` branch rule requires these jobs by name, and each reports on every PR
 | `Accessibility audit`         | `ci.yml`           | Xcode's accessibility audit                                                                                        |
 | `Mutation Tests (Stryker)`    | `mutation.yml`     | mutation testing of the lines a PR changed                                                                         |
 | `Claude Review`               | `claude-review.yml` | jbhirsh/ci's AI review; this repo's guide is `.github/claude-review.md`                                           |
-| `PR visuals`                  | `pr-visuals.yml`   | a UI change has pictures in its description                                                                        |
+| `PR visuals`                  | `pr-visuals.yml`   | a UI change shows: its changed baselines (in a before/after comment), a GIF, or a picture no test can draw          |
 | `Secret scan`, `SAST scan`    | `gitleaks.yml`, `semgrep.yml` | gitleaks and Semgrep, also swept weekly                                                                 |
 
 `Screenshots and GIFs` makes pictures and never gates; `Visual regression` joins the list once it
@@ -117,8 +117,10 @@ iOS asks for on the first launch.
   write and Actions read, and no Workflows permission. Claude autofix pushes its fixes and runs
   `gh` with it, so its pushes start the PR's workflows (Actions read is for the failed runs' logs).
   The README screenshot bot opens its PR with it: a PR the default Actions token opens starts no
-  workflows, so its required checks would never report. Bots' PRs get no secrets, so the simulator
-  app builds without an Expo or Apple login on them (`scripts/build-simulator-app.sh`).
+  workflows, so its required checks would never report. PR GIFs attach (`pr-gif-attach.yml`), and PR
+  GIFs (`pr-gif.yml`) run by hand, need it too, to attach GIFs: GitHub refuses the Actions token for
+  attachments. Bots' PRs get no secrets, so the simulator app builds without an Expo or Apple login
+  on them (`scripts/build-simulator-app.sh`).
 - **Claude Review and autofix** sign in by workload identity federation: the workflows pass the IDs
   of a rule in the Anthropic Console (Workload identity), so there is no Claude secret. The IDs
   aren't secret. Review and autofix run on the Agent SDK (`"engine": "sdk"` in `.github/ci.json`),
