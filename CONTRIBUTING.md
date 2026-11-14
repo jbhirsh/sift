@@ -30,11 +30,11 @@ in-memory mock library.
 | `make format`                               | Prettier rewrites the tree (CI only checks it)                                               |
 | `make typecheck` / `npm run typecov`        | TypeScript 7 / type coverage at 100% (`npm run typecov:strict` also counts `as` casts)       |
 | `npm run depcruise`                         | the import layering rules (`.dependency-cruiser.cjs`)                                        |
-| `make check`                                | the unit job's lint, format check, typecheck, type coverage, depcruise, bridge check and tests with coverage (not its commit, pins, autofix-trigger, Expo Doctor or audit steps) |
+| `make check`                                | the unit job's lint, format check, typecheck, type coverage, depcruise, bridge check and tests with coverage (not its commit, pins, autofix-trigger, unmeasured, Expo Doctor or audit steps) |
 | `make build-e2e`, then `make test-e2e`      | the E2E simulator build, then the Maestro suite on a booted simulator                        |
 | `make test-mutation`                        | Stryker over the whole mutation scope (slow; `npx stryker run --mutate <file>` while iterating) |
 | `make doctor`                               | Expo Doctor (needs the network; CI runs it as advice)                                        |
-| `npx knip` / `npx jscpd`                    | what the weekly audit reports: dead code / duplicated code                                   |
+| `npx knip` / `npm run jscpd`                | what the weekly audit reports: dead code / duplicated code                                   |
 | `npm run pr-gifs -- <PR>`                   | a PR's before/after GIFs, hosted on the `screenshots` branch                                 |
 
 The git hooks run lint, Prettier on the staged files, the type-check, the layering rules and the
@@ -55,8 +55,9 @@ compares its screenshots of the main screens with their baselines in `e2e/screen
 **When a simulator job fails or flakes,** its run summary gives the verdict and what needs
 attention (failed or re-run flows, flaky ones, steps and flows slower than usual) and links to its
 report: every step and flow beside the job's recent runs, the machine's CPU across the job, and
-its notes (the simulator, runner image, Xcode, Maestro, the warm-up). Read it before the logs. The
-E2E job's `maestro-results` artifact then holds:
+its notes (the simulator, runner image, Xcode, whether the simulator booted from the settled
+snapshot, Maestro, the warm-up, apsd and the busiest processes after setup). Read it before the
+logs. The E2E job's `maestro-results` artifact then holds:
 
 - `trace.txt`, the app's trace (E2E build only): every touch with where it landed and how late
   JavaScript saw it, every screen and sheet (when it started rendering, when React committed it,
@@ -71,7 +72,8 @@ E2E job's `maestro-results` artifact then holds:
 diff in the `visual-diffs` artifact. A screen that wasn't taken is a flow that stopped: the
 `ios-screenshots` artifact holds Maestro's logs and the app's trace, read as for a failed E2E flow.
 For a change that's meant, run `visual-baselines.yml` by hand on the PR's branch once its run has
-taken the screenshots; it commits them as the new baselines, then push again for the checks.
+taken the screenshots; it commits them as the new baselines, then approve the checks its push
+starts on the PR.
 
 ## Required checks
 
@@ -79,7 +81,7 @@ The `main` branch rule requires these jobs by name, and each reports on every PR
 
 | Check                         | Workflow           | What it runs                                                                                                       |
 | ----------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------ |
-| `Lint, Typecheck & Unit Test` | `ci.yml`           | commit messages, pins, autofix triggers, lint, Prettier, typecheck, type coverage, layering, the native bridge, Jest with coverage, `npm audit --omit=dev` (critical) |
+| `Lint, Typecheck & Unit Test` | `ci.yml`           | commit messages, pins, autofix triggers, lint, Prettier, typecheck, type coverage, layering, the native bridge, Jest with coverage, unmeasured source files, `npm audit --omit=dev` (critical) |
 | `Build iOS simulator app`     | `ci.yml`           | the E2E app: the native code's compile gate when a PR changes native files, and otherwise built when it isn't cached |
 | `E2E Tests (Maestro)`         | `ci.yml`           | the Maestro suite on the Simulator                                                                                 |
 | `Accessibility audit`         | `ci.yml`           | Xcode's accessibility audit                                                                                        |

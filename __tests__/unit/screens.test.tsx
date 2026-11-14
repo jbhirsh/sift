@@ -1,5 +1,20 @@
 import React from 'react';
-import { AccessibilityInfo, ActionSheetIOS, Alert, Linking, Share, Text } from 'react-native';
+import {
+  AccessibilityInfo,
+  ActionSheetIOS,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Linking,
+  Modal,
+  Pressable,
+  ScrollView,
+  Share,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { fireEvent, act, waitFor } from '@testing-library/react-native';
 
 // Common mocks
@@ -101,6 +116,23 @@ import SettingsScreen from '../../src/screens/SettingsScreen';
 import PlaylistPicker from '../../src/components/PlaylistPicker';
 import { loadReviewedIds, unmarkReviewed } from '../../src/services/ReviewedLedgerStore';
 import { useMusicProvider } from '../../src/hooks/useMusicProvider';
+
+// React Native's index loads each component the first time it's read, and
+// ScrollView brings Animated and the rest with it: on a cold Jest cache the
+// first render took 2-3 s of the first test's 5-second timeout, and opening
+// the playlist picker (Modal, FlatList) a second more. Read here, that
+// loading happens once as the file loads, inside no test's timeout.
+void [
+  View,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  Pressable,
+  FlatList,
+  Modal,
+  Switch,
+  ActivityIndicator,
+];
 
 describe('SetupScreen', () => {
   // Start Sifting and Start Over read the saved session from disk before

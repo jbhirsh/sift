@@ -1,10 +1,16 @@
 import React from 'react';
-import { TouchableOpacity } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { fireEvent, act } from '@testing-library/react-native';
 import SiftScreen from '../../src/screens/SiftScreen';
 import { useSift } from '../../src/context/SiftContext';
 import { renderWithProviders } from '../helpers/renderWithProviders';
 import { Track } from '../../src/types';
+
+// React Native's index loads each component the first time it's read, and
+// TouchableOpacity brings Animated and the rest with it: on a cold Jest cache
+// the first test spent over a second of its 5-second timeout loading it. Read
+// here, that loading happens once as the file loads, inside no test's timeout.
+void [View, TouchableOpacity, Text];
 
 // The Sift screen and its player controls each call useMusicProvider. Each
 // call used to own a provider instance and a poller; with the real mock
@@ -42,19 +48,9 @@ jest.mock('react-native-reanimated', () => ({
   FadeOut: { duration: () => undefined },
   runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
 }));
-jest.mock('react-native-gesture-handler', () => ({
-  GestureDetector: ({ children }: { children: React.ReactNode }) => children,
-  Gesture: {
-    Pan: () => ({
-      minDistance: () => ({
-        enabled: () => ({ onUpdate: () => ({ onEnd: () => ({ onFinalize: () => ({}) }) }) }),
-      }),
-      onUpdate: () => ({ onFinalize: () => ({}) }),
-    }),
-    Tap: () => ({ onEnd: () => ({}) }),
-    Race: () => ({}),
-  },
-}));
+jest.mock('react-native-gesture-handler', () =>
+  jest.requireActual('../helpers/gestureHandlerMock').gestureHandlerMock(),
+);
 jest.mock('@sentry/react-native', () => ({
   setTag: jest.fn(),
   setContext: jest.fn(),

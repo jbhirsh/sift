@@ -1,9 +1,15 @@
 import React from 'react';
-import { Text } from 'react-native';
+import { Pressable, Switch, Text } from 'react-native';
 import { fireEvent, render } from '@testing-library/react-native';
 import SwitchRow from '../../src/components/SwitchRow';
 import { ThemeProvider } from '../../src/theme/ThemeContext';
 import { a11yViolations } from '../helpers/a11yScan';
+
+// React Native's index loads each component the first time it's read: on a cold
+// Jest cache, loading Switch and Text took 2-3.5 s of the first test's 5-second
+// timeout. Read here, that loading happens once as the file loads, inside no
+// test's timeout.
+void [Text, Switch, Pressable];
 
 jest.mock('react-native/Libraries/Utilities/useColorScheme', () => ({
   __esModule: true,

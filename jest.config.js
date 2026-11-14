@@ -38,10 +38,6 @@ module.exports = {
     // The scripts: each is one file, its command line included, that Node
     // runs as it is and the tests import.
     'scripts/*.ts',
-    // Only types: nothing in them runs.
-    '!src/types/**',
-    '!src/services/MusicProviderInterface.ts',
-    '!modules/expo-musickit/src/ExpoMusicKit.types.ts',
   ],
   // Per-file coverage enforcement (mirrors BoardGames' vite.config.ts
   // `coverage.thresholds.perFile: true, lines: 80`). A glob key applies the

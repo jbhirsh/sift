@@ -1,18 +1,3 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  // Autolinked as a native module (package.json "expo.autolinking"), and
-  // loaded with require() by path, never imported by its package name.
-  // expo-system-ui: Expo needs it for app.json's userInterfaceStyle on
-  // Android only, and Sift is iOS-only (MusicKit has no Android SDK).
-  // jscpd, pixelmatch, pngjs: run by jbhirsh/ci's actions from this repo's
-  // node_modules (the weekly audit's jscpd; the README screenshot
-  // comparison's pixelmatch and pngjs).
-  "ignoreDependencies": ["expo-musickit", "expo-system-ui", "jscpd", "pixelmatch", "pngjs"],
-  // The native module's wrappers are required by path as one object
-  // (AppleMusicProvider, useResolvedArtwork), which knip can't follow; the
-  // native bridge check (scripts/check-native-bridge.ts) holds them to the
-  // Swift module instead.
-  "ignoreIssues": {
-    "modules/expo-musickit/src/index.ts": ["exports", "types"],
-  },
 }

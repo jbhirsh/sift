@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppState, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { AppState, FlatList, ScrollView, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { fireEvent, act } from '@testing-library/react-native';
 import SiftScreen from '../../src/screens/SiftScreen';
 import { useSift } from '../../src/context/SiftContext';
@@ -8,6 +8,13 @@ import { a11yViolations } from '../helpers/a11yScan';
 import DoneScreen from '../../src/screens/DoneScreen';
 import { loadReviewedIds } from '../../src/services/ReviewedLedgerStore';
 import { PendingDecision, Track } from '../../src/types';
+
+// React Native's index loads each component the first time it's read, and
+// TouchableOpacity and ScrollView bring Animated and the rest with them: on a
+// cold Jest cache the first tests spent 1-1.5 s of their 5-second timeout
+// loading them. Read here, that loading happens once as the file loads, inside
+// no test's timeout.
+void [TouchableOpacity, Text, FlatList, ScrollView];
 
 // The latest decision is held back for the undo window and sent after it,
 // on the next decision, or when the Sift screen goes away (#152).
@@ -42,19 +49,9 @@ jest.mock('react-native-reanimated', () => ({
   FadeOut: { duration: () => undefined },
   runOnJS: (fn: (...args: unknown[]) => unknown) => fn,
 }));
-jest.mock('react-native-gesture-handler', () => ({
-  GestureDetector: ({ children }: { children: React.ReactNode }) => children,
-  Gesture: {
-    Pan: () => ({
-      minDistance: () => ({
-        enabled: () => ({ onUpdate: () => ({ onEnd: () => ({ onFinalize: () => ({}) }) }) }),
-      }),
-      onUpdate: () => ({ onFinalize: () => ({}) }),
-    }),
-    Tap: () => ({ onEnd: () => ({}) }),
-    Race: () => ({}),
-  },
-}));
+jest.mock('react-native-gesture-handler', () =>
+  jest.requireActual('../helpers/gestureHandlerMock').gestureHandlerMock(),
+);
 jest.mock('@sentry/react-native', () => ({
   setTag: jest.fn(),
   setContext: jest.fn(),
