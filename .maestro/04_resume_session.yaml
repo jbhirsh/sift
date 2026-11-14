@@ -121,22 +121,25 @@ name: "Resume Session Modal"
 - assertNotVisible:
     id: "resume-session-modal"
 
-# Cancel dismissed the prompt — a fresh sift is offered
-- assertVisible: "Start Sifting"
+# Cancel only dismissed the prompt ("not now"): the saved sift is still
+# offered inline, not thrown away.
+- assertVisible: "Resume Sifting"
+- assertNotVisible: "Start Sifting"
 
-# ── Start Over from the modal wipes progress ──
-- tapOn: "Start Sifting"
+# ── The inline Start Over discards it ──
+- tapOn:
+    id: "setup-start-over"
 
-# The saved sift still has a decision on disk, so starting a new one asks
-# before discarding it (#137). Wait for the button, not just the title: an
-# alert's buttons can enter the accessibility tree a beat later.
+# The saved sift still has a decision on disk, so Start Over asks before
+# discarding it (#137). Wait for the button, not just the title: an alert's
+# buttons can enter the accessibility tree a beat later.
 - extendedWaitUntil:
-    visible: "Discard your current sift?"
+    visible: "Start Over?"
     timeout: 30000
 - extendedWaitUntil:
-    visible: "Discard"
+    visible: "Discard and Start Over"
     timeout: 30000
-- tapOn: "Discard"
+- tapOn: "Discard and Start Over"
 
 - extendedWaitUntil:
     visible:
@@ -154,6 +157,7 @@ name: "Resume Session Modal"
     visible: "Resume Sifting"
     timeout: 30000
 
+# ── Start Over from the modal wipes progress ──
 - launchApp
 
 - extendedWaitUntil:
