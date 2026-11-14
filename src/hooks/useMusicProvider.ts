@@ -197,8 +197,15 @@ export function useMusicProvider() {
    */
   const ensureAccess = useCallback(
     async (stillWanted: () => boolean = () => true): Promise<boolean> => {
-      if (await providerRef.current.isAuthorized()) return true;
-      if (await providerRef.current.requestAuthorization()) return true;
+      // Either way access is granted, say so: Settings shows connectionStatus,
+      // which otherwise stays "Not checked" for the whole launch.
+      if (
+        (await providerRef.current.isAuthorized()) ||
+        (await providerRef.current.requestAuthorization())
+      ) {
+        dispatch({ type: 'SET_CONNECTION_STATUS', status: 'connected' });
+        return true;
+      }
       // Asked for by a load that was cancelled since: say nothing.
       if (!stillWanted()) return false;
       dispatch({ type: 'SET_CONNECTION_STATUS', status: 'disconnected' });

@@ -640,6 +640,37 @@ describe('SetupScreen', () => {
     expect(getByTestId('probe-errors').props.children).toBe('Could not remove Track B');
   });
 
+  test('Resume marks the connection connected, for Settings', async () => {
+    function StatusProbe() {
+      const { state } = useSift();
+      return <Text testID="probe-status">{state.connectionStatus}</Text>;
+    }
+    const { loadSession } = require('../../src/services/SessionStore');
+    (loadSession as jest.Mock).mockResolvedValueOnce({
+      tracks: [mockTrackA, mockTrackB],
+      cursor: 1,
+      kept: [mockTrackA],
+      removed: [],
+      skipped: [],
+      sortOrder: 'least-played',
+      savedAt: '2026-04-10T00:00:00.000Z',
+      provider: 'apple-music',
+      source: { type: 'library' },
+    });
+    const { getByTestId } = await renderWithProviders(
+      <>
+        <SetupScreen />
+        <StatusProbe />
+      </>,
+    );
+    await act(async () => {});
+    expect(getByTestId('probe-status').props.children).toBe('unknown');
+    await act(async () => {
+      await fireEvent.press(getByTestId('resume-modal-resume'));
+    });
+    expect(getByTestId('probe-status').props.children).toBe('connected');
+  });
+
   test('Resume asks for Music access first, and stays on Setup without it', async () => {
     function PhaseProbe() {
       const { state } = useSift();

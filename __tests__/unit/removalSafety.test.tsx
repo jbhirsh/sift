@@ -437,6 +437,24 @@ describe('ensureAccess', () => {
     expect(Alert.alert).not.toHaveBeenCalled();
   });
 
+  test('already authorized: marks the connection connected, for Settings', async () => {
+    await renderSift();
+    expect(sift.state.connectionStatus).toBe('unknown');
+    await act(async () => {
+      await api.ensureAccess();
+    });
+    expect(sift.state.connectionStatus).toBe('connected');
+  });
+
+  test('granted when asked: marks the connection connected', async () => {
+    mockProvider.isAuthorized.mockResolvedValue(false);
+    await renderSift();
+    await act(async () => {
+      await api.ensureAccess();
+    });
+    expect(sift.state.connectionStatus).toBe('connected');
+  });
+
   test('refused: says so, offers Settings, and marks the connection lost', async () => {
     mockProvider.isAuthorized.mockResolvedValue(false);
     mockProvider.requestAuthorization.mockResolvedValue(false);

@@ -262,7 +262,9 @@ export default function SetupScreen() {
       type: 'RESUME_SESSION',
       session: resumeState(savedSession, {
         provider: state.provider,
-        connectionStatus: state.connectionStatus,
+        // ensureAccess just said yes. This render's state.connectionStatus
+        // predates the 'connected' it dispatched, and would put it back.
+        connectionStatus: 'connected',
         finish,
       }),
     });
