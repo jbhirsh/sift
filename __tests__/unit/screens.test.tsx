@@ -907,6 +907,32 @@ describe('SetupScreen', () => {
     expect(queryByTestId('resume-session-modal')).toBeNull();
   });
 
+  test('cancelling the resume sheet keeps the saved sift: Resume Sifting stays offered', async () => {
+    const { loadSession } = require('../../src/services/SessionStore');
+    (loadSession as jest.Mock).mockResolvedValueOnce({
+      tracks: [mockTrackA, mockTrackB],
+      cursor: 1,
+      kept: [mockTrackA],
+      removed: [],
+      skipped: [],
+      sortOrder: 'least-played',
+      savedAt: '2026-04-10T00:00:00.000Z',
+      provider: 'apple-music',
+      source: { type: 'library' },
+    });
+
+    const { getByTestId, queryByTestId, queryByText } = await renderWithProviders(<SetupScreen />);
+    await act(async () => {});
+    await act(async () => {
+      await fireEvent.press(getByTestId('resume-modal-cancel'));
+    });
+
+    expect(queryByTestId('resume-session-modal')).toBeNull();
+    expect(queryByText('Resume Sifting')).toBeTruthy();
+    expect(queryByText('Start Sifting')).toBeNull();
+    expect(getByTestId('setup-stat-kept')).toBeTruthy();
+  });
+
   test('playlist picker excludes "- Sifted" companion playlists', async () => {
     mockProvider.loadPlaylists.mockResolvedValue([
       { id: 'p1', name: 'My Playlist', trackCount: 8 },
