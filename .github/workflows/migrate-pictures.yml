@@ -53,9 +53,9 @@ jobs:
     # state, inside the 6 hours a job may take.
     timeout-minutes: 330
     env:
-      DRY_RUN: "true"
-      FROM_RUN: ""
-      HOST_PR: ""
+      DRY_RUN: "false"
+      FROM_RUN: "43540265445"
+      HOST_PR: "232"
     steps:
       - name: The token and the run's settings
         env:
