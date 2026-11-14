@@ -1,0 +1,14 @@
+{
+  "id": 43572509567,
+  "number": 700,
+  "workflow": "CI",
+  "branch": "claude/zen-meitner-0s3vbt",
+  "sha": "04f31eecc5fd7abbaaa339087f01c31e1caf9acd",
+  "created": "2026-11-14T07:44:38Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/43572509567",
+  "jobs": [
+    "accessibility-audit",
+    "e2e-tests-maestro",
+    "screenshots-and-gifs"
+  ]
+}

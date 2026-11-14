@@ -1,0 +1,14 @@
+{
+  "id": 43334776116,
+  "number": 683,
+  "workflow": "CI",
+  "branch": "claude/unmeasured-coverage",
+  "sha": "5d8535696783c3f725834f2b1ed2b145da9fb5d8",
+  "created": "2026-11-13T00:09:27Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/43334776116",
+  "jobs": [
+    "accessibility-audit",
+    "e2e-tests-maestro",
+    "screenshots-and-gifs"
+  ]
+}

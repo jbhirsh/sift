@@ -1,0 +1,14 @@
+{
+  "id": 43130532587,
+  "number": 679,
+  "workflow": "CI",
+  "branch": "claude/shared-claude-rules",
+  "sha": "9620baa885fb172e8e007bb084a367f3fac4123f",
+  "created": "2026-11-12T00:52:56Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/43130532587",
+  "jobs": [
+    "accessibility-audit",
+    "e2e-tests-maestro",
+    "screenshots-and-gifs"
+  ]
+}

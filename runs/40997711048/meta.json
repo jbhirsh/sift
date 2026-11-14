@@ -1,0 +1,13 @@
+{
+  "id": 40997711048,
+  "number": 663,
+  "workflow": "CI",
+  "branch": "claude/brave-ritchie-k055tx",
+  "sha": "69e83c56c357eac190f79224c5d5d62e41dbc498",
+  "created": "2026-10-30T03:29:59Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/40997711048",
+  "jobs": [
+    "accessibility-audit",
+    "screenshots-and-gifs"
+  ]
+}

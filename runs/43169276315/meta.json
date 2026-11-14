@@ -1,0 +1,14 @@
+{
+  "id": 43169276315,
+  "number": 682,
+  "workflow": "CI",
+  "branch": "knip-no-ignores",
+  "sha": "44fe17b6cea198ccd8442f8d9fe031c74b72d5ef",
+  "created": "2026-11-12T06:36:12Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/43169276315",
+  "jobs": [
+    "accessibility-audit",
+    "e2e-tests-maestro",
+    "screenshots-and-gifs"
+  ]
+}
