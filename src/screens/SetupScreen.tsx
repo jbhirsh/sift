@@ -129,6 +129,9 @@ export default function SetupScreen() {
   const [showPlaylistPicker, setShowPlaylistPicker] = useState(false);
   const [savedSession, setSavedSession] = useState<SiftSession | null>(null);
   const [showResumeModal, setShowResumeModal] = useState(false);
+  // Set by the resume sheet's Cancel: the sheet isn't offered again this
+  // mount, but the saved sift is kept for the inline Resume Sifting.
+  const [resumePromptDismissed, setResumePromptDismissed] = useState(false);
   // Songs kept in earlier sifts of the selected library or playlist, which
   // a new sift leaves out unless the switch says otherwise (#143).
   const [includeSifted, setIncludeSifted] = useState(false);
@@ -227,7 +230,7 @@ export default function SetupScreen() {
   }, [dispatch]);
 
   const checkForMatchingSession = (chosen: SiftSource) => {
-    if (!savedSession) return;
+    if (!savedSession || resumePromptDismissed) return;
     const sessionSource = savedSession.source;
     if (!sessionSource) return;
     // The sift in memory for this source is the same session, and newer
@@ -697,8 +700,11 @@ export default function SetupScreen() {
             }}
             onStartOver={handleStartOver}
             onCancel={() => {
+              // "Not now", not "throw it away": the saved sift stays, so the
+              // inline Resume Sifting still offers it, and re-picking its
+              // source doesn't pop the sheet again.
               setShowResumeModal(false);
-              setSavedSession(null);
+              setResumePromptDismissed(true);
             }}
           />
         )}
