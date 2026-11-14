@@ -35,7 +35,8 @@
       "assets/**"
     ],
     "notUi": [],
-    "advice": "Add before/after pictures to the description: simulator screenshots for how it looks, a GIF for how it moves or responds (a card swipe, an animation, a sheet or modal opening and closing, scrolling, a multi-step flow). Screenshot: `xcrun simctl io booted screenshot after.png`, or without a Mac the `ios-screenshots` artifact of CI's Screenshots and GIFs job (Setup, the sort sheet, Sift, the decisions list, Settings and Done, light and dark); never a web export, which draws every SF Symbol as an empty box. GIF: add or edit the scenario in e2e/gifs/ for the motion this PR changes (a Maestro flow; swipe-and-undo.yaml says how one is built), push, then `npm run pr-gifs -- <PR number>` records main and this branch, makes the GIFs, commits them to the screenshots branch and prints the Before | After table to paste (`--side-by-side` adds a labelled pair, `--no-before` is for a screen main doesn't have); on a Mac by hand, `xcrun simctl io booted recordVideo --codec=h264 swipe.mov`. To host pictures yourself, drag them into the description, or commit them to a folder named for the topic on the screenshots branch (one branch for every PR's pictures, never a new one per topic) and link them by that commit's SHA, raw.githubusercontent.com/jbhirsh/sift/<sha>/<topic>/..., so a later push can't change what this PR shows. Or tick \"No visible UI change\" in the template. Editing the description re-runs this check."
+    "advice": "A UI change shows through the visual baselines it changes, which this check puts in a before/after table comment, light beside dark: change them with the UI (e2e/screenshots/screens.yaml holds the screens), and once this PR's CI run has taken its screenshots, run Update visual baselines (visual-baselines.yml) on this branch, then approve the checks its push starts. For motion (a card swipe, an animation, a sheet or modal opening and closing, scrolling, a multi-step flow), add or edit the scenario in e2e/gifs/ (a Maestro flow, <name>.yaml; swipe-and-undo.yaml says how one is built) and push: once this PR's CI run finishes, PR GIFs attach (pr-gif-attach.yml) takes the videos its Screenshots and GIFs job recorded and main's, makes the GIFs and attaches them here, labelled GIF: (run PR GIFs, pr-gif.yml, by hand for a scenario this PR doesn't change, or a fork's PR). Only what no test can draw (the app icon, the launch screen, an iOS prompt) is dragged in by hand, with alt text `No test draws: <why>`. Or tick \"No visible UI change\" in the template. Editing the description re-runs this check.",
+    "fromBaselines": true
   },
   "audit": {
     "graph": ["src"]
@@ -48,10 +49,15 @@
     "artifact": {
       "workflow": "ci.yml",
       "name": "ios-screenshots"
-    }
+    },
+    "columns": [
+      { "label": "Light", "file": "light-{state}.png", "width": 220 },
+      { "label": "Dark", "file": "dark-{state}.png", "width": 220 }
+    ]
   },
   "gif": {
     "source": "ci-videos",
+    "scenarios": "e2e/gifs",
     "cellWidth": 260,
     "videos": {
       "workflow": "ci.yml",
@@ -78,7 +84,7 @@
       "mutation testing"
     ],
     "exempt": {
-      "PR visuals": "Wants pictures in the PR description, which no code change gives (autofix skips its failure too).",
+      "PR visuals": "Wants new baselines from the Simulator or GIFs, which autofix can't make (autofix skips its failure too).",
       "README screenshots": "Runs as a PR closes, when there's nothing left for autofix to do."
     }
   }
