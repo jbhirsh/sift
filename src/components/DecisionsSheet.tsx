@@ -160,9 +160,6 @@ export default function DecisionsSheet({
           <Text style={[styles.doneText, { color: colors.accent }]}>Done</Text>
         </TouchableOpacity>
       </View>
-      <Text style={[styles.note, { color: colors.textSecondary }]}>
-        Change any of them: Sift updates your library to match.
-      </Text>
       <FlatList
         data={tracks}
         keyExtractor={(item) => item.id}
@@ -195,11 +192,6 @@ const styles = StyleSheet.create({
   doneText: {
     fontSize: 17,
     fontWeight: '600',
-  },
-  note: {
-    fontSize: 13,
-    paddingHorizontal: SPACING['2xl'],
-    paddingBottom: SPACING.lg,
   },
   list: {
     flexGrow: 0,
