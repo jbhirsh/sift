@@ -10,8 +10,6 @@ name: "Swipe to Keep and Remove"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 - extendedWaitUntil:
     visible:
       id: "setup-brand"

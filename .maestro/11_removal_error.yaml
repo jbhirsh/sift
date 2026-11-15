@@ -27,8 +27,6 @@ name: "Failed Removal Shows the Removal-Errors Warning"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 - extendedWaitUntil:
     visible:
       id: "setup-brand"
@@ -48,7 +46,6 @@ name: "Failed Removal Shows the Removal-Errors Warning"
 # Remove the first track — the injected failure fires here
 - tapOn:
     id: "action-remove"
-- waitForAnimationToEnd
 
 # The first library remove explains where removed songs go, and the failure
 # shows during the sift, not only on Done (#141).
@@ -67,7 +64,6 @@ name: "Failed Removal Shows the Removal-Errors Warning"
     commands:
       - tapOn:
           id: "action-keep"
-      - waitForAnimationToEnd
 
 - extendedWaitUntil:
     visible:

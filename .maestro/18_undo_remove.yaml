@@ -10,8 +10,6 @@ name: "Undo a Remove"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 - extendedWaitUntil:
     visible:
       id: "setup-brand"
@@ -29,15 +27,13 @@ name: "Undo a Remove"
 # runner can spend just finding the pill (a run failed this way), so the
 # E2E build lengthens it to 30 s (eas.json EXPO_PUBLIC_UNDO_WINDOW_MS; unit
 # tests pin the 5 s). After a tap Maestro also waits for the screen to
-# settle, and the playing song's seek bar never does, so that wait is
-# capped. The Undo tap waits for the pill itself.
+# stop changing, which with the E2E build's still song clock is soon after
+# the card has gone. The Undo tap waits for the pill itself.
 - tapOn:
     id: "action-remove"
-    waitToSettleTimeoutMs: 500
 
 - tapOn:
     id: "undo-pill"
-    waitToSettleTimeoutMs: 500
 
 - extendedWaitUntil:
     visible:

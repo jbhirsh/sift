@@ -9,8 +9,6 @@ name: "Start Over Asks First"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 - extendedWaitUntil:
     visible:
       id: "setup-brand"
@@ -29,7 +27,11 @@ name: "Start Over Asks First"
 
 - tapOn:
     id: "action-keep"
-- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "stat-kept"
+      text: "1 kept"
+    timeout: 10000
 
 - tapOn:
     id: "back-button"

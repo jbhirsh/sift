@@ -543,7 +543,7 @@ describe('MockMusicProvider: songs deleted in Music (#183, SiftDeletedInMusic)',
   });
 });
 
-describe('MockMusicProvider: a still clock for screenshots (SiftStillPlayback)', () => {
+describe('MockMusicProvider: a still clock in the E2E build, unless SiftLivePlayback', () => {
   afterEach(() => {
     jest.useRealTimers();
   });
@@ -557,15 +557,15 @@ describe('MockMusicProvider: a still clock for screenshots (SiftStillPlayback)',
     return mock.getPlaybackState();
   }
 
-  test('launched with it, the playing song stays where it started', async () => {
-    const { MockMusicProvider: Mock } = launchedWith({ SiftStillPlayback: 'true' });
+  test('in the E2E build, the playing song stays where it started', async () => {
+    const { MockMusicProvider: Mock } = launchedWith({});
     await expect(positionAfter(new Mock())).resolves.toEqual({ position: 12, isPlaying: true });
   });
 
-  test('without it, or outside the E2E build, the clock runs', async () => {
-    const { MockMusicProvider: Plain } = launchedWith({});
-    await expect(positionAfter(new Plain())).resolves.toEqual({ position: 17, isPlaying: true });
-    const { MockMusicProvider: Release } = launchedWith({ SiftStillPlayback: 'true' }, false);
+  test('launched with SiftLivePlayback, or outside the E2E build, the clock runs', async () => {
+    const { MockMusicProvider: Live } = launchedWith({ SiftLivePlayback: 'true' });
+    await expect(positionAfter(new Live())).resolves.toEqual({ position: 17, isPlaying: true });
+    const { MockMusicProvider: Release } = launchedWith({}, false);
     await expect(positionAfter(new Release())).resolves.toEqual({ position: 17, isPlaying: true });
   });
 });

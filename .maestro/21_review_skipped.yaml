@@ -9,8 +9,6 @@ name: "Review Skipped Songs"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 - extendedWaitUntil:
     visible:
       id: "setup-brand"
@@ -23,19 +21,16 @@ name: "Review Skipped Songs"
       id: "card-track-name"
     timeout: 30000
 
-# Keep one, skip the other nine. Each tap waits out the screen's settle
-# cap (the playing song's seek bar never settles), a second, which is
-# longer than the guard after a decision: no tap lands on a decision
-# still under way.
+# Keep one, skip the other nine.
+# Each tap waits until the screen stops changing, which with the E2E
+# build's still song clock is soon after the card has gone.
 - tapOn:
     id: "action-keep"
-    waitToSettleTimeoutMs: 1000
 - repeat:
     times: 9
     commands:
       - tapOn:
           id: "action-skip"
-          waitToSettleTimeoutMs: 1000
 
 - extendedWaitUntil:
     visible:

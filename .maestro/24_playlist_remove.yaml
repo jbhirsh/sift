@@ -12,8 +12,6 @@ name: "Remove and Restore in a Playlist Sift"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 - extendedWaitUntil:
     visible:
       id: "setup-brand"
@@ -52,7 +50,6 @@ name: "Remove and Restore in a Playlist Sift"
 # The launch's first removed song: its removal fails.
 - tapOn:
     id: "action-remove"
-    waitToSettleTimeoutMs: 500
 
 - extendedWaitUntil:
     visible:
@@ -62,7 +59,6 @@ name: "Remove and Restore in a Playlist Sift"
 
 - tapOn:
     id: "action-remove"
-    waitToSettleTimeoutMs: 500
 
 - extendedWaitUntil:
     visible:

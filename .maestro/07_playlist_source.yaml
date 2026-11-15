@@ -8,8 +8,6 @@ name: "Playlist Source - Select and Sift"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 # Verify setup screen
 - extendedWaitUntil:
     visible:
@@ -61,19 +59,23 @@ name: "Playlist Source - Select and Sift"
 # Make a decision to verify the flow works
 - tapOn:
     id: "action-keep"
-- waitForAnimationToEnd
 
-- assertVisible:
-    id: "stat-kept"
-    text: "1 kept"
+- extendedWaitUntil:
+    visible:
+      id: "stat-kept"
+      text: "1 kept"
+    timeout: 10000
 
 # ── Finish the playlist (Chill Vibes has 3 tracks) and reach Done ──
 - tapOn:
     id: "action-keep"
-- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "stat-kept"
+      text: "2 kept"
+    timeout: 10000
 - tapOn:
     id: "action-keep"
-- waitForAnimationToEnd
 
 - extendedWaitUntil:
     visible:

@@ -15,8 +15,6 @@ name: "Setup Says How Many Songs Were Deleted in Music"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 - extendedWaitUntil:
     visible:
       id: "setup-brand"
@@ -30,10 +28,8 @@ name: "Setup Says How Many Songs Were Deleted in Music"
       text: "Peaches"
     timeout: 30000
 
-# The playing song's seek bar keeps the screen from settling (flow 15).
 - tapOn:
     id: "action-remove"
-    waitToSettleTimeoutMs: 500
 
 - extendedWaitUntil:
     visible:
@@ -43,7 +39,6 @@ name: "Setup Says How Many Songs Were Deleted in Music"
 
 - tapOn:
     id: "action-remove"
-    waitToSettleTimeoutMs: 500
 
 - extendedWaitUntil:
     visible:

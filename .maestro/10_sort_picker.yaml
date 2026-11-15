@@ -13,8 +13,6 @@ name: "Sort Picker - Action Sheet Changes Track Order"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 - extendedWaitUntil:
     visible:
       id: "setup-brand"

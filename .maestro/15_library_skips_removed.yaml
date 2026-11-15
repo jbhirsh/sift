@@ -16,8 +16,6 @@ name: "Library Sift Skips Removed Songs"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 - extendedWaitUntil:
     visible:
       id: "setup-brand"
@@ -33,9 +31,6 @@ name: "Library Sift Skips Removed Songs"
 
 - tapOn:
     id: "action-remove"
-    waitToSettleTimeoutMs: 500
-- waitForAnimationToEnd:
-    timeout: 1500
 
 - extendedWaitUntil:
     visible:
@@ -45,22 +40,19 @@ name: "Library Sift Skips Removed Songs"
 
 - tapOn:
     id: "action-remove"
-    waitToSettleTimeoutMs: 500
-- waitForAnimationToEnd:
-    timeout: 1500
+- extendedWaitUntil:
+    visible:
+      id: "stat-removed"
+      text: "2 removed"
+    timeout: 10000
 
-# The playing song's seek bar keeps the screen from ever "settling", so
-# Maestro's settle and animation waits would each run to their limit (about
-# 6 s per card). Capped: the card flies off in 300 ms, and each tap still
-# leaves 2 s before the next.
+# Each tap waits until the screen stops changing, which with the E2E
+# build's still song clock is soon after the card has gone.
 - repeat:
     times: 8
     commands:
       - tapOn:
           id: "action-keep"
-          waitToSettleTimeoutMs: 500
-      - waitForAnimationToEnd:
-          timeout: 1500
 
 - extendedWaitUntil:
     visible:
@@ -119,7 +111,6 @@ name: "Library Sift Skips Removed Songs"
 
 - tapOn:
     id: "action-skip"
-- waitForAnimationToEnd
 
 - extendedWaitUntil:
     visible:
