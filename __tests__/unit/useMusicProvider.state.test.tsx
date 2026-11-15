@@ -18,6 +18,8 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { MusicProviderService } from '../../src/services/MusicProviderInterface';
 import { Playlist, Track } from '../../src/types';
+import { isMarked, unmark } from '../../src/services/e2eMarks';
+import { trace } from '../../src/services/trace';
 
 // Companion to useMusicProvider.test.tsx. That file wires provider calls;
 // this one asserts the hook's observable outcomes: the state it leaves in
@@ -29,6 +31,12 @@ jest.mock('@sentry/react-native', () => ({
   setContext: jest.fn(),
   addBreadcrumb: jest.fn(),
   captureException: jest.fn(),
+}));
+
+// Read for the E2E trace line a dropped load writes.
+jest.mock('../../src/services/trace', () => ({
+  ...jest.requireActual('../../src/services/trace'),
+  trace: jest.fn(),
 }));
 
 jest.mock('../../src/services/SessionStore', () => ({
@@ -56,6 +64,7 @@ const mockProvider = {
   addToPlaylist: jest.fn().mockResolvedValue(undefined),
   addToLibrary: jest.fn().mockResolvedValue(undefined),
   warmSongCache: jest.fn().mockResolvedValue(undefined),
+  loadCancelled: jest.fn(),
 };
 
 // The active provider is swappable per test so we can exercise providers
@@ -575,6 +584,14 @@ describe('useMusicProvider — observable state', () => {
       expect(sift.state.phase).toBe('setup');
     }
 
+    beforeEach(() => unmark('load-discarded'));
+
+    /** The late answer was dropped at `type`: traced, and marked for Setup's E2E marker. */
+    function expectDropped(type: string) {
+      expect(trace).toHaveBeenCalledWith('load-dropped', { type });
+      expect(isMarked('load-discarded')).toBe(true);
+    }
+
     function expectBackOnSetup() {
       expect(sift.state.phase).toBe('setup');
       expect(sift.state.tracks).toEqual([]);
@@ -594,6 +611,7 @@ describe('useMusicProvider — observable state', () => {
         await pending;
       });
       expect(mockProvider.loadLibrary).not.toHaveBeenCalled();
+      expectDropped('access');
       expectBackOnSetup();
     });
 
@@ -625,6 +643,8 @@ describe('useMusicProvider — observable state', () => {
         library.resolve([mockTrack, mockTrackB]);
         await pending;
       });
+      // Its next step, the progress, is the first thing dropped.
+      expectDropped('SET_LOAD_PROGRESS');
       expectBackOnSetup();
     });
 
@@ -637,10 +657,14 @@ describe('useMusicProvider — observable state', () => {
       await act(async () => {});
       expect(mockProvider.loadPlaylistTracks).toHaveBeenCalledWith('p1');
       await cancel();
+      // The provider hears the load isn't wanted (the E2E mock answers at once).
+      expect(mockProvider.loadCancelled).toHaveBeenCalled();
       await act(async () => {
         tracks.resolve([mockTrack]);
         await pending;
       });
+      // Its late answer is dropped, and marked for Setup's E2E marker.
+      expectDropped('playlist-tracks');
       // The import looks for "My Playlist - Sifted" through loadPlaylists.
       expect(mockProvider.loadPlaylists).not.toHaveBeenCalled();
       expect(loadHistory).not.toHaveBeenCalled();

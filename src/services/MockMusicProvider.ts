@@ -271,6 +271,8 @@ export class MockMusicProvider implements MusicProviderService {
   private playStartTime = 0;
   private playStartPosition = 0;
   private currentTrackDuration = 0;
+  /** The slow playlist's loads under way, each answered by loadCancelled. */
+  private cancelWaiters: (() => void)[] = [];
 
   async requestAuthorization(): Promise<boolean> {
     return true;
@@ -406,10 +408,22 @@ export class MockMusicProvider implements MusicProviderService {
   }
 
   async loadPlaylistTracks(playlistID: string): Promise<Track[]> {
-    await delay(playlistID === 'playlist-5' ? SLOW_PLAYLIST_LOAD_MS : 300);
+    if (playlistID === 'playlist-5') {
+      await Promise.race([
+        delay(SLOW_PLAYLIST_LOAD_MS),
+        new Promise<void>((answer) => this.cancelWaiters.push(answer)),
+      ]);
+    } else {
+      await delay(300);
+    }
     const indices = MOCK_PLAYLIST_TRACK_INDICES[playlistID];
     if (!indices) return [];
     return indices.map((i) => ({ ...MOCK_LIBRARY_TRACKS[i] }));
+  }
+
+  /** Answers the slow playlist's loads under way at once (Loading's Cancel). */
+  loadCancelled(): void {
+    for (const answer of this.cancelWaiters.splice(0)) answer();
   }
 
   /** Compute the current position based on elapsed wall-clock time. */

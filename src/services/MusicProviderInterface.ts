@@ -106,6 +106,13 @@ export interface MusicProviderService {
   loadPlaylistTracks?(playlistID: string): Promise<Track[]>;
 
   /**
+   * Loading's Cancel (#177): the app no longer wants the load under way.
+   * E2E mock only: its slow playlist answers at once, so a flow sees the
+   * late answer dropped without waiting it out.
+   */
+  loadCancelled?(): void;
+
+  /**
    * Warm the native cache for a list of track IDs (used on session resume).
    * `playlistID`: the playlist the session sifts, whose entries (music
    * videos included) only a playlist load can bring back. Resolves to how

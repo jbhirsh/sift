@@ -42,6 +42,8 @@ import { ledgerKey, reviewedNote } from '../utils/reviewedLedger';
 import { COLORS, CONTENT_COLUMN, RADIUS, SPACING } from '../theme';
 import { Playlist, SiftSession, SiftSource, SortOrder, SORT_ORDER_DISPLAY } from '../types';
 import { useTraceScreen } from '../hooks/useTrace';
+import E2eMarker from '../components/E2eMarker';
+import { useE2eMark } from '../hooks/useE2eMark';
 
 function sourceMatches(a: SiftSource, b: SiftSource): boolean {
   if (a.type !== b.type) return false;
@@ -80,6 +82,7 @@ const SOURCE_DISPLAY: Record<(typeof SOURCE_TYPES)[number], string> = {
 
 export default function SetupScreen() {
   useTraceScreen('setup');
+  const loadDiscarded = useE2eMark('load-discarded');
   const { state, dispatch, startFresh, flushPendingSave, setSortOrder, setFilter } = useSift();
   const { colors, glass } = useTheme();
   const {
@@ -782,6 +785,8 @@ export default function SetupScreen() {
 
         <View style={{ flex: 1 }} />
       </ScrollView>
+      {/* E2E only: a cancelled load's late answer was dropped (flow 26). */}
+      <E2eMarker id="load-discarded" when={loadDiscarded} />
     </View>
   );
 }
