@@ -31,6 +31,7 @@ import { importSiftedKeeps } from '../services/SiftedImport';
 import { deletedInMusicCount } from '../services/DeletedInMusic';
 import { loadPlaylistTracksOnce } from '../services/playlistLoads';
 import { trace } from '../services/trace';
+import { mark } from '../services/e2eMarks';
 import type { MusicProvider, Playlist, SiftSource, Track } from '../types';
 
 const SKIP_SECONDS = 15;
@@ -344,10 +345,15 @@ export function useMusicProvider() {
       // Every dispatch below goes through send: once Cancel (or a newer load)
       // has moved the generation on, this load changes nothing.
       const current = () => generation === loadGeneration;
+      // A late answer to a cancelled load, dropped: in the E2E trace, and
+      // marked for flow 26 (services/e2eMarks).
+      const dropped = (type: string) => {
+        trace('load-dropped', { type });
+        mark('load-discarded');
+      };
       const send: typeof dispatch = (action) => {
         if (current()) dispatch(action);
-        // In the E2E trace, so a flow can show a late result was dropped.
-        else trace('load-dropped', { type: action.type });
+        else dropped(action.type);
       };
 
       const shouldFilter = !options?.skipFiltering;
@@ -363,7 +369,10 @@ export function useMusicProvider() {
           send({ type: 'SET_LOAD_ERROR', error: ACCESS_REQUIRED });
           return;
         }
-        if (!current()) return;
+        if (!current()) {
+          dropped('access');
+          return;
+        }
 
         send({ type: 'SET_LOAD_PROGRESS', progress: 0.3, message: 'Fetching tracks…' });
 
@@ -382,7 +391,10 @@ export function useMusicProvider() {
           tracks = result;
           unfilteredCount = tracks.length;
           // Cancelled while it loaded: leave the rest (the import included).
-          if (!current()) return;
+          if (!current()) {
+            dropped('playlist-tracks');
+            return;
+          }
           // Keeps an older build saved to "<name> - Sifted", into the ledger
           // first (once per playlist), so the filter below counts them.
           await importSiftedKeeps(providerRef.current, state.provider, source, result);
@@ -515,7 +527,8 @@ export function useMusicProvider() {
     loadGeneration += 1;
     loadingInProgressRef.current = null;
     dispatch({ type: 'CANCEL_LOAD' });
-  }, [dispatch]);
+    providerRef.current.loadCancelled?.();
+  }, [dispatch, providerRef]);
 
   /**
    * Retry the removals that failed (#151). Each is checked first: a removal

@@ -4,7 +4,8 @@ name: "Cancel on Loading"
 
 # A long load has a way out (#177): Cancel goes back to Setup, and the load
 # finishing later must not start a sift. The mock's "Long Drive" playlist
-# takes 15 s to load (SLOW_PLAYLIST_LOAD_MS), long enough to press Cancel.
+# takes 15 s to load (SLOW_PLAYLIST_LOAD_MS), long enough to press Cancel,
+# and answers at once when cancelled.
 - launchApp:
     # A fresh start without a reinstall (services/e2eReset).
     arguments:
@@ -44,13 +45,12 @@ name: "Cancel on Loading"
       id: "setup-start-sifting"
     timeout: 10000
 
-# Outlast the load (15 s from Start Sifting). Waits for the first card,
-# which must never come: a late load that started a sift would show it.
+# The cancelled load's answer comes and is dropped: Setup marks it (an
+# E2E-only element), and no sift starts.
 - extendedWaitUntil:
     visible:
-      id: "card-track-name"
-    timeout: 20000
-    optional: true
+      id: "load-discarded"
+    timeout: 10000
 - assertNotVisible:
     id: "card-track-name"
 - assertVisible:

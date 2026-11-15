@@ -214,6 +214,18 @@ describe('MockMusicProvider', () => {
     expect(SLOW_PLAYLIST_LOAD_MS).toBeGreaterThanOrEqual(10000);
   });
 
+  test('a cancelled load of "Long Drive" answers at once, so a flow sees it dropped', async () => {
+    let tracks: { id: string }[] | undefined;
+    void provider.loadPlaylistTracks('playlist-5').then((t) => {
+      tracks = t;
+    });
+    await jest.advanceTimersByTimeAsync(0);
+    expect(tracks).toBeUndefined();
+    provider.loadCancelled();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(tracks).toHaveLength(10);
+  });
+
   test('loadPlaylistTracks returns empty array for unknown playlist ID', async () => {
     const tracks = await flushAsync(provider.loadPlaylistTracks('nonexistent'));
     expect(tracks).toEqual([]);
