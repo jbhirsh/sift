@@ -112,12 +112,15 @@ iOS asks for on the first launch.
 
 ## One-time setup
 
-- **Actions secrets:** `EXPO_TOKEN` (EAS builds and updates), `SENTRY_AUTH_TOKEN` (source maps),
-  `CLAUDE_CODE_OAUTH_TOKEN` (Claude Review and autofix) and `BOT_PR_TOKEN`, a fine-grained token
-  for this repository with Contents and Pull requests read and write. The README screenshot bot
-  opens its PR with it: a PR the default Actions token opens starts no workflows, so its required
-  checks would never report. Bots' PRs get no secrets, so the simulator app builds without an Expo
-  or Apple login on them (`scripts/build-simulator-app.sh`).
+- **Actions secrets:** `EXPO_TOKEN` (EAS builds and updates), `SENTRY_AUTH_TOKEN` (source maps)
+  and `BOT_PR_TOKEN`, a fine-grained token for this repository with Contents and Pull requests
+  read and write. The README screenshot bot opens its PR with it: a PR the default Actions token
+  opens starts no workflows, so its required checks would never report. Bots' PRs get no secrets,
+  so the simulator app builds without an Expo or Apple login on them
+  (`scripts/build-simulator-app.sh`).
+- **Claude Review and autofix** sign in by workload identity federation: the workflows pass the
+  IDs of a rule in the Anthropic Console (Workload identity), so there is no Claude secret. The
+  IDs aren't secret.
 - **The `main` branch rule:** it requires the checks above, Claude Review included, and resolved
   review threads. A bot PR merges as soon as the rule lets it, so a check missing from the rule
   doesn't gate it.
