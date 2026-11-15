@@ -71,15 +71,13 @@ name: "Library Sift Skips Removed Songs"
     id: "summary-count-removed"
     text: "2"
 
-# Give the autosave (debounced 500 ms) time to write the finished session:
-# stopApp kills the app without a background flush, and a session saved one
-# card short would pop the resume sheet on relaunch. Waits for an id that
-# never appears.
+# The finished session is on disk before stopApp, which kills the app with
+# no background flush: SiftContext writes it as Done shows, and its E2E mark
+# says once it has.
 - extendedWaitUntil:
     visible:
-      id: "wait-for-autosave"
-    timeout: 1500
-    optional: true
+      id: "session-saved"
+    timeout: 10000
 
 # A second library sift: relaunch and start one. A finished session isn't
 # offered for resume, so Setup goes straight to Start Sifting.

@@ -11,7 +11,13 @@ jest.mock('../../src/services/trace', () => ({
   enterScreen: jest.fn(() => () => {}),
   currentScreen: () => 'sift',
 }));
-jest.mock('../../src/services/SessionStore');
+// Automocked, but each save resolves, as SessionStore's own does.
+jest.mock('../../src/services/SessionStore', () => ({
+  ...jest.createMockFromModule<typeof import('../../src/services/SessionStore')>(
+    '../../src/services/SessionStore',
+  ),
+  saveSession: jest.fn(() => Promise.resolve()),
+}));
 jest.mock('@sentry/react-native', () => ({
   setTag: jest.fn(),
   setContext: jest.fn(),

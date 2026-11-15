@@ -176,6 +176,7 @@ import {
   markSwipeHintSeen,
 } from '../../src/services/PreferencesStore';
 import { useSift } from '../../src/context/SiftContext';
+import { isMarked, mark } from '../../src/services/e2eMarks';
 import SiftScreen from '../../src/screens/SiftScreen';
 import { a11yViolations } from '../helpers/a11yScan';
 import { flyOffDistance } from '../../src/utils/cardLayout';
@@ -478,6 +479,72 @@ describe('SiftScreen', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  test('the last decision saves the finished session at once, not after the debounce', async () => {
+    const { saveSession } = require('../../src/services/SessionStore');
+    jest.useFakeTimers();
+    try {
+      (saveSession as jest.Mock).mockClear();
+      // Every save waits until the test lets it land.
+      const saves: (() => void)[] = [];
+      (saveSession as jest.Mock).mockImplementation(
+        () => new Promise<void>((resolve) => saves.push(resolve)),
+      );
+      const { getByLabelText } = await renderWithProviders(<SiftScreen />, {
+        initialTracks: tracks.slice(0, 1),
+      });
+
+      // Left by an earlier sift's save.
+      mark('session-saved');
+      // Skipping the only card finishes the sift: Done is often where the
+      // app is left, so the save can't wait out the debounce.
+      await fireEvent.press(getByLabelText('Skip'));
+      expect(saveSession).toHaveBeenLastCalledWith(expect.objectContaining({ cursor: 1 }));
+      // Flow 15's E2E mark says so only once this save is written.
+      expect(isMarked('session-saved')).toBe(false);
+      await act(async () => saves.forEach((resolve) => resolve()));
+      expect(isMarked('session-saved')).toBe(true);
+    } finally {
+      (saveSession as jest.Mock).mockResolvedValue(undefined);
+      jest.useRealTimers();
+    }
+  });
+
+  test('Start Over from Done never writes back the session it is clearing', async () => {
+    const { saveSession, clearSession } = require('../../src/services/SessionStore');
+    let cleared!: () => void;
+    (clearSession as jest.Mock).mockImplementationOnce(
+      () => new Promise<void>((resolve) => (cleared = resolve)),
+    );
+    let sift!: ReturnType<typeof useSift>;
+    const Grab = () => {
+      sift = useSift();
+      return <SiftScreen />;
+    };
+    const { getByLabelText } = await renderWithProviders(<Grab />, {
+      initialTracks: tracks.slice(0, 1),
+    });
+    await fireEvent.press(getByLabelText('Skip'));
+    expect(sift.state.phase).toBe('done');
+    (saveSession as jest.Mock).mockClear();
+    // While the clear is under way the phase is still Done; a change then
+    // (a removal's late error, say) must not save the session again.
+    await act(async () => {
+      sift.resetToSetup();
+      sift.dispatch({ type: 'SET_SORT_ORDER', sortOrder: 'most-played' });
+    });
+    expect(saveSession).not.toHaveBeenCalled();
+    await act(async () => cleared());
+    expect(sift.state.phase).toBe('setup');
+    expect(saveSession).not.toHaveBeenCalled();
+    // Once cleared, the next sift's Done saves again.
+    await act(async () => {
+      sift.dispatch({ type: 'LOAD_TRACKS', tracks: tracks.slice(0, 1) });
+      sift.dispatch({ type: 'FINISH' });
+    });
+    expect(sift.state.phase).toBe('done');
+    expect(saveSession).toHaveBeenCalledTimes(1);
   });
 
   test('a skip press immediately after a swipe decide cannot double-decide', async () => {

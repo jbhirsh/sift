@@ -33,6 +33,7 @@ import { trace, tracing } from '../services/trace';
 import { describeAction } from '../utils/trace';
 import { sortTracks } from '../utils/sorting';
 import { uniqueTracks } from '../utils/trackIdentity';
+import { mark, unmark } from '../services/e2eMarks';
 
 // ── State ──────────────────────────────────────────────
 
@@ -550,6 +551,9 @@ export function SiftProvider({
   }, []);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingSessionRef = useRef<SiftSession | null>(null);
+  // Set while Start Over or a fresh start clears the session: Done's own
+  // save mustn't write it back before the phase leaves Done.
+  const discardingRef = useRef(false);
   // The preferences the user changed this launch, so a slow initial load
   // can't overwrite their choice with the stored value.
   const preferencesChangedRef = useRef(new Set<PreferenceField>());
@@ -627,6 +631,17 @@ export function SiftProvider({
     };
 
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    // A finished sift is written at once, not after the debounce: the app is
+    // often left (or, in E2E, stopped) on Done, and a session saved a card
+    // short would offer to resume it. Flow 15 waits for its E2E mark.
+    if (state.phase === 'done') {
+      saveTimeoutRef.current = null;
+      pendingSessionRef.current = null;
+      if (discardingRef.current) return;
+      unmark('session-saved');
+      void saveSession(session).then(() => mark('session-saved'));
+      return;
+    }
     pendingSessionRef.current = session;
     saveTimeoutRef.current = setTimeout(() => {
       pendingSessionRef.current = null;
@@ -732,8 +747,10 @@ export function SiftProvider({
         level: 'info',
       });
       dropPendingSave();
+      discardingRef.current = true;
       clearSession().then(() => {
         dispatch({ type: 'START_FRESH', skipFiltering });
+        discardingRef.current = false;
       });
     },
     [dispatch, dropPendingSave],
@@ -742,8 +759,10 @@ export function SiftProvider({
   const resetToSetup = useCallback(() => {
     Sentry.addBreadcrumb({ category: 'user-action', message: 'Reset to setup', level: 'info' });
     dropPendingSave();
+    discardingRef.current = true;
     clearSession().then(() => {
       dispatch({ type: 'RESET_TO_SETUP' });
+      discardingRef.current = false;
     });
   }, [dispatch, dropPendingSave]);
 
