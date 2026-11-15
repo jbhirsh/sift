@@ -54,6 +54,8 @@ import {
 import { collectsRemovals, MUSIC_APP_URL } from '../utils/libraryRemovals';
 import { COLORS, CONTENT_COLUMN, RADIUS, SETTINGS_BUTTON, SPACING } from '../theme';
 import { useTraceScreen } from '../hooks/useTrace';
+import { useE2eMark } from '../hooks/useE2eMark';
+import E2eMarker from '../components/E2eMarker';
 
 /** Done's "Save kept songs as a playlist", from press to result. */
 type KeptSave =
@@ -69,6 +71,7 @@ export default function DoneScreen() {
   const insets = useSafeAreaInsets();
   const { colors } = useTheme();
   const { restoreTrack, restoreUnderWay, keepTrack, saveKeptPlaylist } = useMusicProvider();
+  const sessionSaved = useE2eMark('session-saved');
   // A decision still held back (a session resumed straight to Done, #152)
   // has nothing left to undo it here: send it.
   const sendPending = useSendPending();
@@ -283,6 +286,8 @@ export default function DoneScreen() {
     <>
       {/* Title section */}
       <View style={styles.titleSection}>
+        {/* E2E only: the finished session is on disk (flow 15). */}
+        <E2eMarker id="session-saved" when={sessionSaved} />
         <Text testID="done-title" style={[styles.titleText, { color: colors.text }]}>
           {headline.title}
         </Text>
