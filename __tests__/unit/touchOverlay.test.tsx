@@ -75,6 +75,10 @@ describe('the touch mark store', () => {
 });
 
 describe('TouchOverlay', () => {
+  // The overlay's frames and fades run on fake time (performance.now follows
+  // Date.now, helpers/clock.setup.ts), moved on by exactly the time each
+  // step needs rather than waited out.
+  beforeEach(() => jest.useFakeTimers());
   afterEach(async () => {
     // Let any held ring scale out so the shared store starts empty.
     await act(async () => {
@@ -82,6 +86,7 @@ describe('TouchOverlay', () => {
       touchMarks.tick(performance.now());
     });
     mockShowTouches = false;
+    jest.useRealTimers();
   });
 
   it('draws nothing unless the launch asked for touches', async () => {
@@ -100,7 +105,7 @@ describe('TouchOverlay', () => {
     await act(async () => {
       touchMarks.down(100, 200, performance.now());
       touchMarks.move(140, 200, performance.now());
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      jest.advanceTimersByTime(50);
     });
     const ring = screen.getByTestId('touch-ring', { includeHiddenElements: true });
     expect(ring.props.style).toEqual(
@@ -111,7 +116,7 @@ describe('TouchOverlay', () => {
     // Released, the ring scales out and goes.
     await act(async () => {
       touchMarks.up(140, 200, performance.now());
-      await new Promise((resolve) => setTimeout(resolve, FADED_MS));
+      jest.advanceTimersByTime(FADED_MS);
     });
     expect(screen.queryByTestId('touch-ring', { includeHiddenElements: true })).toBeNull();
   });
@@ -124,12 +129,12 @@ describe('TouchOverlay', () => {
       await act(async () => {
         touchMarks.down(10, 10, performance.now());
         touchMarks.up(10, 10, performance.now());
-        await new Promise((resolve) => setTimeout(resolve, FADED_MS));
+        jest.advanceTimersByTime(FADED_MS);
       });
       const frames = raf.mock.calls.length;
       expect(frames).toBeGreaterThan(0);
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        jest.advanceTimersByTime(100);
       });
       expect(raf.mock.calls.length).toBe(frames);
     } finally {
@@ -150,13 +155,13 @@ describe('TouchOverlay', () => {
       </>,
     );
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      jest.advanceTimersByTime(50);
     });
     expect(layers()).toBe(1);
     expect(screen.toJSON()).not.toBeNull();
     await screen.rerender(<TouchOverlay />);
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      jest.advanceTimersByTime(50);
     });
     expect(layers()).toBe(1);
   });
@@ -181,12 +186,12 @@ describe('TouchOverlay', () => {
       )?.opacity;
     };
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 30));
+      jest.advanceTimersByTime(30);
     });
     const early = opacity() ?? 0;
     // Nothing else changes in the store meanwhile: only its own loop moves it.
     await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      jest.advanceTimersByTime(100);
     });
     expect(opacity()).toBeLessThan(early);
   });

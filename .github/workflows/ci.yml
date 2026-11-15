@@ -377,8 +377,8 @@ jobs:
   # scripts/simulator-device.sh names it, for this job and the simulator
   # jobs alike (sim-settled-<version>-<runtime build>-<model>);
   # scripts/settle-simulator.sh boots a device no app has run on, waits
-  # until it has settled (10 minutes at least, then until the CPU stays
-  # under 25% for a minute, 20 at most), shuts it down and archives its
+  # until it has settled (until the CPU stays under 25% for a minute, 20
+  # minutes at most), shuts it down and archives its
   # data folder. Nothing waits for it: on a miss the simulator jobs boot
   # fresh as before, and the next run restores what this one saves (a
   # PR's save only that PR's later runs; main's, every PR's). Not a

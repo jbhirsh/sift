@@ -336,9 +336,8 @@ describe('SiftScreen', () => {
     // Keep/Remove decides only when its animation ends.
     await fireEvent.press(getByTestId('finish-button'), pressAt(t0 + 100));
     expect(getByTestId('current-phase').props.children).toBe('sifting');
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 350));
-    });
+    // Past the skip's hold, as its press time says: the guard judges each
+    // press by when it lifted, so no time has to pass here.
     await fireEvent.press(getByTestId('finish-button'), pressAt(t0 + 350));
     expect(getByTestId('current-phase').props.children).toBe('done');
     // Where it stopped is kept, so Continue sifting picks up there.
