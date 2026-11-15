@@ -9,8 +9,6 @@ name: "Setup Remembers Sort and Filters"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 - extendedWaitUntil:
     visible:
       id: "setup-brand"

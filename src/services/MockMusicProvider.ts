@@ -243,17 +243,20 @@ function launchedDeletedInMusic(): boolean {
 }
 const deletedInMusic = tracing && launchedDeletedInMusic();
 
-// E2E only: launched with SiftStillPlayback ("true"), the playing song's
-// clock doesn't move, so the screenshots CI compares with their baselines
-// (e2e/screenshots) show the same time and seek bar on every run.
-function launchedStillPlayback(): boolean {
+// E2E only: the playing song's clock doesn't move unless a launch passes
+// SiftLivePlayback ("true"), as only the start-at-chorus flow needs. A still
+// screen lets Maestro's waits for it to stop changing end as soon as it has
+// (a moving seek bar ran each to its limit, jbhirsh/ci#58), and the
+// screenshots CI compares with their baselines (e2e/screenshots) show the
+// same time and seek bar on every run.
+function launchedLivePlayback(): boolean {
   try {
-    return launchFlagOn(Settings.get('SiftStillPlayback'));
+    return launchFlagOn(Settings.get('SiftLivePlayback'));
   } catch {
     return false;
   }
 }
-const stillPlayback = tracing && launchedStillPlayback();
+const stillPlayback = tracing && !launchedLivePlayback();
 
 function requestedFailures(raw: string | undefined): number {
   if (!raw) return 0;

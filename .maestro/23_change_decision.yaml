@@ -9,8 +9,6 @@ name: "Change an Earlier Decision"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 - extendedWaitUntil:
     visible:
       id: "setup-brand"
@@ -26,10 +24,8 @@ name: "Change an Earlier Decision"
 
 - tapOn:
     id: "action-skip"
-    waitToSettleTimeoutMs: 1000
 - tapOn:
     id: "action-skip"
-    waitToSettleTimeoutMs: 1000
 
 - extendedWaitUntil:
     visible:
@@ -39,7 +35,6 @@ name: "Change an Earlier Decision"
 
 - tapOn:
     id: "decisions-button"
-    waitToSettleTimeoutMs: 500
 
 - extendedWaitUntil:
     visible:
@@ -49,11 +44,9 @@ name: "Change an Earlier Decision"
 # The first card, Peaches, sent already: kept instead.
 - tapOn:
     id: "decision-keep-mock-7"
-    waitToSettleTimeoutMs: 500
 
 - tapOn:
     id: "decisions-done"
-    waitToSettleTimeoutMs: 500
 
 - extendedWaitUntil:
     visible:

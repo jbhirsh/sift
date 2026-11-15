@@ -8,8 +8,6 @@ name: "Sift Decisions - Keep, Remove, Skip"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 - extendedWaitUntil:
     visible:
       id: "setup-brand"
@@ -22,28 +20,38 @@ name: "Sift Decisions - Keep, Remove, Skip"
       id: "card-track-name"
     timeout: 30000
 
-# Keep the first track
+# Keep the first track, each decision landing before the next tap (a
+# Keep or Remove while one is under way is turned away).
 - tapOn:
     id: "action-keep"
-- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "stat-kept"
+      text: "1 kept"
+    timeout: 10000
 
 # Remove the second track
 - tapOn:
     id: "action-remove"
-- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "stat-removed"
+      text: "1 removed"
+    timeout: 10000
 
 # Skip the third track
 - tapOn:
     id: "action-skip"
-- waitForAnimationToEnd
 
 # Verify stats updated — text format is "N label"
+- extendedWaitUntil:
+    visible:
+      id: "stat-skipped"
+      text: "1 skipped"
+    timeout: 10000
 - assertVisible:
     id: "stat-kept"
     text: "1 kept"
 - assertVisible:
     id: "stat-removed"
     text: "1 removed"
-- assertVisible:
-    id: "stat-skipped"
-    text: "1 skipped"

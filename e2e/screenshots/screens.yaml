@@ -9,14 +9,17 @@ name: "Screenshots"
 # MODE (light or dark) comes from scripts/take-screenshots.sh, which
 # gathers the shots from Maestro's output folder (it refuses an absolute
 # path). Nothing here asserts more than it needs to reach the next screen.
-# A wait for a screen to settle is capped at 3 s instead of its default 15,
-# so something on it that never stops moving can't stall the job.
+# Each shot waits for its screen to stop moving: the E2E build's song clock
+# stands still (MockMusicProvider), so Sift shows the same time on every
+# run and the wait ends once the screen's own motion has.
+# A card's cover loads from Apple's artwork server, and a blank card is
+# still too, so each Sift shot first waits for the card to say its cover
+# is shown (card-artwork-shown, components/InteractiveCard): loaded, or
+# failed (a failed cover stays blank, and the compare catches it).
 - launchApp:
-    # A fresh start without a reinstall (services/e2eReset), and a song
-    # clock that stands still, so Sift shows the same time on every run.
+    # A fresh start without a reinstall (services/e2eReset).
     arguments:
       SiftResetState: "true"
-      SiftStillPlayback: "true"
 
 - extendedWaitUntil:
     visible:
@@ -42,33 +45,35 @@ name: "Screenshots"
     visible:
       id: "card-track-name"
     timeout: 30000
-- waitForAnimationToEnd:
-    timeout: 3000
+- extendedWaitUntil:
+    visible:
+      id: "card-artwork-shown"
+    timeout: 30000
+- waitForAnimationToEnd
 - takeScreenshot: ${MODE}-03-sift
 
 # A Keep, then a Skip. No Remove: the E2E build fails the launch's first
 # one, which would put an error on Sift and Done.
 - tapOn:
     id: "action-keep"
-    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: "stat-kept"
       text: "1 kept"
     timeout: 10000
-# The card's fly-off: a tap before it settles is turned away.
-- waitForAnimationToEnd:
-    timeout: 3000
 - tapOn:
     id: "action-skip"
-    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: "stat-skipped"
       text: "1 skipped"
     timeout: 10000
-- waitForAnimationToEnd:
-    timeout: 3000
+# The third card's cover, which 05's sheet also leaves in view.
+- extendedWaitUntil:
+    visible:
+      id: "card-artwork-shown"
+    timeout: 30000
+- waitForAnimationToEnd
 - takeScreenshot: ${MODE}-04-sift-undo
 
 - tapOn:
@@ -77,8 +82,7 @@ name: "Screenshots"
     visible:
       id: "decisions-sheet"
     timeout: 10000
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 - takeScreenshot: ${MODE}-05-decisions
 - tapOn:
     id: "decisions-done"
@@ -93,8 +97,12 @@ name: "Screenshots"
     visible:
       id: "settings-done-button"
     timeout: 10000
-- waitForAnimationToEnd:
-    timeout: 3000
+# The sheet says when its slide has finished (settings-shown, App.tsx).
+- extendedWaitUntil:
+    visible:
+      id: "settings-shown"
+    timeout: 10000
+- waitForAnimationToEnd
 - takeScreenshot: ${MODE}-06-settings
 - tapOn:
     id: "settings-done-button"
@@ -109,6 +117,5 @@ name: "Screenshots"
     visible:
       id: "done-title"
     timeout: 30000
-- waitForAnimationToEnd:
-    timeout: 3000
+- waitForAnimationToEnd
 - takeScreenshot: ${MODE}-07-done

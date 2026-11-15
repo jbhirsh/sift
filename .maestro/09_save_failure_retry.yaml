@@ -28,8 +28,6 @@ name: "Save Failure Shows Retry, Retry Recovers"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 - extendedWaitUntil:
     visible:
       id: "setup-brand"
@@ -91,7 +89,11 @@ name: "Save Failure Shows Retry, Retry Recovers"
 
 - tapOn:
     id: "action-keep"
-- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "stat-kept"
+      text: "1 kept"
+    timeout: 10000
 
 - tapOn:
     id: "finish-button"
@@ -122,10 +124,13 @@ name: "Save Failure Shows Retry, Retry Recovers"
 
 - tapOn:
     id: "action-keep"
-- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "stat-kept"
+      text: "2 kept"
+    timeout: 10000
 - tapOn:
     id: "action-keep"
-- waitForAnimationToEnd
 
 # Done again: a fresh button, not the earlier Retry.
 - extendedWaitUntil:

@@ -9,8 +9,6 @@ name: "Library Sift Skips Kept Songs"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 - extendedWaitUntil:
     visible:
       id: "setup-brand"
@@ -29,10 +27,18 @@ name: "Library Sift Skips Kept Songs"
 
 - tapOn:
     id: "action-keep"
-- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "stat-kept"
+      text: "1 kept"
+    timeout: 10000
 - tapOn:
     id: "action-keep"
-- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "stat-kept"
+      text: "2 kept"
+    timeout: 10000
 
 - tapOn:
     id: "finish-button"

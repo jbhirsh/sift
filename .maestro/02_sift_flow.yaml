@@ -8,8 +8,6 @@ name: "Setup to Sifting - Full Flow"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 # Verify setup screen
 - extendedWaitUntil:
     visible:

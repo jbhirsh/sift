@@ -8,8 +8,6 @@ name: "App Launch - Setup Screen"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 - extendedWaitUntil:
     visible:
       id: "setup-brand"

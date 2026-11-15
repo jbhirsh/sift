@@ -3,10 +3,10 @@ name: "GIF: swipe to keep, skip, undo"
 ---
 # A PR GIF (scripts/take-gifs.sh, scripts/pr-gifs.ts). Not a test: it
 # waits only as much as it needs to reach the next step. No fixed pause
-# between steps: playback's clock keeps the screen moving, so a
-# waitForAnimationToEnd always runs its whole timeout, and Maestro finding
-# the next element already leaves a person's pause. Only the end holds
-# still for a moment, so the loop doesn't jump straight back.
+# between steps: Maestro finding the next element already leaves a
+# person's pause. Only the end holds still for a moment, for whoever
+# watches, so the loop doesn't jump straight back (jbhirsh/ci#58's GIF
+# hold).
 # Everything before startRecording gets the app to where the GIF begins;
 # the recording is named after this file. It must end with the `-end` screenshot, which
 # says the steps all ran (take-gifs.sh drops a recording without one).
@@ -50,7 +50,6 @@ name: "GIF: swipe to keep, skip, undo"
 # Skip, by the button.
 - tapOn:
     id: "action-skip"
-    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: "stat-skipped"
@@ -60,14 +59,18 @@ name: "GIF: swipe to keep, skip, undo"
 # Undo brings the skipped card back.
 - tapOn:
     id: "undo-pill"
-    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: "stat-skipped"
       text: "0 skipped"
     timeout: 10000
-- waitForAnimationToEnd:
+# The end hold, for the viewer: a wait for an element no screen has, which
+# only its 1.5 s ends (ci's gif/video.mjs keeps 1.5 s after the last touch).
+- extendedWaitUntil:
+    visible:
+      id: "gif-end-hold"
     timeout: 1500
+    optional: true
 
 - stopRecording
 - takeScreenshot: swipe-and-undo-end

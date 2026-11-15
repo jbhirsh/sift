@@ -14,8 +14,6 @@ name: "Resume Session Modal"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 # Wait for the setup screen before tapping Start Sifting: on a cold,
 # fresh launch the button can render before the screen is ready, and
 # a tap landing then is lost (flow 05 hit this in CI: no card within 30s).
@@ -34,7 +32,11 @@ name: "Resume Session Modal"
 # Make one decision so the session has progress
 - tapOn:
     id: "action-keep"
-- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "stat-kept"
+      text: "1 kept"
+    timeout: 10000
 
 # ── Back out mid-session: inline resume, no modal ──
 - tapOn:
@@ -148,7 +150,11 @@ name: "Resume Session Modal"
 
 - tapOn:
     id: "action-keep"
-- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "stat-kept"
+      text: "1 kept"
+    timeout: 10000
 
 - tapOn:
     id: "back-button"

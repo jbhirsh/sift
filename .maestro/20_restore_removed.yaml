@@ -9,8 +9,6 @@ name: "Restore a Removed Song on Done"
     arguments:
       SiftResetState: "true"
 
-- waitForAnimationToEnd
-
 - extendedWaitUntil:
     visible:
       id: "setup-brand"
@@ -26,7 +24,6 @@ name: "Restore a Removed Song on Done"
 
 - tapOn:
     id: "action-remove"
-    waitToSettleTimeoutMs: 500
 
 - extendedWaitUntil:
     visible:
