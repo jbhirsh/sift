@@ -40,8 +40,11 @@ fi
 
 pid=$(cat "$pidfile" 2>/dev/null || true)
 if [ -n "$pid" ]; then
+  # INT lets the stream flush; TERM ends it for certain, as a stream started
+  # in the background by a script may ignore INT. Nothing waits between
+  # them (jbhirsh/ci#58): the log show below persists every line, and the
+  # report reads whichever file holds more.
   kill -INT "$pid" 2>/dev/null || true
-  sleep 2
   kill "$pid" 2>/dev/null || true
 fi
 rm -f "$pidfile"

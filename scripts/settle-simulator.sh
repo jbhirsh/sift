@@ -14,12 +14,12 @@
 #
 # So this creates a device of the same model and runtime that no app has
 # ever been installed on, boots it, and leaves it until it has settled:
-# at least MIN_SECONDS after boot, and until the CPU has stayed under
-# QUIET_BUSY% busy for QUIET_SECONDS straight (each sample a 5 s average,
-# scripts/machine-load.sh --cpu-row), or MAX_SECONDS at most. Measured,
-# never a fixed wait: a snapshot taken early repeats the rest of the work
-# on every boot (caloryn saw a deferred media analysis pass at 210% for 3
-# minutes, past the 10th minute). Then it shuts the device down cleanly
+# until the CPU has stayed under QUIET_BUSY% busy for QUIET_SECONDS
+# straight (each sample a 5 s average, scripts/machine-load.sh --cpu-row),
+# or MAX_SECONDS at most. Measured, never a fixed wait (jbhirsh/ci#58):
+# a snapshot taken early repeats the rest of the work on every boot
+# (caloryn saw a deferred media analysis pass at 210% for 3 minutes, past
+# the 10th minute). Then it shuts the device down cleanly
 # and archives its data folder.
 #
 # apsd is stopped once it has booted, as in the simulator jobs
@@ -43,7 +43,6 @@ out="${1:?usage: scripts/settle-simulator.sh <out-dir>}"
 : "${SIM_RUNTIME_ID:?from scripts/simulator-device.sh}"
 here="$(dirname "$0")"
 
-MIN_SECONDS=600
 MAX_SECONDS=1200
 QUIET_BUSY=25
 QUIET_SECONDS=60
@@ -99,7 +98,7 @@ while :; do
     echo "$(((now - booted) / 60)) min after boot: ${busy:-?}% busy, quiet for ${quiet} s"
     logged=$now
   fi
-  if [ $((now - booted)) -ge $MIN_SECONDS ] && [ "$quiet" -ge $QUIET_SECONDS ]; then
+  if [ "$quiet" -ge $QUIET_SECONDS ]; then
     settled=yes
     break
   fi

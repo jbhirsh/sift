@@ -531,7 +531,7 @@ describe('AppleMusicProvider', () => {
 
   describe('writes run one at a time', () => {
     // A native playlist removal reads the playlist, then writes it back
-    // without the removed entries. The fake does the same, with a pause
+    // without the removed entries. The fake does the same, yielding a turn
     // between the two, so overlapping removals would undo each other.
     beforeEach(() => {
       mockNative.removeFromPlaylist.mockImplementation(
@@ -539,7 +539,7 @@ describe('AppleMusicProvider', () => {
           const playlist = fake.playlists.get(playlistID);
           if (!playlist) throw new Error('No tracks found for the given IDs.');
           const remaining = playlist.items.filter((id) => !ids.includes(id));
-          await new Promise((resolve) => setTimeout(resolve, 5));
+          await new Promise((resolve) => setTimeout(resolve, 0));
           playlist.items = remaining;
         },
       );

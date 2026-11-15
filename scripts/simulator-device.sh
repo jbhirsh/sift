@@ -37,10 +37,10 @@
 # Two helpers for one device, which the snapshot scripts share:
 #
 #   scripts/simulator-device.sh --data <udid>       prints its data folder
-#   scripts/simulator-device.sh --shut-down <udid>  shuts it down and waits
-#                                                   until simctl says so (2
-#                                                   minutes at most; exits 1
-#                                                   if it never does)
+#   scripts/simulator-device.sh --shut-down <udid>  shuts it down (simctl
+#                                                   returns once it's down);
+#                                                   exits 1, with simctl's
+#                                                   reason, if it isn't
 set -euo pipefail
 
 SIM_MODEL='iPhone 17 Pro'
@@ -68,12 +68,12 @@ case "${1:-}" in
   --shut-down)
     udid="${2:?usage: scripts/simulator-device.sh --shut-down <udid>}"
     [ "$(device_field "$udid" state || true)" = Shutdown ] && exit 0
-    xcrun simctl shutdown "$udid" >/dev/null 2>&1 || true
-    for ((i = 0; i < 120; i++)); do
-      [ "$(device_field "$udid" state || true)" = Shutdown ] && exit 0
-      sleep 1
-    done
-    echo "$udid is still '$(device_field "$udid" state || true)' after 2 minutes" >&2
+    # simctl shutdown returns once the device has shut down; one read
+    # then says whether it did (jbhirsh/ci#58: no polling).
+    said=$(xcrun simctl shutdown "$udid" 2>&1) || true
+    state=$(device_field "$udid" state || true)
+    [ "$state" = Shutdown ] && exit 0
+    echo "$udid is '$state' after simctl shutdown, not Shutdown${said:+: $said}" >&2
     exit 1
     ;;
 esac

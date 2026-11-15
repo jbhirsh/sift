@@ -263,9 +263,14 @@ runs:
     # dyld and simulator caches, and minutes after the runner booted it
     # stalled JavaScript for seconds (on PR #211 a tap reached it 3.9 s late,
     # then a 5 s stall, and the screenshot pass gave up on Setup). It waits
-    # for the app to say Setup is up (its E2E trace line, persisted here as
-    # scripts/app-trace.sh does) instead of a fixed sleep, up to a minute,
-    # then quits it. Best effort: a warm-up hiccup never fails the job, and
+    # for the app to say Setup is up (its E2E trace line): the log stream
+    # is opened first, and once its header says it's filtering, the app is
+    # launched and the stream read until that line, so it returns the
+    # moment Setup is up. read -t only ends it if Setup hasn't come a
+    # minute after the launch (macOS has no timeout command), and a grep
+    # -m1 on the pipe would wait on the stream, which dies only on its next
+    # write. Lines start with a date; log's header, which quotes the
+    # predicate, doesn't. Then it quits the app and the stream. Best effort: a warm-up hiccup never fails the job, and
     # each job's own launch resets or reinstalls the app.
     - name: Warm up the app (its first launch, before the job's)
       shell: bash
@@ -273,18 +278,20 @@ runs:
       run: |
         xcrun simctl spawn booted log config --subsystem com.facebook.react.log \
           --mode "level:info,persist:info" || true
-        xcrun simctl launch booted com.jessicahirsh.sift || true
-        start=$SECONDS
+        exec 3< <(exec xcrun simctl spawn booted log stream --level info --style compact \
+          --predicate 'subsystem == "com.facebook.react.log" AND eventMessage CONTAINS "screen name=setup at=up"' 2>/dev/null)
+        stream=$!
         ready=""
-        while [ $((SECONDS - start)) -lt 60 ]; do
-          if xcrun simctl spawn booted log show --info --last 2m --style compact \
-            --predicate 'subsystem == "com.facebook.react.log" AND eventMessage CONTAINS "screen name=setup at=up"' 2>/dev/null \
-            | grep -q 'screen name=setup at=up'; then
-            ready=$((SECONDS - start))
-            break
-          fi
-          sleep 1
+        IFS= read -r -t 60 -u 3 _ || true
+        start=$SECONDS
+        xcrun simctl launch booted com.jessicahirsh.sift || true
+        while left=$((start + 60 - SECONDS)); [ "$left" -gt 0 ] && IFS= read -r -t "$left" -u 3 line; do
+          case $line in
+            [0-9]*'screen name=setup at=up'*) ready=$((SECONDS - start)); break ;;
+          esac
         done
+        exec 3<&-
+        kill "$stream" 2>/dev/null || true
         if [ -n "$ready" ]; then
           echo "Setup was up within ${ready}s"
           scripts/job-note.sh "$JOB_NOTES" "Warm-up launch" "Setup up within ${ready} s"
