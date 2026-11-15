@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Image } from 'expo-image';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -23,6 +23,7 @@ import { thresholdHaptic } from '../services/haptics';
 import { followTouch, liftTouch, showTouches } from '../services/touchOverlay';
 import { trace, tracing } from '../services/trace';
 import type { TraceData } from '../utils/trace';
+import E2eMarker from './E2eMarker';
 
 // The E2E trace (services/trace) of what the card's pan saw of a touch, so a
 // swipe that decided nothing says whether the pan began, took over, and how
@@ -65,6 +66,9 @@ export default function InteractiveCard({
   const { colors, isDark } = useTheme();
   const meta = formatTrackMeta(track.playCount, track.dateAdded, { playsKnown });
   const resolvedArtworkURL = useResolvedArtwork(track.id, track.artworkURL, artworkRetryKey);
+  // Whether the cover has loaded (or failed), for the accessibility audit's
+  // E2E marker: one mid-fade reads as low contrast behind the text.
+  const [artworkDone, setArtworkDone] = useState(false);
   const dragX = useSharedValue(0);
   const dragY = useSharedValue(0);
   // Whether the drag is past the point where letting go decides, so
@@ -154,6 +158,8 @@ export default function InteractiveCard({
     <GestureDetector gesture={panGesture}>
       <Animated.View style={[styles.cardWrapper, cardStyle]}>
         <View style={styles.card}>
+          {/* E2E only: the cover is shown and still (e2e/a11y-audit). */}
+          <E2eMarker id="card-artwork-shown" when={!resolvedArtworkURL || artworkDone} />
           {/* Artwork fills entire card */}
           <View style={styles.artworkContainer}>
             {resolvedArtworkURL ? (
@@ -168,7 +174,11 @@ export default function InteractiveCard({
                 source={resolvedArtworkURL}
                 style={styles.artwork}
                 contentFit="cover"
-                transition={200}
+                // No fade in the E2E build: the audit checks the cover as
+                // it rests, from the moment it has loaded.
+                transition={tracing ? 0 : 200}
+                onLoad={() => setArtworkDone(true)}
+                onError={() => setArtworkDone(true)}
               />
             ) : (
               <LinearGradient

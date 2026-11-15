@@ -18,6 +18,7 @@ import DoneScreen from './screens/DoneScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import { SETTINGS_BUTTON, SPACING } from './theme';
 import { scrubBreadcrumb, scrubEvent } from './utils/sentryScrub';
+import E2eMarker from './components/E2eMarker';
 import TouchOverlay from './components/TouchOverlay';
 
 Sentry.init({
@@ -49,6 +50,14 @@ function PhaseRouter() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [settingsVisible, setSettingsVisible] = useState(false);
+  // Whether the Settings sheet has finished sliding in (its Modal's onShow),
+  // for the accessibility audit's E2E marker: a sheet mid-slide reads as
+  // low contrast.
+  const [settingsShown, setSettingsShown] = useState(false);
+  const closeSettings = () => {
+    setSettingsShown(false);
+    setSettingsVisible(false);
+  };
   // The E2E trace (services/trace): every touch on every screen and sheet,
   // and any stall of the JavaScript thread. Nothing in other builds.
   useJsStallWatch();
@@ -93,10 +102,13 @@ function PhaseRouter() {
         visible={settingsVisible}
         animationType="slide"
         presentationStyle="pageSheet"
-        onRequestClose={() => setSettingsVisible(false)}
+        onRequestClose={closeSettings}
+        onShow={() => setSettingsShown(true)}
       >
-        <SettingsScreen onClose={() => setSettingsVisible(false)} />
+        <SettingsScreen onClose={closeSettings} />
         <TouchOverlay inModal />
+        {/* E2E only: the sheet is up and still (e2e/a11y-audit). */}
+        <E2eMarker id="settings-shown" when={settingsShown} />
       </Modal>
 
       {/* Draws touches for PR GIFs only (components/TouchOverlay). */}

@@ -31,21 +31,27 @@ final class AccessibilityAuditTests: XCTestCase {
 
     app.buttons["Start Sifting"].tap()
     waitFor("card-track-name")
+    // The app's E2E marker once the card's cover has loaded: the E2E build
+    // shows it without a fade.
+    waitFor("card-artwork-shown")
     try audit("Sift")
 
     element("settings-button").tap()
-    waitFor("check-connection-button")
+    // The app's E2E marker once the sheet has finished sliding in.
+    waitFor("settings-shown")
     try audit("Settings")
     element("settings-done-button").tap()
-    waitFor("card-track-name")
+    // Gone once the sheet has slid away.
+    XCTAssertTrue(element("check-connection-button").waitForNonExistence(timeout: 30), "Settings never closed")
 
     // Two Removes, so Done shows its Finish in Music card (#173): the E2E
     // build fails the first removed song of a launch
-    // (EXPO_PUBLIC_MOCK_FAIL_REMOVES=1), and the second lands.
+    // (EXPO_PUBLIC_MOCK_FAIL_REMOVES=1), and the second lands. Each lands
+    // as its card's fly-off ends, which its count shows.
     app.buttons["Remove"].tap()
-    waitFor("undo-pill")
+    waitForLabel("stat-removed", "1 removed")
     app.buttons["Remove"].tap()
-    waitFor("finish-button")
+    waitForLabel("stat-removed", "2 removed")
     element("finish-button").tap()
     waitFor("finish-in-music")
     try audit("Done")
@@ -55,10 +61,18 @@ final class AccessibilityAuditTests: XCTestCase {
     app.descendants(matching: .any)[identifier].firstMatch
   }
 
+  // No settle after it (jbhirsh/ci#58): what moves on the way to a screen
+  // has its own wait above (the card's cover and the Settings sheet's
+  // markers, a decision's count, the sheet's button gone). Setup and Done
+  // have no entrance animation.
   private func waitFor(_ identifier: String, file: StaticString = #filePath, line: UInt = #line) {
     XCTAssertTrue(element(identifier).waitForExistence(timeout: 30), "\(identifier) never appeared", file: file, line: line)
-    // Let entrance animations finish: a mid-fade element reads as low contrast.
-    Thread.sleep(forTimeInterval: 1.5)
+  }
+
+  /// Waits until the element's accessibility label reads `label`.
+  private func waitForLabel(_ identifier: String, _ label: String, file: StaticString = #filePath, line: UInt = #line) {
+    let reads = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", label), object: element(identifier))
+    XCTAssertEqual(XCTWaiter.wait(for: [reads], timeout: 30), .completed, "\(identifier) never read \"\(label)\"", file: file, line: line)
   }
 
   private func audit(_ screen: String) throws {
