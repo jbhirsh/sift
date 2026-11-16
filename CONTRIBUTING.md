@@ -96,6 +96,13 @@ has proved stable. The CI tooling is shared with fog-and-frontier and BoardGames
 tool are its key in `.github/ci.json`. Dependabot's npm PRs merge themselves once every required
 check is green.
 
+## Visual review
+
+`Visual changes` (`visual-review.yml`) isn't required yet: it runs only from `main`, so a
+follow-up adds it to the branch rule in place of `PR visuals` once it has shown on a PR.
+`BOT_PR_TOKEN` (One-time setup) needs Issues read and write for it too, beside Contents and Pull
+requests: it posts a mockup's pictures on the mockup's issue.
+
 ## Deployment
 
 Every merge to `main` runs `preview-deploy.yml`. JavaScript-only changes ship as an EAS Update
