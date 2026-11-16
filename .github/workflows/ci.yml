@@ -22,6 +22,27 @@ on:
         description: Build the simulator app as a Dependabot PR does, with no Expo login (prebuild + xcodebuild)
         type: boolean
         default: false
+      # A mockup of a planned screen change (jbhirsh/ci#64; CLAUDE.md says
+      # how to make one): run on main with a throwaway patch, which the
+      # check, bundle, build and pictures jobs apply (jbhirsh/ci's visual-shots/mockup:
+      # only `visual-review.mockupPaths`, never a lockfile). It reuses main's
+      # cached app when the patch leaves the native fingerprint alone (a
+      # JavaScript-only change: only the bundle job rebuilds), and builds
+      # one, with no Expo login, when it doesn't (an icon). It holds no
+      # secret, writes no cache (it reads main's), runs no suite, report or
+      # GIF, and takes only the screenshots, which visual review puts in a
+      # table on the issue. Both reach a step only through `with:`
+      # or `env:`, never spliced into a script. Empty: no mockup. A job asks
+      # `!inputs.mockup_patch` for "not a mockup", which holds on a PR or a
+      # push too, where inputs are null.
+      mockup_patch:
+        description: 'Mockup: the change, base64 (git diff --binary | base64 -w0)'
+        type: string
+        default: ''
+      mockup_issue:
+        description: "Mockup: the plan's issue number, for the table"
+        type: string
+        default: ''
 
 # A gifs-only run (a PR's "before" GIFs, started by pr-gif-attach.yml,
 # pr-gif.yml or scripts/pr-gifs.ts) gets a group of its own: sharing main's,
@@ -33,7 +54,9 @@ concurrency:
   # compared with (visual review, jbhirsh/ci#64), so a quick second merge
   # mustn't leave the first without them. Sharing one group, even with
   # cancel-in-progress off, GitHub would still drop a push run left waiting.
-  group: ${{ github.workflow }}-${{ (inputs.gifs_only == true && format('gifs-{0}', github.run_id)) || (github.event_name == 'push' && format('push-{0}', github.sha)) || github.ref }}
+  # A mockup, like a gifs-only run, gets a group of its own run, so it
+  # never cancels another run or is cancelled by one.
+  group: ${{ github.workflow }}-${{ (inputs.gifs_only == true && format('gifs-{0}', github.run_id)) || (inputs.mockup_patch != '' && format('mockup-{0}', github.run_id)) || (github.event_name == 'push' && format('push-{0}', github.sha)) || github.ref }}
   cancel-in-progress: ${{ github.event_name != 'push' }}
 
 env:
@@ -98,10 +121,22 @@ jobs:
               - '!.lycheeignore'
               - '!tsconfig.typecov.json'
 
+      # A mockup run uses this job only for the app's key, worked out on the
+      # patched tree so that a patch to anything the native fingerprint
+      # covers (an icon, the launch screen) misses main's cached app and
+      # builds, while a JavaScript-only one finds it. So it applies the
+      # patch, skips every check below and writes no npm cache.
+      - name: Apply the mockup
+        if: inputs.mockup_patch != ''
+        uses: jbhirsh/ci/visual-shots/mockup@main
+        with:
+          patch: ${{ inputs.mockup_patch }}
+          issue: ${{ inputs.mockup_issue }}
+
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: npm
+          cache: ${{ !inputs.mockup_patch && 'npm' || '' }}
 
       - run: npm ci
 
@@ -149,6 +184,7 @@ jobs:
         uses: jbhirsh/ci/autofix/check-triggers@main
 
       - name: Pins
+        if: ${{ !inputs.mockup_patch }}
         # A version held below its major needs a reason beside it (jbhirsh/ci's
         # pins/check.mjs says what counts; Expo's SDK is the reason for the
         # versions it chooses, read from node_modules, hence after npm ci).
@@ -156,13 +192,16 @@ jobs:
 
       # The package scripts, so a clean pre-commit hook means a clean CI.
       - name: Lint
+        if: ${{ !inputs.mockup_patch }}
         run: npm run lint
 
       # Prettier over the whole tree (.prettierrc.json, .prettierignore).
       - name: Format
+        if: ${{ !inputs.mockup_patch }}
         run: npm run format:check
 
       - name: Typecheck
+        if: ${{ !inputs.mockup_patch }}
         run: npm run typecheck
 
       # No `any` anywhere in the app code (src, the native module's
@@ -175,6 +214,7 @@ jobs:
       # counts `as` casts, non-null assertions and `any` inside generics, goes
       # in the summary for information only.
       - name: Type coverage
+        if: ${{ !inputs.mockup_patch }}
         run: |
           npm run -s typecov || {
             echo "::error title=Type coverage::An expression is typed any. Give it its type where it enters: const x: unknown = JSON.parse(...) (or a response.json() or require() result), then narrow it; a process.env key goes in src/types/env.d.ts. npm run typecov lists each one."
@@ -184,23 +224,28 @@ jobs:
           echo "Strict type coverage (information only): $strict" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Dependency graph
+        if: ${{ !inputs.mockup_patch }}
         run: npm run depcruise
 
       - name: Native bridge
+        if: ${{ !inputs.mockup_patch }}
         # Keeps modules/expo-musickit thin: every native function is listed
         # in native-api.json, Swift and TypeScript surfaces match, and size
         # budgets hold (scripts/check-native-bridge.ts).
         run: npm run bridge
 
       - name: Test with coverage
+        if: ${{ !inputs.mockup_patch }}
         run: npx jest --coverage
 
       # Fails a source file the coverage run above didn't measure, unless
       # .github/ci.json's unmeasured.files gives its reason (jbhirsh/ci#35).
       - name: Unmeasured source files
+        if: ${{ !inputs.mockup_patch }}
         uses: jbhirsh/ci/unmeasured@main
 
       - name: Expo Doctor
+        if: ${{ !inputs.mockup_patch }}
         run: npx expo-doctor@latest
         continue-on-error: true
 
@@ -211,6 +256,7 @@ jobs:
       # would be permanently red over code that doesn't ship in the app.
       # Dependabot picks up Expo's fixes on its weekly run.
       - name: Production dependency audit
+        if: ${{ !inputs.mockup_patch }}
         run: npm audit --omit=dev --audit-level=critical
 
   # Which native-affecting files a PR changed: the build job below runs only
@@ -263,7 +309,9 @@ jobs:
     # doesn't hide a compile error (and `changes` runs only on PRs, a
     # skipped dependency that would otherwise skip this). Fail-safe: if
     # change detection itself errored, build anyway, as a skipped job reads
-    # as a passing check. A docs-only PR builds nothing.
+    # as a passing check. A docs-only PR builds nothing. A mockup builds,
+    # with its patch, only when its key (the check job's, on the patched
+    # tree) isn't cached: a patch to the icon or another native asset.
     if: >-
       ${{ !cancelled() && needs.check.outputs.app_key != '' && (
         needs.changes.result == 'failure' || needs.changes.outputs.native == 'true' ||
@@ -282,30 +330,41 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # A mockup's patch, before anything is built (the mockup inputs say
+      # what it may change).
+      - name: Apply the mockup
+        if: inputs.mockup_patch != ''
+        uses: jbhirsh/ci/visual-shots/mockup@main
+        with:
+          patch: ${{ inputs.mockup_patch }}
+          issue: ${{ inputs.mockup_issue }}
+
+      # No npm cache for a mockup, whose patch is code on no branch.
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: npm
+          cache: ${{ !inputs.mockup_patch && 'npm' || '' }}
 
       - run: npm ci
 
       # Only the eas path needs the EAS CLI.
       - name: Setup EAS CLI
-        if: env.HAS_EXPO_TOKEN == 'true' && inputs.without_expo_login != true
+        if: env.HAS_EXPO_TOKEN == 'true' && inputs.without_expo_login != true && !inputs.mockup_patch
         run: npm install -g eas-cli
 
       # Every PR really builds, Dependabot's included (#178): its runs get no
       # Actions secrets, so without EXPO_TOKEN the script builds the same
       # e2e-simulator app with no Expo or Apple login (expo prebuild +
       # xcodebuild). A run by hand with without_expo_login takes that path
-      # on purpose, to check it. Without SENTRY_AUTH_TOKEN the source-map
-      # upload is turned off rather than the build skipped.
+      # on purpose, to check it, and a mockup that builds always does, with
+      # neither secret: its patch is code on no branch. Without SENTRY_AUTH_TOKEN the
+      # source-map upload is turned off rather than the build skipped.
       - name: Build simulator app (compiles expo-musickit Swift)
         run: scripts/build-simulator-app.sh build/Sift-e2e.tar.gz
         env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SIFT_BUILD_WITHOUT_EXPO: ${{ inputs.without_expo_login == true && '1' || '' }}
+          EXPO_TOKEN: ${{ !inputs.mockup_patch && secrets.EXPO_TOKEN || '' }}
+          SENTRY_AUTH_TOKEN: ${{ !inputs.mockup_patch && secrets.SENTRY_AUTH_TOKEN || '' }}
+          SIFT_BUILD_WITHOUT_EXPO: ${{ (inputs.without_expo_login == true || inputs.mockup_patch != '') && '1' || '' }}
           USE_CCACHE: '1'
 
       # For this run's simulator jobs, in case the cache save below loses a
@@ -318,15 +377,16 @@ jobs:
 
       # Under the check job's key, for this run's simulator jobs and later
       # runs. A build of an app already cached (a native PR's compile check
-      # of an unchanged tree) has nothing new to save.
+      # of an unchanged tree) has nothing new to save, and a mockup's is never
+      # saved: the key is main's, and the app has the patch in it.
       - name: Unpack the app for the cache
-        if: needs.check.outputs.app_cached != 'true'
+        if: needs.check.outputs.app_cached != 'true' && !inputs.mockup_patch
         run: |
           mkdir -p build/e2e
           tar -xzf build/Sift-e2e.tar.gz -C build/e2e
 
       - name: Save the app
-        if: needs.check.outputs.app_cached != 'true'
+        if: needs.check.outputs.app_cached != 'true' && !inputs.mockup_patch
         uses: actions/cache/save@v6
         continue-on-error: true
         with:
@@ -338,8 +398,10 @@ jobs:
       # minutes on it every run (a push to main that builds the app fills
       # the cache PRs read).
       # Not this job's check: an audit bundle that won't build fails the
-      # audit job, which builds it again.
+      # audit job, which builds it again. Not for a mockup, which runs no
+      # audit and writes no cache.
       - name: Cache the accessibility audit's test bundle
+        if: ${{ !inputs.mockup_patch }}
         uses: ./.github/actions/a11y-audit-bundle
         continue-on-error: true
 
@@ -359,10 +421,18 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # A mockup's patch goes into the JavaScript here, as in the build job.
+      - name: Apply the mockup
+        if: inputs.mockup_patch != ''
+        uses: jbhirsh/ci/visual-shots/mockup@main
+        with:
+          patch: ${{ inputs.mockup_patch }}
+          issue: ${{ inputs.mockup_issue }}
+
       - uses: actions/setup-node@v7
         with:
           node-version: 24
-          cache: npm
+          cache: ${{ !inputs.mockup_patch && 'npm' || '' }}
 
       - run: npm ci
 
@@ -394,7 +464,8 @@ jobs:
   simulator-snapshot:
     name: Settle a simulator snapshot
     needs: [check]
-    if: ${{ !cancelled() && inputs.gifs_only != true && (needs.check.outputs.code == 'true' || github.event_name != 'pull_request') }}
+    # Nor a mockup, which writes no cache.
+    if: ${{ !cancelled() && inputs.gifs_only != true && !inputs.mockup_patch && (needs.check.outputs.code == 'true' || github.event_name != 'pull_request') }}
     runs-on: macos-26
     # Booting (about 3 min), settling (20 min at most), archiving and
     # saving; the settle step's own cap comes first.
@@ -473,7 +544,8 @@ jobs:
   # PRs (the `code` filter in `check`; a skipped job counts as passing). A
   # push to main runs only the pictures job, on every commit, docs-only ones
   # too: its screenshots are the reference for each PR built on it (visual
-  # review), and the suite and the audit already ran on the PR. Pinned to
+  # review), and the suite and the audit already ran on the PR. A mockup
+  # runs only the pictures job too. Pinned to
   # macos-26 (not macos-latest) so a runner-image migration can't silently
   # change simulator/Xcode behavior; bump deliberately (Expo SDK 58 needs
   # Xcode 26.4 or later; macos-15's default Xcode 16.4 cannot compile
@@ -481,7 +553,7 @@ jobs:
   e2e:
     name: E2E Tests (Maestro)
     needs: [check, build, bundle]
-    if: ${{ !cancelled() && needs.check.result == 'success' && needs.build.result != 'failure' && github.event_name != 'push' && inputs.gifs_only != true && (needs.check.outputs.code == 'true' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ !cancelled() && needs.check.result == 'success' && needs.build.result != 'failure' && github.event_name != 'push' && inputs.gifs_only != true && !inputs.mockup_patch && (needs.check.outputs.code == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: macos-26
     # About 5 min of setup + the Maestro step's 40-min cap + the trace and
     # diagnostics. The step caps must expire before this one: a JOB timeout
@@ -612,7 +684,7 @@ jobs:
   a11y:
     name: Accessibility audit
     needs: [check, build, bundle]
-    if: ${{ !cancelled() && needs.check.result == 'success' && needs.build.result != 'failure' && github.event_name != 'push' && inputs.gifs_only != true && (needs.check.outputs.code == 'true' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ !cancelled() && needs.check.result == 'success' && needs.build.result != 'failure' && github.event_name != 'push' && inputs.gifs_only != true && !inputs.mockup_patch && (needs.check.outputs.code == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: macos-26
     # About 5 min of setup, the audit bundle (restored, or about 5 min to
     # build on a miss) and the audit's 15-min cap.
@@ -702,14 +774,34 @@ jobs:
     steps:
       # Two commits deep: on a PR the checkout is its merge commit, whose
       # parents visual-shots reads (the PR's head and the main it's built on).
+      # A mockup's job runs its patched app on this machine, so the job's
+      # token isn't left in .git/config (only a gifs run's fetch needs it).
       - uses: actions/checkout@v7
         with:
           fetch-depth: 2
+          persist-credentials: ${{ !inputs.mockup_patch }}
 
+      # A mockup's patch here too, for its e2e/screenshots/screens.yaml: a
+      # mockup may add a screen to the flow, which the screenshot pass walks
+      # and the gather step counts. The app comes from the build and bundle
+      # jobs, so the patch's src/ and assets/ go unused here.
+      - name: Apply the mockup
+        if: inputs.mockup_patch != ''
+        uses: jbhirsh/ci/visual-shots/mockup@main
+        with:
+          patch: ${{ inputs.mockup_patch }}
+          issue: ${{ inputs.mockup_issue }}
+
+      # A mockup's key is the check job's on the patched tree: main's cached
+      # app when the patch leaves native alone, else this run's build (the
+      # cache misses, and a mockup's build is never saved). Either way the
+      # JavaScript is this run's bundle, with the patch, never a cached one.
+      # It saves no Maestro cache.
       - uses: ./.github/actions/simulator-app
         with:
           app-key: ${{ needs.check.outputs.app_key }}
           load-dir: screenshots
+          save-cache: ${{ !inputs.mockup_patch }}
 
       # The main screens on the Simulator, light and dark, for PR
       # descriptions (PR visuals says how to use them) and Visual
@@ -783,10 +875,12 @@ jobs:
       # Uploads them as `visual-shots`, with the commit they're of: main's
       # push runs are the reference (kept 90 days), and visual-review.yml
       # compares each PR's with them once this run finishes. It never fails
-      # on a changed screen.
+      # on a changed screen. A mockup's name their issue, for the table.
       - name: Upload the shots for visual review
         if: ${{ !cancelled() && steps.gather.outcome == 'success' }}
         uses: jbhirsh/ci/visual-shots@main
+        with:
+          mockup-issue: ${{ inputs.mockup_patch != '' && inputs.mockup_issue || '' }}
 
       # The GIF scenarios in e2e/gifs, recorded on the Simulator with the
       # touches drawn (components/TouchOverlay), as videos that
@@ -810,17 +904,18 @@ jobs:
           git checkout FETCH_HEAD -- e2e/gifs
 
       # Not when the PR's scenarios couldn't be fetched: main's own, under
-      # the same names, would pass for its "before". Nor on a push to main,
-      # which takes only the screenshots: nothing reads its videos.
+      # the same names, would pass for its "before". Nor on a push to main
+      # or a mockup, which take only the screenshots: nothing reads their
+      # videos.
       # The app's trace for the recordings too, uploaded with the videos
       # (the GIF tool reads only <scenario>.mp4): a scenario that stops
       # early says where its taps went.
       - name: Start recording the app's trace for the GIFs
-        if: ${{ !cancelled() && steps.gif-scenarios.outcome != 'failure' && github.event_name != 'push' }}
+        if: ${{ !cancelled() && steps.gif-scenarios.outcome != 'failure' && github.event_name != 'push' && !inputs.mockup_patch }}
         run: scripts/app-trace.sh start gif-videos
 
       - name: Record GIF videos
-        if: ${{ !cancelled() && steps.gif-scenarios.outcome != 'failure' && github.event_name != 'push' }}
+        if: ${{ !cancelled() && steps.gif-scenarios.outcome != 'failure' && github.event_name != 'push' && !inputs.mockup_patch }}
         timeout-minutes: 10
         continue-on-error: true
         env:
@@ -832,11 +927,11 @@ jobs:
           scripts/take-gifs.sh gif-videos
 
       - name: Stop recording the GIFs' trace
-        if: ${{ !cancelled() && steps.gif-scenarios.outcome != 'failure' && github.event_name != 'push' }}
+        if: ${{ !cancelled() && steps.gif-scenarios.outcome != 'failure' && github.event_name != 'push' && !inputs.mockup_patch }}
         run: scripts/app-trace.sh stop gif-videos
 
       - name: Upload GIF videos
-        if: ${{ !cancelled() && github.event_name != 'push' }}
+        if: ${{ !cancelled() && github.event_name != 'push' && !inputs.mockup_patch }}
         uses: actions/upload-artifact@v7
         with:
           name: ios-gif-videos
@@ -865,11 +960,12 @@ jobs:
   # the pictures job ran, failed or not: a failed screenshot run fails it
   # (screens missing, or no artifact), rather than skip it as a pass. Not on
   # a push to main, whose pictures are visual review's reference: a PR is
-  # checked against the baselines before it merges.
+  # checked against the baselines before it merges. Nor on a mockup, which
+  # visual review compares with main's shots.
   visual:
     name: Visual regression
     needs: [pictures]
-    if: ${{ !cancelled() && needs.pictures.result != 'skipped' && inputs.gifs_only != true && github.event_name != 'push' }}
+    if: ${{ !cancelled() && needs.pictures.result != 'skipped' && inputs.gifs_only != true && github.event_name != 'push' && !inputs.mockup_patch }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -895,10 +991,11 @@ jobs:
   # the PR that makes it (a workflow_run caller runs only from main). Not a
   # required check; it never fails a run for a report. When the simulator
   # jobs skip (a docs-only PR), it finds nothing to report; on a push to
-  # main it publishes the pictures job's.
+  # main it publishes the pictures job's. A mockup publishes nothing: its
+  # app runs a patch on no branch.
   reports:
     needs: [e2e, a11y, pictures]
-    if: ${{ !cancelled() && inputs.gifs_only != true }}
+    if: ${{ !cancelled() && inputs.gifs_only != true && !inputs.mockup_patch }}
     permissions:
       contents: write
       actions: read
