@@ -95,6 +95,13 @@ changing the module.
 - **A self-merging PR fails `Visual changes` if a screen changed**: a bot's PR with auto-merge on,
   or one whose auto-merge was on before the table showed. The owner looks and merges, or turns
   auto-merge off and on again to accept.
+- **A mockup** (a plan's screens, before any code): commit the throwaway change on a local branch
+  that's never pushed, then
+  `git fetch origin` and
+  `gh workflow run ci.yml --ref main -f mockup_patch="$(git diff --binary "$(git merge-base origin/main HEAD)" | base64 -w0)" -f mockup_issue=<issue>`.
+  The patch may change only `src/**`, `assets/**` and `e2e/screenshots/screens.yaml` (to add a
+  screen), in about 60 KB of base64. Visual review puts the before/after
+  table in the issue's description (an open issue in this repo) once the run's shots are taken.
 
 ## Figma MCP Integration Rules
 

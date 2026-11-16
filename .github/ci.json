@@ -76,7 +76,8 @@
     "columns": [
       { "label": "Light", "file": "light-{state}.png", "width": 220 },
       { "label": "Dark", "file": "dark-{state}.png", "width": 220 }
-    ]
+    ],
+    "mockupPaths": ["src/**", "assets/**", "e2e/screenshots/screens.yaml"]
   },
   "review": {
     "instructions": ".github/claude-review.md",
