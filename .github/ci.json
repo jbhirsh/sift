@@ -64,9 +64,14 @@
     }
   },
   "review": {
-    "instructions": ".github/claude-review.md"
+    "instructions": ".github/claude-review.md",
+    "engine": "sdk",
+    "advisor": "opus",
+    "skipBots": ["dependabot[bot]"]
   },
   "autofix": {
+    "engine": "sdk",
+    "advisor": "opus",
     "ciFixChecks": [
       "`npm run check` (what CI's unit job runs: lint, format check, typecheck, type coverage, depcruise, the native bridge check, tests with coverage; `npm run format` rewrites what the format check flags)",
       "`npm audit --omit=dev --audit-level=critical`"

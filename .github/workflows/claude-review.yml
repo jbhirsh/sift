@@ -4,11 +4,9 @@
 # .github/ci.json ("review") and the guide it names,
 # .github/claude-review.md, both read from main.
 #
-# Its own workflow, not a job in ci.yml, because claude-code-action skips
-# (and still reports success) on any PR that edits the workflow file it runs
-# from: only a PR that edits this stub skips review. It doesn't wait for CI,
-# so a red PR is reviewed too; claude-autofix still works review threads only
-# once CI is green as well. The job's `name:` is a required status check.
+# Its own workflow, not a job in ci.yml, so it doesn't wait for CI: a red PR
+# is reviewed too; claude-autofix still works review threads only once CI is
+# green as well. The job's `name:` is a required status check.
 name: Claude Review
 
 on:
