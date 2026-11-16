@@ -700,7 +700,11 @@ jobs:
       actions: read
 
     steps:
+      # Two commits deep: on a PR the checkout is its merge commit, whose
+      # parents visual-shots reads (the PR's head and the main it's built on).
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
 
       - uses: ./.github/actions/simulator-app
         with:
@@ -741,6 +745,48 @@ jobs:
           path: screenshots
           if-no-files-found: warn
           retention-days: 14
+
+      # The shots alone, for visual review (jbhirsh/ci#64): the ones the
+      # screenshot script leaves at the top of its folder, not Maestro's
+      # debug output beside them, into the folder `visual-review.folders`
+      # in .github/ci.json names (build/ is git-ignored). On a push to main
+      # it fails when a screen is missing, so nothing is uploaded: a partial
+      # set would be the reference, and every PR built on the commit would
+      # show its missing screens as new. Without shots, visual review says
+      # main has none, to re-run this job. The screens are each
+      # takeScreenshot in e2e/screenshots/screens.yaml, in both of
+      # scripts/take-screenshots.sh's modes.
+      - name: Gather the shots for visual review
+        id: gather
+        if: ${{ !cancelled() && inputs.gifs_only != true }}
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          mkdir -p build/visual-shots
+          find screenshots -maxdepth 1 -name '*.png' -exec cp {} build/visual-shots/ \;
+          screens=$(sed -n 's/^- takeScreenshot: \${MODE}-\(.*\)$/\1/p' e2e/screenshots/screens.yaml)
+          if [ -z "$screens" ]; then
+            echo "::error title=Visual review::No '- takeScreenshot: \${MODE}-<screen>' line in e2e/screenshots/screens.yaml: update this step to the flow's new form."
+            exit 1
+          fi
+          missing=()
+          for screen in $screens; do
+            for mode in light dark; do
+              [ -f "build/visual-shots/$mode-$screen.png" ] || missing+=("$mode-$screen")
+            done
+          done
+          if [ "${#missing[@]}" -gt 0 ] && [ "$EVENT" = push ]; then
+            echo "::error title=Visual review::Main's screenshots are missing ${missing[*]}, so this commit has no reference for visual review: re-run this job."
+            exit 1
+          fi
+
+      # Uploads them as `visual-shots`, with the commit they're of: main's
+      # push runs are the reference (kept 90 days), and visual-review.yml
+      # compares each PR's with them once this run finishes. It never fails
+      # on a changed screen.
+      - name: Upload the shots for visual review
+        if: ${{ !cancelled() && steps.gather.outcome == 'success' }}
+        uses: jbhirsh/ci/visual-shots@main
 
       # The GIF scenarios in e2e/gifs, recorded on the Simulator with the
       # touches drawn (components/TouchOverlay), as videos that

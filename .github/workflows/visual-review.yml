@@ -1,0 +1,44 @@
+# Visual review (jbhirsh/ci#64): each PR's Simulator screenshots against
+# main's of the commit the PR is built on, as a before/after table in the
+# PR's description and the `Visual changes` status. CI's Screenshots and
+# GIFs job uploads the shots (jbhirsh/ci's visual-shots); this runs once
+# that run finishes, from main's copy of this file, and never checks out or
+# runs a PR's code. Its settings are `visual-review` in .github/ci.json, and
+# how it works is in jbhirsh/ci's .github/workflows/visual-review.yml.
+#
+# Triggers, each an event that can change a result:
+#   - CI finished: on a PR, its review; on a push to main, every PR and
+#     mockup waiting for main's shots of that commit; a mockup run by hand,
+#     its issue's table;
+#   - the PR's description was edited (the pictures a UI change shows), or
+#     auto-merge was turned on or off (which decides whether a changed
+#     screen blocks the merge). A pull_request_target run is main's code,
+#     so it's exempt from autofix's triggers (.github/ci.json).
+name: Visual review
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  pull_request_target:
+    types: [edited, auto_merge_enabled, auto_merge_disabled]
+
+permissions: {}
+
+jobs:
+  review:
+    # What the reusable workflow's jobs ask for; it can't be given more.
+    permissions:
+      actions: read
+      # dependabot-merge's enable.mjs turns Dependabot's auto-merge on once
+      # no screen changed.
+      contents: write
+      statuses: write
+      pull-requests: write
+      issues: write
+    uses: jbhirsh/ci/.github/workflows/visual-review.yml@main
+    secrets:
+      # The pictures go up in a comment with it: GitHub refuses attachments
+      # from the Actions token. It needs Contents, Pull requests and Issues
+      # write (CONTRIBUTING.md).
+      bot-pr-token: ${{ secrets.BOT_PR_TOKEN }}
