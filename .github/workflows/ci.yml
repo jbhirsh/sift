@@ -82,6 +82,7 @@ jobs:
       code: ${{ steps.filter.outputs.code }}
       app_key: ${{ steps.app-key.outputs.key }}
       app_cached: ${{ steps.app-cache.outputs.cache-hit }}
+      maestro_version: ${{ steps.maestro.outputs.version }}
 
     steps:
       - uses: actions/checkout@v7
@@ -175,6 +176,22 @@ jobs:
           path: build/e2e
           key: ${{ steps.app-key.outputs.key }}
           lookup-only: true
+
+      # Maestro's latest release, for the simulator jobs to install
+      # (.github/actions/simulator-app, which caches it under this version).
+      # Looked up here, once a run: on a macOS runner the same request took
+      # 53 s to 81 s, as it ran while the simulator's boot held all 3 cores
+      # (even printing the step's header took 11 s), in each of the jobs.
+      # An empty version (the lookup failed) makes them install the latest
+      # uncached.
+      - name: Find Maestro's latest release
+        id: maestro
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh api repos/mobile-dev-inc/maestro/releases/latest --jq .tag_name || true)
+          echo "version=${tag#cli-}" >> "$GITHUB_OUTPUT"
+          echo "Maestro's latest release: ${tag:-unknown}"
 
       - name: Autofix triggers
         # Every pull-request workflow must wake Claude autofix or be exempt
@@ -572,6 +589,7 @@ jobs:
       - uses: ./.github/actions/simulator-app
         with:
           app-key: ${{ needs.check.outputs.app_key }}
+          maestro-version: ${{ needs.check.outputs.maestro_version }}
           load-dir: maestro-results
 
       # The E2E trace (src/services/trace.ts), recorded for the whole suite:
@@ -802,6 +820,7 @@ jobs:
       - uses: ./.github/actions/simulator-app
         with:
           app-key: ${{ needs.check.outputs.app_key }}
+          maestro-version: ${{ needs.check.outputs.maestro_version }}
           load-dir: screenshots
           save-cache: ${{ !inputs.mockup_patch }}
 
