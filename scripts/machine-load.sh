@@ -23,6 +23,10 @@
 #   scripts/machine-load.sh <dir>            returns at once; the samplers run on
 #   scripts/machine-load.sh --cpu-row [<s>]  one machine-cpu.csv row: the CPU
 #                                            over the next <s> seconds (1)
+#   scripts/machine-load.sh --wait-quiet <busy> <quiet> <max>
+#                                            returns once the CPU has stayed
+#                                            under <busy>% for <quiet> s
+#                                            straight, or after <max> s
 #
 # Once started it can't fail the job: a sampler that won't start leaves
 # its error in its file.
@@ -31,8 +35,8 @@ set -uo pipefail
 # One row from iostat's second report (its first counts since boot), whose
 # last columns are the CPU's "us sy id" and the load average's "1m 5m 15m",
 # whatever disk columns come before them: busy is 100 less idle. The
-# report covers the given number of seconds (scripts/settle-simulator.sh
-# takes 5, so a moment's spike doesn't decide whether the CPU is quiet).
+# report covers the given number of seconds (wait_quiet below takes 5, so
+# a moment's spike doesn't decide whether the CPU is quiet).
 cpu_row() {
   local row
   row=$(iostat -c 2 -w "${1:-1}" | tail -1 | awk '
@@ -45,6 +49,60 @@ cpu_row() {
 
 if [ "${1:-}" = --cpu-row ]; then
   cpu_row "${2:-1}"
+  exit
+fi
+
+# Waits for the machine to go quiet: until the CPU has been under <busy>%
+# for <quiet> seconds straight, each sample a 5 s average (a moment's spike
+# doesn't decide it), or <max> seconds at most. Measured, never a fixed wait
+# (jbhirsh/ci#58): each sample takes iostat's own interval, with no sleeps.
+# scripts/settle-simulator.sh waits on it for a snapshot's first-boot work,
+# and scripts/run-a11y-audit.sh before each pass, as XCTest's audit gives
+# up on a screen when a busy runner keeps it from finishing in time.
+# Prints a line a minute to stderr while it waits, so a caller capturing
+# its output gets only the last line, on stdout, saying how it ended.
+# Exits 0 once quiet, 1 at <max>, 2 if the CPU can't be read (a sampler
+# failing at once would spin here, and without a reading it can't tell
+# quiet from busy), and 3 for a usage error.
+wait_quiet() {
+  local busy_max=$1 quiet_for=$2 max=$3 sample=5
+  local start=$SECONDS logged=$SECONDS quiet_from='' row busy sampled_from now quiet
+  while :; do
+    sampled_from=$SECONDS
+    row=$(cpu_row "$sample") || {
+      echo "Couldn't read the CPU (iostat)."
+      return 2
+    }
+    busy=${row##*,}
+    if awk -v b="$busy" -v q="$busy_max" 'BEGIN { exit !(b + 0 < q + 0) }'; then
+      quiet_from=${quiet_from:-$sampled_from}
+    else
+      quiet_from=''
+    fi
+    now=$SECONDS
+    quiet=0
+    [ -z "$quiet_from" ] || quiet=$((now - quiet_from))
+    if [ "$quiet" -ge "$quiet_for" ]; then
+      echo "Quiet after $((now - start)) s (CPU under ${busy_max}% for ${quiet_for} s)"
+      return 0
+    fi
+    if [ $((now - start)) -ge "$max" ]; then
+      echo "Not quiet after $((now - start)) s (the cap): ${busy}% busy, quiet for ${quiet} s"
+      return 1
+    fi
+    if [ $((now - logged)) -ge 60 ]; then
+      echo "$(((now - start) / 60)) min: ${busy}% busy, quiet for ${quiet} s" >&2
+      logged=$now
+    fi
+  done
+}
+
+if [ "${1:-}" = --wait-quiet ]; then
+  if [ $# -ne 4 ]; then
+    echo 'usage: scripts/machine-load.sh --wait-quiet <busy %> <quiet s> <max s>' >&2
+    exit 3
+  fi
+  wait_quiet "$2" "$3" "$4"
   exit
 fi
 

@@ -15,11 +15,11 @@
 # So this creates a device of the same model and runtime that no app has
 # ever been installed on, boots it, and leaves it until it has settled:
 # until the CPU has stayed under QUIET_BUSY% busy for QUIET_SECONDS
-# straight (each sample a 5 s average, scripts/machine-load.sh --cpu-row),
-# or MAX_SECONDS at most. Measured, never a fixed wait (jbhirsh/ci#58):
-# a snapshot taken early repeats the rest of the work on every boot
-# (caloryn saw a deferred media analysis pass at 210% for 3 minutes, past
-# the 10th minute). Then it shuts the device down cleanly
+# straight (each sample a 5 s average, scripts/machine-load.sh
+# --wait-quiet), or MAX_SECONDS at most. Measured, never a fixed wait
+# (jbhirsh/ci#58): a snapshot taken early repeats the rest of the work on
+# every boot (caloryn saw a deferred media analysis pass at 210% for 3
+# minutes, past the 10th minute). Then it shuts the device down cleanly
 # and archives its data folder.
 #
 # apsd is stopped once it has booted, as in the simulator jobs
@@ -46,7 +46,6 @@ here="$(dirname "$0")"
 MAX_SECONDS=1200
 QUIET_BUSY=25
 QUIET_SECONDS=60
-SAMPLE_SECONDS=5
 # Never saved from a device the app has run on: its data would come back
 # in every job's simulator.
 BUNDLE_ID=com.jessicahirsh.sift
@@ -73,37 +72,20 @@ for domain in user/foreground system; do
   $sim bootout "$domain/com.apple.apsd" >/dev/null 2>&1 || true
 done
 
-# Each sample takes SAMPLE_SECONDS (iostat's own interval): no sleeps. A
-# sample that fails ends it, with nothing saved: it can't tell a settled
-# device from a busy one, and a sampler failing at once would spin here.
-quiet_from=''
+# The CPU sampled in 5 s averages (scripts/machine-load.sh --wait-quiet).
+# A sample that fails ends it, with nothing saved: it can't tell a settled
+# device from a busy one.
 settled=''
-logged=$booted
-while :; do
-  sampled_from=$SECONDS
-  row=$("$here/machine-load.sh" --cpu-row "$SAMPLE_SECONDS") || {
-    echo "::error::Couldn't read the CPU (scripts/machine-load.sh --cpu-row): no snapshot made."
+quiet_status=0
+"$here/machine-load.sh" --wait-quiet "$QUIET_BUSY" "$QUIET_SECONDS" "$MAX_SECONDS" || quiet_status=$?
+case $quiet_status in
+  0) settled=yes ;;
+  1) ;;
+  *)
+    echo "::error::Couldn't read the CPU (scripts/machine-load.sh): no snapshot made."
     exit 1
-  }
-  busy=${row##*,}
-  if awk -v b="$busy" -v q="$QUIET_BUSY" 'BEGIN { exit !(b + 0 < q + 0) }'; then
-    quiet_from=${quiet_from:-$sampled_from}
-  else
-    quiet_from=''
-  fi
-  now=$SECONDS
-  quiet=0
-  [ -z "$quiet_from" ] || quiet=$((now - quiet_from))
-  if [ $((now - logged)) -ge 60 ]; then
-    echo "$(((now - booted) / 60)) min after boot: ${busy:-?}% busy, quiet for ${quiet} s"
-    logged=$now
-  fi
-  if [ "$quiet" -ge $QUIET_SECONDS ]; then
-    settled=yes
-    break
-  fi
-  [ $((now - booted)) -lt $MAX_SECONDS ] || break
-done
+    ;;
+esac
 waited=$((SECONDS - booted))
 took="$((waited / 60)) min $((waited % 60)) s"
 busiest=$(ps -Aro pcpu,comm | sed -n '2,6p' | sed 's#[^ ]*/.*RuntimeRoot#sim:#' \
