@@ -4,11 +4,10 @@
 # simulator-snapshot job (which settles one like it) always agree.
 #
 # Pinned to one model (SIM_MODEL), on the newest iOS runtime that has it:
-# the visual regression compares screenshots pixel for pixel with baselines
-# (e2e/screenshots/baselines), so the screen they come from can't change
-# with the runner image's device list. When an image drops the model this
-# fails and lists what it has: move to a newer one and rewrite the
-# baselines (visual-baselines.yml).
+# visual review compares a PR's screenshots pixel for pixel with main's, so
+# the screen they come from can't change with the runner image's device
+# list. When an image drops the model this fails and lists what it has:
+# move to a newer one; every screen differs until main's next run.
 #
 # Prints NAME=value lines, for $GITHUB_ENV or $GITHUB_OUTPUT:
 #   SIM_UDID            the runner's own device of that model and runtime

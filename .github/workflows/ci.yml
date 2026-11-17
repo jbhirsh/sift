@@ -767,10 +767,9 @@ jobs:
           notes: a11y-audit/job-notes.json
           load: a11y-audit/machine-cpu.csv
 
-  # Pictures, not a gate itself: the screenshots for the visual baselines
-  # (the Visual regression job below compares them, and visual-baselines.yml
-  # commits them) and the README (readme-screenshots.yml takes this run's
-  # ios-screenshots artifact), and the GIF scenarios' videos
+  # Pictures, not a gate itself: the screenshots visual review compares with
+  # main's (visual-review.yml) and the README (readme-screenshots.yml takes
+  # this run's ios-screenshots artifact), and the GIF scenarios' videos
   # (pr-gif-attach.yml, pr-gif.yml and scripts/pr-gifs.ts take
   # ios-gif-videos; a gifs-only run records only these).
   pictures:
@@ -825,10 +824,10 @@ jobs:
           save-cache: ${{ !inputs.mockup_patch }}
 
       # The main screens on the Simulator, light and dark, for PR
-      # descriptions (PR visuals says how to use them) and Visual
-      # regression: real SF Symbols and materials, which a web export can't
-      # draw. It never fails the job; a screen it missed fails Visual
-      # regression, and the app's trace, recorded around it as in the E2E
+      # descriptions and visual review: real SF Symbols and materials, which
+      # a web export can't draw. It never fails the job; a screen it missed
+      # is missing from the shots, which the gather step below fails on, and
+      # the app's trace, recorded around it as in the E2E
       # job (scripts/app-trace.sh) and uploaded with the shots, says where
       # its taps went.
       - name: Start recording the app's trace
@@ -862,18 +861,18 @@ jobs:
       # The shots alone, for visual review (jbhirsh/ci#64): the ones the
       # screenshot script leaves at the top of its folder, not Maestro's
       # debug output beside them, into the folder `visual-review.folders`
-      # in .github/ci.json names (build/ is git-ignored). On a push to main
-      # it fails when a screen is missing, so nothing is uploaded: a partial
-      # set would be the reference, and every PR built on the commit would
-      # show its missing screens as new. Without shots, visual review says
-      # main has none, to re-run this job. The screens are each
+      # in .github/ci.json names (build/ is git-ignored). It fails when a
+      # screen is missing, so nothing is uploaded: a screenshot flow that
+      # stopped (a dropped tap) isn't a removed screen, a removed one is gone
+      # from screens.yaml too. On main, a partial set would be the reference,
+      # and every PR built on the commit would show its missing screens as
+      # new; on a PR it would show them as removed. Without shots, visual
+      # review says so and names this job. The screens are each
       # takeScreenshot in e2e/screenshots/screens.yaml, in both of
       # scripts/take-screenshots.sh's modes.
       - name: Gather the shots for visual review
         id: gather
         if: ${{ !cancelled() && inputs.gifs_only != true }}
-        env:
-          EVENT: ${{ github.event_name }}
         run: |
           mkdir -p build/visual-shots
           find screenshots -maxdepth 1 -name '*.png' -exec cp {} build/visual-shots/ \;
@@ -888,8 +887,8 @@ jobs:
               [ -f "build/visual-shots/$mode-$screen.png" ] || missing+=("$mode-$screen")
             done
           done
-          if [ "${#missing[@]}" -gt 0 ] && [ "$EVENT" = push ]; then
-            echo "::error title=Visual review::Main's screenshots are missing ${missing[*]}, so this commit has no reference for visual review: re-run this job."
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error title=Visual review::The screenshots are missing ${missing[*]}: the flow stopped early (see maestro-light.log or maestro-dark.log in the ios-screenshots artifact)."
             exit 1
           fi
 
@@ -970,40 +969,6 @@ jobs:
           job: Screenshots and GIFs
           notes: screenshots/job-notes.json
           load: screenshots/machine-cpu.csv
-
-  # The screenshots the pictures job took, compared with their baselines in
-  # e2e/screenshots/baselines (jbhirsh/ci's visual-baselines/compare; this
-  # app's settings are the `visual-baselines` key of .github/ci.json): a
-  # screen that changed, appeared or wasn't taken fails it, with each shot
-  # and its diff in the visual-diffs artifact. On Linux, as the comparing
-  # needs no Simulator. A change that's meant is written into the baselines
-  # by visual-baselines.yml, run by hand on the PR's branch. It runs whenever
-  # the pictures job ran, failed or not: a failed screenshot run fails it
-  # (screens missing, or no artifact), rather than skip it as a pass. Not on
-  # a push to main, whose pictures are visual review's reference: a PR is
-  # checked against the baselines before it merges. Nor on a mockup, which
-  # visual review compares with main's shots.
-  visual:
-    name: Visual regression
-    needs: [pictures]
-    if: ${{ !cancelled() && needs.pictures.result != 'skipped' && inputs.gifs_only != true && github.event_name != 'push' && !inputs.mockup_patch }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/download-artifact@v8
-        with:
-          name: ios-screenshots
-          path: screenshots
-
-      # It installs its own pixelmatch and pngjs: no npm install here.
-      - uses: jbhirsh/ci/visual-baselines/compare@main
-        with:
-          fresh: screenshots
 
   # Publishes this run's job reports to the repository's Pages and keeps
   # one comment on the PR with every simulator job's summary (jbhirsh/ci's

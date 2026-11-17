@@ -1,7 +1,7 @@
 #!/bin/bash
 # Photograph the main screens on the booted simulator, in light and dark,
-# for PR descriptions, the README and the visual regression check
-# (ci.yml's Visual regression job): e2e/screenshots/screens.yaml walks
+# for PR descriptions, the README and visual review (visual-review.yml):
+# e2e/screenshots/screens.yaml walks
 # Setup, the sort sheet, Sift, the decisions list, Settings and Done. A web
 # export can't draw SF Symbols; these are the real app as iOS renders it.
 #

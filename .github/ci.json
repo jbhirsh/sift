@@ -35,25 +35,13 @@
       "assets/**"
     ],
     "notUi": [],
-    "advice": "A UI change shows through the visual baselines it changes, which this check puts in a before/after table comment, light beside dark: change them with the UI (e2e/screenshots/screens.yaml holds the screens), and once this PR's CI run has taken its screenshots, run Update visual baselines (visual-baselines.yml) on this branch, then approve the checks its push starts. For motion (a card swipe, an animation, a sheet or modal opening and closing, scrolling, a multi-step flow), add or edit the scenario in e2e/gifs/ (a Maestro flow, <name>.yaml; swipe-and-undo.yaml says how one is built) and push: once this PR's CI run finishes, PR GIFs attach (pr-gif-attach.yml) takes the videos its Screenshots and GIFs job recorded and main's, makes the GIFs and attaches them here, labelled GIF: (run PR GIFs, pr-gif.yml, by hand for a scenario this PR doesn't change, or a fork's PR). Only what no test can draw (the app icon, the launch screen, an iOS prompt) is dragged in by hand, with alt text `No test draws: <why>`. Or tick \"No visible UI change\" in the template. Editing the description re-runs this check.",
-    "fromBaselines": true
+    "sharedTemplate": true
   },
   "audit": {
     "graph": ["src"]
   },
   "readme-screenshots": {
     "source": "the iOS Simulator shots CI's Screenshots and GIFs job took (mock library)"
-  },
-  "visual-baselines": {
-    "folders": ["e2e/screenshots/baselines"],
-    "artifact": {
-      "workflow": "ci.yml",
-      "name": "ios-screenshots"
-    },
-    "columns": [
-      { "label": "Light", "file": "light-{state}.png", "width": 220 },
-      { "label": "Dark", "file": "dark-{state}.png", "width": 220 }
-    ]
   },
   "gif": {
     "source": "ci-videos",
@@ -74,8 +62,16 @@
     "job": "Screenshots and GIFs",
     "folders": ["build/visual-shots"],
     "columns": [
-      { "label": "Light", "file": "light-{state}.png", "width": 220 },
-      { "label": "Dark", "file": "dark-{state}.png", "width": 220 }
+      {
+        "label": "Light",
+        "file": "light-{state}.png",
+        "width": 220
+      },
+      {
+        "label": "Dark",
+        "file": "dark-{state}.png",
+        "width": 220
+      }
     ],
     "mockupPaths": ["src/**", "assets/**", "e2e/screenshots/screens.yaml"]
   },
@@ -92,16 +88,11 @@
       "`npm run check` (what CI's unit job runs: lint, format check, typecheck, type coverage, depcruise, the native bridge check, tests with coverage; `npm run format` rewrites what the format check flags)",
       "`npm audit --omit=dev --audit-level=critical`"
     ],
-    "cannotRun": [
-      "E2E (Maestro, on macOS)",
-      "the iOS simulator build",
-      "visual regression (its screenshots come from the iOS Simulator)",
-      "mutation testing"
-    ],
+    "cannotRun": ["E2E (Maestro, on macOS)", "the iOS simulator build", "mutation testing"],
     "exempt": {
-      "PR visuals": "Wants new baselines from the Simulator or GIFs, which autofix can't make (autofix skips its failure too).",
+      "PR visuals": "Passes every PR: visual review decides (visuals.sharedTemplate).",
       "README screenshots": "Runs as a PR closes, when there's nothing left for autofix to do.",
-      "Visual review": "Runs from main after CI and on description and auto-merge events, and fails only on what a person decides (a changed screen on a PR that merges itself, or a UI change with no pictures), which no code change gives."
+      "Visual review": "Runs from main after CI and on description and auto-merge events, and fails only on what a person decides (a changed screen on a PR that merges itself), which no code change gives."
     }
   }
 }
