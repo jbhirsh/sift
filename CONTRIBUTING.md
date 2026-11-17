@@ -119,12 +119,16 @@ iOS asks for on the first launch.
   The README screenshot bot opens its PR with it: a PR the default Actions token opens starts no
   workflows, so its required checks would never report. PR GIFs attach (`pr-gif-attach.yml`), and PR
   GIFs (`pr-gif.yml`) run by hand, need it too, to attach GIFs: GitHub refuses the Actions token for
-  attachments. Bots' PRs get no secrets, so the simulator app builds without an Expo or Apple login
-  on them (`scripts/build-simulator-app.sh`).
+  attachments. Bots' PRs get no Actions secrets, so the simulator app builds without an Expo or
+  Apple login on them (`scripts/build-simulator-app.sh`).
 - **Claude Review and autofix** sign in by workload identity federation: the workflows pass the IDs
-  of a rule in the Anthropic Console (Workload identity), so there is no Claude secret. The IDs
-  aren't secret. Review and autofix run on the Agent SDK (`"engine": "sdk"` in `.github/ci.json`),
-  which the Max plan's API credit pays for (jbhirsh/ci#68).
+  of a rule in the Anthropic Console (Workload identity). The IDs aren't secret. Review and
+  autofix run on the Agent SDK (`"engine": "sdk"` in `.github/ci.json`), which the Max plan's API
+  credit pays for (jbhirsh/ci#68).
+- **`CLAUDE_CODE_OAUTH_TOKEN`**, as an Actions secret and as a Dependabot secret (Dependabot's
+  PRs see only Dependabot secrets): the owner's Claude subscription token, from
+  `claude setup-token`. Claude Review retries a pass the API refuses for credit or a limit on it,
+  once; without it, such a stop fails the check (jbhirsh/ci#57).
 - **The `main` branch rule:** it requires the checks above, Claude Review included, and resolved
   review threads. A bot PR merges as soon as the rule lets it, so a check missing from the rule
   doesn't gate it.
