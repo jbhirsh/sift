@@ -12,6 +12,17 @@ set -euo pipefail
 APP_PATH=${1:?usage: run-a11y-audit.sh <path to .app> [<bundle dir>]}
 BUNDLE_DIR=${2:-build/a11y-audit-bundle}
 BUNDLE_ID=com.jessicahirsh.sift
+HERE="$(dirname "$0")"
+# Quiet: the CPU under QUIET_BUSY% for QUIET_SECONDS straight, measured
+# as scripts/settle-simulator.sh measures a settled simulator, over a
+# shorter stretch: this waits out a burst of work, not first-boot chores.
+# Not settle's 25%: on this job the load samplers, the app's trace stream
+# and the runner keep a calm machine at about 40-55% (sift#240's run),
+# while the boot that broke the audit held it at 100% for minutes. Each
+# pass's job note records what the wait saw, to tune this by.
+QUIET_BUSY=50
+QUIET_SECONDS=30
+QUIET_MAX_SECONDS=180
 OUT_DIR=${A11Y_OUT_DIR:-a11y-audit}
 mkdir -p "$OUT_DIR"
 
@@ -26,7 +37,7 @@ sys.exit('no booted simulator')
 
 XCTESTRUN=$(ls "$BUNDLE_DIR"/*.xctestrun 2>/dev/null | head -1 || true)
 if [ -z "$XCTESTRUN" ]; then
-  "$(dirname "$0")/build-a11y-audit.sh" "$BUNDLE_DIR"
+  "$HERE/build-a11y-audit.sh" "$BUNDLE_DIR"
   XCTESTRUN=$(ls "$BUNDLE_DIR"/*.xctestrun | head -1)
 fi
 
@@ -36,6 +47,22 @@ for appearance in light dark; do
   # A fresh install each pass: no saved session, the same path through.
   xcrun simctl uninstall "$UDID" "$BUNDLE_ID" || true
   xcrun simctl install "$UDID" "$APP_PATH"
+  # XCTest's audit gives up on a screen it can't finish in its own time
+  # ("Audit failed to complete in time"), which a runner still busy with
+  # the simulator's boot or the install causes: on sift#234 and #235 the
+  # CPU was pegged (a load average of 200-270 on 3 cores) through the
+  # light pass, and the dark pass, run once it had calmed, passed. So
+  # each pass starts once the machine is quiet (scripts/machine-load.sh
+  # --wait-quiet), or after QUIET_MAX_SECONDS, when it runs anyway: a busy
+  # machine may still pass.
+  if quiet=$("$HERE/machine-load.sh" --wait-quiet "$QUIET_BUSY" "$QUIET_SECONDS" "$QUIET_MAX_SECONDS"); then
+    echo "Before the $appearance pass: $quiet"
+  else
+    echo "::warning title=Accessibility audit::Before the $appearance pass: $quiet"
+  fi
+  if [ -n "${JOB_NOTES:-}" ]; then
+    "$HERE/job-note.sh" "$JOB_NOTES" "Quiet before the $appearance pass" "$quiet"
+  fi
   TEST_RUNNER_A11Y_APPEARANCE=$appearance xcodebuild test-without-building \
     -xctestrun "$XCTESTRUN" \
     -destination "id=$UDID" \

@@ -43,6 +43,18 @@ runs:
         scripts/job-note.sh "$PWD/$LOAD_DIR/job-notes.json" Runner "${ImageOS:-?} ${ImageVersion:-}, $(sysctl -n hw.ncpu) cores"
         scripts/job-note.sh "$PWD/$LOAD_DIR/job-notes.json" Xcode "$(xcodebuild -version 2>/dev/null | head -1)"
 
+    # Spotlight indexes what each job writes to the runner's disk (the
+    # caches it restores, the app, the simulator's data): on sift#244's
+    # audit its mdworker_shared, mds_stores and mds held the 3 cores at
+    # 50-100% for the whole job, so the audit's wait for a quiet machine
+    # (scripts/run-a11y-audit.sh) never saw one, and every job shared the
+    # CPU with it. Nothing in CI searches with Spotlight. Best effort.
+    - name: Stop Spotlight indexing on the runner
+      shell: bash
+      run: |
+        sudo mdutil -a -i off >/dev/null 2>&1 || true
+        scripts/job-note.sh "$JOB_NOTES" Spotlight "$(mdutil -s / 2>/dev/null | tail -1 | sed 's/^[[:space:]]*//')"
+
     # The model and runtime to boot, and the settled snapshot's cache key,
     # from scripts/simulator-device.sh, which ci.yml's simulator-snapshot
     # job reads too, so the snapshot it makes is the one looked up here.

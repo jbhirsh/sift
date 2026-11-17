@@ -607,8 +607,8 @@ jobs:
     if: ${{ !cancelled() && needs.check.result == 'success' && needs.build.result != 'failure' && github.event_name != 'push' && inputs.gifs_only != true && (needs.check.outputs.code == 'true' || github.event_name == 'workflow_dispatch') }}
     runs-on: macos-26
     # About 5 min of setup, the audit bundle (restored, or about 5 min to
-    # build on a miss) and the audit's 15-min cap.
-    timeout-minutes: 30
+    # build on a miss) and the audit's 25-min cap.
+    timeout-minutes: 40
     permissions:
       contents: read
       # The job summary reads this run's steps and earlier runs.
@@ -633,12 +633,14 @@ jobs:
       # job: each is an error annotation and a row in the step summary. A
       # pass took about 40 s when this ran after the E2E suite; on a fresh
       # runner, minutes after it booted, it takes 1 to 2 min (the whole
-      # machine is slower then), so the cap leaves room.
+      # machine is slower then). Each pass first waits, up to 3 min, for the
+      # machine to go quiet (scripts/run-a11y-audit.sh says why), so the cap
+      # leaves room for both waits and both passes.
       - name: Start recording the app's trace
         run: scripts/app-trace.sh start a11y-audit
 
       - name: Accessibility audit
-        timeout-minutes: 15
+        timeout-minutes: 25
         run: scripts/run-a11y-audit.sh "$(ls -d build/e2e/*.app | head -1)" "${{ steps.audit-bundle.outputs.dir }}"
 
       # The app's trace through both passes, uploaded with the audit: a pass
