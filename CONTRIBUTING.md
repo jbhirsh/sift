@@ -50,7 +50,7 @@ the `screenshots` branch). Both do nothing when `$CI` is set; CI re-runs everyth
 | Mutation | how much the unit tests check                   | Stryker over each PR's changed lines, and a monthly full sweep                   |
 
 CI also runs Xcode's accessibility audit on Setup, Sift, Settings and Done in light and dark, and
-compares its screenshots of the main screens with their baselines in `e2e/screenshots/baselines`.
+takes screenshots of the main screens, which visual review compares with main's.
 
 **When a simulator job fails or flakes,** its run summary gives the verdict and what needs
 attention (failed or re-run flows, flaky ones, steps and flows slower than usual) and links to its
@@ -68,12 +68,11 @@ logs. The E2E job's `maestro-results` artifact then holds:
   `machine-disk.txt`;
 - the screenshots.
 
-**Visual regression** fails on a screen that changed, appeared or wasn't taken, with its shot and
-diff in the `visual-diffs` artifact. A screen that wasn't taken is a flow that stopped: the
+**Visual changes** (`visual-review.yml`, from jbhirsh/ci) compares a PR's screenshots with main's of
+the PR's base and puts the before/after table in the PR's description. Merging accepts a changed
+screen, and a PR that merges itself fails the check when a screen changed: look, then merge it or
+turn auto-merge off and on again. A screen that wasn't taken is a flow that stopped: the
 `ios-screenshots` artifact holds Maestro's logs and the app's trace, read as for a failed E2E flow.
-For a change that's meant, run `visual-baselines.yml` by hand on the PR's branch once its run has
-taken the screenshots; it commits them as the new baselines, then approve the checks its push
-starts on the PR.
 
 ## Required checks
 
@@ -87,20 +86,18 @@ The `main` branch rule requires these jobs by name, and each reports on every PR
 | `Accessibility audit`         | `ci.yml`           | Xcode's accessibility audit                                                                                        |
 | `Mutation Tests (Stryker)`    | `mutation.yml`     | mutation testing of the lines a PR changed                                                                         |
 | `Claude Review`               | `claude-review.yml` | jbhirsh/ci's AI review; this repo's guide is `.github/claude-review.md`                                           |
-| `PR visuals`                  | `pr-visuals.yml`   | a UI change shows: its changed baselines (in a before/after comment), a GIF, or a picture no test can draw          |
+| `PR visuals`                  | `pr-visuals.yml`   | passes every PR: visual review decides (`visuals.sharedTemplate`)                                                  |
+| `Visual changes`              | `visual-review.yml` | a status, not a job: no screen changed, or a changed screen is there for a person to look at and merge            |
 | `Secret scan`, `SAST scan`    | `gitleaks.yml`, `semgrep.yml` | gitleaks and Semgrep, also swept weekly                                                                 |
 
-`Screenshots and GIFs` makes pictures and never gates; `Visual regression` joins the list once it
-has proved stable. The CI tooling is shared with fog-and-frontier and BoardGames from
+`Screenshots and GIFs` makes pictures and never gates. The CI tooling is shared with fog-and-frontier and BoardGames from
 [jbhirsh/ci](https://github.com/jbhirsh/ci), run from its `main`; this repo's settings for each
 tool are its key in `.github/ci.json`. Dependabot's npm PRs merge themselves once every required
 check is green.
 
 ## Visual review
 
-`Visual changes` (`visual-review.yml`) isn't required yet: it runs only from `main`, so a
-follow-up adds it to the branch rule in place of `PR visuals` once it has shown on a PR.
-`BOT_PR_TOKEN` (One-time setup) needs Issues read and write for it too, beside Contents and Pull
+`Visual changes` (`visual-review.yml`) is a required check. `BOT_PR_TOKEN` (One-time setup) needs Issues read and write for it too, beside Contents and Pull
 requests: it posts a mockup's pictures on the mockup's issue.
 
 ## Deployment

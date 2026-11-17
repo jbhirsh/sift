@@ -88,10 +88,9 @@ changing the module.
 
 ## Visual review
 
-- **Two picture checks run until a follow-up removes the old one.** `Visual regression` still
-  compares with the committed baselines, so a screen change still rewrites them
-  (`CONTRIBUTING.md`, Tests). `Visual changes` (`visual-review.yml`) compares with main's shots of
-  the PR's base, and for it the merge is the acceptance.
+- **Merging accepts a screen change.** `Visual changes` (`visual-review.yml`) compares a PR's
+  screenshots with main's of the PR's base; nothing is committed, and main's next run is the new
+  reference.
 - **A self-merging PR fails `Visual changes` if a screen changed**: a bot's PR with auto-merge on,
   or one whose auto-merge was on before the table showed. The owner looks and merges, or turns
   auto-merge off and on again to accept.
