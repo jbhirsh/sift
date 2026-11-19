@@ -87,6 +87,7 @@ The `main` branch rule requires these jobs by name, and each reports on every PR
 | `Mutation Tests (Stryker)`    | `mutation.yml`     | mutation testing of the lines a PR changed                                                                         |
 | `Claude Review`               | `claude-review.yml` | jbhirsh/ci's AI review; this repo's guide is `.github/claude-review.md`                                           |
 | `PR visuals`                  | `pr-visuals.yml`   | passes every PR: visual review decides (`visuals.sharedTemplate`)                                                  |
+| `PR description`              | `pr-description.yml` | the PR's description in the shared shape (headings, the goal's issue, each change's commit, Revisions naming the head) |
 | `Visual changes`              | `visual-review.yml` | a status, not a job: no screen changed, or a changed screen is there for a person to look at and merge            |
 | `Secret scan`, `SAST scan`    | `gitleaks.yml`, `semgrep.yml` | gitleaks and Semgrep, also swept weekly                                                                 |
 
