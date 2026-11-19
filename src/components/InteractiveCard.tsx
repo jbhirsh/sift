@@ -20,6 +20,7 @@ import { DRAG_THRESHOLD, swipeDecision } from '../utils/cardLayout';
 import { useTheme } from '../theme/ThemeContext';
 import { useResolvedArtwork } from '../hooks/useResolvedArtwork';
 import { thresholdHaptic } from '../services/haptics';
+import { mockCoverSource } from '../services/mockCovers';
 import { followTouch, liftTouch, showTouches } from '../services/touchOverlay';
 import { trace, tracing } from '../services/trace';
 import type { TraceData } from '../utils/trace';
@@ -66,9 +67,11 @@ export default function InteractiveCard({
   const { colors, isDark } = useTheme();
   const meta = formatTrackMeta(track.playCount, track.dateAdded, { playsKnown });
   const resolvedArtworkURL = useResolvedArtwork(track.id, track.artworkURL, artworkRetryKey);
-  // Whether the cover has loaded (or failed), for the accessibility audit's
-  // E2E marker: one mid-fade reads as low contrast behind the text.
-  const [artworkDone, setArtworkDone] = useState(false);
+  // Whether the cover has loaded, for the E2E marker the screenshots and the
+  // accessibility audit wait on: one mid-fade reads as low contrast behind
+  // the text. A cover that fails to load never sets it, so the flow fails
+  // rather than photographing a blank card.
+  const [artworkLoaded, setArtworkLoaded] = useState(false);
   const dragX = useSharedValue(0);
   const dragY = useSharedValue(0);
   // Whether the drag is past the point where letting go decides, so
@@ -159,7 +162,7 @@ export default function InteractiveCard({
       <Animated.View style={[styles.cardWrapper, cardStyle]}>
         <View style={styles.card}>
           {/* E2E only: the cover is shown and still (e2e/a11y-audit). */}
-          <E2eMarker id="card-artwork-shown" when={!resolvedArtworkURL || artworkDone} />
+          <E2eMarker id="card-artwork-shown" when={!resolvedArtworkURL || artworkLoaded} />
           {/* Artwork fills entire card */}
           <View style={styles.artworkContainer}>
             {resolvedArtworkURL ? (
@@ -171,14 +174,13 @@ export default function InteractiveCard({
                 accessible
                 accessibilityRole="image"
                 accessibilityLabel={track.album ? `Album art, ${track.album}` : 'Album art'}
-                source={resolvedArtworkURL}
+                source={mockCoverSource(resolvedArtworkURL)}
                 style={styles.artwork}
                 contentFit="cover"
                 // No fade in the E2E build: the audit checks the cover as
                 // it rests, from the moment it has loaded.
                 transition={tracing ? 0 : 200}
-                onLoad={() => setArtworkDone(true)}
-                onError={() => setArtworkDone(true)}
+                onLoad={() => setArtworkLoaded(true)}
               />
             ) : (
               <LinearGradient

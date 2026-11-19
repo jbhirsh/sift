@@ -1,3 +1,4 @@
+import covers from '../../src/services/mockCovers.json';
 import { MockMusicProvider, SLOW_PLAYLIST_LOAD_MS } from '../../src/services/MockMusicProvider';
 
 describe('MockMusicProvider', () => {
@@ -42,18 +43,21 @@ describe('MockMusicProvider', () => {
     }
   });
 
-  test("every library song has its album's cover, from Apple's artwork server", async () => {
+  test("every library song has its album's cover, named by a slug in the list", async () => {
     const tracks = await flushAsync(provider.loadLibrary());
+    const listed = new Set(covers.map((cover) => cover.slug));
     for (const track of tracks) {
-      expect(track.artworkURL).toMatch(
-        /^https:\/\/is1-ssl\.mzstatic\.com\/image\/thumb\/.+\/1000x1000bb\.jpg$/,
-      );
+      const slug = track.artworkURL?.replace(/^mock-cover:/, '');
+      expect(track.artworkURL).toMatch(/^mock-cover:[a-z0-9-]+$/);
+      expect(listed.has(slug as string)).toBe(true);
     }
     // Two songs off one album share its cover.
     const sour = tracks.filter((track) => track.album === 'SOUR');
     expect(sour).toHaveLength(2);
     expect(sour[0].artworkURL).toBe(sour[1].artworkURL);
     expect(new Set(tracks.map((track) => track.artworkURL)).size).toBe(tracks.length - 1);
+    // And every cover in the list is some song's.
+    expect(new Set(tracks.map((track) => track.artworkURL)).size).toBe(covers.length);
   });
 
   test('loadLibrary tracks have valid durations', async () => {

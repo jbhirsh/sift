@@ -104,6 +104,8 @@ jest.mock('../../src/services/touchOverlay', () =>
   ),
 );
 
+jest.mock('expo-file-system', () => ({ Paths: { bundle: { uri: 'file:///Sift.app/' } } }));
+
 jest.mock('../../src/hooks/useResolvedArtwork', () => ({
   useResolvedArtwork: jest.fn().mockReturnValue('https://example.com/art.jpg'),
 }));
@@ -184,6 +186,46 @@ describe('InteractiveCard', () => {
   test('artwork of a song with no album is just "Album art"', async () => {
     const { getByLabelText } = await renderCard({ ...mockTrack, album: '' });
     expect(getByLabelText('Album art').props.accessibilityRole).toBe('image');
+  });
+
+  describe('the cover marker (E2E build)', () => {
+    beforeEach(() => {
+      mockTracing = true;
+    });
+    afterEach(() => {
+      mockTracing = false;
+    });
+
+    test('a cover is shown once it has loaded, not before', async () => {
+      const { getByLabelText, queryByTestId } = await renderCard();
+      expect(queryByTestId('card-artwork-shown')).toBeNull();
+      await fireEvent(getByLabelText('Album art, Test Album'), 'load');
+      expect(queryByTestId('card-artwork-shown')).not.toBeNull();
+    });
+
+    test('a cover that fails to load is never shown', async () => {
+      const { getByLabelText, queryByTestId } = await renderCard();
+      await fireEvent(getByLabelText('Album art, Test Album'), 'error');
+      expect(queryByTestId('card-artwork-shown')).toBeNull();
+    });
+
+    test('a song with no artwork shows its placeholder at once', async () => {
+      jest.mocked(useResolvedArtwork).mockReturnValueOnce(undefined);
+      const { queryByTestId } = await renderCard({ ...mockTrack, artworkURL: undefined });
+      expect(queryByTestId('card-artwork-shown')).not.toBeNull();
+    });
+
+    test("a mock cover is drawn from the app's bundle", async () => {
+      jest.mocked(useResolvedArtwork).mockReturnValue('mock-cover:sour');
+      try {
+        const { getByLabelText } = await renderCard();
+        expect(getByLabelText('Album art, Test Album').props.source).toBe(
+          'file:///Sift.app/mock-covers/sour.jpg',
+        );
+      } finally {
+        jest.mocked(useResolvedArtwork).mockReturnValue('https://example.com/art.jpg');
+      }
+    });
   });
 
   test('renders placeholder when no artwork URL', async () => {
