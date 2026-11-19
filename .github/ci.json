@@ -92,7 +92,8 @@
     "exempt": {
       "PR visuals": "Passes every PR: visual review decides (visuals.sharedTemplate).",
       "README screenshots": "Runs as a PR closes, when there's nothing left for autofix to do.",
-      "Visual review": "Runs from main after CI and on description and auto-merge events, and fails only on what a person decides (a changed screen on a PR that merges itself), which no code change gives."
+      "Visual review": "Runs from main after CI and on description and auto-merge events, and fails only on what a person decides (a changed screen on a PR that merges itself), which no code change gives.",
+      "PR changes": "PR changes: reads the PR as data, runs none of its code."
     }
   }
 }
