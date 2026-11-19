@@ -8,8 +8,10 @@ description: >-
   Only the build job builds the app; this takes it from actions/cache, under
   the native key the check job works out, or from the build job's artifact
   when this run built it and the cache isn't there yet, puts the bundle
-  job's JavaScript into it (scripts/apply-js-bundle.sh), then launches it
-  once and quits it, so the job's own launch isn't its first. With
+  job's JavaScript and the mock library's covers into it
+  (scripts/apply-js-bundle.sh; the covers are fetched and cached below, so
+  no flow downloads one), then launches it once and quits it, so the job's
+  own launch isn't its first. With
   `maestro`, it also puts Maestro on the PATH, cached under the release
   the check job looked up (`maestro-version`).
 
@@ -34,9 +36,9 @@ inputs:
     required: true
   save-cache:
     description: >-
-      Save Maestro to the cache on a miss. Off for a mockup (ci.yml's
-      mockup_patch), whose run writes no cache: its app holds a patch on no
-      branch.
+      Save Maestro and the mock covers to the cache on a miss. Off for a
+      mockup (ci.yml's mockup_patch), whose run writes no cache: its app
+      holds a patch on no branch. It still fetches the covers it lacks.
     default: 'true'
 
 runs:
@@ -227,9 +229,42 @@ runs:
         name: sift-js-bundle
         path: build/js
 
-    - name: Put the JavaScript into the app
+    # The mock library's covers (src/services/mockCovers.json), put into the
+    # app so a flow never fetches one from Apple's artwork server: a slow
+    # download was screenshotted as a blank card, and that card became main's
+    # visual-review reference (#248). Cached under the list's hash. The fetch
+    # runs on a hit too: it downloads only what's missing but checks every
+    # file, so a corrupt cache entry fails the job here, naming the cover,
+    # and Apple changing one fails it with the command that updates the
+    # list. Dependency-free Node (no npm ci on this runner); 24 reads a .ts
+    # script as it is. Two jobs racing on a cold cache both fetch: harmless.
+    - uses: actions/setup-node@v7
+      with:
+        node-version: 24
+        package-manager-cache: false
+
+    - name: Restore the mock covers
+      id: covers-cache
+      uses: actions/cache/restore@v6
+      with:
+        path: build/mock-covers
+        key: mock-covers-${{ hashFiles('src/services/mockCovers.json') }}
+
+    - name: Fetch the mock covers
       shell: bash
-      run: scripts/apply-js-bundle.sh "$(ls -d build/e2e/*.app | head -1)" build/js
+      run: node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/fetch-mock-covers.ts build/mock-covers
+
+    - name: Save the mock covers
+      if: inputs.save-cache == 'true' && steps.covers-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v6
+      continue-on-error: true
+      with:
+        path: build/mock-covers
+        key: mock-covers-${{ hashFiles('src/services/mockCovers.json') }}
+
+    - name: Put the JavaScript and the covers into the app
+      shell: bash
+      run: scripts/apply-js-bundle.sh "$(ls -d build/e2e/*.app | head -1)" build/js build/mock-covers
 
     # Attaching the XCUITest driver to a half-booted simulator is the main
     # startup-flake source, so this blocks until SpringBoard is up.

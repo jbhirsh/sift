@@ -112,7 +112,7 @@ jobs:
               - '!LICENSE'
               - '!.github/*'
               - '!.github/workflows/!(ci).yml'
-              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh|e2e-env.sh|bundle-js.sh|apply-js-bundle.sh|app-trace.sh|build-a11y-audit.sh|machine-load.sh|job-note.sh|simulator-device.sh|settle-simulator.sh|restore-simulator.sh)'
+              - '!scripts/!(run-e2e.sh|run-a11y-audit.sh|take-screenshots.sh|take-gifs.sh|build-simulator-app.sh|e2e-env.sh|bundle-js.sh|apply-js-bundle.sh|fetch-mock-covers.ts|app-trace.sh|build-a11y-audit.sh|machine-load.sh|job-note.sh|simulator-device.sh|settle-simulator.sh|restore-simulator.sh)'
               - '!stryker.config.json'
               - '!.prettierrc.json'
               - '!.prettierignore'
