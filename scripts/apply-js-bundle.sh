@@ -8,11 +8,18 @@
 # instead, saying so. An app that was signed is signed again, ad hoc, as
 # its contents changed.
 #
-# Usage: scripts/apply-js-bundle.sh <Sift.app> <bundle-dir>
+# With a covers folder (scripts/fetch-mock-covers.ts's), its files go into
+# <Sift.app>/mock-covers/, where the E2E build reads the mock library's
+# covers from (services/mockCovers), before the signing: a file added after
+# it would break the seal.
+#
+# Usage: scripts/apply-js-bundle.sh <Sift.app> <bundle-dir> [<covers-dir>]
 set -euo pipefail
 
-APP="${1:?usage: scripts/apply-js-bundle.sh <app> <bundle-dir>}"
-BUNDLE="${2:?usage: scripts/apply-js-bundle.sh <app> <bundle-dir>}"
+USAGE="usage: scripts/apply-js-bundle.sh <app> <bundle-dir> [<covers-dir>]"
+APP="${1:?$USAGE}"
+BUNDLE="${2:?$USAGE}"
+COVERS="${3:-}"
 
 # Hermes bytecode starts with an 8-byte magic number, then its version.
 HBC_MAGIC=c61fbc03c103191f
@@ -38,6 +45,15 @@ if [ -f "$APP/EXUpdates.bundle/app.manifest" ]; then
   cp "$BUNDLE/app.manifest" "$APP/EXUpdates.bundle/app.manifest"
 else
   echo "::warning::$APP has no EXUpdates.bundle/app.manifest to replace."
+fi
+
+if [ -n "$COVERS" ]; then
+  if [ ! -d "$COVERS" ]; then
+    echo "::error::The covers folder $COVERS doesn't exist."
+    exit 1
+  fi
+  rm -rf "$APP/mock-covers"
+  cp -R "$COVERS" "$APP/mock-covers"
 fi
 
 if [ -d "$APP/_CodeSignature" ]; then
