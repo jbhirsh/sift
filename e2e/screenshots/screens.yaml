@@ -12,10 +12,12 @@ name: "Screenshots"
 # Each shot waits for its screen to stop moving: the E2E build's song clock
 # stands still (MockMusicProvider), so Sift shows the same time on every
 # run and the wait ends once the screen's own motion has.
-# A card's cover loads from Apple's artwork server, and a blank card is
-# still too, so each Sift shot first waits for the card to say its cover
-# is shown (card-artwork-shown, components/InteractiveCard): loaded, or
-# failed (a failed cover stays blank, and the compare catches it).
+# No shot depends on the network or a timer: the mock library's covers are
+# files in the app (services/mockCovers, put there by CI), so a Sift shot
+# first waits for the card to say its cover has loaded (card-artwork-shown,
+# components/InteractiveCard; a cover that fails to load never says it, and
+# the flow fails rather than photographing a blank card), and for the
+# elements that appear after an async step (the swipe hint, the Undo pill).
 - launchApp:
     # A fresh start without a reinstall (services/e2eReset).
     arguments:
@@ -49,6 +51,12 @@ name: "Screenshots"
     visible:
       id: "card-artwork-shown"
     timeout: 30000
+# Shown after an async read of what the hint remembers; it stays until the
+# first decision (SiftResetState clears it).
+- extendedWaitUntil:
+    visible:
+      id: "swipe-hint"
+    timeout: 10000
 - waitForAnimationToEnd
 - takeScreenshot: ${MODE}-03-sift
 
@@ -68,11 +76,16 @@ name: "Screenshots"
       id: "stat-skipped"
       text: "1 skipped"
     timeout: 10000
-# The third card's cover, which 05's sheet also leaves in view.
+# The third card's cover, which 05's sheet also leaves in view, and the Undo
+# pill, which stands in for the REMOVE/SKIP/KEEP words while it shows.
 - extendedWaitUntil:
     visible:
       id: "card-artwork-shown"
     timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "undo-pill"
+    timeout: 10000
 - waitForAnimationToEnd
 - takeScreenshot: ${MODE}-04-sift-undo
 
