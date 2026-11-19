@@ -1,0 +1,13 @@
+{
+  "id": 43960039859,
+  "number": 730,
+  "workflow": "CI",
+  "branch": "no-fixed-waits-flows",
+  "sha": "9a02a1595073bd4b0a7a9b1638d5a3ef9ebc0be3",
+  "created": "2026-11-16T21:26:02Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/43960039859",
+  "jobs": [
+    "accessibility-audit",
+    "screenshots-and-gifs"
+  ]
+}

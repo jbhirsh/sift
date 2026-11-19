@@ -1,0 +1,14 @@
+{
+  "id": 44472093434,
+  "number": 764,
+  "workflow": "CI",
+  "branch": "claude/mock-covers-from-ci",
+  "sha": "8e56e421d0ad2edf0f7db17b4afbf6a257e59c52",
+  "created": "2026-11-19T06:25:46Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/44472093434",
+  "jobs": [
+    "accessibility-audit",
+    "e2e-tests-maestro",
+    "screenshots-and-gifs"
+  ]
+}

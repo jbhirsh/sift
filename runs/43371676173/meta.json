@@ -1,0 +1,14 @@
+{
+  "id": 43371676173,
+  "number": 685,
+  "workflow": "CI",
+  "branch": "claude/hopeful-archimedes-d7r0jg",
+  "sha": "c82a431477e091dc8b512b8d6b01a14efd11a9f3",
+  "created": "2026-11-13T05:23:07Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/43371676173",
+  "jobs": [
+    "accessibility-audit",
+    "e2e-tests-maestro",
+    "screenshots-and-gifs"
+  ]
+}

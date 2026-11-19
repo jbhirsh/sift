@@ -1,0 +1,14 @@
+{
+  "id": 44435246561,
+  "number": 759,
+  "workflow": "CI",
+  "branch": "dependabot/npm_and_yarn/security-updates-a6beeddc84",
+  "sha": "f76c22845842d4d147492d94019791d50c25ee3d",
+  "created": "2026-11-19T01:13:27Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/44435246561",
+  "jobs": [
+    "accessibility-audit",
+    "e2e-tests-maestro",
+    "screenshots-and-gifs"
+  ]
+}

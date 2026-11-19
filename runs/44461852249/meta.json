@@ -1,0 +1,12 @@
+{
+  "id": 44461852249,
+  "number": 762,
+  "workflow": "CI",
+  "branch": "main",
+  "sha": "01107abd36bcf86ac369d3c6f2b7e67aecbf50ba",
+  "created": "2026-11-19T04:57:47Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/44461852249",
+  "jobs": [
+    "screenshots-and-gifs"
+  ]
+}

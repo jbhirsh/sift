@@ -1,0 +1,14 @@
+{
+  "id": 43720414698,
+  "number": 707,
+  "workflow": "CI",
+  "branch": "no-fixed-waits-app",
+  "sha": "7a80ea9c1b58e90d13b864f56e41b47a0efeb7a3",
+  "created": "2026-11-15T13:42:42Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/43720414698",
+  "jobs": [
+    "accessibility-audit",
+    "e2e-tests-maestro",
+    "screenshots-and-gifs"
+  ]
+}
