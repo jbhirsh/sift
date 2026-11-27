@@ -65,7 +65,7 @@ name: "GIF: swipe to keep, skip, undo"
       text: "0 skipped"
     timeout: 10000
 # The end hold, for the viewer: a wait for an element no screen has, which
-# only its 1.5 s ends (ci's gif/video.mjs keeps 1.5 s after the last touch).
+# only its 1.5 s ends (ci's gif/video.ts keeps 1.5 s after the last touch).
 - extendedWaitUntil:
     visible:
       id: "gif-end-hold"

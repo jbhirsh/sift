@@ -1,6 +1,6 @@
 // `npm run pr-gifs -- <pr> [options]`: a PR's before/after GIFs, made
 // by the GIF tool in jbhirsh/ci, which this app shares with the owner's
-// other apps (gif/videos.mjs there says what it does and which options it
+// other apps (gif/videos.ts there says what it does and which options it
 // takes; this app's settings for it are the `gif` key of .github/ci.json).
 // What it turns into GIFs stays here: CI records each scenario in e2e/gifs
 // on the Simulator, touches drawn (components/TouchOverlay), as a video

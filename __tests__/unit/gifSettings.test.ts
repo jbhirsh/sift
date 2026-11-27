@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { COLORS } from '../../src/theme';
 
-// The PR GIF tool (jbhirsh/ci's gif/videos.mjs, set up by .github/ci.json's
+// The PR GIF tool (jbhirsh/ci's gif/videos.ts, set up by .github/ci.json's
 // `gif` key) cuts the waits between touches by finding the ring
 // components/TouchOverlay draws, by its colour.
 const settings: unknown = JSON.parse(
