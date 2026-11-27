@@ -10,7 +10,8 @@
 // This only fetches the tool and runs it: it makes sure jbhirsh/ci is cloned
 // beside this checkout, as ../ci (cloned if missing, `git pull --ff-only` if
 // there, so it follows main as CI does; a pull that fails, offline say, runs
-// what's there), then runs ../ci/gif/cli.mjs with APP_ROOT set to this
+// what's there), then runs its command line (../ci/gif/cli.mjs, or
+// gif/cli.ts once that is the entry, below) with APP_ROOT set to this
 // checkout. CI_TOOLING_DIR points it at another clone instead, left as it is
 // (one being changed, say). Node runs this file as it is (it strips the
 // types); its command line is main(), run only when Node runs the file
@@ -50,9 +51,16 @@ export function prGifs(input: {
       return 1;
     }
   }
-  const cli = path.join(tooling, 'gif', 'cli.mjs');
+  // The tool's entry is gif/cli.mjs while jbhirsh/ci holds it: until then
+  // gif/cli.ts is only the module cli.mjs loads, and run alone does nothing.
+  // ci#180 (jbhirsh/ci#155's cleanup) deletes cli.mjs and, in the same
+  // change, makes cli.ts the entry, so a clone without cli.mjs runs cli.ts
+  // (Node strips its types, as it does this file's). Once ci's main has no
+  // cli.mjs, run only cli.ts and name it in the message below.
+  const mjs = path.join(tooling, 'gif', 'cli.mjs');
+  const cli = existsSync(mjs) ? mjs : path.join(tooling, 'gif', 'cli.ts');
   if (!existsSync(cli)) {
-    say(`gif: ${cli} isn't there: is ${tooling} a clone of jbhirsh/ci?`);
+    say(`gif: ${mjs} isn't there: is ${tooling} a clone of jbhirsh/ci?`);
     return 1;
   }
   const result = spawnSync(process.execPath, [cli, ...args], {

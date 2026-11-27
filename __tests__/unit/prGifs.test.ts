@@ -1,7 +1,8 @@
 // scripts/pr-gifs.ts fetches jbhirsh/ci beside the checkout (as ../ci) and
 // hands over to its GIF tool. Each test runs it on a scratch checkout, with
 // a fake git on PATH (no network, and nothing touches a real ../ci) and a
-// fake gif/cli.mjs that writes what it was given to FAKE_OUT.
+// fake gif/cli.mjs (or gif/cli.ts, the entry once jbhirsh/ci drops cli.mjs)
+// that writes what it was given to FAKE_OUT.
 import {
   copyFileSync,
   existsSync,
@@ -21,13 +22,14 @@ writeFileSync(process.env.FAKE_OUT, JSON.stringify({ args: process.argv.slice(2)
 process.exit(Number(process.env.FAKE_STATUS || 0));
 `;
 
-// Logs each call; a clone puts the fake GIF tool where it was asked to;
+// Logs each call; a clone puts the fake GIF tool where it was asked to, as
+// gif/cli.mjs, or as FAKE_ENTRY when that names another file;
 // FAKE_GIT=fail makes every call fail.
 const FAKE_GIT = `#!/bin/sh
 echo "$*" >> "$GIT_LOG"
 [ "$FAKE_GIT" = fail ] && exit 1
 if [ "$1" = clone ]; then
-  mkdir -p "$4/gif" && cp "$FAKE_CLI_FILE" "$4/gif/cli.mjs"
+  mkdir -p "$4/gif" && cp "$FAKE_CLI_FILE" "$4/gif/\${FAKE_ENTRY:-cli.mjs}"
 fi
 exit 0
 `;
@@ -51,11 +53,15 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true });
 });
 
-/** A clone of jbhirsh/ci at `at`, holding the fake GIF tool. */
-function cloneAt(at: string): void {
+/**
+ * A clone of jbhirsh/ci at `at`, holding the fake GIF tool as `entry`:
+ * gif/cli.mjs as ci's main has it today, or gif/cli.ts alone, as it will
+ * once ci#180 deletes cli.mjs.
+ */
+function cloneAt(at: string, entry: 'cli.mjs' | 'cli.ts' = 'cli.mjs'): void {
   mkdirSync(`${at}/.git`, { recursive: true });
   mkdirSync(`${at}/gif`, { recursive: true });
-  copyFileSync(`${dir}/cli.mjs`, `${at}/gif/cli.mjs`);
+  copyFileSync(`${dir}/cli.mjs`, `${at}/gif/${entry}`);
 }
 
 /** The fake's environment, over this process's, with `env` on top. */
@@ -129,6 +135,36 @@ test('stops when the folder holds no GIF tool', () => {
     `gif: ${dir}/empty/gif/cli.mjs isn't there: is ${dir}/empty a clone of jbhirsh/ci?`,
   ]);
   expect(result.status).toBe(1);
+});
+
+test('runs gif/cli.ts from a fresh clone that has no gif/cli.mjs', () => {
+  const result = run(['42'], { FAKE_ENTRY: 'cli.ts' });
+  expect(result.git).toEqual([`clone --quiet https://github.com/jbhirsh/ci ${ci}`]);
+  expect(result.tool).toEqual({ args: ['42'], appRoot: app });
+  expect(result.status).toBe(0);
+});
+
+test('runs gif/cli.ts when the clone has no gif/cli.mjs', () => {
+  cloneAt(ci, 'cli.ts');
+  const result = run(['42', '--side-by-side']);
+  expect(result.tool).toEqual({ args: ['42', '--side-by-side'], appRoot: app });
+  expect(result.said).toEqual([]);
+  expect(result.status).toBe(0);
+});
+
+test('runs gif/cli.mjs while the clone has it, as its cli.ts is then only a module', () => {
+  cloneAt(ci);
+  // As ci's main has it beside cli.mjs: exports main, and run alone does nothing.
+  writeFileSync(`${ci}/gif/cli.ts`, 'export async function main() {}\n');
+  const result = run(['42']);
+  expect(result.tool).toEqual({ args: ['42'], appRoot: app });
+  expect(result.said).toEqual([]);
+  expect(result.status).toBe(0);
+});
+
+test('exits as the GIF tool did, run as gif/cli.ts too', () => {
+  cloneAt(ci, 'cli.ts');
+  expect(run(['42'], { FAKE_STATUS: '4' }).status).toBe(4);
 });
 
 test('exits as the GIF tool did', () => {
