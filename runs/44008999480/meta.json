@@ -1,0 +1,14 @@
+{
+  "id": 44008999480,
+  "number": 753,
+  "workflow": "CI",
+  "branch": "maestro-version-on-ubuntu",
+  "sha": "5c123996c5d68a8fe9b6362e09f2c8f96df8aa24",
+  "created": "2026-11-17T03:16:14Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/44008999480",
+  "jobs": [
+    "accessibility-audit",
+    "e2e-tests-maestro",
+    "screenshots-and-gifs"
+  ]
+}

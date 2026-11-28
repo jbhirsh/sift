@@ -1,0 +1,14 @@
+{
+  "id": 43542679565,
+  "number": 697,
+  "workflow": "CI",
+  "branch": "pr-pictures",
+  "sha": "b409d36f97ac22f4ab7bd92951ebb6421203300a",
+  "created": "2026-11-14T01:47:38Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/43542679565",
+  "jobs": [
+    "accessibility-audit",
+    "e2e-tests-maestro",
+    "screenshots-and-gifs"
+  ]
+}

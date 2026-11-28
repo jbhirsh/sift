@@ -1,0 +1,12 @@
+{
+  "id": 77,
+  "number": 77,
+  "workflow": "CI",
+  "branch": "feat",
+  "sha": "abcdef1234",
+  "created": "2026-10-29T11:00:00Z",
+  "url": "https://gh/run/77",
+  "jobs": [
+    "check"
+  ]
+}

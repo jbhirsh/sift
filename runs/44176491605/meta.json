@@ -1,0 +1,14 @@
+{
+  "id": 44176491605,
+  "number": 755,
+  "workflow": "CI",
+  "branch": "claude/remove-visual-baselines",
+  "sha": "31690431b0c739b671b101cba41f891d5d62e086",
+  "created": "2026-11-17T21:07:31Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/44176491605",
+  "jobs": [
+    "accessibility-audit",
+    "e2e-tests-maestro",
+    "screenshots-and-gifs"
+  ]
+}

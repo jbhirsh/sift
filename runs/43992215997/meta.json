@@ -1,0 +1,14 @@
+{
+  "id": 43992215997,
+  "number": 746,
+  "workflow": "CI",
+  "branch": "a11y-wait-quiet",
+  "sha": "bef8002a995cfd461f9cbf05166a5baf13b53492",
+  "created": "2026-11-17T01:00:48Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/43992215997",
+  "jobs": [
+    "accessibility-audit",
+    "e2e-tests-maestro",
+    "screenshots-and-gifs"
+  ]
+}

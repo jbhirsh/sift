@@ -1,0 +1,14 @@
+{
+  "id": 46063561989,
+  "number": 781,
+  "workflow": "CI",
+  "branch": "claude/gif-cli-ts-fallback",
+  "sha": "2156526096cd144300a56b8367a76639b8b65e09",
+  "created": "2026-11-27T20:25:41Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/46063561989",
+  "jobs": [
+    "accessibility-audit",
+    "e2e-tests-maestro",
+    "screenshots-and-gifs"
+  ]
+}

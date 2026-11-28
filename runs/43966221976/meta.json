@@ -1,0 +1,14 @@
+{
+  "id": 43966221976,
+  "number": 732,
+  "workflow": "CI",
+  "branch": "claude/visual-review-opt-in",
+  "sha": "5e5afaf0a9f4437061114b99a49a06885a2170d2",
+  "created": "2026-11-16T22:03:15Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/43966221976",
+  "jobs": [
+    "accessibility-audit",
+    "e2e-tests-maestro",
+    "screenshots-and-gifs"
+  ]
+}

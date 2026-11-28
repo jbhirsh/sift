@@ -1,0 +1,14 @@
+{
+  "id": 41091865349,
+  "number": 672,
+  "workflow": "CI",
+  "branch": "claude/brave-ritchie-k055tx",
+  "sha": "bf9e6f4e6c666656d4308bd02610e0ea7cdb6e7e",
+  "created": "2026-10-30T16:39:24Z",
+  "url": "https://github.com/jbhirsh/sift/actions/runs/41091865349",
+  "jobs": [
+    "accessibility-audit",
+    "e2e-tests-maestro",
+    "screenshots-and-gifs"
+  ]
+}
